@@ -1,12 +1,11 @@
-<!-- SendOff wordmark — reference markup.
-     Copy the .so-wordmark block into any page. Styles live in brand/tokens.css.
+<!-- SendOff wordmark — reference.
+     The artwork lives in sendoff-wordmark.svg as outlined paths. Inline its
+     contents inside an element with .so-wordmark and the two CSS vars drive
+     the colours; nothing needs a webfont.
 
-     Two things control it:
-       .so-on-dark / .so-on-light / .so-on-beam  → which signal value is used
-       --so-wm-size                              → everything scales off this
-
-     The SVG strokes read var(--so-signal), so the mark recolours with the
-     ground preset and never needs a second copy of the markup.
+     Ground presets from tokens.css set the right pair automatically:
+       .so-on-dark   cream letters, bright teal signal
+       .so-on-light  near-black letters, deep teal signal
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -14,7 +13,6 @@
 <meta charset="UTF-8">
 <title>SendOff wordmark — reference</title>
 <link rel="icon" href="sendoff-favicon.svg" type="image/svg+xml">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@1,700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tokens.css">
 <style>
   body { margin: 0; font-family: var(--so-font-body); }
@@ -27,82 +25,28 @@
   }
   .demo.dark .label  { color: var(--so-ink-on-dark); }
   .demo.light .label { color: var(--so-ink-on-light); }
+  img.mark { height: 64px; width: auto; display: block; }
 </style>
 </head>
 <body>
 
-<!-- ============ ON DARK ============ -->
 <div class="demo dark so-on-dark">
-  <span class="label">on dark · 96px</span>
-
-  <div class="so-wordmark" style="--so-wm-size: 96px;">
-    <span>Send</span>
-    <svg class="so-o" viewBox="0 0 100 100" aria-label="SendOff">
-      <ellipse cx="50" cy="50" rx="34" ry="42" fill="none"
-               stroke="var(--so-signal)" stroke-width="16" transform="rotate(-13 50 50)"/>
-      <ellipse cx="45" cy="43" rx="12" ry="14"
-               fill="var(--so-signal)" transform="rotate(-13 45 43)"/>
-    </svg>
-    <span>ff</span>
-    <span class="so-pulse" aria-hidden="true">
-      <i class="so-bar"></i>
-      <svg class="so-spike" viewBox="0 0 130 100" preserveAspectRatio="xMidYMid meet">
-        <path d="M 0 50 L 14 50 L 22 38 L 30 48 L 40 30 L 48 44 L 58 8 L 64 94
-                 L 72 34 L 82 46 L 92 32 L 100 46 L 110 50 L 130 50"
-              fill="none" stroke="var(--so-signal)" stroke-width="14"
-              stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <i class="so-bar tail"></i>
-    </span>
-  </div>
-
-  <div class="so-wordmark tight" style="--so-wm-size: 34px;">
-    <span>Send</span>
-    <svg class="so-o" viewBox="0 0 100 100" aria-label="SendOff">
-      <ellipse cx="50" cy="50" rx="34" ry="42" fill="none"
-               stroke="var(--so-signal)" stroke-width="16" transform="rotate(-13 50 50)"/>
-      <ellipse cx="45" cy="43" rx="12" ry="14"
-               fill="var(--so-signal)" transform="rotate(-13 45 43)"/>
-    </svg>
-    <span>ff</span>
-    <span class="so-pulse" aria-hidden="true">
-      <i class="so-bar"></i>
-      <svg class="so-spike" viewBox="0 0 130 100" preserveAspectRatio="xMidYMid meet">
-        <path d="M 0 50 L 14 50 L 22 38 L 30 48 L 40 30 L 48 44 L 58 8 L 64 94
-                 L 72 34 L 82 46 L 92 32 L 100 46 L 110 50 L 130 50"
-              fill="none" stroke="var(--so-signal)" stroke-width="14"
-              stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <i class="so-bar tail"></i>
-    </span>
-  </div>
+  <span class="label">on dark</span>
+  <span class="so-wordmark" style="--so-wm-size: 96px;"><!-- paste sendoff-wordmark.svg contents here --></span>
+  <img class="mark" src="sendoff-icon-dark-bg.svg" alt="SendOff mark">
 </div>
 
-<!-- ============ ON LIGHT ============ -->
 <div class="demo light so-on-light">
-  <span class="label">on light · 96px</span>
-
-  <div class="so-wordmark" style="--so-wm-size: 96px;">
-    <span>Send</span>
-    <svg class="so-o" viewBox="0 0 100 100" aria-label="SendOff">
-      <ellipse cx="50" cy="50" rx="34" ry="42" fill="none"
-               stroke="var(--so-signal)" stroke-width="16" transform="rotate(-13 50 50)"/>
-      <ellipse cx="45" cy="43" rx="12" ry="14"
-               fill="var(--so-signal)" transform="rotate(-13 45 43)"/>
-    </svg>
-    <span>ff</span>
-    <span class="so-pulse" aria-hidden="true">
-      <i class="so-bar"></i>
-      <svg class="so-spike" viewBox="0 0 130 100" preserveAspectRatio="xMidYMid meet">
-        <path d="M 0 50 L 14 50 L 22 38 L 30 48 L 40 30 L 48 44 L 58 8 L 64 94
-                 L 72 34 L 82 46 L 92 32 L 100 46 L 110 50 L 130 50"
-              fill="none" stroke="var(--so-signal)" stroke-width="14"
-              stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <i class="so-bar tail"></i>
-    </span>
-  </div>
+  <span class="label">on light</span>
+  <span class="so-wordmark" style="--so-wm-size: 96px;"><!-- paste sendoff-wordmark.svg contents here --></span>
+  <img class="mark" src="sendoff-icon-light-bg.svg" alt="SendOff mark">
 </div>
+
+<p style="padding: 24px 40px; font-family: var(--so-font-mono); font-size: 12px; color: var(--so-mute);">
+  For a quick look at the shipped artwork on its own:
+  <a href="sendoffprimaryonDark.svg" style="color: var(--so-signal-on-dark);">onDark</a> ·
+  <a href="sendoffprimaryonLight.svg" style="color: var(--so-signal-on-dark);">onLight</a>
+</p>
 
 </body>
 </html>
