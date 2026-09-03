@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>SendOff</title>
 <link rel="icon" href="brand/sendoff-favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0a0f14" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=19">
+<link rel="stylesheet" href="lib/race-theme.css?v=20">
 <style>
   .cards {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -102,13 +103,13 @@
   }
   .empty .cta {
     display: inline-block; padding: 14px 22px;
-    background: var(--accent); color: #1a0a04;
+    background: var(--accent); color: var(--accent-ink);
     font-family: 'JetBrains Mono', monospace; font-weight: 700;
     font-size: 12px; letter-spacing: 0.15em; text-transform: uppercase;
     border-radius: 4px; text-decoration: none;
     border: 1px solid var(--accent);
   }
-  .empty .cta:hover { background: #ff7d54; }
+  .empty .cta:hover { background: var(--accent-hot); }
 
   .hub-actions {
     margin-bottom: 28px; display: flex; gap: 12px; flex-wrap: wrap;
@@ -120,10 +121,10 @@
     font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700;
     letter-spacing: 0.18em; text-transform: uppercase;
     padding: 3px 7px; border-radius: 2px;
-    background: rgba(255, 107, 61, 0.15); color: var(--accent);
+    background: rgba(15, 184, 191, 0.15); color: var(--accent);
     border: 1px solid var(--accent);
   }
-  .card-badge.viewer { background: rgba(94, 200, 255, 0.12); color: var(--blue); border-color: var(--blue); }
+  .card-badge.viewer { background: rgba(138, 169, 208, 0.12); color: var(--blue); border-color: var(--blue); }
 </style>
 </head>
 <body>
@@ -145,7 +146,7 @@
   <div id="repo-link">—</div>
 </footer>
 
-<script src="lib/race-core.js?v=19"></script>
+<script src="lib/race-core.js?v=20"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
