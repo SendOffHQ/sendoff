@@ -1,0 +1,109 @@
+/* SendOff brand tokens.
+ *
+ * Import before race-theme.css, or paste these into its :root block.
+ *
+ * The two signal values are not interchangeable. A colour reads heavier on a
+ * light ground and lighter on a dark one, so each ground gets its own value to
+ * keep the mark's perceived weight constant. Use --signal-on-dark on the app's
+ * dark surfaces and --signal-on-light on cream/white ones.
+ */
+
+:root {
+  /* ---- Grounds ---- */
+  --so-void:       #0A0F14;  /* app ground */
+  --so-panel:      #121820;  /* raised surface */
+  --so-panel-2:    #182029;
+  --so-line:       #253340;  /* hairlines on dark */
+  --so-icon-tile:  #141E25;  /* favicon / app-icon tile */
+  --so-cream:      #F5F2EA;  /* light ground: print, marketing, partner pages */
+  --so-cream-2:    #ECE7DD;  /* wordmark letters on dark */
+
+  /* ---- Signal: one hue, two values ---- */
+  --so-signal-on-dark:   #10BFC8;  /* 8.4:1 on void */
+  --so-signal-on-light:  #0F8E97;  /* 3.9:1 on white — graphics & large type */
+
+  /* ---- Support ---- */
+  --so-beam:   #5EFDF6;  /* glow ONLY: the one live number, focus rings, gradient tops.
+                            1.2:1 with white — never use as a surface behind text. */
+  --so-deep:   #0A5F68;  /* solid surface that holds white text at 7.3:1 (AAA) */
+  --so-deeper: #083F47;  /* deep gradient stop, pressed states */
+  --so-warm:   #FFB07A;  /* secondary accent: warnings, caps, "approaching cutoff" */
+
+  /* ---- Ink ---- */
+  --so-ink-on-dark:   #ECE7DD;
+  --so-ink-on-light:  #121A1F;
+  --so-mute:          #7A8D99;
+  --so-faint:         #4E606D;
+
+  /* ---- Semantic (kept separate from the accent) ---- */
+  --so-on-pace:  #6EE7A8;
+  --so-tight:    #FFB07A;
+  --so-cutoff:   #E5484D;
+
+  /* ---- Type ---- */
+  --so-font-display: "Anta", ui-sans-serif, system-ui, sans-serif;
+  --so-font-body:    "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --so-font-mono:    "DM Mono", ui-monospace, "SF Mono", monospace;
+  --so-font-wordmark:"Poppins", "Trebuchet MS", ui-sans-serif, sans-serif;
+}
+
+/* Ground presets — set one of these on any container and the wordmark
+   component below picks up the right pair automatically. */
+.so-on-dark {
+  --so-ink:    var(--so-ink-on-dark);
+  --so-signal: var(--so-signal-on-dark);
+}
+.so-on-light {
+  --so-ink:    var(--so-ink-on-light);
+  --so-signal: var(--so-signal-on-light);
+}
+/* On the beam gradient the signal steps up once more so it stays visible. */
+.so-on-beam {
+  --so-ink:    var(--so-ink-on-dark);
+  --so-signal: var(--so-beam);
+}
+
+/* ------------------------------------------------------------------
+   Wordmark component
+   Scales entirely off --so-wm-size. Markup lives in wordmark.html.
+   ------------------------------------------------------------------ */
+.so-wordmark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--so-font-wordmark);
+  font-style: italic;
+  font-weight: 700;
+  font-size: var(--so-wm-size, 40px);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--so-ink, var(--so-ink-on-dark));
+  padding-bottom: calc(var(--so-wm-size, 40px) * 0.30);
+  white-space: nowrap;
+}
+/* Use .tight where vertical space is short (app headers, nav bars). */
+.so-wordmark.tight { padding-bottom: calc(var(--so-wm-size, 40px) * 0.26); }
+
+.so-wordmark .so-o {
+  width:  calc(var(--so-wm-size, 40px) * 0.80);
+  height: calc(var(--so-wm-size, 40px) * 0.80);
+  flex: 0 0 auto;
+  margin: 0 calc(var(--so-wm-size, 40px) * -0.045);
+  display: block;
+  overflow: visible;
+}
+.so-wordmark .so-pulse {
+  position: absolute;
+  left:  calc(var(--so-wm-size, 40px) * -0.12);
+  right: calc(var(--so-wm-size, 40px) * -0.12);
+  bottom: 0;
+  height: calc(var(--so-wm-size, 40px) * 0.46);
+  overflow: visible;
+}
+
+/* Below ~40px the pulse line collapses; hide it and let the ring carry the
+   mark, or switch to brand/sendoff-icon-*.svg entirely. */
+@media (max-width: 480px) {
+  .so-wordmark.responsive .so-pulse { display: none; }
+  .so-wordmark.responsive { padding-bottom: 0; }
+}
