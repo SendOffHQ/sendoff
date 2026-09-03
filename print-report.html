@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Print Report</title>
+<title>SendOff · Race Report</title>
+<link rel="icon" href="brand/sendoff-favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=16">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Inter:wght@400;500;600&family=Poppins:ital,wght@1,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lib/race-theme.css?v=17">
 <style>
   /* Screen styles (reuse dashboard) */
   .controls {
@@ -173,6 +174,12 @@
     }
     body { padding: 0 !important; }
     .controls, .nav-link, .pulse, .brand-meta a { display: none !important; }
+    /* Keep the wordmark on the printout, in its light-ground values. */
+    .brand-meta a.wordmark {
+      display: inline-flex !important;
+      --wm-signal: #0f8e97;
+      --wm-letter: #121a1f;
+    }
     header.site { padding-bottom: 10pt; margin-bottom: 12pt; border-bottom: 1px solid #999; }
     h1.site { color: #111 !important; font-size: 22pt; }
     h1.site em { color: #c44a18 !important; }
@@ -236,7 +243,7 @@
 <header class="site">
   <div class="brand">
     <div class="brand-meta">
-      <span>Race Report</span><span>·</span>
+      <a class="wordmark" href="index.html" aria-label="SendOff — home"><span>Send</span><svg class="wm-o" viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="50" cy="50" rx="33" ry="41" fill="none" stroke="var(--wm-signal)" stroke-width="15" transform="rotate(-13 50 50)"/><ellipse cx="45" cy="43" rx="11" ry="13" fill="var(--wm-signal)" transform="rotate(-13 45 43)"/></svg><span>ff</span><svg class="wm-pulse" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><path d="M 8 74 L 330 74 L 356 52 L 374 68 L 400 40 L 418 60 L 442 8 L 452 96 L 466 46 L 486 62 L 510 44 L 532 66 L 560 74 L 992 74" fill="none" stroke="var(--wm-signal)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg></a><span>·</span><span>Race Report</span><span>·</span>
       <a href="#" id="back-link" style="color: var(--accent); text-decoration: none;">← Race</a>
     </div>
     <h1 class="site" id="race-title">Loading…</h1>
@@ -261,7 +268,7 @@
   <div>Auto-generated · race-dashboard hub</div>
 </footer>
 
-<script src="lib/race-core.js?v=16"></script>
+<script src="lib/race-core.js?v=17"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -418,7 +425,7 @@
       data = await dataRes.json();
       gpxPts = await loadGpx();
 
-      document.title = `${cfg.name} · Report`;
+      document.title = `${cfg.name} · Report · SendOff`;
       document.getElementById('race-title').innerHTML = cfg.name.replace(/(\w+)$/, '<em>$1</em>');
       renderCutoffs();
 

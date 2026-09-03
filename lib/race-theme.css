@@ -14,7 +14,57 @@
   --yellow: #f5c451;
   --red: #ff5959;
   --blue: #5ec8ff;
+
+  /* SendOff brand — see brand/README.md. One hue, two values: the signal
+     reads heavier on light grounds, so each ground gets its own. */
+  --signal: #10bfc8;          /* on dark grounds (the app) */
+  --signal-on-light: #0f8e97; /* on cream / white (print, marketing) */
+  --beam: #5efdf6;            /* glow only — 1.2:1 on white, never a surface */
 }
+
+/* ---------- SendOff wordmark ----------
+   Everything scales off --wm-size. The SVG strokes read var(--wm-signal) so
+   the mark recolours with its container instead of needing a second copy. */
+.wordmark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  font-family: 'Poppins', 'Trebuchet MS', sans-serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: var(--wm-size, 26px);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  --wm-signal: var(--signal);
+  color: var(--wm-letter, var(--text));
+  padding-bottom: calc(var(--wm-size, 26px) * 0.26);
+  white-space: nowrap;
+  text-transform: none;
+  text-decoration: none;
+}
+.wordmark .wm-o {
+  width: calc(var(--wm-size, 26px) * 0.80);
+  height: calc(var(--wm-size, 26px) * 0.80);
+  flex: 0 0 auto;
+  margin: 0 calc(var(--wm-size, 26px) * -0.045);
+  display: block;
+  overflow: visible;
+}
+.wordmark .wm-pulse {
+  position: absolute;
+  left: calc(var(--wm-size, 26px) * -0.10);
+  right: calc(var(--wm-size, 26px) * -0.10);
+  bottom: 0;
+  height: calc(var(--wm-size, 26px) * 0.42);
+  overflow: visible;
+}
+a.wordmark:hover { --wm-signal: var(--beam); }
+a.wordmark:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 4px;
+}
+/* Header lockup: nudges the letters onto the meta line's baseline. */
+.brand-meta .wordmark { --wm-size: 26px; margin-right: 2px; }
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body {
   background: var(--bg);
