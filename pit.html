@@ -678,13 +678,13 @@
     } else if (next.state === 'in-pit') {
       const def = Race.course.legAt(cfg, next.nextLegIndex);
       buttonLabel = def && def.toAid
-        ? `Sign Out · ${def.fromAid || '?'} → ${def.toAid}`
-        : `Sign Out · Start ${def ? def.name : 'leg'}`;
+        ? `Send Off · ${def.fromAid || '?'} → ${def.toAid}`
+        : `Send Off · Start ${def ? def.name : 'leg'}`;
     } else {
       const def = Race.course.legAt(cfg, 1);
       buttonLabel = def && def.toAid
-        ? `Sign Out · Start (${def.toAid})`
-        : `Sign Out · Start ${def ? def.name : 'Lap 1'}`;
+        ? `Send Off · Start (${def.toAid})`
+        : `Send Off · Start ${def ? def.name : 'Lap 1'}`;
     }
 
     const since = next.lastTs || '';
