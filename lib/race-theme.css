@@ -17,75 +17,35 @@
 
   /* SendOff brand — see brand/README.md. One hue, two values: the signal
      reads heavier on light grounds, so each ground gets its own. */
-  --signal: #10bfc8;          /* on dark grounds (the app) */
-  --signal-on-light: #0f8e97; /* on cream / white (print, marketing) */
+  --signal: #0fb8bf;          /* on dark grounds (the app) */
+  --signal-on-light: #0a8b92; /* on cream / white (print, marketing) */
   --beam: #5efdf6;            /* glow only — 1.2:1 on white, never a surface */
 }
 
 /* ---------- SendOff wordmark ----------
-   Everything scales off --wm-size. The SVG strokes read var(--wm-signal) so
-   the mark recolours with its container instead of needing a second copy. */
+   brand/sendoff-wordmark.svg inlined. Outlined paths, so no webfont needed.
+   Height is set by --wm-size; the two colours come from CSS vars the SVG
+   reads, so one copy of the markup serves every ground. */
 .wordmark {
-  position: relative;
   display: inline-flex;
   align-items: center;
-  font-family: 'Poppins', 'Trebuchet MS', sans-serif;
-  font-style: italic;
-  font-weight: 700;
-  font-size: var(--wm-size, 26px);
-  line-height: 1;
-  letter-spacing: -0.03em;
-  --wm-signal: var(--signal);
-  color: var(--wm-letter, var(--text));
-  padding-bottom: calc(var(--wm-size, 26px) * 0.26);
-  white-space: nowrap;
-  text-transform: none;
+  line-height: 0;
   text-decoration: none;
+  --wm-signal: var(--signal);
+  --wm-letter: var(--text);
 }
-.wordmark .wm-o {
-  width: 0.95em;
-  height: 0.95em;
-  flex: 0 0 auto;
-  margin: 0 -0.055em;
-  display: block;
-  overflow: visible;
-}
-/* The pulse is a flex row: two CSS bars that stretch to whatever width the
-   lockup happens to be, with a fixed-aspect SVG spike between them. Drawing
-   the flat runs in CSS is what keeps the spike from being squashed — an SVG
-   stretched across the full width would distort it. */
-.wordmark .wm-pulse {
-  position: absolute;
-  left: -0.08em;
-  right: -0.08em;
-  bottom: 0;
-  height: 0.40em;
-  display: flex;
-  align-items: center;
-}
-.wordmark .wm-bar {
-  flex: 1 1 auto;
-  height: 0.058em;
-  min-height: 1.5px;
-  background: var(--wm-signal);
-  border-radius: 999px;
-}
-.wordmark .wm-bar.tail { flex-grow: 1.4; }
-.wordmark .wm-spike {
-  height: 100%;
+.wordmark svg {
+  height: var(--wm-size, 30px);
   width: auto;
-  flex: 0 0 auto;
   display: block;
-  margin: 0 -0.5px;      /* close the seam against the bars */
   overflow: visible;
 }
 a.wordmark:hover { --wm-signal: var(--beam); }
-a.wordmark:focus-visible {
-  outline: 2px solid var(--signal);
-  outline-offset: 4px;
-}
-/* Header lockup: nudges the letters onto the meta line's baseline. */
-.brand-meta .wordmark { --wm-size: 26px; margin-right: 2px; }
+a.wordmark:focus-visible { outline: 2px solid var(--signal); outline-offset: 4px; }
+/* On light grounds flip both values. */
+.wordmark.on-light { --wm-signal: var(--signal-on-light); --wm-letter: #0d1117; }
+.brand-meta .wordmark { --wm-size: 30px; }
+
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body {
   background: var(--bg);

@@ -1,72 +1,72 @@
 # SendOff brand assets
 
-Everything the app needs to render the identity. Import `tokens.css`, use one of
-the ground presets, drop in the wordmark markup or an icon SVG.
+The wordmark and mark as supplied, plus the tokens and component styles the app
+uses to render them.
 
 ## Files
 
 | File | Use |
 |---|---|
-| `tokens.css` | Colour + type tokens, ground presets, wordmark component styles |
-| `wordmark.html` | Reference markup for the wordmark, both grounds |
-| `sendoff-icon.svg` | Mark only, `currentColor` — inherits whatever colour you set |
+| `sendoffprimaryonDark.svg` | **Source artwork** — full lockup, for dark grounds |
+| `sendoffprimaryonLight.svg` | **Source artwork** — full lockup, for light grounds |
+| `sendoff-wordmark.svg` | The same lockup with the two colours swapped for CSS vars, so one file serves both grounds |
+| `sendoff-icon.svg` | Mark only (ring + dot), recolourable |
 | `sendoff-icon-dark-bg.svg` | Mark in bright teal, for dark grounds |
 | `sendoff-icon-light-bg.svg` | Mark in deep teal, for light grounds |
-| `sendoff-icon-tile.svg` | Mark on the dark rounded tile — app icon, social avatar |
-| `sendoff-favicon.svg` | Tile with a heavier stroke so the counter survives at 16px |
+| `sendoff-icon-tile.svg` | Mark on a rounded dark tile — app icon, social avatar |
+| `sendoff-favicon.svg` | Tile with tighter padding, for the browser tab |
+| `tokens.css` | Colour + type tokens, ground presets, wordmark component styles |
+| `wordmark.html` | Reference page showing both grounds |
 
-## The two-value signal
+The icons are cut from the lockup's own geometry — the ring is
+`circle(2356, 350) r294 stroke112` and the dot `circle(2370, 350) r80`, both
+inside the `skewX(-16)` group that gives the mark its lean — so they are the
+same shape as the "O", not an approximation of it.
 
-The identity teal exists at **two values, one hue**. They are not
-interchangeable — a colour reads heavier on a light ground and lighter on a dark
-one, so each ground gets the value that keeps the mark's *perceived* weight
-constant.
+## Colours, as drawn
 
-| Token | Value | Ground | Contrast |
-|---|---|---|---|
-| `--so-signal-on-dark` | `#10BFC8` | void `#0A0F14` | 8.4 : 1 |
-| `--so-signal-on-light` | `#0F8E97` | white / cream | 3.9 : 1 |
+| | Signal | Letters |
+|---|---|---|
+| On dark | `#0FB8BF` | `#F0ECE3` |
+| On light | `#0A8B92` | `#0D1117` |
 
-Set the ground preset on a container and everything inside picks up the right
-pair:
+One hue, two values. A colour reads heavier on a light ground and lighter on a
+dark one, so each ground gets the value that keeps the mark's *perceived* weight
+constant. They are not interchangeable.
+
+`--beam` `#5EFDF6` is a third value used only as a glow — hover states, focus
+rings, the one live figure on a race page. At 1.2:1 against white it can never
+sit behind text.
+
+## Using the wordmark
+
+Inline the contents of `sendoff-wordmark.svg` inside an element with the
+`.wordmark` class (app) or `.so-wordmark` (standalone, via `tokens.css`). The
+paths are outlined, so no webfont is needed, and the two colours come from CSS
+vars:
 
 ```html
-<header class="so-on-dark"> … </header>   <!-- app, live race page -->
-<section class="so-on-light"> … </section> <!-- print report, marketing -->
-<div class="so-on-beam"> … </div>          <!-- over the beam gradient -->
+<a class="wordmark" href="/" style="--wm-size: 30px;" aria-label="SendOff — home">
+  <svg viewBox="-130 -130 3708.0 1317.6"> … </svg>
+</a>
 ```
 
-## Colour rules
-
-- **`--so-beam` `#5EFDF6` is a glow, not a surface.** It sits at 1.2:1 against
-  white — never put text on it. Use it for the one live number a crew scans
-  first, focus rings, and the top of a gradient.
-- **`--so-deep` `#0A5F68` is the surface that holds white text** at 7.3:1 (AAA).
-  Buttons, panels, solid fills.
-- **Semantic colours stay separate from the accent.** On-pace green, tight
-  amber, and cutoff red carry state; the teal carries identity. Don't overload
-  the teal to mean "good".
+`--wm-size` sets the height; width follows the 2.81:1 aspect. On light grounds
+add `.on-light` to flip both colours.
 
 ## Scale
 
-The full lockup holds down to about **40px** tall. Below that the pulse line
-turns to mush — switch to `sendoff-icon-*.svg` instead. The favicon uses a
-heavier stroke than the display icon so its counter stays open at 16px.
+The full lockup holds down to roughly **24px tall** — below that the pulse
+line stops resolving. Use `sendoff-icon-*.svg` instead of shrinking further.
+The favicon is the mark alone on its tile.
 
 ## Type
 
-| Role | Face | Notes |
-|---|---|---|
-| Wordmark | Poppins Italic 700 | Logo only — not for UI copy |
-| Display | Anta | Stats, headings, numerals |
-| Body | Public Sans | Everything readable |
-| Mono | DM Mono | Labels, timestamps, data |
+The wordmark's letterforms are outlines, not live text, so the logo needs no
+font. For everything else:
 
-## Outstanding
-
-The wordmark here is built from live text + SVG rather than outlined paths, so
-it depends on Poppins loading. For print and third-party placements, export an
-**outlined** wordmark from the source design file and drop it in as
-`sendoff-wordmark-dark-bg.svg` / `sendoff-wordmark-light-bg.svg`. The component
-version stays useful in-app because it recolours per ground and stays crisp at
-any size without shipping a raster.
+| Role | Face |
+|---|---|
+| Display | Fraunces (headings, race names) |
+| Body | Inter |
+| Mono | JetBrains Mono (labels, timestamps, data) |

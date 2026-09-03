@@ -65,65 +65,26 @@
 
 /* ------------------------------------------------------------------
    Wordmark component
-   Scales entirely off --so-wm-size. Markup lives in wordmark.html.
+   Inline the contents of sendoff-wordmark.svg inside an element carrying
+   .so-wordmark. The artwork is outlined paths — no webfont required — and
+   reads --wm-signal / --wm-letter, so one copy serves every ground.
    ------------------------------------------------------------------ */
 .so-wordmark {
-  position: relative;
   display: inline-flex;
   align-items: center;
-  font-family: var(--so-font-wordmark);
-  font-style: italic;
-  font-weight: 700;
-  font-size: var(--so-wm-size, 40px);
-  line-height: 1;
-  letter-spacing: -0.03em;
-  color: var(--so-ink, var(--so-ink-on-dark));
-  padding-bottom: calc(var(--so-wm-size, 40px) * 0.30);
-  white-space: nowrap;
+  line-height: 0;
+  text-decoration: none;
+  --wm-signal: var(--so-signal, var(--so-signal-on-dark));
+  --wm-letter: var(--so-ink, var(--so-ink-on-dark));
 }
-/* Use .tight where vertical space is short (app headers, nav bars). */
-.so-wordmark.tight { padding-bottom: calc(var(--so-wm-size, 40px) * 0.26); }
-
-.so-wordmark .so-o {
-  width: 0.95em;
-  height: 0.95em;
-  flex: 0 0 auto;
-  margin: 0 -0.055em;
-  display: block;
-  overflow: visible;
-}
-/* The pulse is a flex row: CSS bars that stretch to whatever width the lockup
-   happens to be, with a fixed-aspect SVG spike between them. Stretching one
-   SVG across the whole width would squash the spike — this can't. */
-.so-wordmark .so-pulse {
-  position: absolute;
-  left: -0.08em;
-  right: -0.08em;
-  bottom: 0;
-  height: 0.40em;
-  display: flex;
-  align-items: center;
-}
-.so-wordmark .so-bar {
-  flex: 1 1 auto;
-  height: 0.058em;
-  min-height: 1.5px;
-  background: var(--so-signal);
-  border-radius: 999px;
-}
-.so-wordmark .so-bar.tail { flex-grow: 1.4; }
-.so-wordmark .so-spike {
-  height: 100%;
+.so-wordmark svg {
+  height: var(--so-wm-size, 40px);
   width: auto;
-  flex: 0 0 auto;
   display: block;
-  margin: 0 -0.5px;
   overflow: visible;
 }
+a.so-wordmark:hover { --wm-signal: var(--so-beam); }
+a.so-wordmark:focus-visible { outline: 2px solid var(--so-signal-on-dark); outline-offset: 4px; }
 
-/* Below ~40px the pulse line collapses; hide it and let the ring carry the
-   mark, or switch to brand/sendoff-icon-*.svg entirely. */
-@media (max-width: 480px) {
-  .so-wordmark.responsive .so-pulse { display: none; }
-  .so-wordmark.responsive { padding-bottom: 0; }
-}
+/* Below ~24px tall the pulse line stops resolving — switch to the mark alone
+   (sendoff-icon-*.svg) rather than shrinking the lockup further. */
