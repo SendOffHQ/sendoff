@@ -10,7 +10,24 @@
       "runnerNames": [
         "Soft Serve"
       ]
+    },
+    {
+      "slug": "six-0-trail-marathon",
+      "name": "Six-0 Trail Marathon",
+      "location": "Cleburne, TX",
+      "startTime": "2026-09-05T07:30:00-05:00",
+      "courseType": "loops",
+      "units": {
+        "distance": "mi",
+        "elevation": "ft"
+      },
+      "totalDistanceMi": 26.6,
+      "runnerNames": [
+        "Jason"
+      ],
+      "cutoffHours": 8.5,
+      "createdBy": "thebillyman@gmail.com"
     }
   ],
-  "lastUpdated": "2026-05-16T19:47:45.641Z"
+  "lastUpdated": "2026-09-03T01:08:15.747Z"
 }

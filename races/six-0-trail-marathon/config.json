@@ -1,0 +1,83 @@
+{
+  "name": "Six-0 Trail Marathon",
+  "location": "Cleburne, TX",
+  "startTime": "2026-09-05T07:30:00-05:00",
+  "courseType": "loops",
+  "units": {
+    "distance": "mi",
+    "elevation": "ft"
+  },
+  "visibility": "public",
+  "createdBy": "thebillyman@gmail.com",
+  "editors": [
+    "thebillyman@gmail.com"
+  ],
+  "viewers": [],
+  "cutoffs": {
+    "totalHours": 8.5
+  },
+  "course": {
+    "loopCount": 2,
+    "loopSegments": [
+      {
+        "name": "Start → Lakeside",
+        "fromAid": "Start",
+        "toAid": "Lakeside",
+        "distanceMi": 4.4,
+        "elevationGainFt": null,
+        "elevationLossFt": null,
+        "arriveCutoffHours": null
+      },
+      {
+        "name": "Lakeside → Lakeside (around lake)",
+        "fromAid": "Lakeside",
+        "toAid": "Lakeside (around lake)",
+        "distanceMi": 1.9,
+        "elevationGainFt": null,
+        "elevationLossFt": null,
+        "arriveCutoffHours": null
+      },
+      {
+        "name": "Lakeside (around lake) → Mountainside",
+        "fromAid": "Lakeside (around lake)",
+        "toAid": "Mountainside",
+        "distanceMi": 2.9,
+        "elevationGainFt": null,
+        "elevationLossFt": null,
+        "arriveCutoffHours": null
+      },
+      {
+        "name": "Mountainside → Mountainside (loop)",
+        "fromAid": "Mountainside",
+        "toAid": "Mountainside (loop)",
+        "distanceMi": 0.5,
+        "elevationGainFt": null,
+        "elevationLossFt": null,
+        "arriveCutoffHours": null
+      },
+      {
+        "name": "Mountainside (loop) → Pit/Finish",
+        "fromAid": "Mountainside (loop)",
+        "toAid": "Pit/Finish",
+        "distanceMi": 3.6,
+        "elevationGainFt": null,
+        "elevationLossFt": null,
+        "arriveCutoffHours": null
+      }
+    ],
+    "loopDistanceMi": 13.3
+  },
+  "runners": [
+    {
+      "id": "jason",
+      "name": "Jason",
+      "bib": "Jason",
+      "color": "#1bc318"
+    }
+  ],
+  "targets": {
+    "caloriesPerHour": 275,
+    "fluidOzPerHour": 32,
+    "sodiumMgPerHour": 1200
+  }
+}
