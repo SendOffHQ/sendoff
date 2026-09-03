@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>SendOff · Admin</title>
 <link rel="icon" href="brand/sendoff-favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0a0f14" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=19">
+<link rel="stylesheet" href="lib/race-theme.css?v=20">
 <style>
   .wrap { max-width: 620px; margin: 0 auto; }
   .panel {
@@ -36,7 +37,7 @@
   }
   .ok .url { display: block; color: var(--green); word-break: break-all; margin: 8px 0; }
   .err {
-    background: rgba(255, 89, 89, 0.06); border: 1px solid rgba(255, 89, 89, 0.4);
+    background: rgba(229, 72, 77, 0.06); border: 1px solid rgba(229, 72, 77, 0.4);
     border-radius: 4px; padding: 12px 14px; font-size: 12px; color: var(--red); margin-top: 12px;
   }
 
@@ -51,7 +52,7 @@
     cursor: pointer; user-select: none;
     font-family: 'JetBrains Mono', monospace; font-size: 12px;
   }
-  .acct-head:hover { background: #1f222a; }
+  .acct-head:hover { background: #1f2a33; }
   .acct-email { flex: 1; color: var(--text); word-break: break-all; }
   .acct-tag {
     font-size: 8px; letter-spacing: 0.15em; text-transform: uppercase;
@@ -155,7 +156,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=19"></script>
+<script src="lib/race-core.js?v=20"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)

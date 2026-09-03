@@ -60,6 +60,24 @@ The full lockup holds down to roughly **24px tall** — below that the pulse
 line stops resolving. Use `sendoff-icon-*.svg` instead of shrinking further.
 The favicon is the mark alone on its tile.
 
+## In the app
+
+`lib/race-theme.css` carries the app's own copy of these values in `:root` —
+grounds, ink, and `--accent: #0fb8bf` (the signal). The signal is the only
+saturated brand colour on a page, so the pace states stay readable as the
+things that actually change during a race:
+
+| Token | Value | Means |
+|---|---|---|
+| `--accent` | `#0fb8bf` | brand, current, live |
+| `--green` | `#6ee7a8` | on pace, leg done clean |
+| `--yellow` | `#ffb07a` | tight against a cutoff |
+| `--red` | `#e5484d` | cutoff blown |
+| `--blue` | `#8aa9d0` | low emphasis: upcoming, finished, viewer |
+
+Keep the two files in step: change a value here, mirror it there, and bump
+the `?v=` on the stylesheet link in every page so browsers pick it up.
+
 ## Type
 
 The wordmark's letterforms are outlines, not live text, so the logo needs no

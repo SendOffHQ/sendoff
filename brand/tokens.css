@@ -14,13 +14,13 @@
   --so-panel:      #121820;  /* raised surface */
   --so-panel-2:    #182029;
   --so-line:       #253340;  /* hairlines on dark */
-  --so-icon-tile:  #141E25;  /* favicon / app-icon tile */
+  --so-icon-tile:  #0D1117;  /* favicon / app-icon tile, as drawn */
   --so-cream:      #F5F2EA;  /* light ground: print, marketing, partner pages */
-  --so-cream-2:    #ECE7DD;  /* wordmark letters on dark */
+  --so-cream-2:    #F0ECE3;  /* wordmark letters on dark, as drawn */
 
   /* ---- Signal: one hue, two values ---- */
-  --so-signal-on-dark:   #10BFC8;  /* 8.4:1 on void */
-  --so-signal-on-light:  #0F8E97;  /* 3.9:1 on white — graphics & large type */
+  --so-signal-on-dark:   #0FB8BF;  /* as drawn — 7.9:1 on void */
+  --so-signal-on-light:  #0A8B92;  /* as drawn — 3.9:1 on white, graphics & large type */
 
   /* ---- Support ---- */
   --so-beam:   #5EFDF6;  /* glow ONLY: the one live number, focus rings, gradient tops.
@@ -30,7 +30,7 @@
   --so-warm:   #FFB07A;  /* secondary accent: warnings, caps, "approaching cutoff" */
 
   /* ---- Ink ---- */
-  --so-ink-on-dark:   #ECE7DD;
+  --so-ink-on-dark:   #F0ECE3;
   --so-ink-on-light:  #121A1F;
   --so-mute:          #7A8D99;
   --so-faint:         #4E606D;
@@ -41,10 +41,10 @@
   --so-cutoff:   #E5484D;
 
   /* ---- Type ---- */
-  --so-font-display: "Anta", ui-sans-serif, system-ui, sans-serif;
-  --so-font-body:    "Public Sans", ui-sans-serif, system-ui, sans-serif;
-  --so-font-mono:    "DM Mono", ui-monospace, "SF Mono", monospace;
-  --so-font-wordmark:"Poppins", "Trebuchet MS", ui-sans-serif, sans-serif;
+  --so-font-display: "Fraunces", ui-serif, Georgia, serif;
+  --so-font-body:    "Inter", ui-sans-serif, system-ui, sans-serif;
+  --so-font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+  /* The wordmark is outlined paths — it needs no font. */
 }
 
 /* Ground presets — set one of these on any container and the wordmark

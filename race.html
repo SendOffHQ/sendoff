@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>SendOff</title>
 <link rel="icon" href="brand/sendoff-favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0a0f14" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=19">
+<link rel="stylesheet" href="lib/race-theme.css?v=20">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   .cutoffs {
@@ -171,9 +172,9 @@
   .leg-cell .t { font-size: 11px; font-weight: 700; }
   .leg-cell.done { background: rgba(110, 231, 168, 0.08); border-color: rgba(110, 231, 168, 0.4); }
   .leg-cell.done .t { color: var(--green); }
-  .leg-cell.slow { background: rgba(245, 196, 81, 0.08); border-color: rgba(245, 196, 81, 0.4); }
+  .leg-cell.slow { background: rgba(255, 176, 122, 0.08); border-color: rgba(255, 176, 122, 0.4); }
   .leg-cell.slow .t { color: var(--yellow); }
-  .leg-cell.danger { background: rgba(255, 89, 89, 0.08); border-color: rgba(255, 89, 89, 0.4); }
+  .leg-cell.danger { background: rgba(229, 72, 77, 0.08); border-color: rgba(229, 72, 77, 0.4); }
   .leg-cell.danger .t { color: var(--red); }
   .leg-cell.current { background: var(--accent-glow); border-color: var(--accent); }
   .leg-cell.current .t { color: var(--accent); }
@@ -387,7 +388,7 @@
     border: 1px solid var(--border); background: var(--bg-card);
   }
   #course-map .leaflet-control-attribution {
-    background: rgba(12, 13, 16, 0.8); color: var(--text-muted);
+    background: rgba(10, 15, 20, 0.8); color: var(--text-muted);
   }
   #course-map .leaflet-control-attribution a { color: var(--text-dim); }
   .aid-marker-label {
@@ -398,8 +399,8 @@
     background: var(--bg-card); border: 1px solid var(--border);
     border-radius: 6px;
   }
-  .course-elev .elev-area { fill: rgba(255, 107, 61, 0.16); stroke: none; }
-  .course-elev .elev-line { fill: none; stroke: #ff6b3d; stroke-width: 1.6; }
+  .course-elev .elev-area { fill: rgba(15, 184, 191, 0.16); stroke: none; }
+  .course-elev .elev-line { fill: none; stroke: #0fb8bf; stroke-width: 1.6; }
   .course-elev .elev-aid-line { stroke-dasharray: 3 3; }
   .course-elev .elev-grid { stroke: var(--border); stroke-width: 1; }
   .course-elev .elev-axis-label {
@@ -411,7 +412,7 @@
     fill: var(--text-muted); letter-spacing: 0.1em; text-transform: uppercase;
   }
   .course-elev .elev-aid-dot { cursor: pointer; }
-  .course-elev .elev-popup-bg { fill: rgba(12, 13, 16, 0.94); stroke: var(--border-bright); }
+  .course-elev .elev-popup-bg { fill: rgba(10, 15, 20, 0.94); stroke: var(--border-bright); }
   .course-elev .elev-popup-text {
     font-family: 'JetBrains Mono', monospace; font-size: 11px; fill: var(--text);
   }
@@ -425,7 +426,7 @@
     50% { stroke-opacity: 0.35; }
   }
   .leaflet-tooltip.runner-dot-label {
-    background: rgba(12, 13, 16, 0.85); border: none; box-shadow: none;
+    background: rgba(10, 15, 20, 0.85); border: none; box-shadow: none;
     color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 11px;
   }
   .leaflet-tooltip.runner-dot-label::before { display: none; }
@@ -487,7 +488,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="lib/race-core.js?v=19"></script>
+<script src="lib/race-core.js?v=20"></script>
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
@@ -914,7 +915,7 @@
   // The route, aid markers and elevation profile are built once from
   // course.gpx. Predicted runner positions are refreshed on every load.
   const AID_END_COLOR = '#6ee7a8';
-  const AID_MID_COLOR = '#ff6b3d';
+  const AID_MID_COLOR = '#0fb8bf';
   let courseVisualsReady = false;
   let courseMap = null, courseGpxPts = null;
   let mapRunnerMarkers = {};               // runnerId -> Leaflet marker
@@ -1034,7 +1035,7 @@
         <line class="elev-aid-line" x1="${ax.toFixed(1)}" y1="${padT}" x2="${ax.toFixed(1)}" y2="${baseY.toFixed(1)}"
               stroke="${color}" stroke-opacity="0.3" />
         <circle class="elev-aid-dot" cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="5"
-                fill="${color}" stroke="#0c0d10" stroke-width="1.5" data-label="${escapeHtml(label)}">
+                fill="${color}" stroke="#0a0f14" stroke-width="1.5" data-label="${escapeHtml(label)}">
           <title>${escapeHtml(label)} · ${ft.toLocaleString()} ${Race.units.elevationLabel(cfg)}</title>
         </circle>`;
     }).join('');
@@ -1135,7 +1136,7 @@
         const color = r.color || AID_MID_COLOR;
         return `
           <circle class="runner-dot" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="5"
-                  fill="${color}" stroke="#0c0d10" stroke-width="1.5">
+                  fill="${color}" stroke="#0a0f14" stroke-width="1.5">
             <title>${escapeHtml(r.name)} · ${escapeHtml(trackingLabel(pos))}</title>
           </circle>
           <text class="elev-runner-label" x="${cx.toFixed(1)}" y="${(cy - 9).toFixed(1)}"

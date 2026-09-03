@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>SendOff · Race Report</title>
 <link rel="icon" href="brand/sendoff-favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0a0f14" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=19">
+<link rel="stylesheet" href="lib/race-theme.css?v=20">
 <style>
   /* Screen styles (reuse dashboard) */
   .controls {
@@ -182,7 +183,7 @@
     }
     header.site { padding-bottom: 10pt; margin-bottom: 12pt; border-bottom: 1px solid #999; }
     h1.site { color: #111 !important; font-size: 22pt; }
-    h1.site em { color: #c44a18 !important; }
+    h1.site em { color: #0a8b92 !important; }
 
     .cutoffs {
       background: #f6f6f6 !important; border: 1px solid #bbb !important;
@@ -207,7 +208,7 @@
     table.legs th { color: #555 !important; border-bottom: 1px solid #999 !important; }
     table.legs td { border-bottom: 1px solid #eee !important; }
     table.legs tr.note td { color: #555 !important; }
-    table.legs .leg-num { color: #c44a18 !important; }
+    table.legs .leg-num { color: #0a8b92 !important; }
 
     .course-block {
       background: white !important; border: 1px solid #999 !important;
@@ -215,8 +216,8 @@
     }
     .course-block h2 { color: #111 !important; }
     .course-stats span { color: #555 !important; }
-    svg.elevation path.area { fill: rgba(196,74,24,0.18) !important; }
-    svg.elevation path.line { stroke: #c44a18 !important; }
+    svg.elevation path.area { fill: rgba(10,139,146,0.16) !important; }
+    svg.elevation path.line { stroke: #0a8b92 !important; }
 
     .chart-card, .intake-card {
       background: white !important; border: 1px solid #999 !important;
@@ -268,7 +269,7 @@
   <div>Auto-generated · race-dashboard hub</div>
 </footer>
 
-<script src="lib/race-core.js?v=19"></script>
+<script src="lib/race-core.js?v=20"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -399,7 +400,7 @@
     const fillD = d + ` L${W},${H} L0,${H} Z`;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.innerHTML = `
-      <path class="area" d="${fillD}" fill="rgba(255,107,61,0.18)"/>
+      <path class="area" d="${fillD}" fill="rgba(10,139,146,0.16)"/>
       <path class="line" d="${d}" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
     `;
   }

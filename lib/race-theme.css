@@ -1,19 +1,25 @@
 :root {
-  --bg: #0c0d10;
-  --bg-elevated: #14161b;
-  --bg-card: #1a1d24;
-  --border: #262932;
-  --border-bright: #353946;
-  --text: #e8e6e1;
-  --text-dim: #b4b4b6;
-  --text-muted: #909098;
-  --accent: #ff6b3d;
-  --accent-glow: rgba(255, 107, 61, 0.18);
+  /* SendOff palette — brand/tokens.css is the source of truth.
+     Grounds are the void/panel stack; the signal is the only saturated
+     brand colour, so the pace signals (green / warm / red) stay legible
+     as the things that actually change during a race. */
+  --bg: #0a0f14;
+  --bg-elevated: #121820;
+  --bg-card: #182029;
+  --border: #253340;
+  --border-bright: #33454f;
+  --text: #f0ece3;   /* matches the wordmark letters as drawn */
+  --text-dim: #b6c2c9;
+  --text-muted: #7a8d99;
+  --accent: #0fb8bf;
+  --accent-glow: rgba(15, 184, 191, 0.18);
+  --accent-ink: #04181a;      /* text on a filled accent — 7.5:1 */
+  --accent-hot: #22d3da;      /* accent hover fill */
   --green: #6ee7a8;
   --green-glow: rgba(110, 231, 168, 0.18);
-  --yellow: #f5c451;
-  --red: #ff5959;
-  --blue: #5ec8ff;
+  --yellow: #ffb07a;
+  --red: #e5484d;
+  --blue: #8aa9d0;            /* low-emphasis states: upcoming, done, viewer */
 
   /* SendOff brand — see brand/README.md. One hue, two values: the signal
      reads heavier on light grounds, so each ground gets its own. */
@@ -56,8 +62,8 @@ html, body {
 }
 body {
   background-image:
-    radial-gradient(circle at 15% 0%, rgba(255, 107, 61, 0.08) 0%, transparent 40%),
-    radial-gradient(circle at 85% 100%, rgba(94, 200, 255, 0.05) 0%, transparent 40%);
+    radial-gradient(circle at 15% 0%, rgba(15, 184, 191, 0.10) 0%, transparent 42%),
+    radial-gradient(circle at 85% 100%, rgba(94, 253, 246, 0.045) 0%, transparent 40%);
   background-attachment: fixed;
   padding: 32px 40px 80px;
 }
@@ -112,12 +118,12 @@ a.nav-link:hover, a.nav-link:active {
   background: var(--bg-elevated); color: var(--text);
   border: 1px solid var(--border-bright);
 }
-.btn:hover:not(:disabled) { background: #22262e; }
+.btn:hover:not(:disabled) { background: #1f2a33; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn.primary { background: var(--accent); color: #1a0a04; border-color: var(--accent); }
-.btn.primary:hover:not(:disabled) { background: #ff7d54; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover:not(:disabled) { background: var(--accent-hot); border-color: var(--accent-hot); }
 .btn.danger { color: var(--red); border-color: var(--red); }
-.btn.danger:hover:not(:disabled) { background: rgba(255,89,89,0.08); }
+.btn.danger:hover:not(:disabled) { background: rgba(229,72,77,0.10); }
 
 footer.site {
   margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border);
@@ -189,12 +195,12 @@ footer.site {
 @media print { .modal-overlay { display: none !important; } }
 
 .error-banner {
-  background: rgba(255, 89, 89, 0.1); border: 1px solid var(--red);
+  background: rgba(229, 72, 77, 0.10); border: 1px solid var(--red);
   color: var(--red); padding: 16px; border-radius: 4px; margin-bottom: 24px;
   font-family: 'JetBrains Mono', monospace; font-size: 12px;
 }
 .info-banner {
-  background: rgba(94, 200, 255, 0.08); border: 1px solid var(--blue);
+  background: rgba(138, 169, 208, 0.08); border: 1px solid var(--blue);
   color: var(--blue); padding: 14px; border-radius: 4px; margin-bottom: 24px;
   font-family: 'JetBrains Mono', monospace; font-size: 12px;
 }
