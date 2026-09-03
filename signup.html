@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Sign Up · Race Hub</title>
+<title>SendOff · Sign Up</title>
+<link rel="icon" href="brand/sendoff-favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=16">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Inter:wght@400;500;600&family=Poppins:ital,wght@1,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lib/race-theme.css?v=17">
 <style>
   .wrap { max-width: 480px; margin: 60px auto; padding: 0 20px; }
   .card {
@@ -58,7 +59,7 @@
 <header class="site">
   <div class="brand">
     <div class="brand-meta">
-      <span>Race Hub</span><span>·</span><span>Sign up</span>
+      <a class="wordmark" href="index.html" aria-label="SendOff — home"><span>Send</span><svg class="wm-o" viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="50" cy="50" rx="33" ry="41" fill="none" stroke="var(--wm-signal)" stroke-width="15" transform="rotate(-13 50 50)"/><ellipse cx="45" cy="43" rx="11" ry="13" fill="var(--wm-signal)" transform="rotate(-13 45 43)"/></svg><span>ff</span><svg class="wm-pulse" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><path d="M 8 74 L 330 74 L 356 52 L 374 68 L 400 40 L 418 60 L 442 8 L 452 96 L 466 46 L 486 62 L 510 44 L 532 66 L 560 74 L 992 74" fill="none" stroke="var(--wm-signal)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg></a><span>·</span><span>Sign up</span>
     </div>
     <h1 class="site">Set up your <em>account</em></h1>
   </div>
@@ -109,7 +110,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=16"></script>
+<script src="lib/race-core.js?v=17"></script>
 <script>
   function escapeHtml(s) {
     return String(s == null ? '' : s)

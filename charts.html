@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Charts</title>
+<title>SendOff · Charts</title>
+<link rel="icon" href="brand/sendoff-favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=16">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Inter:wght@400;500;600&family=Poppins:ital,wght@1,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lib/race-theme.css?v=17">
 <style>
   .chart-card {
     background: var(--bg-card); border: 1px solid var(--border);
@@ -67,7 +68,7 @@
 <header class="site">
   <div class="brand">
     <div class="brand-meta">
-      <span>Charts</span><span>·</span>
+      <a class="wordmark" href="index.html" aria-label="SendOff — home"><span>Send</span><svg class="wm-o" viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="50" cy="50" rx="33" ry="41" fill="none" stroke="var(--wm-signal)" stroke-width="15" transform="rotate(-13 50 50)"/><ellipse cx="45" cy="43" rx="11" ry="13" fill="var(--wm-signal)" transform="rotate(-13 45 43)"/></svg><span>ff</span><svg class="wm-pulse" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><path d="M 8 74 L 330 74 L 356 52 L 374 68 L 400 40 L 418 60 L 442 8 L 452 96 L 466 46 L 486 62 L 510 44 L 532 66 L 560 74 L 992 74" fill="none" stroke="var(--wm-signal)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg></a><span>·</span><span>Charts</span><span>·</span>
       <a href="#" id="back-link" style="color: var(--accent); text-decoration: none;">← Race</a>
     </div>
     <h1 class="site" id="race-title">Loading…</h1>
@@ -82,7 +83,7 @@
   <span>Charts auto-refresh every 30s</span>
 </footer>
 
-<script src="lib/race-core.js?v=16"></script>
+<script src="lib/race-core.js?v=17"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -100,7 +101,7 @@
       if (!dataRes.ok) throw new Error('data.json not found');
       cfg = await cfgRes.json();
       data = await dataRes.json();
-      document.title = `Charts · ${cfg.name}`;
+      document.title = `${cfg.name} · Charts · SendOff`;
       document.getElementById('race-title').textContent = cfg.name;
       document.getElementById('error').style.display = 'none';
       Race.charts.render(document.getElementById('body'), cfg, data);
