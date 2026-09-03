@@ -85,19 +85,39 @@
 .so-wordmark.tight { padding-bottom: calc(var(--so-wm-size, 40px) * 0.26); }
 
 .so-wordmark .so-o {
-  width:  calc(var(--so-wm-size, 40px) * 0.80);
-  height: calc(var(--so-wm-size, 40px) * 0.80);
+  width: 0.95em;
+  height: 0.95em;
   flex: 0 0 auto;
-  margin: 0 calc(var(--so-wm-size, 40px) * -0.045);
+  margin: 0 -0.055em;
   display: block;
   overflow: visible;
 }
+/* The pulse is a flex row: CSS bars that stretch to whatever width the lockup
+   happens to be, with a fixed-aspect SVG spike between them. Stretching one
+   SVG across the whole width would squash the spike — this can't. */
 .so-wordmark .so-pulse {
   position: absolute;
-  left:  calc(var(--so-wm-size, 40px) * -0.12);
-  right: calc(var(--so-wm-size, 40px) * -0.12);
+  left: -0.08em;
+  right: -0.08em;
   bottom: 0;
-  height: calc(var(--so-wm-size, 40px) * 0.46);
+  height: 0.40em;
+  display: flex;
+  align-items: center;
+}
+.so-wordmark .so-bar {
+  flex: 1 1 auto;
+  height: 0.058em;
+  min-height: 1.5px;
+  background: var(--so-signal);
+  border-radius: 999px;
+}
+.so-wordmark .so-bar.tail { flex-grow: 1.4; }
+.so-wordmark .so-spike {
+  height: 100%;
+  width: auto;
+  flex: 0 0 auto;
+  display: block;
+  margin: 0 -0.5px;
   overflow: visible;
 }
 
