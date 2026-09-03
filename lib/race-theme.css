@@ -43,19 +43,40 @@
   text-decoration: none;
 }
 .wordmark .wm-o {
-  width: calc(var(--wm-size, 26px) * 0.80);
-  height: calc(var(--wm-size, 26px) * 0.80);
+  width: 0.95em;
+  height: 0.95em;
   flex: 0 0 auto;
-  margin: 0 calc(var(--wm-size, 26px) * -0.045);
+  margin: 0 -0.055em;
   display: block;
   overflow: visible;
 }
+/* The pulse is a flex row: two CSS bars that stretch to whatever width the
+   lockup happens to be, with a fixed-aspect SVG spike between them. Drawing
+   the flat runs in CSS is what keeps the spike from being squashed — an SVG
+   stretched across the full width would distort it. */
 .wordmark .wm-pulse {
   position: absolute;
-  left: calc(var(--wm-size, 26px) * -0.10);
-  right: calc(var(--wm-size, 26px) * -0.10);
+  left: -0.08em;
+  right: -0.08em;
   bottom: 0;
-  height: calc(var(--wm-size, 26px) * 0.42);
+  height: 0.40em;
+  display: flex;
+  align-items: center;
+}
+.wordmark .wm-bar {
+  flex: 1 1 auto;
+  height: 0.058em;
+  min-height: 1.5px;
+  background: var(--wm-signal);
+  border-radius: 999px;
+}
+.wordmark .wm-bar.tail { flex-grow: 1.4; }
+.wordmark .wm-spike {
+  height: 100%;
+  width: auto;
+  flex: 0 0 auto;
+  display: block;
+  margin: 0 -0.5px;      /* close the seam against the bars */
   overflow: visible;
 }
 a.wordmark:hover { --wm-signal: var(--beam); }
