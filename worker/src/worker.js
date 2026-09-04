@@ -429,13 +429,13 @@ async function handleResetLink(req, env) {
   const base = publicBaseUrl(env, req);
   const url = (base ? base : '') + `/reset.html?reset=${encodeURIComponent(token)}`;
 
+  const mail = resetMail(env, url, RESET_TTL_DAYS);
   let emailed = false, emailError = null;
   if (body && body.send) {
-    const m = resetMail(env, url, RESET_TTL_DAYS);
-    const err = await sendMail(env, { to: email, from: mailFrom(env, 'reset'), ...m });
+    const err = await sendMail(env, { to: email, from: mailFrom(env, 'reset'), ...mail });
     if (err) emailError = err; else emailed = true;
   }
-  return json({ token, url, email, expiresAt, emailed, emailError }, {}, env, req);
+  return json({ token, url, email, expiresAt, emailed, emailError, mail }, {}, env, req);
 }
 
 // Public: metadata for a reset link, so reset.html can show the email.
@@ -512,13 +512,16 @@ async function handleAccountInvite(req, env) {
   // The link is returned either way. Mail is the convenience, not the record:
   // if it fails the admin still has something to paste into their own client,
   // and is told plainly that it did not go.
+  // The rendered message goes back with the link. Sending it by hand is the
+  // normal path right now, and building it a second time in the admin page is
+  // how the two would drift into saying different things.
+  const mail = inviteMail(env, url, INVITE_TTL_DAYS);
   let emailed = false, emailError = null;
   if (body && body.send) {
-    const m = inviteMail(env, url, INVITE_TTL_DAYS);
-    const err = await sendMail(env, { to: email, from: mailFrom(env, 'invite'), ...m });
+    const err = await sendMail(env, { to: email, from: mailFrom(env, 'invite'), ...mail });
     if (err) emailError = err; else emailed = true;
   }
-  return json({ token, url, email, expiresAt, emailed, emailError }, {}, env, req);
+  return json({ token, url, email, expiresAt, emailed, emailError, mail }, {}, env, req);
 }
 
 // Public: metadata for an account-invite link.
