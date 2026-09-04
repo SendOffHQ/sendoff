@@ -27,7 +27,24 @@
       ],
       "cutoffHours": 8.5,
       "createdBy": "thebillyman@gmail.com"
+    },
+    {
+      "slug": "000001-test-race",
+      "name": "Test Race",
+      "location": "Cleburne, TX",
+      "startTime": "2026-09-18T06:00:00-05:00",
+      "courseType": "segments",
+      "units": {
+        "distance": "mi",
+        "elevation": "ft"
+      },
+      "totalDistanceMi": 6,
+      "runnerNames": [
+        "Dude"
+      ],
+      "cutoffHours": 36,
+      "createdBy": "thebillyman@gmail.com"
     }
   ],
-  "lastUpdated": "2026-09-04T03:17:08.219Z"
+  "lastUpdated": "2026-09-04T14:14:58.693Z"
 }
