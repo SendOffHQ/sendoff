@@ -874,7 +874,10 @@ async function handleAccessRequest(req, env) {
               `</div>`
       });
     } catch (e) {
-      // Deliberately swallowed. The request is stored either way.
+      // Swallowed for the caller: the request is stored either way and must not
+      // fail because mail did. Logged so `wrangler tail` can show an operator
+      // why the notifications stopped arriving.
+      console.error('access-request notify failed:', e && e.message ? e.message : e);
     }
   }
 
