@@ -32,7 +32,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=20">
+<link rel="stylesheet" href="lib/race-theme.css?v=21">
 <style>
   .cards {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -154,7 +154,6 @@
   background: var(--bg-card); border: 1px solid var(--border-bright); border-radius: 6px;
   padding: 26px 28px 22px; width: 100%; max-width: 540px;
   box-shadow: 0 18px 56px rgba(0, 0, 0, 0.55);
-  max-height: calc(100vh - 40px); overflow-y: auto;
 }
 /* Left-aligned with everything else in the dialog: the kicker, heading, lede,
    steps and note all start on one axis, and the wordmark anchors it. */
@@ -194,6 +193,10 @@
 .intro-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 560px) {
   .intro-box { padding: 22px 20px 18px; }
+  .intro-box .wm { height: 38px; margin-bottom: 16px; }
+  .intro-box h2 { font-size: 23px; }
+  .intro-lede { font-size: 14px; margin-bottom: 16px; }
+  .intro-steps li { margin-bottom: 11px; }
   .intro-actions { justify-content: stretch; }
   .intro-actions .btn { flex: 1; text-align: center; }
 }
@@ -521,7 +524,11 @@
     ov.querySelector('[data-intro-close]').addEventListener('click', close);
     // Leaving for the wizard counts as having seen it.
     ov.querySelector('.btn.primary').addEventListener('click', markIntroSeen);
-    (box.querySelector('.btn.primary') || box).focus();
+    // The CTA is the last thing in the dialog, so focusing it normally scrolls
+    // the box to the bottom and the wordmark and heading start out of view.
+    // Keep the focus for keyboard users, but open at the top.
+    (box.querySelector('.btn.primary') || box).focus({ preventScroll: true });
+    box.scrollTop = 0;
   }
 
   // ---- Request an invite ----------------------------------------------
