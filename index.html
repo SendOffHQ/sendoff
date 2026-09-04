@@ -621,7 +621,7 @@
         box.innerHTML = `
           <h2>Request sent</h2>
           <p class="req-lede">Thanks. We will be in touch at
-            <strong>${payload.email.replace(/[<>&]/g, '')}</strong>.</p>
+            <strong>${INVITE_EMAIL}</strong>.</p>
           <div class="req-actions"><button type="button" class="btn primary" data-req-close>Close</button></div>`;
         box.querySelector('[data-req-close]').addEventListener('click', close);
         box.querySelector('[data-req-close]').focus();
