@@ -911,6 +911,26 @@
     el.innerHTML = ''; el.style.display = 'none';
   }
 
+  // GitHub's contents API will 404 a file it accepted moments ago, for a few
+  // seconds. race.html reads config.json through that same API to decide who
+  // may view the race, so redirecting inside that window lands the person who
+  // just created the race on "config.json not found". Wait it out here, where
+  // there is already a progress list to wait in.
+  //
+  // Returns false if it never reads back, which is worth a note rather than an
+  // error: the files are committed either way and a refresh will find them.
+  async function waitForRaceReadable(cfg, slug, timeoutMs) {
+    const deadline = Date.now() + (timeoutMs || 20000);
+    while (Date.now() < deadline) {
+      try {
+        const r = await Race.gh.getFile(cfg, `races/${slug}/config.json`);
+        if (!r.missing) return true;
+      } catch (e) { /* transient; keep trying until the deadline */ }
+      await new Promise(res => setTimeout(res, 700));
+    }
+    return false;
+  }
+
   async function onSubmit() {
     clearProgress();
     document.getElementById('error').style.display = 'none';
@@ -982,6 +1002,12 @@
       } else {
         progressLine(`Private race: skipping public manifest.`);
       }
+
+      progressLine('Waiting for the race to be readable…', 'pending');
+      const readable = await waitForRaceReadable(cfg, slug);
+      progressLine(readable
+        ? 'Race is readable.'
+        : 'Still settling. The race page may need one refresh.');
 
       progressLine(`Done. Redirecting…`, 'ok');
       setTimeout(() => {
