@@ -213,6 +213,17 @@
     repeating-linear-gradient(45deg, #1d2b36 0 12px, #0f1820 12px 24px); }
   .dont .frame.f-cream { background: var(--so-cream); }
   .dont .frame.f-clash { background: #7A2540; }
+
+  /* ---- File links ---- */
+  table td a, .filenote a {
+    color: var(--so-signal-on-dark); text-decoration: none;
+    border-bottom: 1px solid rgba(15,184,191,0.35);
+  }
+  table td a:hover, .filenote a:hover { border-bottom-color: var(--so-signal-on-dark); }
+  table td a:focus-visible, .filenote a:focus-visible {
+    outline: 2px solid var(--so-signal-on-dark); outline-offset: 3px; border-bottom-color: transparent;
+  }
+  td.file { white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -553,20 +564,27 @@
     <table>
       <thead><tr><th>File</th><th>Use</th></tr></thead>
       <tbody>
-        <tr><td>sendoffprimaryonDark.svg</td><td>Source artwork — full lockup, dark grounds</td></tr>
-        <tr><td>sendoffprimaryonLight.svg</td><td>Source artwork — full lockup, light grounds</td></tr>
-        <tr><td>sendoff-wordmark.svg</td><td>The lockup with both colours as CSS variables — one file, either ground</td></tr>
-        <tr><td>sendoff-icon.svg</td><td>Mark alone, recolourable</td></tr>
-        <tr><td>sendoff-icon-dark-bg.svg</td><td>Mark in bright teal</td></tr>
-        <tr><td>sendoff-icon-light-bg.svg</td><td>Mark in deep teal</td></tr>
-        <tr><td>sendoff-icon-tile.svg</td><td>Mark on a rounded dark tile — app icon, avatar</td></tr>
-        <tr><td>sendoff-favicon.svg</td><td>Tile with tighter padding, browser tab</td></tr>
-        <tr><td>tokens.css</td><td>Colour and type tokens, ground presets, wordmark component</td></tr>
+        <tr><td class="file"><a href="sendoffprimaryonDark.svg">sendoffprimaryonDark.svg</a></td><td>Source artwork — full lockup, dark grounds</td></tr>
+        <tr><td class="file"><a href="sendoffprimaryonLight.svg">sendoffprimaryonLight.svg</a></td><td>Source artwork — full lockup, light grounds</td></tr>
+        <tr><td class="file"><a href="sendoff-wordmark.svg">sendoff-wordmark.svg</a></td><td>The lockup with both colours as CSS variables — one file, either ground</td></tr>
+        <tr><td class="file"><a href="sendoff-icon.svg">sendoff-icon.svg</a></td><td>Mark alone, recolourable</td></tr>
+        <tr><td class="file"><a href="sendoff-icon-dark-bg.svg">sendoff-icon-dark-bg.svg</a></td><td>Mark in bright teal</td></tr>
+        <tr><td class="file"><a href="sendoff-icon-light-bg.svg">sendoff-icon-light-bg.svg</a></td><td>Mark in deep teal</td></tr>
+        <tr><td class="file"><a href="sendoff-icon-tile.svg">sendoff-icon-tile.svg</a></td><td>Mark on a rounded dark tile — app icon, avatar</td></tr>
+        <tr><td class="file"><a href="sendoff-favicon.svg">sendoff-favicon.svg</a></td><td>Tile with tighter padding, browser tab</td></tr>
+        <tr><td class="file"><a href="tokens.css">tokens.css</a></td><td>Colour and type tokens, ground presets, wordmark component</td></tr>
+        <tr><td class="file"><a href="apple-touch-icon.png">apple-touch-icon.png</a></td><td>Home-screen icon, iOS — 180×180</td></tr>
+        <tr><td class="file"><a href="icon-192.png">icon-192.png</a></td><td>Manifest icon — 192×192</td></tr>
+        <tr><td class="file"><a href="icon-512.png">icon-512.png</a></td><td>Manifest icon — 512×512</td></tr>
+        <tr><td class="file"><a href="icon-maskable-512.png">icon-maskable-512.png</a></td><td>Maskable icon, inset clear of Android&#39;s crop</td></tr>
+        <tr><td class="file"><a href="favicon-32.png">favicon-32.png</a></td><td>PNG favicon for contexts that ignore SVG</td></tr>
+        <tr><td class="file"><a href="favicon-16.png">favicon-16.png</a></td><td>PNG favicon, small</td></tr>
+        <tr><td class="file"><a href="og-default.png">og-default.png</a></td><td>Default social card — 1200×630</td></tr>
       </tbody>
     </table>
   </div>
-  <p style="color: var(--so-mute); font-size: 13.5px;">
-    <code>lib/race-theme.css</code> carries the app's own copy of these values in its
+  <p class="filenote" style="color: var(--so-mute); font-size: 13.5px;">
+    <code><a href="../lib/race-theme.css">lib/race-theme.css</a></code> carries the app's own copy of these values in its
     <code>:root</code>. Change one, mirror the other, and bump the <code>?v=</code> on
     every page's stylesheet link.
   </p>
