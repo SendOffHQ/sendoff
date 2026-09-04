@@ -16,7 +16,7 @@
 <meta name="theme-color" content="#0A0F14">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,800;1,9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tokens.css">
 <style>
   * { box-sizing: border-box; }
@@ -81,7 +81,7 @@
   .spec .row { display: flex; justify-content: space-between; align-items: baseline; gap: 24px; flex-wrap: wrap; }
   .spec .role { font-size: 13px; font-weight: 600; }
   .spec .setting { font-family: var(--so-font-mono); font-size: 11px; color: var(--so-mute); }
-  .sample-display { font-family: var(--so-font-display); font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -0.025em; }
+  .sample-display { font-family: var(--so-font-display); font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
   .sample-display em { font-style: italic; font-weight: 600; color: var(--so-signal-on-dark); }
   .sample-h2 { font-family: var(--so-font-display); font-size: 20px; font-weight: 600; }
   .sample-body { font-family: var(--so-font-body); font-size: 15px; max-width: 62ch; color: var(--so-ink-on-dark); }
@@ -352,20 +352,22 @@
   <hr>
   <h2>Type</h2>
   <p>
-    Three faces, one job each. The wordmark's letterforms are outlines, so the logo
-    is independent of all of them.
+    Three faces, one job each. The condensed display face is the language of race
+    bibs, course signage and timing boards — it belongs to the sport rather than to
+    a template. The wordmark's letterforms are outlines, so the logo is independent
+    of all three.
   </p>
 
   <div class="spec">
-    <div class="row"><span class="role">Display — Fraunces</span><span class="setting">800 · 44px · −0.025em · line-height 1</span></div>
+    <div class="row"><span class="role">Display — Barlow Condensed</span><span class="setting">800 · 44px · −0.02em · line-height 1</span></div>
     <div class="sample-display">Highball to Thurmond <em>Ultra</em></div>
   </div>
   <div class="spec">
-    <div class="row"><span class="role">Section heading — Fraunces</span><span class="setting">600 · 20px</span></div>
+    <div class="row"><span class="role">Section heading — Barlow Condensed</span><span class="setting">600 · 20px</span></div>
     <div class="sample-h2">Runners &amp; goals</div>
   </div>
   <div class="spec">
-    <div class="row"><span class="role">Body — Inter</span><span class="setting">400 / 500 / 600 · 15–16px</span></div>
+    <div class="row"><span class="role">Body — IBM Plex Sans</span><span class="setting">400 / 500 / 600 · 15–16px</span></div>
     <p class="sample-body">Estimated split — GPS watch lost signal near mile 35; arrivals interpolated between Kaymoor Miners and the official finish.</p>
   </div>
   <div class="spec">
@@ -379,7 +381,7 @@
 
   <ul class="rules" style="margin-top:14px">
     <li><strong>Every number is mono, and tabular.</strong> Splits sit in columns and get compared down the page; proportional digits make them jump.</li>
-    <li><strong>Fraunces is for names, not for interface.</strong> Race names, runner names, section headings. Never a button, never a label.</li>
+    <li><strong>Barlow Condensed is for names, not for interface.</strong> Race names, runner names, section headings. Never a button, never a label.</li>
     <li><strong>The italic is a single accent word</strong> at the end of a race name, in the signal colour. One per heading.</li>
   </ul>
 </section>
