@@ -1,11 +1,11 @@
-# Race Dashboard — Feature List
+# Race Dashboard: Feature List
 
 An ultra-running crew dashboard hub: a static GitHub Pages site with an
 optional Cloudflare Worker auth proxy.
 
 ## Race tracking
-- Live race dashboard (`race.html`) — per-runner progress, pace, cutoffs, predicted finish
-- Pit/leg logging (`pit.html`) — leg start/end times, calories, fluid, sodium, gear changes, meds, issues, notes
+- Live race dashboard (`race.html`): per-runner progress, pace, cutoffs, predicted finish
+- Pit/leg logging (`pit.html`): leg start/end times, calories, fluid, sodium, gear changes, meds, issues, notes
 - Worker-routed reads for signed-in crew to avoid GitHub Pages publish lag
 - Predicted mileage / position for runners on course or in a pit
 
@@ -18,11 +18,11 @@ optional Cloudflare Worker auth proxy.
 - Leg time per leg
 - Mile pace per leg
 - Aid-station time per stop
-- Intake per hour — calories / fluid / sodium, with target lines
+- Intake per hour: calories / fluid / sodium, with target lines
 - Cumulative progress with a pace-based projected-finish ray and cutoff line
 
 ## Reporting
-- Printable race report (`print-report.html`) — cutoffs, per-runner leg tables, course elevation, and all charts, print-styled
+- Printable race report (`print-report.html`): cutoffs, per-runner leg tables, course elevation, and all charts, print-styled
 
 ## Race setup & config (`setup.html`)
 - Create and configure races; define runners, targets, cutoffs

@@ -4,30 +4,30 @@ Cloudflare Worker that lets crew sign into the race-dashboard hub with email
 + password instead of each generating a GitHub PAT, and provides the access
 control layer (per-race editors/viewers, invite links, view share links).
 
-Reads of public races stay direct to GitHub Pages — only writes (pit board,
+Reads of public races stay direct to GitHub Pages, only writes (pit board,
 intake editing, race creation) and access-control endpoints go through the
 worker.
 
 ## Endpoints
 
 ### Auth & users
-- `POST /login` — `{ email, password }` → `{ token, email, role, expiresAt }`
-- `POST /accept-invite` — `{ token, password }` → session + race assignment
-- `POST /change-password` — `{ currentPassword, newPassword }` (session required)
-- `POST /reset-link` — `{ email }` → one-time reset link (admin only)
+- `POST /login`: `{ email, password }` → `{ token, email, role, expiresAt }`
+- `POST /accept-invite`: `{ token, password }` → session + race assignment
+- `POST /change-password`: `{ currentPassword, newPassword }` (session required)
+- `POST /reset-link`: `{ email }` → one-time reset link (admin only)
 - `GET  /reset-info?token=...` → `{ email }`
-- `POST /reset-password` — `{ token, newPassword }` → session
+- `POST /reset-password`: `{ token, newPassword }` → session
 
 ### Race file IO
-- `POST /commit` — `{ path, content, sha?, message }` + `Authorization: Bearer <jwt>` (writer ACL enforced)
-- `GET  /get?path=...[&t=<share-token>]` — read a file (reader ACL enforced; share-token optional)
+- `POST /commit`: `{ path, content, sha?, message }` + `Authorization: Bearer <jwt>` (writer ACL enforced)
+- `GET  /get?path=...[&t=<share-token>]`: read a file (reader ACL enforced; share-token optional)
 
 ### Access management (creator/editor only)
-- `POST /invite` — `{ slug, email, role: 'editor'|'viewer' }` → `{ url, token, expiresAt }`
-- `POST /share-link` — `{ slug, role: 'view', expiresInDays? }` → `{ url, token, expiresAt }`
-- `POST /access/add` — `{ slug, email, role }` (assumes account already exists)
-- `POST /access/remove` — `{ slug, email }`
-- `POST /share/revoke` — `{ token }` (revokes invite OR share link by token)
+- `POST /invite`: `{ slug, email, role: 'editor'|'viewer' }` → `{ url, token, expiresAt }`
+- `POST /share-link`: `{ slug, role: 'view', expiresInDays? }` → `{ url, token, expiresAt }`
+- `POST /access/add`: `{ slug, email, role }` (assumes account already exists)
+- `POST /access/remove`: `{ slug, email }`
+- `POST /share/revoke`: `{ token }` (revokes invite OR share link by token)
 - `GET  /access?slug=...` → `{ editors, viewers, shareLinks, pendingInvites }`
 
 ### Listing
@@ -55,7 +55,7 @@ npx wrangler secret put GITHUB_TOKEN
 # Long random string used to sign sessions
 openssl rand -hex 32 | npx wrangler secret put JWT_SECRET
 
-# User list — generate hashes with admin/hash.html (open the file in a
+# User list: generate hashes with admin/hash.html (open the file in a
 # browser, type an email + password, copy the JSON it produces, paste
 # here). Wrap multiple users in a JSON array. The email field is the
 # login identifier; the legacy "username" field is still accepted for
@@ -75,8 +75,8 @@ point at your hub.
 
 Invite tokens, share-link tokens, and dynamically-created (invite-accepted)
 user accounts live in a KV namespace called `AUTH_KV`. Without it the
-worker still runs — `/login`, `/commit`, `/get`, `/access/*`, and
-`/my-races` all work — but `/invite`, `/accept-invite`, and `/share-link`
+worker still runs: `/login`, `/commit`, `/get`, `/access/*`, and
+`/my-races` all work, but `/invite`, `/accept-invite`, and `/share-link`
 return 503.
 
 Create the namespace and bind it:
@@ -111,37 +111,37 @@ In your hub repo, create `hub.json` at the root:
 
 All pages auto-detect this and switch from the PAT form to an email/password
 login form. If `hub.json` is missing or `auth.proxyUrl` is unset, the pages
-fall back to direct PAT mode — so the worker can go down without bricking
+fall back to direct PAT mode, so the worker can go down without bricking
 race day, as long as someone has a PAT.
 
 ## Adding / removing users
 
 Two ways:
 
-1. **Admin-managed** — re-run `npx wrangler secret put USERS` with the
+1. **Admin-managed**: re-run `npx wrangler secret put USERS` with the
    updated JSON list. No redeploy needed. Use this for the hub admin's own
    account and anyone you trust enough to bake in at deploy time.
-2. **Invite-driven** — from any race page where you're an editor, expand
+2. **Invite-driven**: from any race page where you're an editor, expand
    "Manage access", enter the invitee's email, and click "Generate invite
-   link". Send them the link (text/Signal/email — your call). They open
+   link". Send them the link (text/Signal/email: your call). They open
    it, set a password, and are added to the race. Their account is stored
    in the `AUTH_KV` namespace, not in `USERS`.
 
 ## Password management
 
-- **Change password** — any signed-in user can change their own password
+- **Change password**: any signed-in user can change their own password
   from the "Password" button in the account bar. The new hash is written
   to `AUTH_KV` (and `lookupUser` checks KV before `USERS`, so this works
   even for accounts seeded via the `USERS` env var).
-- **Forgot password** — there's no email service, so resets are
+- **Forgot password**: there's no email service, so resets are
   admin-issued. An **admin** opens `admin.html`, enters the locked-out
   user's email, and gets a one-time reset link (valid 2 days) to hand
   over. The user opens it on `reset.html`, sets a new password, and is
   signed in.
 
   "Admin" means a user whose `USERS` entry (or KV record) has
-  `"role": "admin"`. Generate that hash with `admin/hash.html` — pick
-  **admin** in the role dropdown — and `wrangler secret put USERS`. The
+  `"role": "admin"`. Generate that hash with `admin/hash.html`: pick
+  **admin** in the role dropdown, and `wrangler secret put USERS`. The
   account bar shows an **Admin** link only for admin users.
 
 ## Visibility & access model
@@ -149,9 +149,9 @@ Two ways:
 Each race carries `visibility: 'public' | 'private'` plus `createdBy`,
 `editors[]`, and `viewers[]` (emails) in its `config.json`.
 
-- **Public race** — appears in `races/index.json` (the public manifest);
+- **Public race**: appears in `races/index.json` (the public manifest);
   anyone with the hub URL can view; only listed editors can write.
-- **Private race** — omitted from the public manifest; slug gets a random
+- **Private race**: omitted from the public manifest; slug gets a random
   suffix to make URL-guessing impractical; the worker's `/my-races`
   endpoint lists it for users who are in `editors` or `viewers`. Reads
   by listed viewers + share-link viewers go through the worker's `/get`

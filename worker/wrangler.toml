@@ -13,7 +13,7 @@ GITHUB_BRANCH = "main"
 # Leave empty if the worker is at the root of its hostname.
 MOUNT_PATH = ""
 # Comma-separated origins allowed by CORS. "*" allows any caller.
-# A CORS origin is scheme + host only — never a path.
+# A CORS origin is scheme + host only, never a path.
 ALLOWED_ORIGINS = "https://sendoff.run"
 # Public URL of the hub frontend, used when building invite & share URLs.
 # The site is served from the root of its domain. If empty, the worker
