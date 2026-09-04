@@ -271,7 +271,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=27"></script>
+<script src="lib/race-core.js?v=28"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
@@ -586,21 +586,26 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
   // address rather than leaving someone with a dead button.
   const INVITE_EMAIL = 'invites@sendoff.run';
 
-  function openRequest() {
+  // mode is 'invite' or 'reset'. A reset asks only who you are: what race you
+  // are crewing has nothing to do with getting back into an account you own.
+  function openRequest(mode) {
     if (document.querySelector('.req-overlay')) return;
+    const isReset = mode === 'reset';
     const previous = document.activeElement;
     const ov = document.createElement('div');
     ov.className = 'modal-overlay req-overlay';
     ov.innerHTML = `
       <div class="intro-box req-box" role="dialog" aria-modal="true" aria-labelledby="req-heading">
-        <h2 id="req-heading">Request an invite</h2>
-        <p class="req-lede">Accounts are invite only while SendOff is new. Tell us who you are and
-          what you are crewing, and we will get back to you.</p>
+        <h2 id="req-heading">${isReset ? 'Request a password reset' : 'Request an invite'}</h2>
+        <p class="req-lede">${isReset
+          ? 'Tell us the email on your account and we will send you a link to set a new password.'
+          : 'Accounts are invite only while SendOff is new. Tell us who you are and what you are crewing, and we will get back to you.'}</p>
         <form id="req-form" novalidate>
           <label class="req-field"><span>Your name</span>
             <input type="text" id="req-name" autocomplete="name" required></label>
           <label class="req-field"><span>Email</span>
             <input type="email" id="req-email" autocomplete="email" spellcheck="false" required></label>
+          ${isReset ? '' : `
           <div class="req-row">
             <label class="req-field"><span>Race</span>
               <input type="text" id="req-race" placeholder="Which one?"></label>
@@ -608,13 +613,13 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
               <input type="text" id="req-when" placeholder="Month, or a date"></label>
           </div>
           <label class="req-field"><span>Anything else</span>
-            <textarea id="req-note" rows="3"></textarea></label>
+            <textarea id="req-note" rows="3"></textarea></label>`}
           <label class="req-hp" aria-hidden="true" tabindex="-1">Leave this empty
             <input type="text" id="req-hp" tabindex="-1" autocomplete="off"></label>
           <p class="req-msg" id="req-msg" role="status" aria-live="polite"></p>
           <div class="req-actions">
             <button type="button" class="intro-link" data-req-close>Cancel</button>
-            <button type="submit" class="btn primary" id="req-send">Send request</button>
+            <button type="submit" class="btn primary" id="req-send">${isReset ? 'Send reset request' : 'Send request'}</button>
           </div>
         </form>
       </div>`;
@@ -639,21 +644,25 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
       if (previous && previous.focus) previous.focus();
     }
     function mailtoFallback(payload) {
-      const body = `Name: ${payload.name}\nEmail: ${payload.email}\n` +
-                   `Race: ${payload.race}\nWhen: ${payload.when}\n\n${payload.note}\n`;
+      const body = isReset
+        ? `Name: ${payload.name}\nEmail: ${payload.email}\n\nI need a password reset.\n`
+        : `Name: ${payload.name}\nEmail: ${payload.email}\n` +
+          `Race: ${payload.race}\nWhen: ${payload.when}\n\n${payload.note}\n`;
       return 'mailto:' + INVITE_EMAIL +
-             '?subject=' + encodeURIComponent('SendOff invite request') +
+             '?subject=' + encodeURIComponent(isReset ? 'SendOff password reset request' : 'SendOff invite request') +
              '&body=' + encodeURIComponent(body);
     }
 
     ov.querySelector('#req-form').addEventListener('submit', async e => {
       e.preventDefault();
+      const val = (id) => { const el = ov.querySelector(id); return el ? el.value.trim() : ''; };
       const payload = {
-        name: ov.querySelector('#req-name').value.trim(),
-        email: ov.querySelector('#req-email').value.trim(),
-        race: ov.querySelector('#req-race').value.trim(),
-        when: ov.querySelector('#req-when').value.trim(),
-        note: ov.querySelector('#req-note').value.trim(),
+        kind: isReset ? 'reset' : 'invite',
+        name: val('#req-name'),
+        email: val('#req-email'),
+        race: val('#req-race'),
+        when: val('#req-when'),
+        note: val('#req-note'),
         website: ov.querySelector('#req-hp').value
       };
       if (!payload.name || !payload.email) {
@@ -719,7 +728,14 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
           return;
         }
 
-        box.innerHTML = `
+        // The worker answers a reset for an unknown address the same way it
+        // answers a known one, so that a stranger cannot use this form to find
+        // out who has an account. The wording here has to hold either way.
+        box.innerHTML = isReset ? `
+          <h2>Reset requested</h2>
+          <p class="req-lede">If there is a SendOff account for
+            <strong>${payload.email.replace(/[<>&"']/g, '')}</strong>, we will send a reset link to it.</p>
+          <div class="req-actions"><button type="button" class="btn primary" data-req-close>Close</button></div>` : `
           <h2>Request sent</h2>
           <p class="req-lede">Thanks. We will be in touch at
             <strong>${INVITE_EMAIL}</strong>.</p>
@@ -731,7 +747,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
         msg.className = 'req-msg err';
         msg.innerHTML = 'Could not send that from here. ' +
           `<a href="${mailtoFallback(payload)}" style="color: var(--accent);">Email it instead</a>.`;
-        send.disabled = false; send.textContent = 'Send request';
+        send.disabled = false; send.textContent = isReset ? 'Send reset request' : 'Send request';
       }
     });
 
@@ -742,11 +758,17 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
   }
 
   document.querySelectorAll('[data-request-invite]').forEach(el => {
-    el.addEventListener('click', e => { e.preventDefault(); openRequest(); });
+    el.addEventListener('click', e => { e.preventDefault(); openRequest('invite'); });
+  });
+  document.querySelectorAll('[data-request-reset]').forEach(el => {
+    el.addEventListener('click', e => { e.preventDefault(); openRequest('reset'); });
   });
 
-  // Deep link, used by the sign-in dialog on other pages.
-  if (new URLSearchParams(location.search).has('invite')) openRequest();
+  // Deep links, used by the sign-in dialog on every other page: it lives in
+  // race-core and has no request form of its own to open.
+  const qp = new URLSearchParams(location.search);
+  if (qp.has('reset')) openRequest('reset');
+  else if (qp.has('invite')) openRequest('invite');
 
   document.getElementById('intro-open').addEventListener('click', openIntro);
   if (!introSeen()) openIntro();
