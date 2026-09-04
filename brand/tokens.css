@@ -32,6 +32,9 @@
   /* ---- Ink ---- */
   --so-ink-on-dark:   #F0ECE3;
   --so-ink-on-light:  #121A1F;
+  /* The wordmark's letterforms on light grounds are the as-drawn near-black,
+     a half-step darker than the body-copy ink above. See brand/README.md. */
+  --so-wm-letter-on-light: #0D1117;
   --so-mute:          #7A8D99;
   --so-faint:         #4E606D;
 
@@ -83,6 +86,12 @@
   display: block;
   overflow: visible;
 }
+/* On a light ground the letters take the as-drawn value rather than the body
+   ink, matching lib/race-theme.css's .wordmark.on-light. Accepts the preset on
+   an ancestor or on the wordmark itself. */
+.so-on-light .so-wordmark,
+.so-wordmark.so-on-light { --wm-letter: var(--so-wm-letter-on-light); }
+
 a.so-wordmark:hover { --wm-signal: var(--so-beam); }
 a.so-wordmark:focus-visible { outline: 2px solid var(--so-signal-on-dark); outline-offset: 4px; }
 

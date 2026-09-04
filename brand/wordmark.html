@@ -1,52 +1,486 @@
-<!-- SendOff wordmark — reference.
-     The artwork lives in sendoff-wordmark.svg as outlined paths. Inline its
-     contents inside an element with .so-wordmark and the two CSS vars drive
-     the colours; nothing needs a webfont.
+<!-- SendOff brand reference.
+     Everything decided about the brand, on one page: the lockup, the mark,
+     the palette with its measured contrast, the type scale as the app
+     actually sets it, and how to write.
 
-     Ground presets from tokens.css set the right pair automatically:
-       .so-on-dark   cream letters, bright teal signal
-       .so-on-light  near-black letters, deep teal signal
--->
+     The artwork is sendoff-wordmark.svg inlined as outlined paths, so nothing
+     here needs a webfont to render the logo. Colours come from tokens.css via
+     the .so-on-dark / .so-on-light ground presets. -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>SendOff wordmark — reference</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SendOff — brand reference</title>
 <link rel="icon" href="sendoff-favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0A0F14">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,800;1,9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tokens.css">
 <style>
-  body { margin: 0; font-family: var(--so-font-body); }
-  .demo { padding: 48px 40px; display: flex; align-items: center; gap: 40px; flex-wrap: wrap; }
-  .demo.dark  { background: var(--so-void); }
-  .demo.light { background: var(--so-cream); }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--so-void); color: var(--so-ink-on-dark);
+    font-family: var(--so-font-body); font-size: 15px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 28px 100px; }
+
+  h1, h2 { font-family: var(--so-font-display); margin: 0; letter-spacing: -0.02em; }
+  h1 { font-size: 40px; font-weight: 800; line-height: 1.05; }
+  h2 { font-size: 26px; font-weight: 600; }
+  h3 { font-family: var(--so-font-body); font-size: 14px; font-weight: 600; margin: 0; }
+  p  { margin: 0; max-width: 66ch; }
+  .lede { color: var(--so-mute); font-size: 17px; max-width: 62ch; }
+
   .label {
     font-family: var(--so-font-mono); font-size: 10px; letter-spacing: 0.2em;
-    text-transform: uppercase; opacity: 0.6;
+    text-transform: uppercase; color: var(--so-mute);
   }
-  .demo.dark .label  { color: var(--so-ink-on-dark); }
-  .demo.light .label { color: var(--so-ink-on-light); }
-  img.mark { height: 64px; width: auto; display: block; }
+  code, .mono { font-family: var(--so-font-mono); font-size: 13px; }
+  code { color: var(--so-signal-on-dark); }
+
+  header.page { padding: 76px 0 0; display: flex; flex-direction: column; gap: 20px; }
+  section { padding-top: 68px; display: flex; flex-direction: column; gap: 22px; }
+  section > hr {
+    border: 0; border-top: 1px solid var(--so-line); margin: 0 0 6px;
+  }
+
+  /* ---- Logo ---- */
+  .ground {
+    padding: 44px 40px; display: flex; align-items: center; gap: 44px;
+    flex-wrap: wrap; border-radius: 4px;
+  }
+  .ground.dark  { background: var(--so-void); border: 1px solid var(--so-line); }
+  .ground.light { background: var(--so-cream); }
+  .ground.light .label { color: #5C6B75; }
+  img.mark { height: 62px; width: auto; display: block; }
+
+  .marks { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .mark-cell {
+    border: 1px solid var(--so-line); border-radius: 4px; padding: 20px 16px;
+    display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center;
+  }
+  .mark-cell img { height: 56px; width: auto; }
+  .mark-cell .n { font-size: 12.5px; color: var(--so-mute); line-height: 1.45; }
+  .mark-cell .n b { color: var(--so-ink-on-dark); font-weight: 500; display: block; }
+
+  /* ---- Colour ---- */
+  .swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 12px; }
+  .sw { border: 1px solid var(--so-line); border-radius: 4px; overflow: hidden; }
+  .sw .chip { height: 66px; }
+  .sw .meta { padding: 11px 13px 13px; display: flex; flex-direction: column; gap: 3px; }
+  .sw .nm { font-size: 13px; font-weight: 600; }
+  .sw .hx { font-family: var(--so-font-mono); font-size: 11.5px; color: var(--so-mute); text-transform: uppercase; }
+  .sw .cx { font-family: var(--so-font-mono); font-size: 11px; color: var(--so-faint); }
+  .group-title { margin-top: 8px; }
+
+  /* ---- Type ---- */
+  .spec { border-top: 1px solid var(--so-line); padding: 22px 0 6px; display: flex; flex-direction: column; gap: 12px; }
+  .spec .row { display: flex; justify-content: space-between; align-items: baseline; gap: 24px; flex-wrap: wrap; }
+  .spec .role { font-size: 13px; font-weight: 600; }
+  .spec .setting { font-family: var(--so-font-mono); font-size: 11px; color: var(--so-mute); }
+  .sample-display { font-family: var(--so-font-display); font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -0.025em; }
+  .sample-display em { font-style: italic; font-weight: 600; color: var(--so-signal-on-dark); }
+  .sample-h2 { font-family: var(--so-font-display); font-size: 20px; font-weight: 600; }
+  .sample-body { font-family: var(--so-font-body); font-size: 15px; max-width: 62ch; color: var(--so-ink-on-dark); }
+  .sample-label { font-family: var(--so-font-mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--so-mute); }
+  .sample-data { font-family: var(--so-font-mono); font-size: 22px; font-variant-numeric: tabular-nums; }
+
+  /* ---- Voice ---- */
+  .voice { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--so-line); border-radius: 4px; overflow: hidden; }
+  .voice > div { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+  .voice .yes { border-right: 1px solid var(--so-line); }
+  .voice .hd { font-family: var(--so-font-mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; }
+  .voice .yes .hd { color: var(--so-on-pace); }
+  .voice .no  .hd { color: var(--so-cutoff); }
+  .voice ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 9px; font-size: 13.5px; }
+  .voice .no ul { color: var(--so-mute); }
+  @media (max-width: 620px) {
+    .voice { grid-template-columns: 1fr; }
+    .voice .yes { border-right: 0; border-bottom: 1px solid var(--so-line); }
+  }
+
+  /* ---- Rules & files ---- */
+  ul.rules { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; max-width: 66ch; }
+  ul.rules li::marker { color: var(--so-signal-on-dark); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: 10px 18px 10px 0; border-bottom: 1px solid var(--so-line); vertical-align: top; }
+  th { font-family: var(--so-font-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--so-mute); }
+  td:first-child { font-family: var(--so-font-mono); font-size: 12.5px; color: var(--so-signal-on-dark); white-space: nowrap; }
+  .tablewrap { overflow-x: auto; }
+
+  .clearspace {
+    position: relative; padding: 40px; border: 1px solid var(--so-line);
+    border-radius: 4px; display: inline-block;
+  }
+  .clearspace .box { outline: 1px dashed var(--so-faint); outline-offset: 22px; display: inline-block; line-height: 0; }
+
+  /* ---- Grounds ---- */
+  .grounds { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .gcell {
+    border: 1px solid var(--so-line); border-radius: 4px; min-height: 150px; padding: 40px 22px 22px;
+    display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;
+  }
+  .gcell .cap {
+    position: absolute; top: 11px; left: 14px; font-family: var(--so-font-mono); font-size: 9.5px;
+    letter-spacing: 0.18em; text-transform: uppercase;
+  }
+  .g-void  { background: var(--so-void); }             .g-void  .cap { color: var(--so-mute); }
+  .g-panel { background: var(--so-panel); }            .g-panel .cap { color: var(--so-mute); }
+  .g-beam  { background-image:
+      radial-gradient(ellipse 420px 220px at 20% 20%, rgba(94,253,246,0.20), transparent 65%),
+      linear-gradient(120deg, var(--so-deep) 0%, var(--so-void) 78%); }
+  .g-beam  .cap { color: rgba(240,236,227,0.72); }
+  .g-deep  { background: var(--so-deep); }             .g-deep  .cap { color: rgba(255,255,255,0.7); }
+  .g-cream { background: var(--so-cream); }            .g-cream .cap { color: #5C6B75; }
+  .g-white { background: #fff; }                       .g-white .cap { color: #7C8785; }
+  .g-tile  { background: var(--so-icon-tile); }        .g-tile  .cap { color: var(--so-mute); }
+
+  /* ---- Scale ---- */
+  .ladder { border: 1px solid var(--so-line); border-radius: 4px; overflow: hidden; }
+  .rung { display: grid; grid-template-columns: 190px 1fr; border-top: 1px solid var(--so-line); }
+  .rung:first-child { border-top: 0; }
+  .rung .meta {
+    padding: 20px; background: var(--so-panel); border-right: 1px solid var(--so-line);
+    display: flex; flex-direction: column; gap: 3px; justify-content: center;
+  }
+  .rung .meta .k { font-size: 13px; font-weight: 600; }
+  .rung .meta .v { font-family: var(--so-font-mono); font-size: 10.5px; color: var(--so-mute); }
+  .rung .demo { padding: 22px 20px; display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+  .rung .demo .note { font-family: var(--so-font-mono); font-size: 10px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--so-mute); line-height: 1.5; }
+  .tile { background: var(--so-icon-tile); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .t96 { width: 96px; height: 96px; border-radius: 21px; }
+  .t64 { width: 64px; height: 64px; border-radius: 14px; }
+  .t32 { width: 32px; height: 32px; border-radius: 7px; }
+  .t16 { width: 16px; height: 16px; border-radius: 4px; }
+  @media (max-width: 620px) {
+    .rung { grid-template-columns: 1fr; }
+    .rung .meta { border-right: 0; border-bottom: 1px solid var(--so-line); }
+  }
+
+  /* ---- Tokens ---- */
+  td .chipdot {
+    display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px;
+    margin-right: 8px; border: 1px solid rgba(255,255,255,0.16);
+  }
+  td.tok { font-family: var(--so-font-mono); font-size: 12px; color: var(--so-signal-on-dark); white-space: nowrap; }
+  td.val { font-family: var(--so-font-mono); font-size: 12px; white-space: nowrap; }
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<div class="demo dark so-on-dark">
-  <span class="label">on dark</span>
-  <span class="so-wordmark" style="--so-wm-size: 96px;"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 3708.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 494.0 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 494.0 425.0 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span>
-  <img class="mark" src="sendoff-icon-dark-bg.svg" alt="SendOff mark">
+<header class="page">
+  <span class="so-wordmark so-on-dark" style="--so-wm-size: 54px;"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 3708.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 494.0 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 494.0 425.0 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span>
+  <h1>Brand reference</h1>
+  <p class="lede">
+    Everything that has actually been decided — the lockup, the palette with its
+    measured contrast, and the type scale as the app really sets it. If it isn't
+    on this page, it isn't decided yet.
+  </p>
+</header>
+
+<section>
+  <hr>
+  <h2>Logo</h2>
+  <p>
+    The lockup is outlined paths, so it needs no webfont, and the two colours are
+    CSS variables — one copy of the markup serves both grounds. Below ~24px tall
+    the pulse line under the letters stops resolving; use the mark alone instead
+    of shrinking further.
+  </p>
+
+  <div class="ground dark so-on-dark">
+    <span class="label">On dark</span>
+    <span class="so-wordmark" style="--so-wm-size: 72px;"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 3708.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 494.0 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 494.0 425.0 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span>
+    <img class="mark" src="sendoff-icon-dark-bg.svg" alt="SendOff mark, bright teal">
+  </div>
+
+  <div class="ground light so-on-light">
+    <span class="label">On light</span>
+    <span class="so-wordmark" style="--so-wm-size: 72px;"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 3708.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 494.0 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 494.0 425.0 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span>
+    <img class="mark" src="sendoff-icon-light-bg.svg" alt="SendOff mark, deep teal">
+  </div>
+
+  <h3 style="margin-top:10px">The mark</h3>
+  <p>
+    Cut from the lockup's own geometry — the ring is <code>circle(2356, 350) r294
+    stroke112</code> and the dot <code>circle(2370, 350) r80</code>, both inside the
+    <code>skewX(-16)</code> group that gives the mark its lean. It is the same shape
+    as the letter O, not a redrawing of it.
+  </p>
+  <div class="marks">
+    <div class="mark-cell">
+      <img src="sendoff-icon-dark-bg.svg" alt="">
+      <span class="n"><b>Mark, dark ground</b>bright teal</span>
+    </div>
+    <div class="mark-cell" style="background: var(--so-cream);">
+      <img src="sendoff-icon-light-bg.svg" alt="">
+      <span class="n" style="color:#5C6B75"><b style="color:#121A1F">Mark, light ground</b>deep teal</span>
+    </div>
+    <div class="mark-cell" style="background: var(--so-cream);">
+      <img src="sendoff-icon-tile.svg" alt="">
+      <span class="n" style="color:#5C6B75"><b style="color:#121A1F">Tile</b>app icon, avatar</span>
+    </div>
+    <div class="mark-cell" style="background: var(--so-cream);">
+      <img src="sendoff-favicon.svg" alt="">
+      <span class="n" style="color:#5C6B75"><b style="color:#121A1F">Favicon</b>tighter padding</span>
+    </div>
+  </div>
+
+  <h3 style="margin-top:10px">Clear space</h3>
+  <p>Keep clear on all sides by the height of the ring. Nothing crops into it.</p>
+  <div class="clearspace so-on-dark">
+    <span class="box"><span class="so-wordmark" style="--so-wm-size: 44px;"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 3708.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 494.0 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 494.0 425.0 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span></span>
+  </div>
+</section>
+
+<section>
+  <hr>
+  <h2>Grounds</h2>
+  <p>
+    Dark grounds take the cream letters and the bright teal; light grounds take the
+    near-black letters and the deep teal. Over the beam gradient and the deep teal
+    surface the signal steps up to <code>--so-beam</code> so it stays legible against
+    a ground that is already teal.
+  </p>
+  <div class="grounds">
+    <div class="gcell g-void so-on-dark"><span class="cap">Void #0A0F14 · app</span><span class="so-wordmark" style="--so-wm-size: 54px;"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 3708.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 494.0 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 494.0 425.0 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span></div>
+    <div class="gcell g-panel so-on-dark"><span class="cap">Panel #121820 · cards</span><span class="so-wordmark" style="--so-wm-size: 54px;"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 3708.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 494.0 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 494.0 425.0 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span></div>
+    <div class="gcell g-beam so-on-beam"><span class="cap">Beam gradient · marketing</span><span class="so-wordmark" style="--so-wm-size: 54px;"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 3708.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 494.0 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 494.0 425.0 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span></div>
+    <div class="gcell g-deep so-on-beam"><span class="cap">Deep #0A5F68 · surface</span><span class="so-wordmark" style="--so-wm-size: 54px;"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 3708.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 494.0 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 494.0 425.0 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span></div>
+    <div class="gcell g-cream so-on-light"><span class="cap">Cream #F5F2EA · print</span><span class="so-wordmark" style="--so-wm-size: 54px;"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 3708.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 494.0 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 494.0 425.0 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span></div>
+    <div class="gcell g-white so-on-light"><span class="cap">White · report</span><span class="so-wordmark" style="--so-wm-size: 54px;"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 3708.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 494.0 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 494.0 425.0 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span></div>
+    <div class="gcell g-tile so-on-dark"><span class="cap">Tile #0D1117 · icon</span><span class="so-wordmark" style="--so-wm-size: 72px;"><svg role="img" aria-label="SendOff mark" viewBox="2056.3 -50 800 800"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><circle cx="2356" cy="350" r="294" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112"/><circle cx="2370" cy="350" r="80" fill="var(--wm-signal, #0FB8BF)"/></g></svg></span></div>
+  </div>
+</section>
+
+<section>
+  <hr>
+  <h2>Scale</h2>
+  <p>
+    The lockup holds to about 24px tall. Below that the pulse line closes up and stops
+    reading as a trace, so the mark takes over — and because the mark is cut from the
+    lockup's own geometry, that swap keeps the same shape on screen rather than
+    introducing a second one.
+  </p>
+  <div class="ladder">
+    <div class="rung">
+      <div class="meta"><span class="k">Marketing</span><span class="v">96px · lockup</span></div>
+      <div class="demo so-on-dark"><span class="so-wordmark" style="--so-wm-size: 96px;"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 3708.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 494.0 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 494.0 425.0 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span></div>
+    </div>
+    <div class="rung">
+      <div class="meta"><span class="k">App header</span><span class="v">30px · lockup</span></div>
+      <div class="demo so-on-dark"><span class="so-wordmark" style="--so-wm-size: 30px;"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 3708.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 494.0 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 494.0 425.0 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span></div>
+    </div>
+    <div class="rung">
+      <div class="meta"><span class="k">Floor</span><span class="v">24px · lockup</span></div>
+      <div class="demo so-on-dark"><span class="so-wordmark" style="--so-wm-size: 24px;"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 3708.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 494.0 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 494.0 425.0 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span><span class="note">Pulse starts to close<br>up below this</span></div>
+    </div>
+    <div class="rung">
+      <div class="meta"><span class="k">Mark</span><span class="v">96 / 64 / 32 / 16px</span></div>
+      <div class="demo so-on-dark">
+        <span class="tile t96"><span class="so-wordmark" style="--so-wm-size: 62px;"><svg role="img" aria-label="SendOff mark" viewBox="2056.3 -50 800 800"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><circle cx="2356" cy="350" r="294" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112"/><circle cx="2370" cy="350" r="80" fill="var(--wm-signal, #0FB8BF)"/></g></svg></span></span>
+        <span class="tile t64"><span class="so-wordmark" style="--so-wm-size: 42px;"><svg role="img" aria-label="SendOff mark" viewBox="2056.3 -50 800 800"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><circle cx="2356" cy="350" r="294" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112"/><circle cx="2370" cy="350" r="80" fill="var(--wm-signal, #0FB8BF)"/></g></svg></span></span>
+        <span class="tile t32"><span class="so-wordmark" style="--so-wm-size: 21px;"><svg role="img" aria-label="SendOff mark" viewBox="2056.3 -50 800 800"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><circle cx="2356" cy="350" r="294" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112"/><circle cx="2370" cy="350" r="80" fill="var(--wm-signal, #0FB8BF)"/></g></svg></span></span>
+        <span class="tile t16"><span class="so-wordmark" style="--so-wm-size: 11px;"><svg role="img" aria-label="SendOff mark" viewBox="2056.3 -50 800 800"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><circle cx="2356" cy="350" r="294" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112"/><circle cx="2370" cy="350" r="80" fill="var(--wm-signal, #0FB8BF)"/></g></svg></span></span>
+        <span class="note">The ring's counter<br>stays open at 16px</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <hr>
+  <h2>Colour</h2>
+  <p>
+    One hue, two values. A colour reads heavier on a light ground and lighter on a
+    dark one, so each ground gets the value that keeps the mark's <em>perceived</em>
+    weight constant. They are not interchangeable, and neither is a substitute for
+    the other in code.
+  </p>
+
+  <p class="label group-title">Signal</p>
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#0FB8BF"></div><div class="meta">
+      <span class="nm">Signal, on dark</span><span class="hx">#0FB8BF</span><span class="cx">7.9:1 on void · AAA</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0A8B92"></div><div class="meta">
+      <span class="nm">Signal, on light</span><span class="hx">#0A8B92</span><span class="cx">4.1:1 white · 3.7:1 cream</span></div></div>
+    <div class="sw"><div class="chip" style="background:#5EFDF6"></div><div class="meta">
+      <span class="nm">Beam</span><span class="hx">#5EFDF6</span><span class="cx">glow only · 1.3:1 on white</span></div></div>
+  </div>
+
+  <p class="label group-title">Grounds &amp; ink</p>
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#0A0F14"></div><div class="meta">
+      <span class="nm">Void</span><span class="hx">#0A0F14</span><span class="cx">app ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#121820"></div><div class="meta">
+      <span class="nm">Panel</span><span class="hx">#121820</span><span class="cx">raised surface</span></div></div>
+    <div class="sw"><div class="chip" style="background:#253340"></div><div class="meta">
+      <span class="nm">Line</span><span class="hx">#253340</span><span class="cx">hairlines on dark</span></div></div>
+    <div class="sw"><div class="chip" style="background:#F0ECE3"></div><div class="meta">
+      <span class="nm">Ink</span><span class="hx">#F0ECE3</span><span class="cx">16.3:1 on void</span></div></div>
+    <div class="sw"><div class="chip" style="background:#F5F2EA"></div><div class="meta">
+      <span class="nm">Cream</span><span class="hx">#F5F2EA</span><span class="cx">print, marketing ground</span></div></div>
+    <div class="sw"><div class="chip" style="background:#7A8D99"></div><div class="meta">
+      <span class="nm">Mute</span><span class="hx">#7A8D99</span><span class="cx">5.6:1 on void</span></div></div>
+  </div>
+
+  <p class="label group-title">Race state — kept separate from the signal</p>
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#6EE7A8"></div><div class="meta">
+      <span class="nm">On pace</span><span class="hx">#6EE7A8</span><span class="cx">12.5:1 on void</span></div></div>
+    <div class="sw"><div class="chip" style="background:#FFB07A"></div><div class="meta">
+      <span class="nm">Tight</span><span class="hx">#FFB07A</span><span class="cx">10.8:1 · approaching cutoff</span></div></div>
+    <div class="sw"><div class="chip" style="background:#E5484D"></div><div class="meta">
+      <span class="nm">Cutoff</span><span class="hx">#E5484D</span><span class="cx">4.9:1 on void</span></div></div>
+    <div class="sw"><div class="chip" style="background:#8AA9D0"></div><div class="meta">
+      <span class="nm">Quiet</span><span class="hx">#8AA9D0</span><span class="cx">upcoming, finished, viewer</span></div></div>
+  </div>
+
+  <ul class="rules">
+    <li><strong>The signal is the only saturated brand colour on a page.</strong> The race states are what change during a race; if the chrome competes with them, the page stops being readable at an aid station.</li>
+    <li><strong>Beam is a glow, never a surface.</strong> At 1.3:1 against white it can't sit behind text. Hover states, focus rings, the one live figure.</li>
+    <li><strong>Never swap the two signal values.</strong> <code>#0FB8BF</code> on cream is too light to hold; <code>#0A8B92</code> on void goes muddy.</li>
+  </ul>
+</section>
+
+<section>
+  <hr>
+  <h2>Type</h2>
+  <p>
+    Three faces, one job each. The wordmark's letterforms are outlines, so the logo
+    is independent of all of them.
+  </p>
+
+  <div class="spec">
+    <div class="row"><span class="role">Display — Fraunces</span><span class="setting">800 · 44px · −0.025em · line-height 1</span></div>
+    <div class="sample-display">Highball to Thurmond <em>Ultra</em></div>
+  </div>
+  <div class="spec">
+    <div class="row"><span class="role">Section heading — Fraunces</span><span class="setting">600 · 20px</span></div>
+    <div class="sample-h2">Runners &amp; goals</div>
+  </div>
+  <div class="spec">
+    <div class="row"><span class="role">Body — Inter</span><span class="setting">400 / 500 / 600 · 15–16px</span></div>
+    <p class="sample-body">Estimated split — GPS watch lost signal near mile 35; arrivals interpolated between Kaymoor Miners and the official finish.</p>
+  </div>
+  <div class="spec">
+    <div class="row"><span class="role">Label — JetBrains Mono</span><span class="setting">400 · 10–11px · 0.18em · uppercase</span></div>
+    <div class="sample-label">Race time elapsed · Pit total · Elevation</div>
+  </div>
+  <div class="spec">
+    <div class="row"><span class="role">Data — JetBrains Mono</span><span class="setting">tabular-nums · every time, distance and count</span></div>
+    <div class="sample-data">12:41:42 &nbsp; 50.0 mi &nbsp; +6,219 / −5,233 ft</div>
+  </div>
+
+  <ul class="rules" style="margin-top:14px">
+    <li><strong>Every number is mono, and tabular.</strong> Splits sit in columns and get compared down the page; proportional digits make them jump.</li>
+    <li><strong>Fraunces is for names, not for interface.</strong> Race names, runner names, section headings. Never a button, never a label.</li>
+    <li><strong>The italic is a single accent word</strong> at the end of a race name, in the signal colour. One per heading.</li>
+  </ul>
+</section>
+
+<section>
+  <hr>
+  <h2>Voice</h2>
+  <p>
+    The app is read one-handed, outdoors, by someone who has been awake since four
+    in the morning. That is the whole brief.
+  </p>
+  <div class="voice">
+    <div class="yes">
+      <span class="hd">Sounds like SendOff</span>
+      <ul>
+        <li>“Send Off · Kaymoor Trailhead → Cunard River Access”</li>
+        <li>“Estimated split — watch lost signal near mile 35.”</li>
+        <li>“On pace · 14 min to cutoff”</li>
+        <li>“Anyone can find it from the hub and view live without an account.”</li>
+      </ul>
+    </div>
+    <div class="no">
+      <span class="hd">Doesn't</span>
+      <ul>
+        <li>“Oops! Something went wrong 😅”</li>
+        <li>“Unleash your ultra potential.”</li>
+        <li>“Sync webhook configuration”</li>
+        <li>“We're sorry, but we were unable to process your request at this time.”</li>
+      </ul>
+    </div>
+  </div>
+  <ul class="rules">
+    <li><strong>Name the thing the crew names.</strong> Aid stations, legs, splits, pits — their words, not the schema's.</li>
+    <li><strong>A control says what happens, then says it happened.</strong> “Send Off”, then the leg starts and the timer runs.</li>
+    <li><strong>Say the uncertainty.</strong> Estimated splits are labelled estimated. Elevation says <span class="mono">est.</span> Crews make decisions on these numbers.</li>
+    <li><strong>No exclamation marks, no apologies, no emoji.</strong> An error explains what broke and what to do.</li>
+  </ul>
+</section>
+
+<section>
+  <hr>
+  <h2>Tokens</h2>
+  <p>
+    <code>tokens.css</code> is the source of truth and prefixes everything with
+    <code>--so-</code>. <code>lib/race-theme.css</code> carries the same values
+    unprefixed (<code>--signal</code>, <code>--beam</code>, <code>--text</code>) for the
+    app's own components — when you are writing app CSS, reach for the unprefixed name.
+  </p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Token</th><th>Value</th><th>Where it is used</th></tr></thead>
+      <tbody>
+        <tr><td class="tok">--so-signal-on-dark</td><td class="val"><span class="chipdot" style="background:#0FB8BF"></span>#0FB8BF</td><td>Wordmark, controls and status chrome on dark</td></tr>
+        <tr><td class="tok">--so-signal-on-light</td><td class="val"><span class="chipdot" style="background:#0A8B92"></span>#0A8B92</td><td>Wordmark and CTAs on cream / white</td></tr>
+        <tr><td class="tok">--so-beam</td><td class="val"><span class="chipdot" style="background:#5EFDF6"></span>#5EFDF6</td><td>Glow only — hover, focus rings, the one live figure</td></tr>
+        <tr><td class="tok">--so-ink-on-dark</td><td class="val"><span class="chipdot" style="background:#F0ECE3"></span>#F0ECE3</td><td>Letterforms and body copy on dark</td></tr>
+        <tr><td class="tok">--so-wm-letter-on-light</td><td class="val"><span class="chipdot" style="background:#0D1117"></span>#0D1117</td><td>Letterforms on light, as drawn</td></tr>
+        <tr><td class="tok">--so-ink-on-light</td><td class="val"><span class="chipdot" style="background:#121A1F"></span>#121A1F</td><td>Body copy on light — a half-step warmer than the letters</td></tr>
+        <tr><td class="tok">--so-void</td><td class="val"><span class="chipdot" style="background:#0A0F14"></span>#0A0F14</td><td>App ground</td></tr>
+        <tr><td class="tok">--so-panel</td><td class="val"><span class="chipdot" style="background:#121820"></span>#121820</td><td>Raised surface</td></tr>
+        <tr><td class="tok">--so-line</td><td class="val"><span class="chipdot" style="background:#253340"></span>#253340</td><td>Hairlines on dark</td></tr>
+        <tr><td class="tok">--so-cream</td><td class="val"><span class="chipdot" style="background:#F5F2EA"></span>#F5F2EA</td><td>Light ground — print, marketing</td></tr>
+        <tr><td class="tok">--so-deep</td><td class="val"><span class="chipdot" style="background:#0A5F68"></span>#0A5F68</td><td>Solid teal surface</td></tr>
+        <tr><td class="tok">--so-icon-tile</td><td class="val"><span class="chipdot" style="background:#0D1117"></span>#0D1117</td><td>Favicon / app-icon tile, as drawn</td></tr>
+        <tr><td class="tok">--so-wm-size</td><td class="val">30px in headers</td><td>Sets lockup height; width follows at 2.81:1</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color: var(--so-mute); font-size: 13.5px;">
+    The two ground presets — <code>.so-on-dark</code> and <code>.so-on-light</code> — set
+    <code>--so-ink</code> and <code>--so-signal</code> for whatever sits inside them, so the
+    wordmark component picks up the right pair without being told which ground it is on.
+  </p>
+</section>
+
+<section>
+  <hr>
+  <h2>Files</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>File</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td>sendoffprimaryonDark.svg</td><td>Source artwork — full lockup, dark grounds</td></tr>
+        <tr><td>sendoffprimaryonLight.svg</td><td>Source artwork — full lockup, light grounds</td></tr>
+        <tr><td>sendoff-wordmark.svg</td><td>The lockup with both colours as CSS variables — one file, either ground</td></tr>
+        <tr><td>sendoff-icon.svg</td><td>Mark alone, recolourable</td></tr>
+        <tr><td>sendoff-icon-dark-bg.svg</td><td>Mark in bright teal</td></tr>
+        <tr><td>sendoff-icon-light-bg.svg</td><td>Mark in deep teal</td></tr>
+        <tr><td>sendoff-icon-tile.svg</td><td>Mark on a rounded dark tile — app icon, avatar</td></tr>
+        <tr><td>sendoff-favicon.svg</td><td>Tile with tighter padding, browser tab</td></tr>
+        <tr><td>tokens.css</td><td>Colour and type tokens, ground presets, wordmark component</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color: var(--so-mute); font-size: 13.5px;">
+    <code>lib/race-theme.css</code> carries the app's own copy of these values in its
+    <code>:root</code>. Change one, mirror the other, and bump the <code>?v=</code> on
+    every page's stylesheet link.
+  </p>
+</section>
+
 </div>
-
-<div class="demo light so-on-light">
-  <span class="label">on light</span>
-  <span class="so-wordmark" style="--so-wm-size: 96px;"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 3708.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 494.0 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 494.0 425.0 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></span>
-  <img class="mark" src="sendoff-icon-light-bg.svg" alt="SendOff mark">
-</div>
-
-<p style="padding: 24px 40px; font-family: var(--so-font-mono); font-size: 12px; color: var(--so-mute);">
-  For a quick look at the shipped artwork on its own:
-  <a href="sendoffprimaryonDark.svg" style="color: var(--so-signal-on-dark);">onDark</a> ·
-  <a href="sendoffprimaryonLight.svg" style="color: var(--so-signal-on-dark);">onLight</a>
-</p>
-
 </body>
 </html>
