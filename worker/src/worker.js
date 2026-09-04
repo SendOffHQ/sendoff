@@ -32,6 +32,7 @@
 //   Race listing for logged-in users
 //     GET  /my-races                                                   → { races: [...] }
 //     GET  /next-race-id                                               → { id: "000042" }
+//     POST /race/delete      { slug }                                  → { ok, deleted } (creator only)
 //
 //   Misc
 //     GET  /health                                                     → { ok: true }
@@ -303,13 +304,14 @@ async function githubPutJson(env, path, data, sha, message, actor) {
   return res.json();
 }
 
-// Optimistic-concurrency mutator.
-async function mutateRaceConfig(env, slug, mutate, message, actor) {
-  const path = `races/${slug}/config.json`;
+// Optimistic-concurrency mutator: GET, apply, PUT, retry on a sha conflict.
+// `missing` decides what an absent file means, since a race config that is not
+// there is an error while the hub manifest simply starts empty.
+async function mutateJsonAt(env, path, mutate, message, actor, onMissing) {
   for (let attempt = 0; attempt < 4; attempt++) {
     const r = await githubGetJson(env, path);
-    if (r.missing) throw new Error(`Race "${slug}" not found`);
-    const next = mutate(r.data) || r.data;
+    if (r.missing && onMissing === 'throw') throw new Error(`"${path}" not found`);
+    const next = mutate(r.missing ? null : r.data) || r.data;
     try {
       await githubPutJson(env, path, next, r.sha, message, actor);
       return next;
@@ -317,7 +319,11 @@ async function mutateRaceConfig(env, slug, mutate, message, actor) {
       if (!/\b409\b/.test(err.message)) throw err;
     }
   }
-  throw new Error('Too many sha conflicts updating race config');
+  throw new Error(`Too many sha conflicts updating ${path}`);
+}
+
+async function mutateRaceConfig(env, slug, mutate, message, actor) {
+  return mutateJsonAt(env, `races/${slug}/config.json`, mutate, message, actor, 'throw');
 }
 
 // ---------- path / ACL helpers ----------
@@ -1333,6 +1339,112 @@ async function handleMyRaces(req, env) {
   return json({ races: [...publicEntries, ...privateAccessible] }, {}, env, req);
 }
 
+// ---------- race deletion ----------
+// Deleting is creator-only, deliberately stricter than editing. An editor was
+// invited to help run a race, not to destroy one; the person who made it is the
+// one who gets to unmake it.
+async function handleRaceDelete(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+
+  let body;
+  try { body = await req.json(); }
+  catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+
+  const slug = clip(body && body.slug, 200);
+  if (!slug || slug.includes('/') || slug === '.' || slug === '..') {
+    return json({ error: 'Missing or invalid slug' }, { status: 400 }, env, req);
+  }
+
+  const raceCfg = await loadRaceConfig(env, slug);
+  if (!raceCfg) return json({ error: 'Race not found' }, { status: 404 }, env, req);
+
+  const me = normalizeEmail(session.email);
+  if (!raceCfg.createdBy || normalizeEmail(raceCfg.createdBy) !== me) {
+    return json({ error: 'Only the race creator can delete it' }, { status: 403 }, env, req);
+  }
+
+  // The manifest goes first. If a file delete then fails we are left with
+  // orphaned files, which are invisible and harmless; the other order leaves a
+  // listed race whose config 404s, which is the failure we are here to fix.
+  let manifestErr = null;
+  try {
+    await mutateJsonAt(env, 'races/index.json', (data) => {
+      const out = data && Array.isArray(data.races) ? data : { races: [] };
+      out.races = (out.races || []).filter(r => r.slug !== slug);
+      out.lastUpdated = new Date().toISOString();
+      return out;
+    }, `hub: unregister race ${slug}`, session.email, 'empty');
+  } catch (e) {
+    manifestErr = e.message || String(e);
+  }
+
+  // The tree carries a sha per blob, which is exactly what a delete needs.
+  const treeUrl = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/git/trees/${encodeURIComponent(env.GITHUB_BRANCH || 'main')}?recursive=1`;
+  const treeRes = await fetch(treeUrl, {
+    headers: {
+      Authorization: `token ${env.GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github.v3+json',
+      'User-Agent': 'race-dashboard-proxy'
+    }
+  });
+  if (!treeRes.ok) {
+    return json({ error: 'Could not list the race files', manifestErr }, { status: 502 }, env, req);
+  }
+  const tree = await treeRes.json();
+  const prefix = `races/${slug}/`;
+  const files = (tree.tree || []).filter(t => t.type === 'blob' && t.path.startsWith(prefix));
+
+  const deleted = [], failed = [];
+  for (const f of files) {
+    const res = await fetch(
+      `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURI(f.path)}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `token ${env.GITHUB_TOKEN}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'race-dashboard-proxy'
+        },
+        body: JSON.stringify({
+          message: `hub: delete race ${slug} (${f.path.slice(prefix.length)}) (via ${session.email})`,
+          sha: f.sha,
+          branch: env.GITHUB_BRANCH || 'main'
+        })
+      });
+    if (res.ok) deleted.push(f.path);
+    else failed.push({ path: f.path, status: res.status });
+  }
+
+  // Share links and pending invites for a race that no longer exists are dead
+  // weight, and an invite accepted afterwards would fail on the missing config
+  // with an error nobody can act on. Both key spaces are paginated: a listing
+  // that stops at the first page would leave tokens behind on a busy account.
+  if (env.AUTH_KV) {
+    for (const prefix of ['share:', 'invite:']) {
+      try {
+        let cursor;
+        do {
+          const list = await env.AUTH_KV.list({ prefix, cursor });
+          for (const k of (list.keys || [])) {
+            const raw = await env.AUTH_KV.get(k.name);
+            if (!raw) continue;
+            try {
+              if (JSON.parse(raw).slug === slug) await env.AUTH_KV.delete(k.name);
+            } catch (e) { /* not JSON we wrote; leave it alone */ }
+          }
+          cursor = list.list_complete ? null : list.cursor;
+        } while (cursor);
+      } catch (e) { /* tokens for a deleted race fail their slug check anyway */ }
+    }
+  }
+
+  if (failed.length || manifestErr) {
+    return json({ ok: false, deleted, failed, manifestErr }, { status: 207 }, env, req);
+  }
+  return json({ ok: true, deleted }, {}, env, req);
+}
+
 // ---------- router ----------
 export default {
   async fetch(request, env) {
@@ -1366,6 +1478,7 @@ export default {
     if (request.method === 'GET'  && path === '/access')          return handleAccessList(request, env);
     if (request.method === 'GET'  && path === '/my-races')        return handleMyRaces(request, env);
     if (request.method === 'GET'  && path === '/next-race-id')    return handleNextRaceId(request, env);
+    if (request.method === 'POST' && path === '/race/delete')     return handleRaceDelete(request, env);
     if (request.method === 'POST' && path === '/account-invite')  return handleAccountInvite(request, env);
     if (request.method === 'GET'  && path === '/account-invite-info') return handleAccountInviteInfo(request, env);
     if (request.method === 'POST' && path === '/accept-account-invite') return handleAcceptAccountInvite(request, env);

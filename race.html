@@ -373,6 +373,11 @@
     font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
   }
   .access-err { color: var(--red); margin-top: 8px; font-size: 11px; }
+  /* Set apart from the rest of the panel: everything above it is reversible. */
+  .danger-zone { border-top: 1px solid var(--border); padding-top: 18px; }
+  .danger-zone .access-section-title { color: var(--red); }
+  .danger-zone .access-help { border-left-color: var(--red); }
+
   .share-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 8px 12px;
     background: var(--bg-elevated); border-radius: 4px;
     font-family: 'JetBrains Mono', monospace; font-size: 11px; align-items: center; }
@@ -514,7 +519,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="lib/race-core.js?v=23"></script>
+<script src="lib/race-core.js?v=24"></script>
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
@@ -1197,6 +1202,14 @@
     return (cfg.editors || []).some(e => (e || '').toLowerCase() === me);
   }
 
+  // Deleting is creator-only, stricter than canManage: an editor was invited to
+  // help run the race, not to unmake it.
+  function isCreator() {
+    if (!isProxyMode() || !Race.auth.has()) return false;
+    const me = (currentEmail() || '').toLowerCase();
+    return !!me && (cfg.createdBy || '').toLowerCase() === me;
+  }
+
   // Edit access: gates the Pit link. In proxy mode it's the per-race ACL;
   // in direct/PAT mode it's whether this device has a token stored.
   function canEdit() {
@@ -1355,9 +1368,70 @@
           <div class="access-list">${pendingHtml}</div>
         </div>
       ` : ''}
+
+      ${isCreator() ? `
+        <div class="access-section danger-zone">
+          <div class="access-section-title">Delete this race</div>
+          <div class="access-help">
+            Removes the course, the roster and every logged leg, and takes the race
+            off the hub. Share links stop working. Only you can do this, editors cannot.
+          </div>
+          <div class="access-add">
+            <button class="btn danger" id="ax-delete">Delete race</button>
+          </div>
+          <div id="ax-delete-result"></div>
+        </div>
+      ` : ''}
     `;
 
     wireAccessHandlers();
+  }
+
+  // Deleting a race destroys logged legs, so the dialog says how many rather
+  // than asking someone to guess what they are about to lose. Typing the name
+  // is the gate: a race with splits on it should be hard to delete by reflex.
+  function confirmDelete() {
+    const legCount = (data && data.runners || [])
+      .reduce((n, r) => n + ((r.legs || []).length), 0);
+    const name = cfg.name || slug;
+    return new Promise(resolve => {
+      const ov = document.createElement('div');
+      ov.className = 'modal-overlay';
+      ov.innerHTML = `
+        <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="del-title">
+          <div class="modal-title" id="del-title" style="color: var(--red);">Delete this race?</div>
+          <p style="font-size: 12px; line-height: 1.6; color: var(--text-dim); margin: 0 0 12px;">
+            <strong>${escapeHtml(name)}</strong> and everything logged on it:
+            ${legCount} leg${legCount === 1 ? '' : 's'}, the roster and the course.
+            Share links stop working. This cannot be undone from the app.
+          </p>
+          <label class="modal-field">
+            <span>Type the race name to confirm</span>
+            <input type="text" id="del-confirm" autocomplete="off" spellcheck="false" />
+          </label>
+          <div class="modal-actions">
+            <button class="btn" id="del-cancel">Cancel</button>
+            <button class="btn danger" id="del-go" disabled>Delete race</button>
+          </div>
+        </div>`;
+      document.body.appendChild(ov);
+      const input = ov.querySelector('#del-confirm');
+      const go = ov.querySelector('#del-go');
+      const done = (v) => { document.removeEventListener('keydown', onKey, true); ov.remove(); resolve(v); };
+      function matches() {
+        return input.value.trim().toLowerCase() === name.trim().toLowerCase();
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') { e.preventDefault(); done(false); }
+        else if (e.key === 'Enter' && matches()) { e.preventDefault(); done(true); }
+      }
+      input.addEventListener('input', () => { go.disabled = !matches(); });
+      ov.querySelector('#del-cancel').addEventListener('click', () => done(false));
+      go.addEventListener('click', () => done(true));
+      ov.addEventListener('click', e => { if (e.target === ov) done(false); });
+      document.addEventListener('keydown', onKey, true);
+      input.focus({ preventScroll: true });
+    });
   }
 
   function wireAccessHandlers() {
@@ -1393,6 +1467,32 @@
         document.getElementById('ax-units-result').innerHTML =
           `<div class="access-err">${escapeHtml(err.message)}</div>`;
         unitsSave.disabled = false; unitsSave.textContent = 'Save units';
+      }
+    });
+
+    const del = body.querySelector('#ax-delete');
+    if (del) del.addEventListener('click', async () => {
+      if (!await confirmDelete()) return;
+      const out = document.getElementById('ax-delete-result');
+      del.disabled = true; del.textContent = 'Deleting…';
+      out.innerHTML = '';
+      try {
+        const res = await Race.api.deleteRace(slug);
+        if (res && res.ok === false) {
+          // A 207: some of it went, some did not. Say which rather than
+          // claiming success and leaving the repo half tidied.
+          const bits = [];
+          if (res.manifestErr) bits.push('the hub listing');
+          if ((res.failed || []).length) bits.push((res.failed || []).map(f => f.path).join(', '));
+          out.innerHTML = `<div class="access-err">Partly deleted. Still there: ${escapeHtml(bits.join('; '))}. Try again, or remove them in GitHub.</div>`;
+          del.disabled = false; del.textContent = 'Delete race';
+          return;
+        }
+        out.innerHTML = '<div style="color: var(--green); font-size: 11px; margin-top: 8px;">Deleted. Back to the hub…</div>';
+        setTimeout(() => { location.href = 'index.html'; }, 900);
+      } catch (err) {
+        out.innerHTML = `<div class="access-err">${escapeHtml(err.message)}</div>`;
+        del.disabled = false; del.textContent = 'Delete race';
       }
     });
 
