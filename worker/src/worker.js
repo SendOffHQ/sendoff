@@ -432,7 +432,7 @@ async function handleResetLink(req, env) {
   let emailed = false, emailError = null;
   if (body && body.send) {
     const m = resetMail(url, RESET_TTL_DAYS);
-    const err = await sendMail(env, email, m.subject, m.html);
+    const err = await sendMail(env, { to: email, from: mailFrom(env, 'reset'), ...m });
     if (err) emailError = err; else emailed = true;
   }
   return json({ token, url, email, expiresAt, emailed, emailError }, {}, env, req);
@@ -515,7 +515,7 @@ async function handleAccountInvite(req, env) {
   let emailed = false, emailError = null;
   if (body && body.send) {
     const m = inviteMail(url, INVITE_TTL_DAYS);
-    const err = await sendMail(env, email, m.subject, m.html);
+    const err = await sendMail(env, { to: email, from: mailFrom(env, 'invite'), ...m });
     if (err) emailError = err; else emailed = true;
   }
   return json({ token, url, email, expiresAt, emailed, emailError }, {}, env, req);
@@ -810,15 +810,25 @@ async function handleGet(req, env) {
 // Returns null on success or a reason string on failure. Deliberately not
 // throwing: some callers must not fail because mail did, and the ones that
 // tell an admin "it has been sent" need the reason to show instead.
-async function sendMail(env, to, subject, html) {
+async function sendMail(env, { to, from, subject, html }) {
+  const sender = from || env.NOTIFY_FROM;
   if (!env.EMAIL) return 'the worker has no EMAIL binding';
-  if (!env.NOTIFY_FROM) return 'NOTIFY_FROM is not set on the worker';
+  if (!sender) return 'no from-address is set on the worker';
   try {
-    await env.EMAIL.send({ to, from: env.NOTIFY_FROM, subject, html });
+    await env.EMAIL.send({ to, from: sender, subject, html });
     return null;
   } catch (e) {
     return (e && e.message) ? e.message : String(e);
   }
+}
+
+// An invite comes from invites@, because that is what it is. Everything else,
+// a password reset or a note to the operator, comes from info@ where it is
+// configured: "invites@" on a reset mail reads like the wrong department
+// answered. Falls back to the invite address so a worker without INFO_FROM
+// still sends rather than refusing.
+function mailFrom(env, kind) {
+  return kind === 'invite' ? env.NOTIFY_FROM : (env.INFO_FROM || env.NOTIFY_FROM);
 }
 
 function mailShell(inner) {
@@ -944,12 +954,16 @@ async function handleAccessRequest(req, env) {
       ].filter(r => r[1])
        .map(r => `<tr><td style="padding:2px 12px 2px 0;color:#7A8D99">${escHtml(r[0])}</td>` +
                  `<td style="padding:2px 0">${escHtml(r[1])}</td></tr>`).join('');
-      const err = await sendMail(env, env.NOTIFY_EMAIL, `SendOff: ${what} from ${email}`,
-        `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#121A1F">` +
-        `<p><strong>${escHtml(what)}</strong></p>` +
-        `<table style="border-collapse:collapse">${rows}</table>` +
-        `<p style="margin-top:16px"><a href="https://sendoff.run/admin.html">Open the admin panel</a></p>` +
-        `</div>`);
+      const err = await sendMail(env, {
+        to: env.NOTIFY_EMAIL,
+        from: mailFrom(env, 'notify'),
+        subject: `SendOff: ${what} from ${email}`,
+        html: `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#121A1F">` +
+              `<p><strong>${escHtml(what)}</strong></p>` +
+              `<table style="border-collapse:collapse">${rows}</table>` +
+              `<p style="margin-top:16px"><a href="https://sendoff.run/admin.html">Open the admin panel</a></p>` +
+              `</div>`
+      });
       if (err) throw new Error(err);
     } catch (e) {
       // Swallowed for the caller: the request is stored either way and must not
