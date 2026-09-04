@@ -130,6 +130,9 @@
   }
   .areq-kind.is-reset { color: var(--yellow); border-color: var(--yellow); }
   .areq-kind.is-invite { color: var(--accent); border-color: var(--accent); }
+  .areq-actions { display: flex; gap: 8px; align-items: flex-start; flex-shrink: 0; }
+  .areq-out { margin-top: 8px; }
+  .areq-out:empty { display: none; }
 </style>
 </head>
 <body>
@@ -150,9 +153,8 @@
 
   <div id="panels" style="display:none;">
     <section class="panel">
-      <h2>Invite requests</h2>
-      <p class="hint">People who asked for an account, and people who asked for a password reset. Action them with the boxes above,
-        then clear the request.</p>
+      <h2>Requests</h2>
+      <p class="hint">People asking for an account, and people asking for a password reset. Act on one straight from its row, then clear it.</p>
       <div id="areq-list">Loading…</div>
     </section>
 
@@ -300,9 +302,35 @@
               ${q.note ? '<br>' + esc(q.note) : ''}
               <br>asked ${esc((q.requestedAt || '').slice(0, 10))}
             </div>
+              <div class="areq-out" data-out="${esc(q.key)}"></div>
           </div>
-          <button class="btn" type="button" data-clear="${esc(q.key)}">Clear</button>
+          <div class="areq-actions"><button class="btn primary" type="button" data-act="${esc(q.key)}">${q.kind === 'reset' ? 'Send reset link' : 'Send invite'}</button><button class="btn" type="button" data-clear="${esc(q.key)}">Clear</button></div>
         </div>`).join('');
+        box.querySelectorAll('[data-act]').forEach(b => {
+          b.addEventListener('click', async () => {
+            const row = list.find(x => x.key === b.dataset.act);
+            if (!row) return;
+            const out = b.closest('.acct-row').querySelector('.areq-out');
+            const isReset = row.kind === 'reset';
+            const label = b.textContent;
+            b.disabled = true; b.textContent = 'Generating…';
+            try {
+              const r = isReset ? await Race.api.resetLink(row.email)
+                                : await Race.api.accountInvite(row.email);
+              out.innerHTML = '<div class="ok">' +
+                (isReset
+                  ? 'Send this reset link to <strong>' + esc(row.email) + '</strong>. Expires in 2 days.'
+                  : 'Send this signup link to <strong>' + esc(row.email) + '</strong>. Expires in 14 days.') +
+                '<span class="url">' + esc(r.url) + '</span>' + copyBtn(r.url) + '</div>';
+              b.textContent = isReset ? 'New reset link' : 'New invite';
+            } catch (err) {
+              out.innerHTML = '<div class="err">' + esc(err.message || 'Could not generate that link.') + '</div>';
+              b.textContent = label;
+            }
+            b.disabled = false;
+          });
+        });
+
       box.querySelectorAll('[data-clear]').forEach(b => {
         b.addEventListener('click', async () => {
           b.disabled = true;
