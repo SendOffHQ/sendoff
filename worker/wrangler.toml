@@ -5,8 +5,8 @@ compatibility_date = "2026-05-01"
 # Non-secret config goes here. Sensitive values are set via
 # `wrangler secret put <NAME>` so they never end up in git.
 [vars]
-GITHUB_OWNER = "jpdupree"
-GITHUB_REPO = "race-dashboard"
+GITHUB_OWNER = "SendOffHQ"
+GITHUB_REPO = "sendoff"
 GITHUB_BRANCH = "main"
 # If you mount the worker at a subpath (e.g. on a route like
 # api.example.com/race-dashboard/*), set MOUNT_PATH to that prefix.
@@ -14,11 +14,11 @@ GITHUB_BRANCH = "main"
 MOUNT_PATH = ""
 # Comma-separated origins allowed by CORS. "*" allows any caller.
 # A CORS origin is scheme + host only — never a path.
-ALLOWED_ORIGINS = "https://jpdupree.github.io"
+ALLOWED_ORIGINS = "https://sendoff.run"
 # Public URL of the hub frontend, used when building invite & share URLs.
-# Includes the repo path so links resolve correctly. If empty, the worker
+# The site is served from the root of its domain. If empty, the worker
 # falls back to the request's Origin header.
-PUBLIC_BASE_URL = "https://jpdupree.github.io/race-dashboard"
+PUBLIC_BASE_URL = "https://sendoff.run"
 
 # Secrets to set with `wrangler secret put`:
 #   GITHUB_TOKEN   PAT with Contents: Read and write
@@ -34,8 +34,8 @@ PUBLIC_BASE_URL = "https://jpdupree.github.io/race-dashboard"
 binding = "AUTH_KV"
 id = "a8c164ca55b14dd08d786a98ced12176"
 
-# To route this worker at api.thebillymangames.com/race-dashboard/*, add
-# a route in the Cloudflare dashboard or uncomment + edit:
+# To put this worker behind api.sendoff.run, add a custom domain in the
+# Cloudflare dashboard or uncomment + edit:
 # [[routes]]
-# pattern = "api.thebillymangames.com/race-dashboard/*"
-# zone_name = "thebillymangames.com"
+# pattern = "api.sendoff.run/*"
+# zone_name = "sendoff.run"
