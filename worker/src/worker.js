@@ -779,6 +779,91 @@ async function handleGet(req, env) {
   });
 }
 
+// ---------- access requests ----------
+// Public, unauthenticated: someone with no account asking for one. That makes
+// it the only write endpoint a stranger can reach, so it carries its own
+// limits rather than trusting the caller: a honeypot field, a length cap on
+// everything, and a per-IP hourly quota in KV.
+const ACCESS_REQ_TTL_DAYS = 90;
+const ACCESS_REQ_PER_HOUR = 5;
+
+function clip(v, n) {
+  return typeof v === 'string' ? v.trim().slice(0, n) : '';
+}
+
+async function handleAccessRequest(req, env) {
+  if (!env.AUTH_KV) return json({ error: 'Access requests require AUTH_KV KV namespace binding' }, { status: 503 }, env, req);
+  let body;
+  try { body = await req.json(); }
+  catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+
+  // Honeypot: a real person never sees this field, so anything in it is a bot.
+  // Answer 200 so the bot has nothing to learn from the response.
+  if (clip(body && body.website, 200)) return json({ ok: true }, {}, env, req);
+
+  const email = normalizeEmail(body && body.email);
+  const name = clip(body && body.name, 120);
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return json({ error: 'A valid email is required' }, { status: 400 }, env, req);
+  }
+  if (!name) return json({ error: 'Your name is required' }, { status: 400 }, env, req);
+
+  const ip = req.headers.get('CF-Connecting-IP') || 'unknown';
+  const bucket = 'arl:' + ip;
+  const seen = parseInt((await env.AUTH_KV.get(bucket)) || '0', 10);
+  if (seen >= ACCESS_REQ_PER_HOUR) {
+    return json({ error: 'Too many requests from here. Try again later.' }, { status: 429 }, env, req);
+  }
+  await env.AUTH_KV.put(bucket, String(seen + 1), { expirationTtl: 3600 });
+
+  // Already has an account, or already asked: answer the same either way so
+  // this cannot be used to test whether an address is registered.
+  if (await lookupUser(env, email)) return json({ ok: true }, {}, env, req);
+
+  const now = new Date().toISOString();
+  const key = 'areq:' + now + '-' + randomToken(6);
+  await env.AUTH_KV.put(key, JSON.stringify({
+    email, name,
+    race: clip(body && body.race, 160),
+    when: clip(body && body.when, 60),
+    note: clip(body && body.note, 600),
+    requestedAt: now
+  }), { expirationTtl: ACCESS_REQ_TTL_DAYS * 24 * 3600 });
+
+  return json({ ok: true }, {}, env, req);
+}
+
+// Admin: the queue of people waiting on an invite.
+async function handleAccessRequests(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Access requests require AUTH_KV KV namespace binding' }, { status: 503 }, env, req);
+
+  const list = await env.AUTH_KV.list({ prefix: 'areq:' });
+  const requests = [];
+  for (const k of list.keys) {
+    const raw = await env.AUTH_KV.get(k.name);
+    if (raw) { try { requests.push({ key: k.name, ...JSON.parse(raw) }); } catch (e) {} }
+  }
+  requests.sort((a, b) => (b.requestedAt || '').localeCompare(a.requestedAt || ''));
+  return json({ requests }, {}, env, req);
+}
+
+// Admin: clear one once it has been actioned.
+async function handleAccessRequestDelete(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Access requests require AUTH_KV KV namespace binding' }, { status: 503 }, env, req);
+  let body;
+  try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  const key = clip(body && body.key, 200);
+  if (!key.startsWith('areq:')) return json({ error: 'Bad key' }, { status: 400 }, env, req);
+  await env.AUTH_KV.delete(key);
+  return json({ ok: true }, {}, env, req);
+}
+
 // ---------- access management ----------
 function publicBaseUrl(env, req) {
   if (env.PUBLIC_BASE_URL) return env.PUBLIC_BASE_URL.replace(/\/+$/, '');
@@ -1164,6 +1249,9 @@ export default {
     path = path.replace(/\/+$/, '') || '/';
 
     if (request.method === 'GET'  && path === '/health')          return json({ ok: true, kv: !!env.AUTH_KV }, {}, env, request);
+    if (request.method === 'POST' && path === '/access-request')  return handleAccessRequest(request, env);
+    if (request.method === 'GET'  && path === '/access-requests') return handleAccessRequests(request, env);
+    if (request.method === 'POST' && path === '/access-request/delete') return handleAccessRequestDelete(request, env);
     if (request.method === 'POST' && path === '/login')           return handleLogin(request, env);
     if (request.method === 'POST' && path === '/accept-invite')   return handleAcceptInvite(request, env);
     if (request.method === 'POST' && path === '/change-password') return handleChangePassword(request, env);

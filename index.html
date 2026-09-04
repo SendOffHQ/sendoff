@@ -197,6 +197,33 @@
   .intro-actions { justify-content: stretch; }
   .intro-actions .btn { flex: 1; text-align: center; }
 }
+
+/* ---- Request an invite ---- */
+.req-box { max-width: 460px; }
+.req-box h2 {
+  font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif;
+  font-size: 24px; font-weight: 600; margin: 0 0 8px;
+}
+.req-lede { margin: 0 0 18px; font-size: 13.5px; line-height: 1.55; color: var(--text-dim); }
+.req-field { display: block; margin-bottom: 12px; }
+.req-field > span {
+  display: block; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 5px;
+}
+.req-field input, .req-field textarea {
+  width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border-bright); border-radius: 4px; padding: 8px 10px;
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; font-size: 13.5px;
+}
+.req-field textarea { min-height: 68px; resize: vertical; }
+.req-field input:focus, .req-field textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.req-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 480px) { .req-row { grid-template-columns: 1fr; } }
+.req-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.req-msg { font-size: 12.5px; min-height: 17px; margin: 2px 0 12px; line-height: 1.5; }
+.req-msg.err { color: var(--red); }
+.req-msg.ok { color: var(--green); }
+.req-actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
 </style>
 </head>
 <body>
@@ -217,7 +244,7 @@
 <footer class="site">
   <div id="repo-link">–</div>
   <div><button type="button" id="intro-open" class="intro-link">What is SendOff?</button>
-    <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:invites@sendoff.run?subject=SendOff%20invite%20request&body=I%27d%20like%20an%20account%20on%20SendOff.%0A%0AName%3A%0ARace%20I%27m%20crewing%3A%0ADate%3A%0A%0AAnything%20else%20worth%20knowing%3A%0A">Request an invite</a></div>
+    <span aria-hidden="true"> · </span><button type="button" class="intro-link" data-request-invite>Request an invite</button></div>
 </footer>
 
 <script src="lib/race-core.js?v=20"></script>
@@ -464,7 +491,7 @@
         </ol>
         <p class="intro-note">Watching needs no account and no app: anyone with the link can follow
             along. Running a race of your own needs an account, and while SendOff is new those
-            are invite only. <a class="intro-note-link" href="mailto:invites@sendoff.run?subject=SendOff%20invite%20request&body=I%27d%20like%20an%20account%20on%20SendOff.%0A%0AName%3A%0ARace%20I%27m%20crewing%3A%0ADate%3A%0A%0AAnything%20else%20worth%20knowing%3A%0A">Request an invite</a>.</p>
+            are invite only. <button type="button" class="intro-link intro-note-link" data-request-invite>Request an invite</button>.</p>
         <div class="intro-actions">
           <button type="button" class="intro-link" data-intro-close>Look around first</button>
           <a class="btn primary" href="setup.html">Set up a race &rarr;</a>
@@ -496,6 +523,129 @@
     ov.querySelector('.btn.primary').addEventListener('click', markIntroSeen);
     (box.querySelector('.btn.primary') || box).focus();
   }
+
+  // ---- Request an invite ----------------------------------------------
+  // Posts to the worker, which stores it for an admin to action. If the
+  // worker has not been deployed with that endpoint yet, fall back to the
+  // address rather than leaving someone with a dead button.
+  const INVITE_EMAIL = 'invites@sendoff.run';
+
+  function openRequest() {
+    if (document.querySelector('.req-overlay')) return;
+    const previous = document.activeElement;
+    const ov = document.createElement('div');
+    ov.className = 'modal-overlay req-overlay';
+    ov.innerHTML = `
+      <div class="intro-box req-box" role="dialog" aria-modal="true" aria-labelledby="req-heading">
+        <h2 id="req-heading">Request an invite</h2>
+        <p class="req-lede">Accounts are invite only while SendOff is new. Tell us who you are and
+          what you are crewing, and we will get back to you.</p>
+        <form id="req-form" novalidate>
+          <label class="req-field"><span>Your name</span>
+            <input type="text" id="req-name" autocomplete="name" required></label>
+          <label class="req-field"><span>Email</span>
+            <input type="email" id="req-email" autocomplete="email" spellcheck="false" required></label>
+          <div class="req-row">
+            <label class="req-field"><span>Race</span>
+              <input type="text" id="req-race" placeholder="Which one?"></label>
+            <label class="req-field"><span>When</span>
+              <input type="text" id="req-when" placeholder="Month, or a date"></label>
+          </div>
+          <label class="req-field"><span>Anything else</span>
+            <textarea id="req-note" rows="3"></textarea></label>
+          <label class="req-hp" aria-hidden="true" tabindex="-1">Leave this empty
+            <input type="text" id="req-hp" tabindex="-1" autocomplete="off"></label>
+          <p class="req-msg" id="req-msg" role="status" aria-live="polite"></p>
+          <div class="req-actions">
+            <button type="button" class="intro-link" data-req-close>Cancel</button>
+            <button type="submit" class="btn primary" id="req-send">Send request</button>
+          </div>
+        </form>
+      </div>`;
+    document.body.appendChild(ov);
+    const box = ov.querySelector('.req-box');
+    const msg = ov.querySelector('#req-msg');
+    const send = ov.querySelector('#req-send');
+
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+      if (e.key !== 'Tab') return;
+      const f = box.querySelectorAll('a[href], button, input, textarea');
+      const vis = [...f].filter(el => el.offsetParent !== null || el.tagName === 'A');
+      if (!vis.length) return;
+      const first = vis[0], last = vis[vis.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    function close() {
+      document.removeEventListener('keydown', onKey, true);
+      ov.remove();
+      if (previous && previous.focus) previous.focus();
+    }
+    function mailtoFallback(payload) {
+      const body = `Name: ${payload.name}\nEmail: ${payload.email}\n` +
+                   `Race: ${payload.race}\nWhen: ${payload.when}\n\n${payload.note}\n`;
+      return 'mailto:' + INVITE_EMAIL +
+             '?subject=' + encodeURIComponent('SendOff invite request') +
+             '&body=' + encodeURIComponent(body);
+    }
+
+    ov.querySelector('#req-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const payload = {
+        name: ov.querySelector('#req-name').value.trim(),
+        email: ov.querySelector('#req-email').value.trim(),
+        race: ov.querySelector('#req-race').value.trim(),
+        when: ov.querySelector('#req-when').value.trim(),
+        note: ov.querySelector('#req-note').value.trim(),
+        website: ov.querySelector('#req-hp').value
+      };
+      if (!payload.name || !payload.email) {
+        msg.className = 'req-msg err'; msg.textContent = 'Name and email are required.'; return;
+      }
+      send.disabled = true; send.textContent = 'Sending…';
+      msg.className = 'req-msg'; msg.textContent = '';
+      const base = (Race.hub.proxyUrl() || '').replace(/\/+$/, '');
+      try {
+        if (!base) throw new Error('no proxy');
+        const res = await fetch(base + '/access-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          let m = `Could not send (${res.status}).`;
+          try { const j = await res.json(); if (j.error) m = j.error; } catch (err) {}
+          throw new Error(m);
+        }
+        box.innerHTML = `
+          <h2>Request sent</h2>
+          <p class="req-lede">Thanks. We will be in touch at
+            <strong>${payload.email.replace(/[<>&]/g, '')}</strong>.</p>
+          <div class="req-actions"><button type="button" class="btn primary" data-req-close>Close</button></div>`;
+        box.querySelector('[data-req-close]').addEventListener('click', close);
+        box.querySelector('[data-req-close]').focus();
+        return;
+      } catch (err) {
+        msg.className = 'req-msg err';
+        msg.innerHTML = 'Could not send that from here. ' +
+          `<a href="${mailtoFallback(payload)}" style="color: var(--accent);">Email it instead</a>.`;
+        send.disabled = false; send.textContent = 'Send request';
+      }
+    });
+
+    document.addEventListener('keydown', onKey, true);
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    ov.querySelector('[data-req-close]').addEventListener('click', close);
+    ov.querySelector('#req-name').focus();
+  }
+
+  document.querySelectorAll('[data-request-invite]').forEach(el => {
+    el.addEventListener('click', e => { e.preventDefault(); openRequest(); });
+  });
+
+  // Deep link, used by the sign-in dialog on other pages.
+  if (new URLSearchParams(location.search).has('invite')) openRequest();
 
   document.getElementById('intro-open').addEventListener('click', openIntro);
   if (!introSeen()) openIntro();
