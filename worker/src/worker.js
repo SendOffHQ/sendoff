@@ -431,7 +431,7 @@ async function handleResetLink(req, env) {
 
   let emailed = false, emailError = null;
   if (body && body.send) {
-    const m = resetMail(url, RESET_TTL_DAYS);
+    const m = resetMail(env, url, RESET_TTL_DAYS);
     const err = await sendMail(env, { to: email, from: mailFrom(env, 'reset'), ...m });
     if (err) emailError = err; else emailed = true;
   }
@@ -514,7 +514,7 @@ async function handleAccountInvite(req, env) {
   // and is told plainly that it did not go.
   let emailed = false, emailError = null;
   if (body && body.send) {
-    const m = inviteMail(url, INVITE_TTL_DAYS);
+    const m = inviteMail(env, url, INVITE_TTL_DAYS);
     const err = await sendMail(env, { to: email, from: mailFrom(env, 'invite'), ...m });
     if (err) emailError = err; else emailed = true;
   }
@@ -810,12 +810,12 @@ async function handleGet(req, env) {
 // Returns null on success or a reason string on failure. Deliberately not
 // throwing: some callers must not fail because mail did, and the ones that
 // tell an admin "it has been sent" need the reason to show instead.
-async function sendMail(env, { to, from, subject, html }) {
+async function sendMail(env, { to, from, subject, html, text }) {
   const sender = from || env.NOTIFY_FROM;
   if (!env.EMAIL) return 'the worker has no EMAIL binding';
   if (!sender) return 'no from-address is set on the worker';
   try {
-    await env.EMAIL.send({ to, from: sender, subject, html });
+    await env.EMAIL.send({ to, from: sender, subject, html, ...(text ? { text } : {}) });
     return null;
   } catch (e) {
     return (e && e.message) ? e.message : String(e);
@@ -831,42 +831,112 @@ function mailFrom(env, kind) {
   return kind === 'invite' ? env.NOTIFY_FROM : (env.INFO_FROM || env.NOTIFY_FROM);
 }
 
-function mailShell(inner) {
-  return `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:15px;` +
-         `line-height:1.6;color:#121A1F;max-width:520px">${inner}` +
-         `<p style="margin-top:28px;font-size:12px;color:#7A8D99">` +
-         `SendOff, live crew tracking for ultras. ` +
-         `<a href="https://sendoff.run" style="color:#0FB8BF">sendoff.run</a></p></div>`;
+// Email is not the web: no flexbox, no CSS variables, no stylesheet, and
+// Gmail strips SVG outright, so the wordmark ships as a PNG. Tables and inline
+// styles only, 600px wide, and it has to still read if images are blocked,
+// which is the default in plenty of clients.
+//
+// The band at the top is the brand's dark ground; the body below is light.
+// A wholly dark mail gets mangled by clients that invert for dark mode, and
+// gives light-mode readers a slab of black. A dark header over a light body is
+// the shape that survives both.
+const MAIL_INK      = '#121A1F';
+const MAIL_MUTED    = '#7A8D99';
+const MAIL_BAND     = '#0D1117';
+const MAIL_PAGE     = '#F5F2EA';
+const MAIL_BUTTON   = '#0A5F68';  // holds white text at 7.3:1
+const MAIL_LINK     = '#0A8B92';  // the signal colour that works on white
+
+function mailBase(env) {
+  return (env.PUBLIC_BASE_URL || 'https://sendoff.run').replace(/\/+$/, '');
 }
 
+function mailShell(env, preheader, inner) {
+  const base = mailBase(env);
+  return `<!doctype html><html><body style="margin:0;padding:0;background:${MAIL_PAGE}">` +
+    // Shown in the inbox preview line, never on the page itself.
+    `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${escHtml(preheader)}</div>` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" ` +
+      `style="background:${MAIL_PAGE};padding:24px 12px">` +
+    `<tr><td align="center">` +
+    `<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" ` +
+      `style="width:100%;max-width:600px;border-collapse:collapse">` +
+
+    // Header band. The alt text carries the name when images are blocked.
+    `<tr><td align="left" style="background:${MAIL_BAND};padding:26px 32px;border-radius:6px 6px 0 0">` +
+      `<img src="${base}/brand/wordmark-email.png" width="220" height="77" alt="SendOff" ` +
+        `style="display:block;border:0;width:220px;height:auto;max-width:100%;` +
+        `color:#F0ECE3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;` +
+        `font-size:26px;font-weight:700;letter-spacing:-0.5px">` +
+    `</td></tr>` +
+
+    `<tr><td style="background:#FFFFFF;padding:32px;font-family:-apple-system,BlinkMacSystemFont,` +
+      `'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:${MAIL_INK}">` +
+      inner +
+    `</td></tr>` +
+
+    `<tr><td style="background:#FFFFFF;padding:0 32px 28px;border-radius:0 0 6px 6px;` +
+      `font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">` +
+      `<div style="border-top:1px solid #E3DED2;padding-top:16px;font-size:12px;color:${MAIL_MUTED}">` +
+        `SendOff, live crew tracking for ultras. ` +
+        `<a href="${base}" style="color:${MAIL_LINK};text-decoration:none">sendoff.run</a>` +
+      `</div>` +
+    `</td></tr>` +
+
+    `</table></td></tr></table></body></html>`;
+}
+
+// Built from a table rather than a styled link: Outlook ignores padding on an
+// anchor, which would collapse the button to bare underlined text.
 function mailButton(url, label) {
-  return `<p style="margin:22px 0"><a href="${escHtml(url)}" ` +
-         `style="background:#0FB8BF;color:#08121A;text-decoration:none;font-weight:600;` +
-         `padding:12px 20px;border-radius:4px;display:inline-block">${escHtml(label)}</a></p>` +
-         `<p style="font-size:12px;color:#7A8D99;word-break:break-all">` +
-         `Or paste this in: ${escHtml(url)}</p>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0">` +
+    `<tr><td align="center" bgcolor="${MAIL_BUTTON}" style="border-radius:4px">` +
+    `<a href="${escHtml(url)}" style="display:inline-block;padding:13px 26px;font-family:-apple-system,` +
+      `BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;` +
+      `color:#FFFFFF;text-decoration:none;border-radius:4px">${escHtml(label)}</a>` +
+    `</td></tr></table>` +
+    // The button is an image-free element, but a blocked or broken renderer
+    // still leaves the link reachable as text.
+    `<p style="margin:0 0 4px;font-size:12px;color:${MAIL_MUTED}">Or paste this into your browser:</p>` +
+    `<p style="margin:0;font-size:12px;word-break:break-all">` +
+      `<a href="${escHtml(url)}" style="color:${MAIL_LINK}">${escHtml(url)}</a></p>`;
 }
 
-// The two messages an admin sends from the requests queue.
-function inviteMail(url, days) {
+// The two messages an admin sends from the requests queue. Each carries a
+// plain-text alternative: some clients prefer it, some people insist on it,
+// and a mail with only an HTML part looks worse to a spam filter.
+function inviteMail(env, url, days) {
+  const h1 = `<h1 style="margin:0 0 14px;font-size:22px;line-height:1.25;color:${MAIL_INK}">` +
+             `You are in.</h1>`;
   return {
     subject: 'Your SendOff invite',
-    html: mailShell(
-      `<p>You asked for an invite to SendOff. Here it is.</p>` +
-      mailButton(url, 'Set up your account →') +
-      `<p style="font-size:13px;color:#4A5C68">The link works once and expires in ${days} days. ` +
-      `If you did not ask for this, you can ignore it.</p>`)
+    html: mailShell(env, `Set up your account. The link expires in ${days} days.`,
+      h1 +
+      `<p style="margin:0 0 4px">You asked for an invite to SendOff. Here it is.</p>` +
+      mailButton(url, 'Set up your account') +
+      `<p style="margin:20px 0 0;font-size:13px;color:${MAIL_MUTED}">The link works once and ` +
+      `expires in ${days} days. If you did not ask for this, you can ignore it.</p>`),
+    text: `You are in.\n\nYou asked for an invite to SendOff. Set up your account here:\n\n${url}\n\n` +
+          `The link works once and expires in ${days} days. If you did not ask for this, you can ignore it.\n\n` +
+          `SendOff, live crew tracking for ultras. ${mailBase(env)}\n`
   };
 }
 
-function resetMail(url, days) {
+function resetMail(env, url, days) {
+  const h1 = `<h1 style="margin:0 0 14px;font-size:22px;line-height:1.25;color:${MAIL_INK}">` +
+             `Set a new password</h1>`;
   return {
     subject: 'Reset your SendOff password',
-    html: mailShell(
-      `<p>Someone asked to reset the password on your SendOff account.</p>` +
-      mailButton(url, 'Choose a new password →') +
-      `<p style="font-size:13px;color:#4A5C68">The link expires in ${days} days. ` +
-      `If this was not you, ignore it and your password stays as it is.</p>`)
+    html: mailShell(env, `Choose a new password. The link expires in ${days} days.`,
+      h1 +
+      `<p style="margin:0 0 4px">Someone asked to reset the password on your SendOff account.</p>` +
+      mailButton(url, 'Choose a new password') +
+      `<p style="margin:20px 0 0;font-size:13px;color:${MAIL_MUTED}">The link expires in ${days} days. ` +
+      `If this was not you, ignore it and your password stays as it is.</p>`),
+    text: `Set a new password\n\nSomeone asked to reset the password on your SendOff account. ` +
+          `Choose a new one here:\n\n${url}\n\n` +
+          `The link expires in ${days} days. If this was not you, ignore it and your password ` +
+          `stays as it is.\n\nSendOff, live crew tracking for ultras. ${mailBase(env)}\n`
   };
 }
 
@@ -958,11 +1028,13 @@ async function handleAccessRequest(req, env) {
         to: env.NOTIFY_EMAIL,
         from: mailFrom(env, 'notify'),
         subject: `SendOff: ${what} from ${email}`,
-        html: `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#121A1F">` +
-              `<p><strong>${escHtml(what)}</strong></p>` +
-              `<table style="border-collapse:collapse">${rows}</table>` +
-              `<p style="margin-top:16px"><a href="https://sendoff.run/admin.html">Open the admin panel</a></p>` +
-              `</div>`
+        html: mailShell(env, `${what} from ${email}`,
+          `<h1 style="margin:0 0 14px;font-size:22px;line-height:1.25;color:${MAIL_INK}">` +
+            `${escHtml(what)}</h1>` +
+          `<table style="border-collapse:collapse;font-size:14px">${rows}</table>` +
+          mailButton(`${mailBase(env)}/admin.html`, 'Open the admin panel')),
+        text: `${what} from ${email}\n\n` +
+              `Open the admin panel: ${mailBase(env)}/admin.html\n`
       });
       if (err) throw new Error(err);
     } catch (e) {
