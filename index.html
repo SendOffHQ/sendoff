@@ -100,16 +100,33 @@
     width: 6px; height: 6px; border-radius: 50%; background: currentColor;
     animation: pulse 1.6s ease-in-out infinite;
   }
-  .sort-control {
-    margin-left: auto; display: flex; align-items: center; gap: 8px;
+  .hub-filters {
+    margin-left: auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .sort-control, .search-control {
+    display: flex; align-items: center; gap: 8px;
     font-family: 'JetBrains Mono', monospace; font-size: 10px;
     letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted);
   }
-  .sort-control select {
+  .sort-control select, .search-control input {
     font-family: 'JetBrains Mono', monospace; font-size: 12px;
     background: var(--bg-elevated); color: var(--text);
     border: 1px solid var(--border-bright); border-radius: 4px;
     padding: 8px 10px; text-transform: none; letter-spacing: 0;
+  }
+  .search-control input { width: 190px; }
+  .search-control input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .search-control input::placeholder { color: var(--text-muted); }
+  /* Filters own the row once they stop fitting beside the New race button. */
+  @media (max-width: 700px) {
+    .hub-filters { margin-left: 0; width: 100%; }
+    .search-control, .sort-control { flex: 1 1 100%; }
+    .search-control input, .sort-control select { flex: 1; min-width: 0; }
+  }
+  .no-matches {
+    background: var(--bg-card); border: 1px dashed var(--border-bright);
+    border-radius: 6px; padding: 28px 24px; text-align: center;
+    color: var(--text-muted); font-size: 13px;
   }
 
   .empty {
@@ -250,7 +267,7 @@
     <span aria-hidden="true"> · </span><button type="button" class="intro-link" data-request-invite>Request an invite</button></div>
 </footer>
 
-<script src="lib/race-core.js?v=23"></script>
+<script src="lib/race-core.js?v=24"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
@@ -325,6 +342,18 @@
     return rows.map(x => x.r);
   }
 
+  // Matches on the things you would actually recall about a race: what it was
+  // called, where it was, and who ran it.
+  function filterRaces(races, q) {
+    q = (q || '').trim().toLowerCase();
+    if (!q) return races;
+    return races.filter(r =>
+      (r.name || '').toLowerCase().includes(q) ||
+      (r.location || '').toLowerCase().includes(q) ||
+      (r.runnerNames || []).some(n => (n || '').toLowerCase().includes(q))
+    );
+  }
+
   function renderCard(r) {
     const status = raceStatus(r);
     const finished = status === 'finished';
@@ -364,8 +393,12 @@
     const sel = document.getElementById('sort-mode');
     if (!sel) return;
     localStorage.setItem(SORT_KEY, sel.value);
-    document.getElementById('cards').innerHTML =
-      sortRaces(loadedRaces, sel.value).map(renderCard).join('');
+    const search = document.getElementById('race-search');
+    const q = search ? search.value : '';
+    const shown = sortRaces(filterRaces(loadedRaces, q), sel.value);
+    document.getElementById('cards').innerHTML = shown.length
+      ? shown.map(renderCard).join('')
+      : `<div class="no-matches">No races match “${escapeHtml(q.trim())}”.</div>`;
   }
 
   function escapeHtml(s) {
@@ -423,13 +456,19 @@
         body.innerHTML = `
           <div class="hub-actions">
             <a class="btn primary" href="setup.html">+ New race</a>
-            <label class="sort-control">Sort
-              <select id="sort-mode">
-                <option value="status">Live / upcoming / past</option>
-                <option value="az">Name (A–Z)</option>
-                ${isAuthed ? '<option value="owned">Owned first</option>' : ''}
-              </select>
-            </label>
+            <div class="hub-filters">
+              <label class="search-control">Search
+                <input type="search" id="race-search" placeholder="Name, place or runner"
+                       autocomplete="off" spellcheck="false" aria-label="Search races" />
+              </label>
+              <label class="sort-control">Sort
+                <select id="sort-mode">
+                  <option value="status">Live / upcoming / past</option>
+                  <option value="az">Name (A–Z)</option>
+                  ${isAuthed ? '<option value="owned">Owned first</option>' : ''}
+                </select>
+              </label>
+            </div>
           </div>
           ${myErr ? `<div class="error-banner" style="display:block; margin-bottom: 16px;">Could not load private races: ${escapeHtml(myErr.message)}</div>` : ''}
           <div class="cards" id="cards"></div>
@@ -438,6 +477,12 @@
         const saved = localStorage.getItem(SORT_KEY) || 'status';
         if ([...sel.options].some(o => o.value === saved)) sel.value = saved;
         sel.addEventListener('change', renderList);
+        const search = document.getElementById('race-search');
+        search.addEventListener('input', renderList);
+        // Escape clears rather than leaving a filter you have to hunt for.
+        search.addEventListener('keydown', e => {
+          if (e.key === 'Escape' && search.value) { e.stopPropagation(); search.value = ''; renderList(); }
+        });
         renderList();
         refineStatuses();
       }
