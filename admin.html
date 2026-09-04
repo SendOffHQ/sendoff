@@ -187,7 +187,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=20"></script>
+<script src="lib/race-core.js?v=21"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -235,6 +235,7 @@
     document.getElementById('reset-gen').addEventListener('click', genReset);
     document.getElementById('reset-email').addEventListener('keydown', (e) => { if (e.key === 'Enter') genReset(); });
     loadAccounts();
+    loadAccessRequests();
   })();
 
   async function genInvite() {
@@ -250,38 +251,6 @@
         '<span class="url">' + esc(r.url) + '</span>' + copyBtn(r.url) + '</div>';
       document.getElementById('inv-email').value = '';
       loadAccounts();
-    async function loadAccessRequests() {
-      const box = document.getElementById('areq-list');
-      try {
-        const r = await Race.api.accessRequests();
-        const list = r.requests || [];
-        if (!list.length) { box.textContent = 'No open requests.'; return; }
-        box.innerHTML = list.map(q => `
-          <div class="acct-row" data-key="${escapeHtml(q.key)}">
-            <div>
-              <strong>${escapeHtml(q.name || '(no name)')}</strong>
-              &lt;${escapeHtml(q.email)}&gt;
-              <div class="hint">
-                ${escapeHtml([q.race, q.when].filter(Boolean).join(' · ') || 'no race given')}
-                ${q.note ? '<br>' + escapeHtml(q.note) : ''}
-                <br>asked ${escapeHtml((q.requestedAt || '').slice(0, 10))}
-              </div>
-            </div>
-            <button class="btn" type="button" data-clear="${escapeHtml(q.key)}">Clear</button>
-          </div>`).join('');
-        box.querySelectorAll('[data-clear]').forEach(b => {
-          b.addEventListener('click', async () => {
-            b.disabled = true;
-            try { await Race.api.deleteAccessRequest(b.dataset.clear); loadAccessRequests(); }
-            catch (e) { b.disabled = false; }
-          });
-        });
-      } catch (e) {
-        box.textContent = 'Could not load requests: ' + e.message;
-      }
-    }
-    loadAccessRequests();
-
     } catch (err) {
       out.innerHTML = '<div class="err">' + esc(err.message || 'Could not generate invite.') + '</div>';
     } finally {
@@ -304,6 +273,37 @@
       out.innerHTML = '<div class="err">' + esc(err.message || 'Could not generate reset link.') + '</div>';
     } finally {
       btn.disabled = false; btn.textContent = 'Generate reset link';
+    }
+  }
+
+  async function loadAccessRequests() {
+    const box = document.getElementById('areq-list');
+    try {
+      const r = await Race.api.accessRequests();
+      const list = r.requests || [];
+      if (!list.length) { box.textContent = 'No open requests.'; return; }
+      box.innerHTML = list.map(q => `
+        <div class="acct-row" data-key="${esc(q.key)}">
+          <div>
+            <strong>${esc(q.name || '(no name)')}</strong>
+            &lt;${esc(q.email)}&gt;
+            <div class="hint">
+              ${esc([q.race, q.when].filter(Boolean).join(' · ') || 'no race given')}
+              ${q.note ? '<br>' + esc(q.note) : ''}
+              <br>asked ${esc((q.requestedAt || '').slice(0, 10))}
+            </div>
+          </div>
+          <button class="btn" type="button" data-clear="${esc(q.key)}">Clear</button>
+        </div>`).join('');
+      box.querySelectorAll('[data-clear]').forEach(b => {
+        b.addEventListener('click', async () => {
+          b.disabled = true;
+          try { await Race.api.deleteAccessRequest(b.dataset.clear); loadAccessRequests(); }
+          catch (e) { b.disabled = false; }
+        });
+      });
+    } catch (e) {
+      box.textContent = 'Could not load requests: ' + e.message;
     }
   }
 
