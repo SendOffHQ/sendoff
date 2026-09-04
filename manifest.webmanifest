@@ -1,0 +1,22 @@
+{
+  "name": "SendOff — live crew tracking",
+  "short_name": "SendOff",
+  "description": "Follow a runner live through an ultra. Crew log legs and pits from the aid station; anyone with the link watches without an account.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0A0F14",
+  "theme_color": "#0A0F14",
+  "orientation": "portrait-primary",
+  "categories": ["sports", "utilities"],
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/brand/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Pit board", "short_name": "Pit", "url": "/pit.html" },
+    { "name": "Race hub", "short_name": "Hub", "url": "/" }
+  ]
+}
