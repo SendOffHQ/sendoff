@@ -787,6 +787,12 @@ async function handleGet(req, env) {
 const ACCESS_REQ_TTL_DAYS = 90;
 const ACCESS_REQ_PER_HOUR = 5;
 
+function escHtml(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function clip(v, n) {
   return typeof v === 'string' ? v.trim().slice(0, n) : '';
 }
@@ -842,6 +848,35 @@ async function handleAccessRequest(req, env) {
     note: clip(body && body.note, 600),
     requestedAt: now
   }), { expirationTtl: ACCESS_REQ_TTL_DAYS * 24 * 3600 });
+
+  // Tell the admin something arrived. A queue nobody is told about is a queue
+  // nobody checks. Never let a mail failure fail the request: the row is
+  // already stored and the admin panel remains the source of truth.
+  if (env.EMAIL && env.NOTIFY_EMAIL && env.NOTIFY_FROM) {
+    try {
+      const what = kind === 'reset' ? 'Password reset request' : 'Invite request';
+      const rows = [
+        ['Name', name], ['Email', email],
+        ['Race', clip(body && body.race, 160)],
+        ['When', clip(body && body.when, 60)],
+        ['Note', clip(body && body.note, 600)]
+      ].filter(r => r[1])
+       .map(r => `<tr><td style="padding:2px 12px 2px 0;color:#7A8D99">${escHtml(r[0])}</td>` +
+                 `<td style="padding:2px 0">${escHtml(r[1])}</td></tr>`).join('');
+      await env.EMAIL.send({
+        to: env.NOTIFY_EMAIL,
+        from: env.NOTIFY_FROM,
+        subject: `SendOff: ${what} from ${email}`,
+        html: `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#121A1F">` +
+              `<p><strong>${escHtml(what)}</strong></p>` +
+              `<table style="border-collapse:collapse">${rows}</table>` +
+              `<p style="margin-top:16px"><a href="https://sendoff.run/admin.html">Open the admin panel</a></p>` +
+              `</div>`
+      });
+    } catch (e) {
+      // Deliberately swallowed. The request is stored either way.
+    }
+  }
 
   return json({ ok: true }, {}, env, req);
 }
