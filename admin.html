@@ -123,6 +123,13 @@
     font-family: 'JetBrains Mono', monospace; font-size: 10px; cursor: pointer;
   }
   .pending-row button:hover { color: var(--red); border-color: var(--red); }
+  .areq-kind {
+    display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 0.16em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px;
+    border: 1px solid var(--border-bright); margin-right: 8px; vertical-align: 1px;
+  }
+  .areq-kind.is-reset { color: var(--yellow); border-color: var(--yellow); }
+  .areq-kind.is-invite { color: var(--accent); border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -144,7 +151,7 @@
   <div id="panels" style="display:none;">
     <section class="panel">
       <h2>Invite requests</h2>
-      <p class="hint">People who asked for an account from the hub. Invite them with the box above,
+      <p class="hint">People who asked for an account, and people who asked for a password reset. Action them with the boxes above,
         then clear the request.</p>
       <div id="areq-list">Loading…</div>
     </section>
@@ -285,6 +292,7 @@
       box.innerHTML = list.map(q => `
         <div class="acct-row" data-key="${esc(q.key)}">
           <div>
+            <span class="areq-kind ${q.kind === 'reset' ? 'is-reset' : 'is-invite'}">${q.kind === 'reset' ? 'password reset' : 'invite'}</span>
             <strong>${esc(q.name || '(no name)')}</strong>
             &lt;${esc(q.email)}&gt;
             <div class="hint">
