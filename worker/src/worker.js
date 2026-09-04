@@ -428,7 +428,14 @@ async function handleResetLink(req, env) {
 
   const base = publicBaseUrl(env, req);
   const url = (base ? base : '') + `/reset.html?reset=${encodeURIComponent(token)}`;
-  return json({ token, url, email, expiresAt }, {}, env, req);
+
+  let emailed = false, emailError = null;
+  if (body && body.send) {
+    const m = resetMail(url, RESET_TTL_DAYS);
+    const err = await sendMail(env, email, m.subject, m.html);
+    if (err) emailError = err; else emailed = true;
+  }
+  return json({ token, url, email, expiresAt, emailed, emailError }, {}, env, req);
 }
 
 // Public: metadata for a reset link, so reset.html can show the email.
@@ -501,7 +508,17 @@ async function handleAccountInvite(req, env) {
   }), { expiration: Math.floor(expiresAt / 1000) });
   const base = publicBaseUrl(env, req);
   const url = (base ? base : '') + `/signup.html?account=${encodeURIComponent(token)}`;
-  return json({ token, url, email, expiresAt }, {}, env, req);
+
+  // The link is returned either way. Mail is the convenience, not the record:
+  // if it fails the admin still has something to paste into their own client,
+  // and is told plainly that it did not go.
+  let emailed = false, emailError = null;
+  if (body && body.send) {
+    const m = inviteMail(url, INVITE_TTL_DAYS);
+    const err = await sendMail(env, email, m.subject, m.html);
+    if (err) emailError = err; else emailed = true;
+  }
+  return json({ token, url, email, expiresAt, emailed, emailError }, {}, env, req);
 }
 
 // Public: metadata for an account-invite link.
@@ -786,6 +803,63 @@ async function handleGet(req, env) {
   });
 }
 
+// ---------- outbound mail ----------
+// One place that knows how to put a message on the wire, so the operator
+// notification and the invite and reset mails cannot drift apart.
+//
+// Returns null on success or a reason string on failure. Deliberately not
+// throwing: some callers must not fail because mail did, and the ones that
+// tell an admin "it has been sent" need the reason to show instead.
+async function sendMail(env, to, subject, html) {
+  if (!env.EMAIL) return 'the worker has no EMAIL binding';
+  if (!env.NOTIFY_FROM) return 'NOTIFY_FROM is not set on the worker';
+  try {
+    await env.EMAIL.send({ to, from: env.NOTIFY_FROM, subject, html });
+    return null;
+  } catch (e) {
+    return (e && e.message) ? e.message : String(e);
+  }
+}
+
+function mailShell(inner) {
+  return `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:15px;` +
+         `line-height:1.6;color:#121A1F;max-width:520px">${inner}` +
+         `<p style="margin-top:28px;font-size:12px;color:#7A8D99">` +
+         `SendOff, live crew tracking for ultras. ` +
+         `<a href="https://sendoff.run" style="color:#0FB8BF">sendoff.run</a></p></div>`;
+}
+
+function mailButton(url, label) {
+  return `<p style="margin:22px 0"><a href="${escHtml(url)}" ` +
+         `style="background:#0FB8BF;color:#08121A;text-decoration:none;font-weight:600;` +
+         `padding:12px 20px;border-radius:4px;display:inline-block">${escHtml(label)}</a></p>` +
+         `<p style="font-size:12px;color:#7A8D99;word-break:break-all">` +
+         `Or paste this in: ${escHtml(url)}</p>`;
+}
+
+// The two messages an admin sends from the requests queue.
+function inviteMail(url, days) {
+  return {
+    subject: 'Your SendOff invite',
+    html: mailShell(
+      `<p>You asked for an invite to SendOff. Here it is.</p>` +
+      mailButton(url, 'Set up your account →') +
+      `<p style="font-size:13px;color:#4A5C68">The link works once and expires in ${days} days. ` +
+      `If you did not ask for this, you can ignore it.</p>`)
+  };
+}
+
+function resetMail(url, days) {
+  return {
+    subject: 'Reset your SendOff password',
+    html: mailShell(
+      `<p>Someone asked to reset the password on your SendOff account.</p>` +
+      mailButton(url, 'Choose a new password →') +
+      `<p style="font-size:13px;color:#4A5C68">The link expires in ${days} days. ` +
+      `If this was not you, ignore it and your password stays as it is.</p>`)
+  };
+}
+
 // ---------- access requests ----------
 // Public, unauthenticated: someone with no account asking for one. That makes
 // it the only write endpoint a stranger can reach, so it carries its own
@@ -870,16 +944,13 @@ async function handleAccessRequest(req, env) {
       ].filter(r => r[1])
        .map(r => `<tr><td style="padding:2px 12px 2px 0;color:#7A8D99">${escHtml(r[0])}</td>` +
                  `<td style="padding:2px 0">${escHtml(r[1])}</td></tr>`).join('');
-      await env.EMAIL.send({
-        to: env.NOTIFY_EMAIL,
-        from: env.NOTIFY_FROM,
-        subject: `SendOff: ${what} from ${email}`,
-        html: `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#121A1F">` +
-              `<p><strong>${escHtml(what)}</strong></p>` +
-              `<table style="border-collapse:collapse">${rows}</table>` +
-              `<p style="margin-top:16px"><a href="https://sendoff.run/admin.html">Open the admin panel</a></p>` +
-              `</div>`
-      });
+      const err = await sendMail(env, env.NOTIFY_EMAIL, `SendOff: ${what} from ${email}`,
+        `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#121A1F">` +
+        `<p><strong>${escHtml(what)}</strong></p>` +
+        `<table style="border-collapse:collapse">${rows}</table>` +
+        `<p style="margin-top:16px"><a href="https://sendoff.run/admin.html">Open the admin panel</a></p>` +
+        `</div>`);
+      if (err) throw new Error(err);
     } catch (e) {
       // Swallowed for the caller: the request is stored either way and must not
       // fail because mail did. Logged so `wrangler tail` can show an operator
