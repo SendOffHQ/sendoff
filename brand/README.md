@@ -85,6 +85,6 @@ font. For everything else:
 
 | Role | Face |
 |---|---|
-| Display | Fraunces (headings, race names) |
-| Body | Inter |
+| Display | Barlow Condensed (headings, race names) |
+| Body | IBM Plex Sans |
 | Mono | JetBrains Mono (labels, timestamps, data) |

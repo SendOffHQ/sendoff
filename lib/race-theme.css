@@ -56,7 +56,7 @@ a.wordmark:focus-visible { outline: 2px solid var(--signal); outline-offset: 4px
 html, body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Inter', sans-serif;
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
@@ -94,7 +94,7 @@ header.site {
   50% { opacity: 0.5; transform: scale(0.85); }
 }
 h1.site {
-  font-family: 'Fraunces', serif; font-weight: 800;
+  font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; font-weight: 800;
   font-size: 44px; line-height: 1; letter-spacing: -0.025em;
 }
 h1.site em { font-style: italic; color: var(--accent); font-weight: 600; }
@@ -178,7 +178,7 @@ footer.site {
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
 }
 .modal-title {
-  font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600;
+  font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; font-size: 20px; font-weight: 600;
   margin-bottom: 16px;
 }
 .modal-field { display: block; margin-bottom: 12px; }
