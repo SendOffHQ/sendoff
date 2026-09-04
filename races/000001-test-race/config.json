@@ -1,0 +1,45 @@
+{
+  "name": "Test Race",
+  "location": "Cleburne, TX",
+  "startTime": "2026-09-18T06:00:00-05:00",
+  "courseType": "segments",
+  "units": {
+    "distance": "mi",
+    "elevation": "ft"
+  },
+  "visibility": "public",
+  "createdBy": "thebillyman@gmail.com",
+  "editors": [
+    "thebillyman@gmail.com"
+  ],
+  "viewers": [],
+  "cutoffs": {
+    "totalHours": 36
+  },
+  "course": {
+    "segments": [
+      {
+        "name": "Start → Finish",
+        "fromAid": "Start",
+        "toAid": "Finish",
+        "distanceMi": 6,
+        "elevationGainFt": null,
+        "elevationLossFt": null,
+        "arriveCutoffHours": null
+      }
+    ]
+  },
+  "runners": [
+    {
+      "id": "dude",
+      "name": "Dude",
+      "bib": "Dude",
+      "color": "#0a8b92"
+    }
+  ],
+  "targets": {
+    "caloriesPerHour": 250,
+    "fluidOzPerHour": 20,
+    "sodiumMgPerHour": 500
+  }
+}
