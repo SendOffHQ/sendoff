@@ -27,58 +27,7 @@
       ],
       "cutoffHours": 8.5,
       "createdBy": "thebillyman@gmail.com"
-    },
-    {
-      "slug": "000001-test-race",
-      "name": "Test Race",
-      "location": "Cleburne, TX",
-      "startTime": "2026-09-18T06:00:00-05:00",
-      "courseType": "segments",
-      "units": {
-        "distance": "mi",
-        "elevation": "ft"
-      },
-      "totalDistanceMi": 6,
-      "runnerNames": [
-        "Dude"
-      ],
-      "cutoffHours": 36,
-      "createdBy": "thebillyman@gmail.com"
-    },
-    {
-      "slug": "000002-test-race-2",
-      "name": "Test Race 2",
-      "location": "Cleburne, TX",
-      "startTime": "2026-09-26T06:00:00-05:00",
-      "courseType": "segments",
-      "units": {
-        "distance": "mi",
-        "elevation": "ft"
-      },
-      "totalDistanceMi": 2,
-      "runnerNames": [
-        "JD"
-      ],
-      "cutoffHours": 36,
-      "createdBy": "thebillyman@gmail.com"
-    },
-    {
-      "slug": "000003-test-race-3",
-      "name": "Test Race 3",
-      "location": "Cleburne, TX",
-      "startTime": "2026-09-12T06:00:00-05:00",
-      "courseType": "segments",
-      "units": {
-        "distance": "mi",
-        "elevation": "ft"
-      },
-      "totalDistanceMi": 3,
-      "runnerNames": [
-        "asd"
-      ],
-      "cutoffHours": 36,
-      "createdBy": "thebillyman@gmail.com"
     }
   ],
-  "lastUpdated": "2026-09-04T14:22:53.310Z"
+  "lastUpdated": "2026-09-04T15:12:57.286Z"
 }
