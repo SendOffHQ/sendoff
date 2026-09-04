@@ -68,6 +68,9 @@
     display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px;
   }
   .compose-row .btn { text-decoration: none; }
+  .compose-help {
+    margin-top: 8px; font-size: 11px; line-height: 1.5; color: var(--text-muted);
+  }
 
   /* accounts list */
   .acct-list { display: flex; flex-direction: column; gap: 6px; }
@@ -200,7 +203,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=28"></script>
+<script src="lib/race-core.js?v=29"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -238,8 +241,52 @@
     };
   }
 
-  // Two ways out, because mailto only works when something is registered to
-  // handle it. Webmail usually is not, so the Gmail compose URL is offered
+  // Puts the branded message on the clipboard as rich HTML, so pasting it into
+  // Gmail's compose box lands the real thing: logo, colours, button. Neither
+  // mailto nor Gmail's compose URL can carry markup in a body, but the
+  // clipboard can, so this is the one route to a branded mail sent by hand.
+  //
+  // A plain-text flavour rides along for anywhere that will not take the HTML.
+  async function copyRichMail(html, text, btn) {
+    const done = (label) => {
+      const was = btn.textContent;
+      btn.textContent = label;
+      setTimeout(() => { btn.textContent = was; }, 1600);
+    };
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/html':  new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text || ''], { type: 'text/plain' })
+        })]);
+        return done('Copied ✓ now paste it');
+      }
+      throw new Error('no ClipboardItem');
+    } catch (e) {
+      // Older engines: copy a live selection of the rendered markup, which
+      // carries formatting the same way copying from a page would.
+      try {
+        const host = document.createElement('div');
+        host.setAttribute('contenteditable', 'true');
+        host.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+        host.innerHTML = html;
+        document.body.appendChild(host);
+        const range = document.createRange();
+        range.selectNodeContents(host);
+        const sel = window.getSelection();
+        sel.removeAllRanges(); sel.addRange(range);
+        const ok = document.execCommand('copy');
+        sel.removeAllRanges();
+        host.remove();
+        return done(ok ? 'Copied ✓ now paste it' : 'Could not copy');
+      } catch (e2) {
+        return done('Could not copy');
+      }
+    }
+  }
+
+  // Three ways out. mailto only works when something is registered to handle
+  // it, and webmail usually is not, so the Gmail compose URL is offered
   // alongside it and always opens in the browser.
   function composeBtns(kind, name, email, url) {
     const m = draftMail(kind, name, url);
@@ -254,8 +301,11 @@
       '&body=' + encodeURIComponent(m.body);
     return '<div class="compose-row">' +
       '<a class="btn primary" href="' + esc(gmail) + '" target="_blank" rel="noopener">Open in Gmail</a>' +
+      '<button class="btn" type="button" data-rich>Copy branded email</button>' +
       '<a class="btn" href="' + esc(mailto) + '">Open in mail app</a>' +
-      copyBtn(url) + '</div>';
+      copyBtn(url) + '</div>' +
+      '<div class="compose-help">Gmail can only be handed plain text in a link. For the ' +
+      'branded version, copy it and paste into the message body.</div>';
   }
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-copy]');
@@ -386,6 +436,15 @@
               out.innerHTML = '<div class="' + cls + '">' + head +
                 '<span class="url">' + esc(r.url) + '</span>' +
                 composeBtns(row.kind, row.name, row.email, r.url) + '</div>';
+              // The worker renders the branded message; the page only carries it
+              // to the clipboard, so there is one template, not two.
+              const rich = out.querySelector('[data-rich]');
+              if (rich && r.mail && r.mail.html) {
+                rich.addEventListener('click', () => copyRichMail(r.mail.html, r.mail.text, rich));
+              } else if (rich) {
+                rich.disabled = true;
+                rich.title = 'The proxy did not return a rendered message. Deploy the worker.';
+              }
               b.textContent = isReset ? 'New reset link' : 'New invite';
             } catch (err) {
               out.innerHTML = '<div class="err">' + esc(err.message || 'Could not generate that link.') + '</div>';
