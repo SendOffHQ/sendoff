@@ -64,6 +64,10 @@
     background: rgba(229, 72, 77, 0.06); border: 1px solid rgba(229, 72, 77, 0.4);
     border-radius: 4px; padding: 12px 14px; font-size: 12px; color: var(--red); margin-top: 12px;
   }
+  .compose-row {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px;
+  }
+  .compose-row .btn { text-decoration: none; }
 
   /* accounts list */
   .acct-list { display: flex; flex-direction: column; gap: 6px; }
@@ -196,7 +200,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=26"></script>
+<script src="lib/race-core.js?v=27"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -205,6 +209,53 @@
   }
   function copyBtn(url) {
     return '<button class="btn" type="button" data-copy="' + esc(url) + '">Copy link</button>';
+  }
+
+  // Cloudflare Email Routing only delivers to addresses verified as
+  // destinations on the account, so the worker cannot mail an invite to
+  // someone who has not signed up with Cloudflare first. Until a sending
+  // service is configured these go out by hand, and this stays false. Flipping
+  // it back to true is all that is needed the day one is: the worker already
+  // takes send.
+  const AUTO_SEND_MAIL = false;
+
+  // The message, ready to send. Kept close to what the worker's own mail says
+  // so the two do not drift into telling people different things.
+  function draftMail(kind, name, url) {
+    const who = (name && name.trim()) ? name.trim().split(/\s+/)[0] : 'there';
+    if (kind === 'reset') {
+      return {
+        subject: 'Reset your SendOff password',
+        body: `Hi ${who},\n\nHere is the link to reset your SendOff password:\n\n${url}\n\n` +
+              `It expires in 2 days. If you did not ask for this, you can ignore it.\n`
+      };
+    }
+    return {
+      subject: 'Your SendOff invite',
+      body: `Hi ${who},\n\nHere is your invite to SendOff:\n\n${url}\n\n` +
+            `The link works once and expires in 14 days. Once you are in you can set up a race ` +
+            `and share the live link with your crew and anyone following along.\n`
+    };
+  }
+
+  // Two ways out, because mailto only works when something is registered to
+  // handle it. Webmail usually is not, so the Gmail compose URL is offered
+  // alongside it and always opens in the browser.
+  function composeBtns(kind, name, email, url) {
+    const m = draftMail(kind, name, url);
+    const gmail = 'https://mail.google.com/mail/?view=cm&fs=1' +
+      '&to=' + encodeURIComponent(email) +
+      '&su=' + encodeURIComponent(m.subject) +
+      '&body=' + encodeURIComponent(m.body);
+    // The address sits in the path, not a query, so the @ stays literal:
+    // some clients choke on mailto:someone%40example.com.
+    const mailto = 'mailto:' + encodeURIComponent(email).replace(/%40/g, '@') +
+      '?subject=' + encodeURIComponent(m.subject) +
+      '&body=' + encodeURIComponent(m.body);
+    return '<div class="compose-row">' +
+      '<a class="btn primary" href="' + esc(gmail) + '" target="_blank" rel="noopener">Open in Gmail</a>' +
+      '<a class="btn" href="' + esc(mailto) + '">Open in mail app</a>' +
+      copyBtn(url) + '</div>';
   }
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-copy]');
@@ -304,7 +355,7 @@
             </div>
               <div class="areq-out" data-out="${esc(q.key)}"></div>
           </div>
-          <div class="areq-actions"><button class="btn primary" type="button" data-act="${esc(q.key)}">${q.kind === 'reset' ? 'Send reset link' : 'Send invite'}</button><button class="btn" type="button" data-clear="${esc(q.key)}">Clear</button></div>
+          <div class="areq-actions"><button class="btn primary" type="button" data-act="${esc(q.key)}">${q.kind === 'reset' ? 'Compose reset' : 'Compose invite'}</button><button class="btn" type="button" data-clear="${esc(q.key)}">Clear</button></div>
         </div>`).join('');
         box.querySelectorAll('[data-act]').forEach(b => {
           b.addEventListener('click', async () => {
@@ -313,21 +364,29 @@
             const out = b.closest('.acct-row').querySelector('.areq-out');
             const isReset = row.kind === 'reset';
             const label = b.textContent;
-            b.disabled = true; b.textContent = 'Sending…';
+            b.disabled = true; b.textContent = AUTO_SEND_MAIL ? 'Sending…' : 'Composing…';
             try {
-              const r = isReset ? await Race.api.resetLink(row.email, { send: true })
-                                : await Race.api.accountInvite(row.email, { send: true });
+              const opts = { send: AUTO_SEND_MAIL };
+              const r = isReset ? await Race.api.resetLink(row.email, opts)
+                                : await Race.api.accountInvite(row.email, opts);
               const days = isReset ? '2 days' : '14 days';
               const what = isReset ? 'reset link' : 'signup link';
-              // The link is shown whether or not the mail went. If it did, it is
-              // there to check; if it did not, it is the way to finish the job.
-              const head = r.emailed
-                ? '<strong>Emailed</strong> the ' + what + ' to ' + esc(row.email) + '. Expires in ' + days + '.'
-                : 'Could not email it: ' + esc(r.emailError || 'unknown reason') +
-                  '<br>Send this ' + what + ' to <strong>' + esc(row.email) + '</strong> yourself. Expires in ' + days + '.';
-              out.innerHTML = '<div class="' + (r.emailed ? 'ok' : 'err') + '">' + head +
-                '<span class="url">' + esc(r.url) + '</span>' + copyBtn(r.url) + '</div>';
-              b.textContent = isReset ? 'Resend reset link' : 'Resend invite';
+              let head, cls;
+              if (r.emailed) {
+                head = '<strong>Emailed</strong> the ' + what + ' to ' + esc(row.email) +
+                       '. Expires in ' + days + '.';
+                cls = 'ok';
+              } else {
+                // Not an error when we never tried: the message is written and
+                // waiting, it just needs a human to press send.
+                head = (r.emailError ? 'Could not email it: ' + esc(r.emailError) + '<br>' : '') +
+                       'Ready to send to <strong>' + esc(row.email) + '</strong>. Expires in ' + days + '.';
+                cls = r.emailError ? 'err' : 'ok';
+              }
+              out.innerHTML = '<div class="' + cls + '">' + head +
+                '<span class="url">' + esc(r.url) + '</span>' +
+                composeBtns(row.kind, row.name, row.email, r.url) + '</div>';
+              b.textContent = isReset ? 'New reset link' : 'New invite';
             } catch (err) {
               out.innerHTML = '<div class="err">' + esc(err.message || 'Could not generate that link.') + '</div>';
               b.textContent = label;
