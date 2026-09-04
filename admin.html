@@ -196,7 +196,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=25"></script>
+<script src="lib/race-core.js?v=26"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -313,16 +313,21 @@
             const out = b.closest('.acct-row').querySelector('.areq-out');
             const isReset = row.kind === 'reset';
             const label = b.textContent;
-            b.disabled = true; b.textContent = 'Generating…';
+            b.disabled = true; b.textContent = 'Sending…';
             try {
-              const r = isReset ? await Race.api.resetLink(row.email)
-                                : await Race.api.accountInvite(row.email);
-              out.innerHTML = '<div class="ok">' +
-                (isReset
-                  ? 'Send this reset link to <strong>' + esc(row.email) + '</strong>. Expires in 2 days.'
-                  : 'Send this signup link to <strong>' + esc(row.email) + '</strong>. Expires in 14 days.') +
+              const r = isReset ? await Race.api.resetLink(row.email, { send: true })
+                                : await Race.api.accountInvite(row.email, { send: true });
+              const days = isReset ? '2 days' : '14 days';
+              const what = isReset ? 'reset link' : 'signup link';
+              // The link is shown whether or not the mail went. If it did, it is
+              // there to check; if it did not, it is the way to finish the job.
+              const head = r.emailed
+                ? '<strong>Emailed</strong> the ' + what + ' to ' + esc(row.email) + '. Expires in ' + days + '.'
+                : 'Could not email it: ' + esc(r.emailError || 'unknown reason') +
+                  '<br>Send this ' + what + ' to <strong>' + esc(row.email) + '</strong> yourself. Expires in ' + days + '.';
+              out.innerHTML = '<div class="' + (r.emailed ? 'ok' : 'err') + '">' + head +
                 '<span class="url">' + esc(r.url) + '</span>' + copyBtn(r.url) + '</div>';
-              b.textContent = isReset ? 'New reset link' : 'New invite';
+              b.textContent = isReset ? 'Resend reset link' : 'Resend invite';
             } catch (err) {
               out.innerHTML = '<div class="err">' + esc(err.message || 'Could not generate that link.') + '</div>';
               b.textContent = label;
