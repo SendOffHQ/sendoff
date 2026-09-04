@@ -148,6 +148,52 @@
     border: 1px solid var(--accent);
   }
   .card-badge.viewer { background: rgba(138, 169, 208, 0.12); color: var(--blue); border-color: var(--blue); }
+
+/* ---- First-visit introduction ---- */
+.intro-box {
+  background: var(--bg-card); border: 1px solid var(--border-bright); border-radius: 6px;
+  padding: 26px 28px 22px; width: 100%; max-width: 540px;
+  box-shadow: 0 18px 56px rgba(0, 0, 0, 0.55);
+  max-height: calc(100vh - 40px); overflow-y: auto;
+}
+.intro-box .wm { height: 26px; width: auto; display: block; margin-bottom: 18px; }
+.intro-kicker {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--accent); margin: 0 0 8px;
+}
+.intro-box h2 {
+  font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif;
+  font-size: 27px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 10px;
+}
+.intro-lede { margin: 0 0 20px; font-size: 14.5px; line-height: 1.6; color: var(--text-dim); }
+.intro-steps { list-style: none; margin: 0 0 18px; padding: 0; counter-reset: introstep; }
+.intro-steps li {
+  counter-increment: introstep; position: relative; padding-left: 34px; margin-bottom: 13px;
+  font-size: 13.5px; line-height: 1.55; color: var(--text-dim);
+}
+.intro-steps li::before {
+  content: counter(introstep); position: absolute; left: 0; top: -1px;
+  width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+  color: var(--accent); border: 1px solid var(--border-bright); border-radius: 3px;
+}
+.intro-steps b { color: var(--text); font-weight: 600; }
+.intro-note {
+  font-size: 12px; line-height: 1.55; color: var(--text-muted);
+  border-top: 1px solid var(--border); padding-top: 14px; margin: 0 0 18px;
+}
+.intro-actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+.intro-link {
+  background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--text-muted); text-decoration: underline;
+}
+.intro-link:hover { color: var(--text); }
+.intro-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 560px) {
+  .intro-box { padding: 22px 20px 18px; }
+  .intro-actions { justify-content: stretch; }
+  .intro-actions .btn { flex: 1; text-align: center; }
+}
 </style>
 </head>
 <body>
@@ -167,6 +213,7 @@
 
 <footer class="site">
   <div id="repo-link">—</div>
+  <div><button type="button" id="intro-open" class="intro-link">What is SendOff?</button></div>
 </footer>
 
 <script src="lib/race-core.js?v=20"></script>
@@ -373,6 +420,78 @@
       e.textContent = `Error: ${err.message}`;
     }
   }
+
+  // ---- First-visit introduction ---------------------------------------
+  // Shown once per browser. Storage can throw (private mode), so fall back to
+  // sessionStorage and, failing that, just show it — a storage error must
+  // never break the hub.
+  const INTRO_KEY = 'race-hub-intro-v1';
+  function introSeen() {
+    try { if (localStorage.getItem(INTRO_KEY) === '1') return true; } catch (e) {}
+    try { if (sessionStorage.getItem(INTRO_KEY) === '1') return true; } catch (e) {}
+    return false;
+  }
+  function markIntroSeen() {
+    try { localStorage.setItem(INTRO_KEY, '1'); return; } catch (e) {}
+    try { sessionStorage.setItem(INTRO_KEY, '1'); } catch (e) {}
+  }
+
+  function openIntro() {
+    if (document.querySelector('.intro-overlay')) return;
+    const previous = document.activeElement;
+    const ov = document.createElement('div');
+    ov.className = 'modal-overlay intro-overlay';
+    ov.innerHTML = `
+      <div class="intro-box" role="dialog" aria-modal="true" aria-labelledby="intro-heading">
+        <img class="wm" src="brand/sendoffprimaryonDark.svg" alt="SendOff">
+        <p class="intro-kicker">Live crew tracking for ultras</p>
+        <h2 id="intro-heading">Send them out, bring them home.</h2>
+        <p class="intro-lede">Crewing an ultra is hours of waiting and then ninety seconds where
+          everything happens. SendOff is the board you run those ninety seconds from — and the page
+          everyone back home watches while they wait.</p>
+        <ol class="intro-steps">
+          <li><b>Set up the race.</b> Lay out the course leg by leg, add your runners, set the cutoffs.</li>
+          <li><b>Work the pit board.</b> On a phone at the aid station — send them off, then log
+            arrivals, pit time, nutrition and notes as they come through.</li>
+          <li><b>Send the link.</b> Family and friends follow live splits, pace against cutoff and
+            elevation, updating as you log it.</li>
+        </ol>
+        <p class="intro-note">Watching needs no account and no app — anyone with the link can follow
+          along. You only need to sign in to run a race of your own.</p>
+        <div class="intro-actions">
+          <button type="button" class="intro-link" data-intro-close>Look around first</button>
+          <a class="btn primary" href="setup.html">Set up a race &rarr;</a>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    const box = ov.querySelector('.intro-box');
+
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+      if (e.key !== 'Tab') return;
+      const f = box.querySelectorAll('a[href], button');
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    function close() {
+      markIntroSeen();
+      document.removeEventListener('keydown', onKey, true);
+      ov.remove();
+      if (previous && previous.focus) previous.focus();
+    }
+
+    document.addEventListener('keydown', onKey, true);
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    ov.querySelector('[data-intro-close]').addEventListener('click', close);
+    // Leaving for the wizard counts as having seen it.
+    ov.querySelector('.btn.primary').addEventListener('click', markIntroSeen);
+    (box.querySelector('.btn.primary') || box).focus();
+  }
+
+  document.getElementById('intro-open').addEventListener('click', openIntro);
+  if (!introSeen()) openIntro();
 
   load();
 </script>
