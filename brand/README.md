@@ -16,7 +16,7 @@ uses to render them.
 | `sendoff-icon-tile.svg` | Mark on a rounded dark tile — app icon, social avatar |
 | `sendoff-favicon.svg` | Tile with tighter padding, for the browser tab |
 | `tokens.css` | Colour + type tokens, ground presets, wordmark component styles |
-| `wordmark.html` | Reference page showing both grounds |
+| `wordmark.html` | **Brand reference** — logo, grounds, scale, colour, type, voice, tokens |
 
 The icons are cut from the lockup's own geometry — the ring is
 `circle(2356, 350) r294 stroke112` and the dot `circle(2370, 350) r80`, both
