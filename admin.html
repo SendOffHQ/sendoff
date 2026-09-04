@@ -143,6 +143,13 @@
 
   <div id="panels" style="display:none;">
     <section class="panel">
+      <h2>Invite requests</h2>
+      <p class="hint">People who asked for an account from the hub. Invite them with the box above,
+        then clear the request.</p>
+      <div id="areq-list">Loading…</div>
+    </section>
+
+    <section class="panel">
       <h2>Invite someone to the hub</h2>
       <p class="lead">Generate a one-time signup link for someone you want to let
         create their own races. They open it, pick a password, and they're in.
@@ -243,6 +250,38 @@
         '<span class="url">' + esc(r.url) + '</span>' + copyBtn(r.url) + '</div>';
       document.getElementById('inv-email').value = '';
       loadAccounts();
+    async function loadAccessRequests() {
+      const box = document.getElementById('areq-list');
+      try {
+        const r = await Race.api.accessRequests();
+        const list = r.requests || [];
+        if (!list.length) { box.textContent = 'No open requests.'; return; }
+        box.innerHTML = list.map(q => `
+          <div class="acct-row" data-key="${escapeHtml(q.key)}">
+            <div>
+              <strong>${escapeHtml(q.name || '(no name)')}</strong>
+              &lt;${escapeHtml(q.email)}&gt;
+              <div class="hint">
+                ${escapeHtml([q.race, q.when].filter(Boolean).join(' · ') || 'no race given')}
+                ${q.note ? '<br>' + escapeHtml(q.note) : ''}
+                <br>asked ${escapeHtml((q.requestedAt || '').slice(0, 10))}
+              </div>
+            </div>
+            <button class="btn" type="button" data-clear="${escapeHtml(q.key)}">Clear</button>
+          </div>`).join('');
+        box.querySelectorAll('[data-clear]').forEach(b => {
+          b.addEventListener('click', async () => {
+            b.disabled = true;
+            try { await Race.api.deleteAccessRequest(b.dataset.clear); loadAccessRequests(); }
+            catch (e) { b.disabled = false; }
+          });
+        });
+      } catch (e) {
+        box.textContent = 'Could not load requests: ' + e.message;
+      }
+    }
+    loadAccessRequests();
+
     } catch (err) {
       out.innerHTML = '<div class="err">' + esc(err.message || 'Could not generate invite.') + '</div>';
     } finally {
