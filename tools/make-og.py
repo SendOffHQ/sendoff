@@ -117,9 +117,14 @@ def b64(name):
     return base64.b64encode((CACHE / name).read_bytes()).decode()
 
 def wordmark():
+    """Inline the lockup, carrying the source file's own viewBox so a change to
+    the artwork's bounds can never leave the cards cropping it."""
     svg = (ROOT / 'brand' / 'sendoff-wordmark.svg').read_text().strip()
+    m = re.search(r'viewBox="([^"]+)"', svg)
+    if not m:
+        sys.exit('sendoff-wordmark.svg has no viewBox')
     return re.sub(r'^<svg[^>]*>',
-                  '<svg viewBox="-130 -130 3708.0 1317.6" role="img" aria-label="SendOff">', svg)
+                  f'<svg viewBox="{m.group(1)}" role="img" aria-label="SendOff">', svg)
 
 def esc(s):
     return (str(s).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;'))
