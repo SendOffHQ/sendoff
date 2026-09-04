@@ -21,6 +21,10 @@ concurrency:
   group: deploy-worker
   cancel-in-progress: true
 
+# A build runner has nothing useful to report and no one to consent for it.
+env:
+  WRANGLER_SEND_METRICS: 'false'
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
