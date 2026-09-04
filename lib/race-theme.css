@@ -170,8 +170,25 @@ footer.site {
 .modal-overlay {
   display: flex; position: fixed; inset: 0; z-index: 1000;
   background: rgba(0, 0, 0, 0.6);
-  align-items: center; justify-content: center; padding: 20px;
+  justify-content: center;
+  /* Phone browsers report 100vh as the height with the toolbars retracted,
+     which is taller than what you can actually see. dvh tracks the visible
+     area, so a dialog measured against it never hides under the chrome. */
+  height: 100vh;
+  height: 100dvh;
+  /* A box taller than its container and centred with plain `center` overflows
+     equally above and below, and the half above is unreachable: scrolling only
+     goes down. `safe` pins it to the top instead once it stops fitting. */
+  align-items: center;
+  align-items: safe center;
+  padding: 20px;
+  padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+  overflow-y: auto;
 }
+/* Dialogs cap against the overlay's content box rather than doing their own
+   viewport arithmetic, so the padding and safe-area insets above are counted
+   once, here, and every dialog inherits them. */
+.modal-overlay > * { max-height: 100%; overflow-y: auto; overscroll-behavior: contain; }
 .modal-box {
   background: var(--bg-card); border: 1px solid var(--border-bright);
   border-radius: 6px; padding: 24px; width: 100%; max-width: 360px;
