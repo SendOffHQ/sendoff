@@ -618,6 +618,51 @@
           try { const j = await res.json(); if (j.error) m = j.error; } catch (err) {}
           throw new Error(m);
         }
+        let data = {};
+        try { data = await res.json(); } catch (err) {}
+
+        if (data.account === 'exists') {
+          // Say so, rather than a fake success that quietly drops the request.
+          box.innerHTML = `
+            <h2>You already have an account</h2>
+            <p class="req-lede">There is already an account for
+              <strong>${payload.email.replace(/[<>&"']/g, '')}</strong>. Sign in from the top of the
+              page. If you cannot remember the password, ask for a reset and we will send you a link.</p>
+            <p class="req-msg" id="req-msg2" role="status" aria-live="polite"></p>
+            <div class="req-actions">
+              <button type="button" class="intro-link" data-req-close>Close</button>
+              <button type="button" class="btn primary" id="req-reset">Request a password reset</button>
+            </div>`;
+          const rmsg = box.querySelector('#req-msg2');
+          const rbtn = box.querySelector('#req-reset');
+          box.querySelector('[data-req-close]').addEventListener('click', close);
+          rbtn.addEventListener('click', async () => {
+            rbtn.disabled = true; rbtn.textContent = 'Sending…';
+            try {
+              const rr = await fetch(base + '/access-request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kind: 'reset', email: payload.email, name: payload.name })
+              });
+              if (!rr.ok) throw new Error('failed');
+              box.innerHTML = `
+                <h2>Reset requested</h2>
+                <p class="req-lede">We will send a reset link to
+                  <strong>${payload.email.replace(/[<>&"']/g, '')}</strong> from
+                  <strong>${INVITE_EMAIL}</strong>.</p>
+                <div class="req-actions"><button type="button" class="btn primary" data-req-close>Close</button></div>`;
+              box.querySelector('[data-req-close]').addEventListener('click', close);
+              box.querySelector('[data-req-close]').focus();
+            } catch (err) {
+              rmsg.className = 'req-msg err';
+              rmsg.textContent = 'Could not send that. Try again shortly.';
+              rbtn.disabled = false; rbtn.textContent = 'Request a password reset';
+            }
+          });
+          rbtn.focus();
+          return;
+        }
+
         box.innerHTML = `
           <h2>Request sent</h2>
           <p class="req-lede">Thanks. We will be in touch at

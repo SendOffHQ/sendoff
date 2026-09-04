@@ -806,7 +806,9 @@ async function handleAccessRequest(req, env) {
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return json({ error: 'A valid email is required' }, { status: 400 }, env, req);
   }
-  if (!name) return json({ error: 'Your name is required' }, { status: 400 }, env, req);
+  if (!name && clip(body && body.kind, 20) !== 'reset') {
+    return json({ error: 'Your name is required' }, { status: 400 }, env, req);
+  }
 
   const ip = req.headers.get('CF-Connecting-IP') || 'unknown';
   const bucket = 'arl:' + ip;
@@ -816,14 +818,25 @@ async function handleAccessRequest(req, env) {
   }
   await env.AUTH_KV.put(bucket, String(seen + 1), { expirationTtl: 3600 });
 
-  // Already has an account, or already asked: answer the same either way so
-  // this cannot be used to test whether an address is registered.
-  if (await lookupUser(env, email)) return json({ ok: true }, {}, env, req);
+  const kind = clip(body && body.kind, 20) === 'reset' ? 'reset' : 'invite';
+  const registered = !!(await lookupUser(env, email));
+
+  if (kind === 'reset') {
+    // A reset is only meaningful for an address that has an account. When it
+    // does not, answer exactly as if it did and store nothing, so the reset
+    // path cannot be used to enumerate who is registered.
+    if (!registered) return json({ ok: true }, {}, env, req);
+  } else if (registered) {
+    // Tell them plainly rather than faking success and dropping the request on
+    // the floor. This does reveal that an address is registered, which the
+    // per-IP quota above is what keeps from being an enumeration tool.
+    return json({ ok: true, account: 'exists' }, {}, env, req);
+  }
 
   const now = new Date().toISOString();
   const key = 'areq:' + now + '-' + randomToken(6);
   await env.AUTH_KV.put(key, JSON.stringify({
-    email, name,
+    kind, email, name,
     race: clip(body && body.race, 160),
     when: clip(body && body.when, 60),
     note: clip(body && body.note, 600),
