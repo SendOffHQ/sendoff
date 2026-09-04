@@ -464,7 +464,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=21"></script>
+<script src="lib/race-core.js?v=22"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -742,21 +742,58 @@
     return state.privateSuffix;
   }
 
-  function effectiveSlug() {
+  // Every race the wizard creates is filed under a zero-padded number followed
+  // by its name: 000042-forest-fifty. Two races can share a name without one
+  // overwriting the other, and the number stays out of the way in the URL. The
+  // races that predate this keep their bare slugs.
+  const RACE_ID_DIGITS = 6;
+  let raceIdPending = null;
+
+  // Reserving an ID needs the network, so we start as soon as there's a name to
+  // preview and cache the result for the rest of the session.
+  function ensureRaceId() {
+    if (state.raceId) return Promise.resolve(state.raceId);
+    if (raceIdPending) return raceIdPending;
+    const cfg = Race.auth.cfg();
+    if (!cfg) return Promise.resolve(null);
+    raceIdPending = Race.gh.nextRaceId(cfg).then(id => {
+      raceIdPending = null;
+      state.raceId = id;
+      updateSlug();
+      return id;
+    }).catch(err => {
+      raceIdPending = null;
+      throw err;
+    });
+    return raceIdPending;
+  }
+
+  // The name half of the slug: what the user is actually typing, plus the
+  // unguessable suffix that private races carry.
+  function slugBody() {
     const name = document.getElementById('race-name').value;
     if (!name) return '';
     const base = Race.slug(name);
     return state.visibility === 'private' ? `${base}-${privateSuffix()}` : base;
   }
 
+  function effectiveSlug() {
+    const body = slugBody();
+    if (!body || !state.raceId) return '';
+    return `${state.raceId}-${body}`;
+  }
+
   function updateSlug() {
-    const slug = effectiveSlug();
-    document.getElementById('slug-preview').textContent = slug || '–';
-    document.getElementById('dest-preview').textContent = slug ? `races/${slug}/` : 'races/<slug>/';
+    const body = slugBody();
+    // Until the number lands the preview stands in an ellipsis, rather than
+    // showing a slug that would be wrong the moment it arrives.
+    const preview = body ? `${state.raceId || '\u2026'}-${body}` : '';
+    document.getElementById('slug-preview').textContent = preview || '–';
+    document.getElementById('dest-preview').textContent = preview ? `races/${preview}/` : 'races/<slug>/';
   }
 
   // ---------- build payload ----------
-  function buildConfig(slug) {
+  function buildConfig() {
     const name = document.getElementById('race-name').value.trim();
     const location = document.getElementById('race-location').value.trim();
     const startTime = buildStartIso();
@@ -885,13 +922,11 @@
     }
 
     const name = document.getElementById('race-name').value.trim();
-    const slug = effectiveSlug();
-    const raceConfig = buildConfig(slug);
-    const errs = validate(raceConfig, slug);
+    const raceConfig = buildConfig();
+    const errs = validate(raceConfig, slugBody());
     if (errs.length) { showError(errs.join(' ')); return; }
 
     const dataJson = buildDataJson(raceConfig);
-    const indexEntry = buildIndexEntry(raceConfig, slug);
 
     const submitBtn = document.getElementById('btn-submit');
     submitBtn.disabled = true;
@@ -899,29 +934,38 @@
     submitBtn.textContent = 'Creating…';
 
     try {
-      // Confirm overwrite if races/<slug>/config.json already exists.
-      const probe = await Race.gh.getFile(cfg, `races/${slug}/config.json`);
-      if (!probe.missing) {
-        if (!confirm(`A race already exists at races/${slug}/. Overwrite its config.json and data.json?`)) {
-          submitBtn.disabled = false; submitBtn.textContent = origLabel; return;
-        }
+      // The number was reserved in the background while the form was filled
+      // in; wait for it here if it hasn't landed, or ask again if it failed.
+      progressLine('Reserving race ID…');
+      await ensureRaceId();
+      if (!state.raceId) throw new Error('Could not reserve a race ID. Check your connection and try again.');
+
+      // Two people creating a race in the same minute can be handed the same
+      // number, so walk forward until we find a folder nobody has taken.
+      let slug = effectiveSlug();
+      let probe = await Race.gh.getFile(cfg, `races/${slug}/config.json`);
+      for (let i = 0; i < 20 && !probe.missing; i++) {
+        state.raceId = String(parseInt(state.raceId, 10) + 1).padStart(RACE_ID_DIGITS, '0');
+        slug = effectiveSlug();
+        probe = await Race.gh.getFile(cfg, `races/${slug}/config.json`);
       }
+      if (!probe.missing) throw new Error('Could not find a free race ID. Try again in a moment.');
+      updateSlug();
+
+      const indexEntry = buildIndexEntry(raceConfig, slug);
 
       progressLine(`Writing races/${slug}/config.json…`);
       await Race.gh.putJson(cfg, `races/${slug}/config.json`, raceConfig,
-        probe.missing ? null : probe.sha, `hub: create race ${slug} (config)`);
+        null, `hub: create race ${slug} (config)`);
 
       progressLine(`Writing races/${slug}/data.json…`);
-      const dataProbe = await Race.gh.getFile(cfg, `races/${slug}/data.json`);
       await Race.gh.putJson(cfg, `races/${slug}/data.json`, dataJson,
-        dataProbe.missing ? null : dataProbe.sha, `hub: create race ${slug} (data)`);
+        null, `hub: create race ${slug} (data)`);
 
       if (state.gpxText) {
         progressLine(`Uploading races/${slug}/course.gpx…`);
-        const gpxProbe = await Race.gh.getFile(cfg, `races/${slug}/course.gpx`);
         await Race.gh.putFile(cfg, `races/${slug}/course.gpx`,
-          state.gpxText, gpxProbe.missing ? null : gpxProbe.sha,
-          `hub: create race ${slug} (course.gpx)`);
+          state.gpxText, null, `hub: create race ${slug} (course.gpx)`);
       }
 
       // Private races stay out of the public manifest. Logged-in viewers
@@ -966,7 +1010,13 @@
   });
   document.getElementById('btn-submit').addEventListener('click', onSubmit);
 
-  document.getElementById('race-name').addEventListener('input', updateSlug);
+  document.getElementById('race-name').addEventListener('input', () => {
+    updateSlug();
+    // Reserve the number in the background so the preview fills in while the
+    // rest of the form is still being filled out. A failure here is not worth
+    // interrupting for; onSubmit retries and reports it there.
+    ensureRaceId().catch(() => {});
+  });
 
   document.querySelectorAll('input[name="ct"]').forEach(r => {
     r.addEventListener('change', e => setCourseType(e.target.value));

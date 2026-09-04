@@ -31,6 +31,7 @@
 //
 //   Race listing for logged-in users
 //     GET  /my-races                                                   → { races: [...] }
+//     GET  /next-race-id                                               → { id: "000042" }
 //
 //   Misc
 //     GET  /health                                                     → { ok: true }
@@ -1225,6 +1226,51 @@ async function handleShareRevoke(req, env) {
   return json({ ok: true }, {}, env, req);
 }
 
+// Every race created from the wizard gets a zero-padded numeric prefix on its
+// slug (000042-forest-fifty), so two races sharing a name never collide. The
+// counter has to see private races too, and those are deliberately absent from
+// races/index.json, so it comes from the repo tree rather than the manifest.
+const RACE_ID_DIGITS = 6;
+
+// Returns every races/<slug>/ folder name in the repo, or null if the tree
+// listing failed.
+async function listRaceSlugs(env) {
+  const treeUrl = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/git/trees/${encodeURIComponent(env.GITHUB_BRANCH || 'main')}?recursive=1`;
+  const res = await fetch(treeUrl, {
+    headers: {
+      Authorization: `token ${env.GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github.v3+json',
+      'User-Agent': 'race-dashboard-proxy'
+    }
+  });
+  if (!res.ok) return null;
+  const tree = await res.json();
+  return (tree.tree || [])
+    .filter(t => t.type === 'blob' && /^races\/[^/]+\/config\.json$/.test(t.path))
+    .map(t => t.path.split('/')[1]);
+}
+
+// Highest prefix in use, plus one. Slugs without a numeric prefix (the races
+// that predate this scheme) simply don't count toward the maximum. The number
+// alone tells the caller nothing about who owns which race, so any signed-in
+// user may ask for one.
+async function handleNextRaceId(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+
+  const slugs = await listRaceSlugs(env);
+  if (!slugs) return json({ error: 'Could not list existing races' }, { status: 502 }, env, req);
+
+  let max = 0;
+  for (const slug of slugs) {
+    const m = /^(\d+)-/.exec(slug);
+    if (!m) continue;
+    const n = parseInt(m[1], 10);
+    if (n > max) max = n;
+  }
+  return json({ id: String(max + 1).padStart(RACE_ID_DIGITS, '0') }, {}, env, req);
+}
+
 async function handleMyRaces(req, env) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -1319,6 +1365,7 @@ export default {
     if (request.method === 'POST' && path === '/access/remove')   return handleAccessRemove(request, env);
     if (request.method === 'GET'  && path === '/access')          return handleAccessList(request, env);
     if (request.method === 'GET'  && path === '/my-races')        return handleMyRaces(request, env);
+    if (request.method === 'GET'  && path === '/next-race-id')    return handleNextRaceId(request, env);
     if (request.method === 'POST' && path === '/account-invite')  return handleAccountInvite(request, env);
     if (request.method === 'GET'  && path === '/account-invite-info') return handleAccountInviteInfo(request, env);
     if (request.method === 'POST' && path === '/accept-account-invite') return handleAcceptAccountInvite(request, env);
