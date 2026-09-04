@@ -98,16 +98,25 @@
   .status-notstarted { color: var(--text-muted); }
   .status-finished { color: var(--accent); }
 
+  /* Four across at every size above phones. The runner card is capped at
+     900px, so a nine-column row gave each tile about 100px of content
+     against the 127px the longest label needs, and "Course Total" wrapped
+     while its neighbours did not, dropping that tile's figure out of line
+     with the rest. Four columns leave 197px. */
   .stats {
-    display: grid; grid-template-columns: repeat(9, 1fr);
+    display: grid; grid-template-columns: repeat(4, 1fr);
     border-bottom: 1px solid var(--border);
   }
   .stat {
-    padding: 16px 14px; border-right: 1px solid var(--border);
+    padding: 16px 14px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
     display: flex; flex-direction: column; gap: 4px;
     min-width: 0;
   }
   .stat:last-child { border-right: none; }
+  .stat:nth-child(4n) { border-right: none; }
+  .stat:nth-last-child(-n+4) { border-bottom: none; }
   .stat.live .value, .stat.live-course .value { color: var(--accent); }
   .stat.live-pit .value { color: var(--green); }
   .stat.live-course .label, .stat.live-pit .label {
@@ -127,12 +136,6 @@
   }
   .stat .sub { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
 
-  @media (max-width: 1400px) {
-    .stats { grid-template-columns: repeat(4, 1fr); }
-    .stat { border-bottom: 1px solid var(--border); }
-    .stat:nth-child(4n) { border-right: none; }
-    .stat:nth-last-child(-n+4) { border-bottom: none; }
-  }
   @media (max-width: 600px) {
     .stats { grid-template-columns: repeat(2, 1fr); }
     .stat:nth-child(2n) { border-right: none; }
