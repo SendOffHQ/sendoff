@@ -519,7 +519,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="lib/race-core.js?v=24"></script>
+<script src="lib/race-core.js?v=25"></script>
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
@@ -890,7 +890,7 @@
     updateTracking();
   }
 
-  async function load() {
+  async function load(opts) {
     try {
       // Stash any ?t=<share-token> for use by the worker reads (currently
       // share-link viewers read direct from Pages since the data is public;
@@ -935,11 +935,52 @@
       tick();
       initCourseVisuals();
       updateTracking();
+      return true;
     } catch (err) {
+      if (opts && opts.quiet) return false;
       const e = document.getElementById('error');
       e.style.display = 'block';
       e.textContent = `Error loading race: ${err.message}`;
+      return false;
     }
+  }
+
+  // A race arrived at straight from the wizard is younger than GitHub's
+  // read-after-write consistency, and that consistency is not monotonic: the
+  // wizard reading the config back is no promise that the next request, from
+  // this page, sees it too. So the wizard marks the hop with ?new=1 and we wait
+  // it out here rather than calling a race that plainly exists missing.
+  //
+  // Only this one navigation is patient. A mistyped race URL still fails at
+  // once, which is what someone who typed it wrong needs.
+  const NEW_RACE_WAIT_MS = 45000;
+
+  async function loadNewRace() {
+    const title = document.getElementById('race-title');
+    const note = document.getElementById('error');
+    title.textContent = 'Setting up your race…';
+    note.className = 'info-banner';
+    note.style.display = 'block';
+    note.textContent = 'Writing the course and roster. This takes a few seconds.';
+
+    const deadline = Date.now() + NEW_RACE_WAIT_MS;
+    while (Date.now() < deadline) {
+      if (await load({ quiet: true })) {
+        note.className = 'error-banner';
+        note.style.display = 'none';
+        // Drop the marker so a refresh, or a link someone copied out of the
+        // address bar, behaves like any other visit to the race.
+        try {
+          const u = new URL(location.href);
+          u.searchParams.delete('new');
+          history.replaceState(null, '', u.pathname + u.search + u.hash);
+        } catch (e) {}
+        return;
+      }
+      await new Promise(r => setTimeout(r, 1200));
+    }
+    note.className = 'error-banner';
+    load();  // one last try, this time saying what is actually wrong
   }
 
   // ---------- course visuals (Leaflet map + elevation profile) ----------
@@ -1656,7 +1697,7 @@
     if (document.visibilityState === 'visible') load();
   });
 
-  load();
+  if (Race.qs('new')) loadNewRace(); else load();
   setInterval(tick, 1000);
   setInterval(updateLastUpdated, 1000);
   setInterval(load, REFRESH_MS);
