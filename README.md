@@ -2,22 +2,22 @@
 
 A static, multi-race dashboard hub for ultra crew. Each race gets a live
 dashboard, charts, printable report, and a phone-friendly pit board.
-No server, no backend — every race is just a folder of files in this
+No server, no backend: every race is just a folder of files in this
 repo, edited live via the GitHub Contents API.
 
 ## Pages
 
-- `index.html` — hub landing. Lists every race from `races/index.json`.
-- `setup.html` — wizard. Asks for race name, runner(s), course type
+- `index.html`: hub landing. Lists every race from `races/index.json`.
+- `setup.html`: wizard. Asks for race name, runner(s), course type
   (loops vs. point-to-point segments), aid stations, cutoffs, intake
   targets, and a GPX file, then commits `races/<slug>/config.json`,
   `races/<slug>/data.json`, optional `races/<slug>/course.gpx`, and
   updates `races/index.json`.
-- `race.html?id=<slug>` — live dashboard for one race, including a
+- `race.html?id=<slug>`: live dashboard for one race, including a
   course map (Leaflet + OpenStreetMap) when a `course.gpx` is present.
-- `pit.html?id=<slug>` — sign in/out, intake editing, aid-station editing.
-- `charts.html?id=<slug>` — leg times, pace, aid times, intake, cumulative.
-- `print-report.html?id=<slug>` — printable summary.
+- `pit.html?id=<slug>`: sign in/out, intake editing, aid-station editing.
+- `charts.html?id=<slug>`: leg times, pace, aid times, intake, cumulative.
+- `print-report.html?id=<slug>`: printable summary.
 
 ## Course types
 
@@ -25,13 +25,13 @@ Two course shapes are supported from day one and share the same data
 schema. Each "leg" has a `startTime` (left the previous aid/pit) and
 `endTime` (arrived at the next).
 
-- **Loops** — N identical laps from one pit. Config:
+- **Loops**: N identical laps from one pit. Config:
   `course: { loopCount, loopDistanceMi, loopElevationGainFt? }`.
-  A loop may optionally carry `loopSegments` — the aid-to-aid segments of
+  A loop may optionally carry `loopSegments`: the aid-to-aid segments of
   one lap (same shape as `segments` below). When present, the loop is
   treated as that segment pattern repeated `loopCount` times, so each lap
   is split into timed checkpoints; total legs = `loopCount × loopSegments.length`.
-- **Segments** — Point-to-point legs between named aid stations. Config:
+- **Segments**: Point-to-point legs between named aid stations. Config:
   `course: { segments: [{ name, fromAid, toAid, distanceMi,
   elevationGainFt?, elevationLossFt?, arriveCutoffHours? }] }`.
 
@@ -52,7 +52,7 @@ This repo is a GitHub Template. To get your own hub:
 3. Visit `https://<your-handle>.github.io/<your-repo>/`. You'll land
    on the empty hub.
 4. Click **Set up a race**. The wizard will ask for a fine-grained PAT
-   the first time — generate one at
+   the first time: generate one at
    <https://github.com/settings/personal-access-tokens/new> with
    **Repository access → Only this repo** and
    **Repository permissions → Contents: Read and write**. The token is
@@ -65,7 +65,7 @@ The hub supports two ways to authenticate writes:
 
 - **Direct PAT** (default). Each device pastes its own fine-grained
   GitHub token. Static, no backend. Fine for one or two operators who
-  are comfortable with PATs. There is no per-race access control — any
+  are comfortable with PATs. There is no per-race access control: any
   PAT-bearer can write any file in the repo.
 - **Login proxy** (optional). A tiny Cloudflare Worker holds the PAT
   on the server side; crew members sign in with email + password and
@@ -75,33 +75,33 @@ The hub supports two ways to authenticate writes:
 To enable the login proxy, deploy `worker/` to Cloudflare (see
 [`worker/README.md`](worker/README.md)) and set `auth.proxyUrl` in
 `hub.json` at the repo root to the worker's URL. With `proxyUrl` unset
-or `null`, the hub falls back to direct PAT mode — so the proxy can be
+or `null`, the hub falls back to direct PAT mode, so the proxy can be
 down without bricking race day, as long as an operator has a PAT.
 
 Generate password hashes for the worker's `USERS` secret with
 [`admin/hash.html`](admin/hash.html) (opens in any browser, runs
-PBKDF2-SHA256 locally — passwords never leave the device).
+PBKDF2-SHA256 locally: passwords never leave the device).
 
 ## Race visibility & access (proxy mode)
 
 When the login proxy is enabled, each race is created with a visibility
 and an ACL:
 
-- **Public race** — appears on the hub landing page; anyone can view the
+- **Public race**: appears on the hub landing page; anyone can view the
   live dashboard without an account. Only listed editors can write.
-- **Private race** — omitted from the public manifest; the slug gets a
+- **Private race**: omitted from the public manifest; the slug gets a
   random suffix so the URL can't be guessed. Editors and listed viewers
   see it on their hub landing when signed in.
 
 From the race page, the creator (and any editor) can:
 
-- **Invite by email** — generates a one-time signup link; the recipient
+- **Invite by email**: generates a one-time signup link; the recipient
   sets a password and is added with editor or viewer access. You hand
   off the link via Signal/text/email yourself; the worker doesn't send
   email.
-- **Add an existing account** — gives an already-signed-up email
+- **Add an existing account**: gives an already-signed-up email
   editor/viewer access without a signup flow.
-- **Generate a view share link** — any anonymous viewer with the link
+- **Generate a view share link**: any anonymous viewer with the link
   can watch the live dashboard for up to 30 days. Revoke any time.
 
 **v1 limitation:** Private race files still live in this public repo.
@@ -128,7 +128,7 @@ iteration.
     race-theme.css        shared design tokens + base styles
   signup.html             invite-acceptance landing page (proxy mode only)
   reset.html              password-reset landing page (proxy mode only)
-  admin.html              hub admin tools — issue password-reset links
+  admin.html              hub admin tools: issue password-reset links
   admin/
     hash.html             local PBKDF2 password hasher for the proxy USERS list
   worker/
@@ -136,10 +136,10 @@ iteration.
     wrangler.toml         worker config
     README.md             worker deploy instructions
   races/
-    index.json            hub manifest — { races: [...] }
+    index.json            hub manifest: { races: [...] }
     <slug>/
       config.json         race definition (course, runners, cutoffs, targets)
-      data.json           live state — { runners: [{ id, legs: [...] }] }
+      data.json           live state: { runners: [{ id, legs: [...] }] }
       course.gpx          optional course file
 ```
 
@@ -193,7 +193,7 @@ iteration.
 
 `visibility`, `createdBy`, `editors`, and `viewers` are only meaningful
 when the login proxy is enabled. In direct PAT mode they're written but
-ignored — any PAT-bearer can read or write any file.
+ignored: any PAT-bearer can read or write any file.
 
 ### `races/<slug>/config.json` (segments)
 

@@ -56,7 +56,7 @@ STUB = """<!DOCTYPE html>
 <meta property="og:image" content="{base}/races/{slug}/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="{title} — follow live on SendOff">
+<meta property="og:image:alt" content="{title}: follow live on SendOff">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{title}">
 <meta name="twitter:description" content="{desc}">
@@ -221,7 +221,7 @@ def main():
                ROOT / 'races' / slug / 'og.png')
 
         name = race.get('name', slug)
-        desc = (f"{meta_line} — follow live on SendOff." if meta_line
+        desc = (f"{meta_line}: follow live on SendOff." if meta_line
                 else "Follow live on SendOff.")
         stub = ROOT / 'races' / slug / 'index.html'
         stub.write_text(STUB.format(slug=slug, title=esc(name), desc=esc(desc), base=BASE),

@@ -19,12 +19,12 @@
   --so-cream-2:    #F0ECE3;  /* wordmark letters on dark, as drawn */
 
   /* ---- Signal: one hue, two values ---- */
-  --so-signal-on-dark:   #0FB8BF;  /* as drawn — 7.9:1 on void */
-  --so-signal-on-light:  #0A8B92;  /* as drawn — 3.9:1 on white, graphics & large type */
+  --so-signal-on-dark:   #0FB8BF;  /* as drawn, 7.9:1 on void */
+  --so-signal-on-light:  #0A8B92;  /* as drawn, 3.9:1 on white, graphics & large type */
 
   /* ---- Support ---- */
   --so-beam:   #5EFDF6;  /* glow ONLY: the one live number, focus rings, gradient tops.
-                            1.2:1 with white — never use as a surface behind text. */
+                            1.2:1 with white, never use as a surface behind text. */
   --so-deep:   #0A5F68;  /* solid surface that holds white text at 7.3:1 (AAA) */
   --so-deeper: #083F47;  /* deep gradient stop, pressed states */
   --so-warm:   #FFB07A;  /* secondary accent: warnings, caps, "approaching cutoff" */
@@ -47,10 +47,10 @@
   --so-font-display: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
   --so-font-body:    "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --so-font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", monospace;
-  /* The wordmark is outlined paths — it needs no font. */
+  /* The wordmark is outlined paths, it needs no font. */
 }
 
-/* Ground presets — set one of these on any container and the wordmark
+/* Ground presets: set one of these on any container and the wordmark
    component below picks up the right pair automatically. */
 .so-on-dark {
   --so-ink:    var(--so-ink-on-dark);
@@ -69,7 +69,7 @@
 /* ------------------------------------------------------------------
    Wordmark component
    Inline the contents of sendoff-wordmark.svg inside an element carrying
-   .so-wordmark. The artwork is outlined paths — no webfont required — and
+   .so-wordmark. The artwork is outlined paths: no webfont required, and
    reads --wm-signal / --wm-letter, so one copy serves every ground.
    ------------------------------------------------------------------ */
 .so-wordmark {
@@ -95,5 +95,5 @@
 a.so-wordmark:hover { --wm-signal: var(--so-beam); }
 a.so-wordmark:focus-visible { outline: 2px solid var(--so-signal-on-dark); outline-offset: 4px; }
 
-/* Below ~24px tall the pulse line stops resolving — switch to the mark alone
+/* Below ~24px tall the pulse line stops resolving, switch to the mark alone
    (sendoff-icon-*.svg) rather than shrinking the lockup further. */

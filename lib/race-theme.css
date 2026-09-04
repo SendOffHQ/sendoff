@@ -1,5 +1,5 @@
 :root {
-  /* SendOff palette — brand/tokens.css is the source of truth.
+  /* SendOff palette: brand/tokens.css is the source of truth.
      Grounds are the void/panel stack; the signal is the only saturated
      brand colour, so the pace signals (green / warm / red) stay legible
      as the things that actually change during a race. */
@@ -13,7 +13,7 @@
   --text-muted: #7a8d99;
   --accent: #0fb8bf;
   --accent-glow: rgba(15, 184, 191, 0.18);
-  --accent-ink: #04181a;      /* text on a filled accent — 7.5:1 */
+  --accent-ink: #04181a;      /* text on a filled accent, 7.5:1 */
   --accent-hot: #22d3da;      /* accent hover fill */
   --green: #6ee7a8;
   --green-glow: rgba(110, 231, 168, 0.18);
@@ -21,11 +21,11 @@
   --red: #e5484d;
   --blue: #8aa9d0;            /* low-emphasis states: upcoming, done, viewer */
 
-  /* SendOff brand — see brand/README.md. One hue, two values: the signal
+  /* SendOff brand: see brand/README.md. One hue, two values: the signal
      reads heavier on light grounds, so each ground gets its own. */
   --signal: #0fb8bf;          /* on dark grounds (the app) */
   --signal-on-light: #0a8b92; /* on cream / white (print, marketing) */
-  --beam: #5efdf6;            /* glow only — 1.2:1 on white, never a surface */
+  --beam: #5efdf6;            /* glow only: 1.2:1 on white, never a surface */
 }
 
 /* ---------- SendOff wordmark ----------
@@ -133,7 +133,7 @@ footer.site {
   letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted);
 }
 
-/* Account bar — slim signed-in/sign-out strip above the page header.
+/* Account bar: slim signed-in/sign-out strip above the page header.
    Injected on every page by Race.mountAccountWidget() in race-core.js. */
 .account-bar {
   display: flex; justify-content: flex-end; align-items: center; gap: 10px;
@@ -166,7 +166,7 @@ footer.site {
 }
 @media print { .account-bar { display: none !important; } }
 
-/* Modal dialog (injected by race-core.js — sign-in, change-password) */
+/* Modal dialog (injected by race-core.js: sign-in, change-password) */
 .modal-overlay {
   display: flex; position: fixed; inset: 0; z-index: 1000;
   background: rgba(0, 0, 0, 0.6);

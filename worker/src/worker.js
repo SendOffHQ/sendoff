@@ -47,7 +47,7 @@
 //   PUBLIC_BASE_URL  optional, used for building invite/share URLs (e.g. https://jpdupree.github.io/race-dashboard).
 //                    Defaults to deriving from the first allowed origin.
 //
-// KV bindings (set in wrangler.toml — optional):
+// KV bindings (set in wrangler.toml: optional):
 //   AUTH_KV          stores invite tokens, share tokens, and dynamically created users.
 //                    Without it, /login still works with USERS env var and ACL still works,
 //                    but invite & share-link endpoints return 503.
@@ -212,7 +212,7 @@ async function requireAuth(req, env) {
 //   - USERS env var (admin-managed, baked in at deploy)
 //   - AUTH_KV at key user:<email> (dynamically created via invite acceptance)
 // Users come from two places. AUTH_KV (user:<email>) is checked FIRST so a
-// changed password — written to KV — overrides the baked-in USERS env var.
+// changed password: written to KV: overrides the baked-in USERS env var.
 // USERS is the bootstrap set; KV is the live store.
 async function lookupUser(env, email) {
   email = normalizeEmail(email);
@@ -372,7 +372,7 @@ async function handleLogin(req, env) {
 }
 
 // Changes the signed-in user's password. The new hash is written to KV, which
-// lookupUser checks before USERS — so this works for env-var users too.
+// lookupUser checks before USERS, so this works for env-var users too.
 async function handleChangePassword(req, env) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -441,7 +441,7 @@ async function handleResetInfo(req, env) {
   return json({ email: rec.email, expiresAt: rec.expiresAt }, {}, env, req);
 }
 
-// Public: redeem a reset link — set a new password and return a session.
+// Public: redeem a reset link: set a new password and return a session.
 async function handleResetPassword(req, env) {
   if (!env.AUTH_KV) return json({ error: 'Password resets require AUTH_KV KV namespace binding' }, { status: 503 }, env, req);
   let body;
@@ -514,7 +514,7 @@ async function handleAccountInviteInfo(req, env) {
   return json({ email: rec.email }, {}, env, req);
 }
 
-// Public: redeem an account invite — create the account, return a session.
+// Public: redeem an account invite: create the account, return a session.
 async function handleAcceptAccountInvite(req, env) {
   if (!env.AUTH_KV) return json({ error: 'Account invites require AUTH_KV KV namespace binding' }, { status: 503 }, env, req);
   let body;
@@ -534,7 +534,7 @@ async function handleAcceptAccountInvite(req, env) {
   }
   if (await lookupUser(env, rec.email)) {
     await env.AUTH_KV.delete('acct:' + token);
-    return json({ error: 'An account with that email already exists — just sign in.' }, { status: 409 }, env, req);
+    return json({ error: 'An account with that email already exists: just sign in.' }, { status: 409 }, env, req);
   }
   try { await createUserInKv(env, rec.email, password, 'crew'); }
   catch (err) { return json({ error: err.message || 'Could not create account' }, { status: 500 }, env, req); }
@@ -608,7 +608,7 @@ async function handleAccountDelete(req, env) {
   let envUsers = [];
   try { envUsers = JSON.parse(env.USERS || '[]'); } catch (e) { envUsers = []; }
   if (envUsers.some(u => normalizeEmail(u.email || u.username) === email)) {
-    return json({ error: 'This account is in the USERS list — remove it with `wrangler secret put USERS`.' }, { status: 400 }, env, req);
+    return json({ error: 'This account is in the USERS list: remove it with `wrangler secret put USERS`.' }, { status: 400 }, env, req);
   }
   await env.AUTH_KV.delete('user:' + email);
   return json({ ok: true }, {}, env, req);
@@ -685,12 +685,12 @@ async function handleCommit(req, env) {
       if (!path.endsWith('/config.json')) {
         return json({ error: 'Race not found' }, { status: 404 }, env, req);
       }
-      // For the initial config.json write, trust the body — the wizard sets
+      // For the initial config.json write, trust the body, the wizard sets
       // createdBy to the session email. If a malicious client lies about
       // createdBy, the worst case is the race is owned by the wrong account;
       // they still had to authenticate to reach this endpoint.
     } else if (!canEditRace(raceCfg, session.email)) {
-      return json({ error: 'Forbidden — not an editor on this race' }, { status: 403 }, env, req);
+      return json({ error: 'Forbidden, not an editor on this race' }, { status: 403 }, env, req);
     }
   } else {
     return json({ error: 'Forbidden path' }, { status: 403 }, env, req);
@@ -733,7 +733,7 @@ async function handleGet(req, env) {
 
   // ACL check
   if (path === 'races/index.json') {
-    // Public manifest — accessible to anyone with a session OR with a share token.
+    // Public manifest: accessible to anyone with a session OR with a share token.
     // (Anonymous public access happens via GitHub Pages directly, not the worker.)
     if (!sessionEmail && !shareToken) {
       return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -757,7 +757,7 @@ async function handleGet(req, env) {
     }
     if (!allowed && raceCfg.visibility === 'public') allowed = true;
     if (!allowed) {
-      return json({ error: sessionEmail ? 'Forbidden — not invited to this race' : 'Unauthorized' },
+      return json({ error: sessionEmail ? 'Forbidden, not invited to this race' : 'Unauthorized' },
         { status: sessionEmail ? 403 : 401 }, env, req);
     }
   } else {
@@ -792,7 +792,7 @@ async function requireRaceAdmin(env, slug, sessionEmail) {
   const raceCfg = await loadRaceConfig(env, slug);
   if (!raceCfg) throw Object.assign(new Error('Race not found'), { status: 404 });
   if (!canEditRace(raceCfg, sessionEmail)) {
-    throw Object.assign(new Error('Forbidden — not an editor on this race'), { status: 403 });
+    throw Object.assign(new Error('Forbidden, not an editor on this race'), { status: 403 });
   }
   return raceCfg;
 }
@@ -1038,7 +1038,7 @@ async function handleShareLink(req, env) {
     return json({ error: 'slug and role (view|edit) required' }, { status: 400 }, env, req);
   }
   if (role === 'edit') {
-    return json({ error: 'Edit share links are not supported — invite an account instead' }, { status: 400 }, env, req);
+    return json({ error: 'Edit share links are not supported: invite an account instead' }, { status: 400 }, env, req);
   }
   try { await requireRaceAdmin(env, slug, session.email); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
@@ -1069,7 +1069,7 @@ async function handleShareRevoke(req, env) {
   const { token } = body || {};
   if (!token) return json({ error: 'token required' }, { status: 400 }, env, req);
   // The token may be a share link (share:), a race invite (invite:), or a
-  // hub account invite (acct:) — this endpoint revokes any of them.
+  // hub account invite (acct:): this endpoint revokes any of them.
   let kvKey = 'share:' + token;
   let raw = await env.AUTH_KV.get(kvKey);
   if (!raw) { kvKey = 'invite:' + token; raw = await env.AUTH_KV.get(kvKey); }
@@ -1079,7 +1079,7 @@ async function handleShareRevoke(req, env) {
   try { rec = JSON.parse(raw); }
   catch (e) { return json({ error: 'Corrupt token' }, { status: 500 }, env, req); }
   if (kvKey.startsWith('acct:')) {
-    // Account invites aren't race-scoped — gate on the hub admin role.
+    // Account invites aren't race-scoped: gate on the hub admin role.
     if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
   } else {
     try { await requireRaceAdmin(env, rec.slug, session.email); }
@@ -1144,7 +1144,7 @@ async function handleMyRaces(req, env) {
   }
 
   // We deliberately don't annotate public-race entries with the caller's
-  // role — that would mean fetching every config.json on each /my-races
+  // role, that would mean fetching every config.json on each /my-races
   // call. Editor status for public races is determined when the user opens
   // race.html (which fetches config.json once for that race and renders the
   // manage-access panel accordingly).
