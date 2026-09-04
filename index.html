@@ -208,6 +208,9 @@
 }
 .intro-link:hover { color: var(--text); }
 .intro-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* The footer uppercases its text, which is right for labels and wrong for an
+   address: nobody writes INFO@SENDOFF.RUN. */
+footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
 @media (max-width: 560px) {
   .intro-box { padding: 22px 20px 18px; }
   .intro-box .wm { height: 38px; margin-bottom: 16px; }
@@ -264,7 +267,8 @@
 <footer class="site">
   <div id="repo-link">–</div>
   <div><button type="button" id="intro-open" class="intro-link">What is SendOff?</button>
-    <span aria-hidden="true"> · </span><button type="button" class="intro-link" data-request-invite>Request an invite</button></div>
+    <span aria-hidden="true"> · </span><button type="button" class="intro-link" data-request-invite>Request an invite</button>
+    <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
 <script src="lib/race-core.js?v=26"></script>

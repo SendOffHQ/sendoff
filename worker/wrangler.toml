@@ -19,9 +19,12 @@ ALLOWED_ORIGINS = "https://sendoff.run"
 # The site is served from the root of its domain. If empty, the worker
 # falls back to the request's Origin header.
 PUBLIC_BASE_URL = "https://sendoff.run"
-# Sender for the admin notification. Must be an address on a domain this
-# account has verified, which Email Routing on sendoff.run already covers.
+# Sender for invite mail. Must be an address on a domain this account has
+# verified, which Email Routing on sendoff.run already covers.
 NOTIFY_FROM = "invites@sendoff.run"
+# Sender for everything that is not an invite: password resets and the note to
+# the operator. "invites@" on a reset reads like the wrong department answered.
+INFO_FROM = "info@sendoff.run"
 
 # Secrets to set with `wrangler secret put`:
 #   GITHUB_TOKEN   PAT with Contents: Read and write
