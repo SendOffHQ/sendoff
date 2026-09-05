@@ -1,12 +1,13 @@
 {
-  "lastUpdated": "2026-09-05T13:54:10.957Z",
+  "lastUpdated": "2026-09-05T13:54:19.372Z",
   "runners": [
     {
       "id": "jason",
       "legs": [
         {
           "index": 1,
-          "startTime": "2026-09-05T13:54:10.238Z"
+          "startTime": "2026-09-05T13:54:10.238Z",
+          "endTime": "2026-09-05T13:54:17.188Z"
         }
       ]
     }
