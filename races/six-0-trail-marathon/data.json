@@ -1,9 +1,14 @@
 {
-  "lastUpdated": "2026-09-04T03:17:07.116Z",
+  "lastUpdated": "2026-09-05T13:54:10.957Z",
   "runners": [
     {
       "id": "jason",
-      "legs": []
+      "legs": [
+        {
+          "index": 1,
+          "startTime": "2026-09-05T13:54:10.238Z"
+        }
+      ]
     }
   ]
 }
