@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-09-05T21:43:44.000Z",
+  "lastUpdated": "2026-09-05T21:48:48.000Z",
   "runners": [
     {
       "id": "jason",
@@ -60,7 +60,7 @@
           "notes": "Ice, half PB&J, watermelon.",
           "calories": 500,
           "sodiumMg": 1087,
-          "fluidOz": 33.0,
+          "fluidOz": 32.9,
           "intakeEstimated": true
         },
         {
@@ -70,7 +70,7 @@
           "notes": "Quarter PB&J.",
           "calories": 188,
           "sodiumMg": 395,
-          "fluidOz": 16.0,
+          "fluidOz": 15.9,
           "intakeEstimated": true
         },
         {
@@ -95,10 +95,10 @@
         {
           "index": 10,
           "startTime": "2026-09-05T18:00:56.000Z",
-          "endTime": "2026-09-05T18:41:02.000Z",
+          "endTime": "2026-09-05T18:41:26.000Z",
           "calories": 100,
           "sodiumMg": 295,
-          "fluidOz": 20.1,
+          "fluidOz": 20.3,
           "intakeEstimated": true
         }
       ]
