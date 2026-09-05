@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-09-05T20:03:37.000Z",
+  "lastUpdated": "2026-09-05T21:37:49.000Z",
   "runners": [
     {
       "id": "jason",
@@ -7,52 +7,61 @@
         {
           "index": 1,
           "startTime": "2026-09-05T12:30:00.000Z",
-          "endTime": "2026-09-05T13:23:26.000Z"
+          "endTime": "2026-09-05T13:26:17.000Z",
+          "notes": "Metronome: gel + salt pill (190 mg) every 25 min, skipping the gel when an aid station was within ~10 min. ~14-16 salt pills across the race. LMNT flask with breakfast and one more on course. 2 Oreos and a creme pie."
         },
         {
           "index": 2,
-          "startTime": "2026-09-05T13:23:35.000Z",
-          "endTime": "2026-09-05T13:49:47.000Z"
+          "startTime": "2026-09-05T13:26:26.000Z",
+          "endTime": "2026-09-05T13:54:24.710Z",
+          "notes": "Half PB&J.",
+          "issues": "GI stop, mile 6.2. Controlled, not an emergency."
         },
         {
           "index": 3,
-          "startTime": "2026-09-05T13:52:06.000Z",
-          "endTime": "2026-09-05T14:24:49.000Z"
+          "startTime": "2026-09-05T13:54:31.682Z",
+          "endTime": "2026-09-05T14:31:51.856Z",
+          "notes": "2 Nutter Butters. Ice in a kerchief."
         },
         {
           "index": 4,
-          "startTime": "2026-09-05T14:26:13.000Z",
-          "endTime": "2026-09-05T14:32:54.000Z"
+          "startTime": "2026-09-05T14:33:22.597Z",
+          "endTime": "2026-09-05T14:40:19.653Z"
         },
         {
           "index": 5,
-          "startTime": "2026-09-05T14:33:32.000Z",
-          "endTime": "2026-09-05T15:11:32.000Z"
+          "startTime": "2026-09-05T14:40:35.000Z",
+          "endTime": "2026-09-05T15:18:41.000Z",
+          "notes": "Start/finish: ice refill, LMNT flask."
         },
         {
           "index": 6,
-          "startTime": "2026-09-05T15:19:29.000Z",
-          "endTime": "2026-09-05T16:18:40.000Z"
+          "startTime": "2026-09-05T15:31:20.000Z",
+          "endTime": "2026-09-05T16:31:00.000Z",
+          "notes": "Ice, half PB&J, watermelon."
         },
         {
           "index": 7,
-          "startTime": "2026-09-05T16:24:47.000Z",
-          "endTime": "2026-09-05T16:51:30.000Z"
+          "startTime": "2026-09-05T16:37:07.000Z",
+          "endTime": "2026-09-05T17:03:50.000Z",
+          "notes": "Quarter PB&J."
         },
         {
           "index": 8,
-          "startTime": "2026-09-05T16:56:37.000Z",
-          "endTime": "2026-09-05T17:40:21.000Z"
+          "startTime": "2026-09-05T17:08:57.000Z",
+          "endTime": "2026-09-05T17:52:41.000Z",
+          "notes": "2 Nutter Butters."
         },
         {
           "index": 9,
-          "startTime": "2026-09-05T17:40:44.000Z",
-          "endTime": "2026-09-05T17:47:06.000Z"
+          "startTime": "2026-09-05T17:53:04.000Z",
+          "endTime": "2026-09-05T17:59:26.000Z",
+          "issues": "GI stop, around mile 23. Controlled, not an emergency."
         },
         {
           "index": 10,
-          "startTime": "2026-09-05T17:48:36.000Z",
-          "endTime": "2026-09-05T18:28:42.000Z"
+          "startTime": "2026-09-05T18:00:56.000Z",
+          "endTime": "2026-09-05T18:41:02.000Z"
         }
       ]
     }
