@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-09-05T21:37:49.000Z",
+  "lastUpdated": "2026-09-05T21:43:44.000Z",
   "runners": [
     {
       "id": "jason",
@@ -8,60 +8,98 @@
           "index": 1,
           "startTime": "2026-09-05T12:30:00.000Z",
           "endTime": "2026-09-05T13:26:17.000Z",
-          "notes": "Metronome: gel + salt pill (190 mg) every 25 min, skipping the gel when an aid station was within ~10 min. ~14-16 salt pills across the race. LMNT flask with breakfast and one more on course. 2 Oreos and a creme pie."
+          "notes": "Metronome: gel + salt pill (190 mg) every 25 min, skipping the gel when an aid station was within ~10 min. ~14-16 salt pills across the race. LMNT flask with breakfast and one more on course. 2 Oreos and a creme pie.",
+          "calories": 376,
+          "sodiumMg": 727,
+          "fluidOz": 28.3,
+          "intakeEstimated": true
         },
         {
           "index": 2,
           "startTime": "2026-09-05T13:26:26.000Z",
           "endTime": "2026-09-05T13:54:24.710Z",
           "notes": "Half PB&J.",
-          "issues": "GI stop, mile 6.2. Controlled, not an emergency."
+          "issues": "GI stop, mile 6.2. Controlled, not an emergency.",
+          "calories": 175,
+          "sodiumMg": 390,
+          "fluidOz": 14.1,
+          "intakeEstimated": true
         },
         {
           "index": 3,
           "startTime": "2026-09-05T13:54:31.682Z",
           "endTime": "2026-09-05T14:31:51.856Z",
-          "notes": "2 Nutter Butters. Ice in a kerchief."
+          "notes": "2 Nutter Butters. Ice in a kerchief.",
+          "calories": 230,
+          "sodiumMg": 395,
+          "fluidOz": 19.5,
+          "intakeEstimated": true
         },
         {
           "index": 4,
           "startTime": "2026-09-05T14:33:22.597Z",
-          "endTime": "2026-09-05T14:40:19.653Z"
+          "endTime": "2026-09-05T14:40:19.653Z",
+          "sodiumMg": 190,
+          "fluidOz": 3.6,
+          "intakeEstimated": true
         },
         {
           "index": 5,
           "startTime": "2026-09-05T14:40:35.000Z",
           "endTime": "2026-09-05T15:18:41.000Z",
-          "notes": "Start/finish: ice refill, LMNT flask."
+          "notes": "Start/finish: ice refill, LMNT flask.",
+          "calories": 110,
+          "sodiumMg": 1295,
+          "fluidOz": 25.4,
+          "intakeEstimated": true
         },
         {
           "index": 6,
           "startTime": "2026-09-05T15:31:20.000Z",
           "endTime": "2026-09-05T16:31:00.000Z",
-          "notes": "Ice, half PB&J, watermelon."
+          "notes": "Ice, half PB&J, watermelon.",
+          "calories": 500,
+          "sodiumMg": 1087,
+          "fluidOz": 33.0,
+          "intakeEstimated": true
         },
         {
           "index": 7,
           "startTime": "2026-09-05T16:37:07.000Z",
           "endTime": "2026-09-05T17:03:50.000Z",
-          "notes": "Quarter PB&J."
+          "notes": "Quarter PB&J.",
+          "calories": 188,
+          "sodiumMg": 395,
+          "fluidOz": 16.0,
+          "intakeEstimated": true
         },
         {
           "index": 8,
           "startTime": "2026-09-05T17:08:57.000Z",
           "endTime": "2026-09-05T17:52:41.000Z",
-          "notes": "2 Nutter Butters."
+          "notes": "2 Nutter Butters.",
+          "calories": 330,
+          "sodiumMg": 690,
+          "fluidOz": 22.1,
+          "intakeEstimated": true
         },
         {
           "index": 9,
           "startTime": "2026-09-05T17:53:04.000Z",
           "endTime": "2026-09-05T17:59:26.000Z",
-          "issues": "GI stop, around mile 23. Controlled, not an emergency."
+          "issues": "GI stop, around mile 23. Controlled, not an emergency.",
+          "sodiumMg": 190,
+          "fluidOz": 3.9,
+          "intakeEstimated": true
         },
         {
           "index": 10,
           "startTime": "2026-09-05T18:00:56.000Z",
-          "endTime": "2026-09-05T18:41:02.000Z"
+          "endTime": "2026-09-05T18:41:02.000Z",
+          "calories": 100,
+          "sodiumMg": 295,
+          "fluidOz": 20.1,
+          "intakeEstimated": true
         }
       ]
     }
