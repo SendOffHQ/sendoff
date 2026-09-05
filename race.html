@@ -266,7 +266,7 @@
   .leglog tr:last-child td { border-bottom: none; }
   .leglog .leg-num {
     font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; font-size: 18px; font-weight: 600;
-    color: var(--accent); width: 30px;
+    color: var(--accent); width: 28%; min-width: 30px;
   }
   .leglog tr.leg-row:has(+ tr.note-row) td { border-bottom: none; padding-bottom: 6px; }
   .leglog tr.note-row td {
@@ -276,6 +276,36 @@
   }
   .leglog tr.note-row:last-child td { border-bottom: none; }
   .leglog tr.empty td { color: var(--text-muted); font-style: italic; text-align: center; padding: 24px; }
+  .leglog .leg-seg { color: var(--text-muted); font-size: 10px; display: block; }
+
+  /* On a phone seven columns do not fit: the segment name wraps to four lines
+     and sodium falls off the right edge. Each leg becomes a block instead,
+     with the column names moving onto the values they label. Reads without
+     sideways scrolling, which nobody does at an aid station. */
+  @media (max-width: 560px) {
+    .leglog thead { display: none; }
+    .leglog table, .leglog tbody { display: block; width: 100%; }
+    .leglog tr.leg-row {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 12px;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+    }
+    .leglog tr.leg-row td { display: block; padding: 0; border-bottom: none; }
+    .leglog tr.leg-row td.leg-num {
+      grid-column: 1 / -1; width: auto;
+      display: flex; align-items: baseline; gap: 8px;
+    }
+    .leglog .leg-seg { display: inline; font-size: 11px; min-width: 0; }
+    .leglog tr.leg-row td.num { text-align: left; }
+    .leglog tr.leg-row td.num::before {
+      content: attr(data-label);
+      display: block; font-family: 'JetBrains Mono', monospace; font-size: 9px;
+      letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted);
+      margin-bottom: 3px;
+    }
+    .leglog tr.note-row { display: block; }
+    .leglog tr.note-row td { display: block; padding: 0 0 12px; }
+    .leglog tr.empty { display: block; }
+  }
 
   .legend { display: flex; gap: 18px; flex-wrap: wrap; }
   .legend-item { display: flex; align-items: center; gap: 6px; }
@@ -519,7 +549,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="lib/race-core.js?v=30"></script>
+<script src="lib/race-core.js?v=31"></script>
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
@@ -676,16 +706,16 @@
       // lap-only loop just shows the index.
       const showName = segDef && segDef.name && !isSimpleLoop();
       const legLabel = showName
-        ? `${l.index} <span style="color: var(--text-muted); font-size: 10px; display: block;">${escapeHtml(segDef.name)}</span>` : l.index;
+        ? `${l.index} <span class="leg-seg">${escapeHtml(segDef.name)}</span>` : l.index;
       return `
         <tr class="leg-row${oldCls}">
           <td class="leg-num">${legLabel}</td>
-          <td class="num">${Race.fmt.clockTime(l.endTime)}</td>
-          <td class="num">${dur ? Race.fmt.durationShort(dur) : '–'}</td>
-          <td class="num">${pitCell}</td>
-          <td class="num">${l.calories || 0}</td>
-          <td class="num">${l.fluidOz || 0}oz</td>
-          <td class="num">${l.sodiumMg || 0}</td>
+          <td class="num" data-label="Done">${Race.fmt.clockTime(l.endTime)}</td>
+          <td class="num" data-label="Leg">${dur ? Race.fmt.durationShort(dur) : '–'}</td>
+          <td class="num" data-label="Pit">${pitCell}</td>
+          <td class="num" data-label="Cal">${l.calories || 0}</td>
+          <td class="num" data-label="Fluid">${l.fluidOz || 0}oz</td>
+          <td class="num" data-label="Na">${l.sodiumMg || 0}</td>
         </tr>
         ${noteRow}`;
     }).join('');
