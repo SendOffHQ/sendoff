@@ -33,7 +33,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=23">
+<link rel="stylesheet" href="lib/race-theme.css?v=24">
 <style>
   .wrap { max-width: 860px; margin: 0 auto; }
   .section {
@@ -148,6 +148,22 @@
      usable, so the cells claim the width they need and the wrapper scrolls. */
   .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .table-scroll > table { width: 100%; table-layout: fixed; }
+  /* Derived, not typed: shown so a band reads as a time of day. */
+  .band-clock {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text-muted); white-space: nowrap;
+  }
+  /* From hour and Starts are narrow and fixed; each metric gets a typing-width
+     column; Name takes whatever is left, because band names are the long part. */
+  #band-table th:nth-child(1), #band-table td:nth-child(1),
+  #band-table th:nth-child(2), #band-table td:nth-child(2) { width: 92px; }
+  #band-table td:nth-child(n+4):not(:last-child),
+  #band-table th:nth-child(n+4):not(:last-child) { width: 96px; }
+  #band-table th:last-child, #band-table td:last-child { width: 46px; }
+  .th-unit {
+    display: block; text-transform: lowercase; letter-spacing: 0.05em;
+    font-size: 9px; color: var(--text-muted); font-weight: 400; margin-top: 2px;
+  }
   .table-scroll th { white-space: nowrap; }
   /* Name / Unit / Short / Goal / delete. Fixed shares rather than letting the
      browser divide by content, so the goal box never wins space off the name. */
@@ -491,6 +507,32 @@
     </div>
     <button type="button" class="add-row" id="add-fuel">+ Add a fueling metric</button>
 
+    <div class="fuel-from-profile" id="seed-from-profile" style="display:none;">
+      <select id="seed-who"></select>
+      <button type="button" class="btn" id="seed-load">Load their plan</button>
+      <span class="hint" id="seed-note">
+        Fills the goals above, and the hour bands below, from a runner's saved
+        profile. Everything stays editable before you create the race.
+      </span>
+    </div>
+
+    <div class="fuel-shorthand">
+      <div class="sub-title">Hour bands (optional)</div>
+      <p style="margin: 0 0 10px; color: var(--text-muted); font-size:11px; line-height:1.5;">
+        When the goals should change as the race wears on. A band overrides only
+        the numbers you fill in. Bands are hours from the start, and the clock
+        time each begins is shown beside it, because what usually changes is the
+        weather rather than the runner.
+      </p>
+      <div class="table-scroll">
+        <table class="list" id="band-table">
+          <thead><tr id="band-head"></tr></thead>
+          <tbody id="band-rows"></tbody>
+        </table>
+      </div>
+      <button type="button" class="add-row" id="add-band">+ Add an hour band</button>
+    </div>
+
     <div class="fuel-shorthand">
       <div class="sub-title">Shorthand (optional)</div>
       <p style="margin: 0 0 10px; color: var(--text-muted); font-size:11px; line-height:1.5;">
@@ -529,7 +571,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=40"></script>
+<script src="lib/race-core.js?v=41"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -554,6 +596,8 @@
     })),
     // Named bundles the crew hands over whole: { name, values: { <key>: amount } }.
     fuelPresets: [],
+    // Hour bands: { fromHour, label, targets: { <key>PerHour: amount } }.
+    fuelBands: [],
     gpxText: null
   };
 
@@ -572,6 +616,9 @@
   }
 
   function renderGhStatus() {
+    // Whether there is an account to pull a plan from can change without a
+    // reload, so the picker is refreshed wherever the auth UI is.
+    if (document.getElementById('seed-from-profile')) renderSeedPicker();
     const dot = document.getElementById('gh-dot');
     const txt = document.getElementById('gh-status');
     if (isProxyMode()) {
@@ -785,13 +832,102 @@
 
   // Columns follow the metrics as they stand in the editor right now, so adding
   // Carbs immediately gives every shorthand a Carbs box to fill in.
+  // The clock time a band begins, from the start the wizard has so far. Blank
+  // until a date and time are picked, since "6:00 PM" of no particular day is
+  // not worth showing.
+  function bandClock(fromHour) {
+    const iso = buildStartIso();
+    if (!iso) return '';
+    const start = new Date(iso);
+    const t = new Date(start.getTime() + (+fromHour || 0) * 3600000);
+    if (isNaN(t)) return '';
+    const day = Math.floor((t - new Date(start.toDateString())) / 86400000);
+    return t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + (day > 0 ? ` D${day + 1}` : '');
+  }
+
+  // Which metrics the dependent tables are currently drawn for. A rename that
+  // does not change this only needs new headings; anything else needs columns.
+  function metricSig() {
+    return Race.fuel.fromRows(state.fuelMetrics).metrics.map(m => m.key).join(',');
+  }
+
+  function renderBandHead() {
+    const metrics = Race.fuel.fromRows(state.fuelMetrics).metrics;
+    document.getElementById('band-head').innerHTML =
+      '<th>From hour</th><th>Starts</th><th>Name</th>' +
+      metrics.map(m => `<th>${Race.fuel.colHead(m, escapeAttr)}</th>`).join('') + '<th></th>';
+    document.getElementById('band-table').style.minWidth = (330 + 92 * metrics.length) + 'px';
+    return metrics;
+  }
+
+  function renderBandRows() {
+    const metrics = renderBandHead();
+    document.getElementById('band-rows').innerHTML = state.fuelBands.map((b, i) => `
+      <tr>
+        <td><input type="number" min="0" step="0.25" data-band="${i}" data-bk="fromHour" value="${escapeAttr(b.fromHour)}" /></td>
+        <td class="band-clock">${escapeAttr(bandClock(b.fromHour))}</td>
+        <td><input type="text" data-band="${i}" data-bk="label" value="${escapeAttr(b.label || '')}" placeholder="e.g. Night · cold" /></td>
+        ${metrics.map(m => `<td><input type="number" min="0" step="${m.step}" data-band="${i}" data-bt="${escapeAttr(m.key)}PerHour"
+             value="${escapeAttr(b.targets[m.key + 'PerHour'] ?? '')}" placeholder="\u2014" /></td>`).join('')}
+        <td><button type="button" class="row-del" data-band-del="${i}" aria-label="Delete">×</button></td>
+      </tr>`).join('');
+  }
+
+  // Whoever is on the roster and might have a profile worth starting from. In
+  // the wizard that is the runners being entered, plus the person creating it.
+  function renderSeedPicker() {
+    const wrap = document.getElementById('seed-from-profile');
+    const sel = document.getElementById('seed-who');
+    const me = (Race.auth.email() || '').toLowerCase();
+    if (!isProxyMode() || !me) { wrap.style.display = 'none'; return; }
+    // Only the signed-in user can be resolved to an account here: the runners
+    // are names, not emails, until they are invited after the race exists.
+    sel.innerHTML = `<option value="${escapeAttr(me)}">${escapeAttr(me)} (you)</option>`;
+    wrap.style.display = '';
+  }
+
+  async function seedFromProfile() {
+    const note = document.getElementById('seed-note');
+    const btn = document.getElementById('seed-load');
+    btn.disabled = true;
+    try {
+      const { profile } = await Race.api.profile();
+      const targets = profile.targets || {};
+      let filled = 0;
+      for (const row of state.fuelMetrics) {
+        const key = row.key || Race.fuel.keyFor(row.label, new Set());
+        const v = targets[key + 'PerHour'];
+        if (v == null) continue;
+        row.target = v;
+        filled++;
+      }
+      const bands = Array.isArray(profile.phaseTargets) ? profile.phaseTargets : [];
+      if (bands.length) {
+        state.fuelBands = bands.map(b => ({
+          fromHour: b.fromHour, label: b.label || '', targets: { ...(b.targets || {}) }
+        }));
+      }
+      renderFuelRows();
+      renderBandRows();
+      note.textContent = (filled || bands.length)
+        ? `Filled ${filled} goal${filled === 1 ? '' : 's'}` +
+          (bands.length ? ` and ${bands.length} hour band${bands.length === 1 ? '' : 's'}` : '') +
+          '. Adjust anything before creating the race.'
+        : 'Your profile has no saved goals yet. Set them from the Profile button up top.';
+    } catch (err) {
+      note.textContent = `Could not load your profile: ${err.message}`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   function renderPresetHead() {
     const metrics = Race.fuel.fromRows(state.fuelMetrics).metrics;
     // 150 for the name, 46 for the delete button, 92 per metric: enough that a
     // four-digit sodium amount is not clipped, and the wrapper scrolls past it.
     document.getElementById('preset-table').style.minWidth = (196 + 92 * metrics.length) + 'px';
     document.getElementById('preset-head').innerHTML =
-      '<th>Name</th>' + metrics.map(m => `<th>${escapeAttr(m.short)}</th>`).join('') + '<th></th>';
+      '<th>Name</th>' + metrics.map(m => `<th>${Race.fuel.colHead(m, escapeAttr)}</th>`).join('') + '<th></th>';
     return metrics;
   }
 
@@ -960,6 +1096,7 @@
         })),
       fuelMetrics: fuelRows.metrics,
       fuelPresets: Race.fuel.presetsFromRows(state.fuelPresets, fuelRows.metrics),
+      phaseTargets: Race.fuel.bandsFromRows(state.fuelBands, fuelRows.metrics),
       targets: fuelRows.targets
     };
     if (!isNaN(lastLegStartHours)) cfg.cutoffs.lastLegStartHours = lastLegStartHours;
@@ -1249,23 +1386,68 @@
   document.getElementById('add-fuel').addEventListener('click', () => {
     state.fuelMetrics.push({ key: '', label: '', unit: '', short: '', decimals: 0, step: 1, target: '' });
     renderFuelRows();
+    renderBandRows();
     renderPresetRows();
   });
   document.getElementById('fuel-rows').addEventListener('input', (e) => {
     const idx = e.target.dataset.fuel;
     const k = e.target.dataset.k;
     if (idx == null || !k) return;
+    const before = metricSig();
     state.fuelMetrics[+idx][k] = e.target.value;
-    // The shorthand columns are named after the metrics, so a relabel shows up
-    // there straight away. Only the header is redrawn, so focus stays put.
-    if (k === 'label' || k === 'short') renderPresetHead();
+    if (k === 'label' || k === 'short' || k === 'unit') {
+      // Naming a blank row brings a whole metric into being, and the tables
+      // keyed off it need the column, not just the heading. Focus is in the
+      // metrics table, so redrawing the two below it costs nothing.
+      if (metricSig() !== before) { renderBandRows(); renderPresetRows(); }
+      else { renderBandHead(); renderPresetHead(); }
+    }
   });
   document.getElementById('fuel-rows').addEventListener('click', (e) => {
     const del = e.target.dataset.delFuel;
     if (del == null) return;
     state.fuelMetrics.splice(+del, 1);
     renderFuelRows();
+    renderBandRows();
     renderPresetRows();
+  });
+
+  // The clock beside each band comes from the race start, so moving the start
+  // moves every band's time with it.
+  for (const id of ['race-date', 'race-hour', 'race-minute', 'race-ampm']) {
+    document.getElementById(id).addEventListener('change', () => {
+      if (state.fuelBands.length) renderBandRows();
+    });
+  }
+
+  document.getElementById('seed-load').addEventListener('click', seedFromProfile);
+
+  document.getElementById('add-band').addEventListener('click', () => {
+    const last = state.fuelBands.length ? +state.fuelBands[state.fuelBands.length - 1].fromHour : -1;
+    state.fuelBands.push({ fromHour: last >= 0 ? last + 1 : 0, label: '', targets: {} });
+    renderBandRows();
+  });
+  document.getElementById('band-rows').addEventListener('input', (e) => {
+    const i = e.target.dataset.band;
+    if (i == null) return;
+    const b = state.fuelBands[+i];
+    if (e.target.dataset.bk === 'fromHour') {
+      b.fromHour = e.target.value;
+      const cell = e.target.closest('tr').querySelector('.band-clock');
+      if (cell) cell.textContent = bandClock(b.fromHour);
+    } else if (e.target.dataset.bk === 'label') {
+      b.label = e.target.value;
+    } else if (e.target.dataset.bt) {
+      const v = e.target.value.trim();
+      if (v === '') delete b.targets[e.target.dataset.bt];
+      else b.targets[e.target.dataset.bt] = parseFloat(v) || 0;
+    }
+  });
+  document.getElementById('band-rows').addEventListener('click', (e) => {
+    const d = e.target.dataset.bandDel;
+    if (d == null) return;
+    state.fuelBands.splice(+d, 1);
+    renderBandRows();
   });
 
   document.getElementById('add-preset').addEventListener('click', () => {
@@ -1332,7 +1514,9 @@
     renderLoopAidRows();
     renderRunnerRows();
     renderFuelRows();
+    renderBandRows();
     renderPresetRows();
+    renderSeedPicker();
     setCourseType(state.courseType);
     updateSlug();
   })();
