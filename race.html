@@ -32,7 +32,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=22">
+<link rel="stylesheet" href="lib/race-theme.css?v=23">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   .cutoffs {
@@ -149,6 +149,11 @@
     letter-spacing: 0.2em; text-transform: uppercase;
     color: var(--text-muted); margin-bottom: 14px;
   }
+  .intake-band {
+    color: var(--accent); border: 1px solid var(--accent); border-radius: 2px;
+    padding: 2px 6px; margin-left: 8px; letter-spacing: 0.12em;
+  }
+  .intake-now { color: var(--text-muted); font-size: 10px; margin-left: 4px; }
   .intake-row {
     display: grid; grid-template-columns: 90px 1fr auto auto;
     gap: 14px; align-items: center; padding: 8px 0;
@@ -580,7 +585,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="lib/race-core.js?v=38"></script>
+<script src="lib/race-core.js?v=39"></script>
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
@@ -877,19 +882,36 @@
         </div>
 
         ${(() => {
-          const goals = fuelMetrics().filter(m => m.targetPerHour);
+          // Bands are named in race hours, because "after hour six" is how a
+          // person says it. The rate they are compared against is intake over
+          // moving time, which is how this page has always computed it; the two
+          // clocks differ by aid station time, and they differed by exactly as
+          // much when the goal was a single flat number.
+          const raceHours = (c.completedRaceSec || 0) / 3600;
+          const metrics = Race.fuel.metrics(cfg, raceHours);
+          const goals = metrics.filter(m => m.expectedPerHour);
           if (!goals.length) return '';
+          const band = Race.fuel.bandAt(cfg, raceHours);
+          const banded = Race.fuel.bands(cfg).length > 0;
           return `
         <div class="intake">
-          <div class="intake-title">Intake / Hour</div>
+          <div class="intake-title">Intake / Hour${banded && band
+            ? ` <span class="intake-band">${escapeHtml(band.label || `from hour ${band.fromHour}`)}</span>` : ''}</div>
           ${goals.map(m => {
             const per = c.intake[m.key]?.perHour || 0;
+            // Against the average they should be at by now, not against the
+            // rate in force this minute: a cumulative number held against an
+            // instantaneous goal would call a runner behind for the whole
+            // stretch after a goal steps down, when they are exactly on plan.
+            const goal = m.expectedPerHour;
+            const stepped = banded && m.targetNow != null && Math.abs(m.targetNow - goal) > 0.5;
             return `
             <div class="intake-row">
               <span class="name">${escapeHtml(m.label)}</span>
-              <div class="bar-track"><div class="bar-fill ${intakeClass(per, m.targetPerHour)}" style="width: ${Math.min(100, (per / m.targetPerHour) * 100)}%"></div></div>
+              <div class="bar-track"><div class="bar-fill ${intakeClass(per, goal)}" style="width: ${Math.min(100, (per / goal) * 100)}%"></div></div>
               <span class="num">${Race.fuel.fmt(m, per)}</span>
-              <span class="target">/ ${Race.fuel.fmt(m, m.targetPerHour)}</span>
+              <span class="target">/ ${Race.fuel.fmt(m, goal)}${stepped
+                ? ` <span class="intake-now">now ${Race.fuel.fmt(m, m.targetNow)}</span>` : ''}</span>
             </div>`;
           }).join('')}
         </div>`;

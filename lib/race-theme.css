@@ -207,6 +207,41 @@ footer.site {
   margin-bottom: 5px;
 }
 .modal-hint { font-size: 11px; color: var(--text-muted); line-height: 1.5; margin: 4px 0 0; }
+
+/* Hour bands in the profile modal. */
+.modal-addrow {
+  background: transparent; border: 1px dashed var(--border-bright);
+  color: var(--text-dim); padding: 8px 12px; border-radius: 4px;
+  cursor: pointer; width: 100%; margin: 8px 0 14px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+}
+.modal-addrow:hover { color: var(--accent); border-color: var(--accent); }
+.prof-band {
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 10px; margin: 8px 0; background: var(--bg-elevated);
+}
+.prof-band-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.prof-band-head > span {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted);
+  white-space: nowrap;
+}
+.prof-band-head input[type="number"] { width: 76px; flex: none; }
+.prof-band-head input[type="text"] { flex: 1 1 auto; min-width: 0; }
+.prof-band-del {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-muted); width: 28px; height: 28px; border-radius: 3px;
+  cursor: pointer; font-size: 15px; line-height: 1; flex: none;
+}
+.prof-band-del:hover { color: var(--red); border-color: var(--red); }
+.prof-band-targets { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+.prof-band-targets label { display: block; }
+.prof-band-targets span {
+  display: block; font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted);
+  margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .modal-msg { font-size: 12px; min-height: 16px; margin: 4px 0 12px; }
 .modal-msg.err { color: var(--red); }
 .modal-msg.ok { color: var(--green); }
