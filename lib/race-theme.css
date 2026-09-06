@@ -76,6 +76,13 @@ header.site {
   flex-wrap: wrap; gap: 24px;
 }
 .brand { display: flex; flex-direction: column; gap: 6px; }
+/* Where the race is, under what it is called. It belongs to the race, not to
+   the app, so it reads beneath the name rather than beside the wordmark. */
+.race-place {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  letter-spacing: 0.1em; color: var(--text-muted); margin-top: -1px;
+}
+.race-place:empty { display: none; }
 .brand-meta {
   display: flex; gap: 14px; align-items: center;
   font-family: 'JetBrains Mono', monospace;
@@ -204,6 +211,13 @@ header.site { position: relative; }
 /* display:flex above would otherwise win against the [hidden] default and
    leave the menu on screen permanently. */
 .account-bar .account-menu[hidden] { display: none; }
+/* Where you can go, above who you are, divided from it. */
+.account-bar .account-menu-nav { display: flex; flex-direction: column; gap: 1px; }
+.account-bar .account-menu-nav[hidden] { display: none; }
+.account-bar .account-menu-nav:not([hidden]) + .account-menu-who,
+.account-bar .account-menu-nav:not([hidden]) + .account-menu-item {
+  border-top: 1px solid var(--border); margin-top: 4px; padding-top: 11px;
+}
 .account-bar .account-menu-who {
   font-size: 10px; letter-spacing: 0.04em; color: var(--text-muted);
   padding: 7px 10px 8px; border-bottom: 1px solid var(--border);
