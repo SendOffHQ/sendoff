@@ -27,9 +27,10 @@
         "elevationLossFt": 13,
         "arriveCutoffHours": null,
         "crewAccess": false,
-        "checkpoint": true,
+        "crewNote": null,
         "pacerEligible": false,
-        "dropBag": false
+        "dropBag": false,
+        "checkpoint": true
       },
       {
         "name": "Music Pass → Music Meadows 1",
@@ -40,9 +41,10 @@
         "elevationLossFt": 2822,
         "arriveCutoffHours": null,
         "crewAccess": true,
-        "checkpoint": false,
+        "crewNote": null,
         "pacerEligible": false,
-        "dropBag": false
+        "dropBag": true,
+        "checkpoint": false
       },
       {
         "name": "Music Meadows 1 → Colony Creek 1",
@@ -53,9 +55,10 @@
         "elevationLossFt": 414,
         "arriveCutoffHours": null,
         "crewAccess": false,
-        "checkpoint": false,
+        "crewNote": null,
         "pacerEligible": false,
-        "dropBag": false
+        "dropBag": false,
+        "checkpoint": false
       },
       {
         "name": "Colony Creek 1 → Horn Creek 1",
@@ -66,10 +69,10 @@
         "elevationLossFt": 1981,
         "arriveCutoffHours": null,
         "crewAccess": true,
-        "checkpoint": false,
+        "crewNote": "Crew lot C1",
         "pacerEligible": false,
-        "dropBag": false,
-        "crewNote": "Crew lot C1"
+        "dropBag": true,
+        "checkpoint": false
       },
       {
         "name": "Horn Creek 1 → Venable",
@@ -80,10 +83,10 @@
         "elevationLossFt": 982,
         "arriveCutoffHours": null,
         "crewAccess": true,
-        "checkpoint": false,
+        "crewNote": "Crew lot C2",
         "pacerEligible": false,
-        "dropBag": false,
-        "crewNote": "Crew lot C2"
+        "dropBag": true,
+        "checkpoint": false
       },
       {
         "name": "Venable → Horn Creek 2",
@@ -94,10 +97,10 @@
         "elevationLossFt": 913,
         "arriveCutoffHours": null,
         "crewAccess": true,
-        "checkpoint": false,
+        "crewNote": "Crew lot C1",
         "pacerEligible": false,
-        "dropBag": false,
-        "crewNote": "Crew lot C1"
+        "dropBag": true,
+        "checkpoint": false
       },
       {
         "name": "Horn Creek 2 → Colony Creek 2",
@@ -108,9 +111,10 @@
         "elevationLossFt": 1023,
         "arriveCutoffHours": null,
         "crewAccess": false,
-        "checkpoint": false,
+        "crewNote": null,
         "pacerEligible": false,
-        "dropBag": false
+        "dropBag": false,
+        "checkpoint": false
       },
       {
         "name": "Colony Creek 2 → Music Meadows 2",
@@ -121,9 +125,10 @@
         "elevationLossFt": 1326,
         "arriveCutoffHours": 18.5,
         "crewAccess": true,
-        "checkpoint": false,
+        "crewNote": null,
         "pacerEligible": true,
-        "dropBag": false
+        "dropBag": true,
+        "checkpoint": false
       },
       {
         "name": "Music Meadows 2 → Colony Creek 3",
@@ -134,9 +139,10 @@
         "elevationLossFt": 418,
         "arriveCutoffHours": null,
         "crewAccess": false,
-        "checkpoint": false,
+        "crewNote": null,
         "pacerEligible": false,
-        "dropBag": false
+        "dropBag": false,
+        "checkpoint": false
       },
       {
         "name": "Colony Creek 3 → Horn Creek 3",
@@ -147,10 +153,10 @@
         "elevationLossFt": 2001,
         "arriveCutoffHours": null,
         "crewAccess": true,
-        "checkpoint": false,
+        "crewNote": "Crew lot C2",
         "pacerEligible": true,
-        "dropBag": false,
-        "crewNote": "Crew lot C2"
+        "dropBag": true,
+        "checkpoint": false
       },
       {
         "name": "Horn Creek 3 → Venable 2",
@@ -161,10 +167,10 @@
         "elevationLossFt": 944,
         "arriveCutoffHours": 26.5,
         "crewAccess": true,
-        "checkpoint": false,
+        "crewNote": "Crew lot C1",
         "pacerEligible": true,
-        "dropBag": false,
-        "crewNote": "Crew lot C1"
+        "dropBag": true,
+        "checkpoint": false
       },
       {
         "name": "Venable 2 → Horn Creek 4",
@@ -175,10 +181,10 @@
         "elevationLossFt": 932,
         "arriveCutoffHours": 28.75,
         "crewAccess": true,
-        "checkpoint": false,
+        "crewNote": "Crew lot C2",
         "pacerEligible": true,
-        "dropBag": false,
-        "crewNote": "Crew lot C2"
+        "dropBag": true,
+        "checkpoint": false
       },
       {
         "name": "Horn Creek 4 → Colony Creek 4",
@@ -189,9 +195,10 @@
         "elevationLossFt": 1000,
         "arriveCutoffHours": null,
         "crewAccess": false,
-        "checkpoint": false,
+        "crewNote": null,
         "pacerEligible": false,
-        "dropBag": false
+        "dropBag": false,
+        "checkpoint": false
       },
       {
         "name": "Colony Creek 4 → Music Meadows 3",
@@ -202,9 +209,10 @@
         "elevationLossFt": 1295,
         "arriveCutoffHours": 34,
         "crewAccess": true,
-        "checkpoint": false,
+        "crewNote": null,
         "pacerEligible": true,
-        "dropBag": false
+        "dropBag": true,
+        "checkpoint": false
       },
       {
         "name": "Music Meadows 3 → Music Pass 2",
@@ -215,9 +223,10 @@
         "elevationLossFt": 14,
         "arriveCutoffHours": null,
         "crewAccess": false,
-        "checkpoint": true,
+        "crewNote": null,
         "pacerEligible": false,
-        "dropBag": false
+        "dropBag": false,
+        "checkpoint": true
       },
       {
         "name": "Music Pass 2 → Finish",
@@ -228,9 +237,10 @@
         "elevationLossFt": 2831,
         "arriveCutoffHours": 38,
         "crewAccess": true,
-        "checkpoint": false,
+        "crewNote": null,
         "pacerEligible": false,
-        "dropBag": false
+        "dropBag": true,
+        "checkpoint": false
       }
     ]
   },
