@@ -368,7 +368,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=31"></script>
+<script src="lib/race-core.js?v=32"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -526,13 +526,24 @@
     if (!next.nextAction) { toast(`${runnerId} has finished.`, 'ok'); return; }
     const now = new Date().toISOString();
 
+    // A checkpoint is passed, not worked. Arriving at one closes the leg and
+    // starts the next in the same instant, so a runner is never shown sitting
+    // in a pit that does not exist and does not have to press twice going by.
+    const st = Race.stationAt(cfg, next.nextLegIndex);
+    const throughCheckpoint = next.nextAction === 'in' && st && st.checkpoint
+                              && next.nextLegIndex < Race.course.legCount(cfg);
+
     // Optimistic local update
-    let legEntry = (runner.legs || []).find(l => l.index === next.nextLegIndex);
-    if (!legEntry) {
-      legEntry = { index: next.nextLegIndex };
-      runner.legs = (runner.legs || []).concat([legEntry]).sort((a, b) => a.index - b.index);
-    }
-    legEntry[next.nextAction === 'out' ? 'startTime' : 'endTime'] = now;
+    const legFor = (idx) => {
+      let l = (runner.legs || []).find(x => x.index === idx);
+      if (!l) {
+        l = { index: idx };
+        runner.legs = (runner.legs || []).concat([l]).sort((a, b) => a.index - b.index);
+      }
+      return l;
+    };
+    legFor(next.nextLegIndex)[next.nextAction === 'out' ? 'startTime' : 'endTime'] = now;
+    if (throughCheckpoint) legFor(next.nextLegIndex + 1).startTime = now;
     render();
 
     // Commit
@@ -546,10 +557,17 @@
         const field = next.nextAction === 'out' ? 'startTime' : 'endTime';
         if (leg[field] === now) return remote; // already applied
         leg[field] = now;
+        if (throughCheckpoint) {
+          let nl = r.legs.find(l => l.index === next.nextLegIndex + 1);
+          if (!nl) { nl = { index: next.nextLegIndex + 1 }; r.legs.push(nl); r.legs.sort((a, b) => a.index - b.index); }
+          nl.startTime = now;
+        }
         remote.lastUpdated = new Date().toISOString();
         return remote;
       }, `pit: ${runner.name || runnerId} sign-${next.nextAction} leg ${next.nextLegIndex}`);
-      toast(`Saved · ${next.nextAction === 'out' ? 'out' : 'in'} · leg ${next.nextLegIndex}`, 'ok');
+      toast(throughCheckpoint
+        ? `Saved · through checkpoint · leg ${next.nextLegIndex}`
+        : `Saved · ${next.nextAction === 'out' ? 'sent off' : 'checked in'} · leg ${next.nextLegIndex}`, 'ok');
     } catch (err) {
       toast(`Save failed: ${err.message}`, 'error');
     }
@@ -588,7 +606,7 @@
   }
 
   async function deleteLastEvent(runnerId) {
-    if (!confirm('Undo the last sign-in/out for this runner?')) return;
+    if (!confirm('Undo the last check-in or send-off for this runner?')) return;
     const runner = (data.runners || []).find(r => r.id === runnerId);
     if (!runner || !runner.legs?.length) return;
     const sorted = runner.legs.slice().sort((a, b) => a.index - b.index);
@@ -696,9 +714,10 @@
       buttonLabel = 'Finished'; buttonDisabled = true;
     } else if (next.state === 'on-course') {
       const def = Race.course.legAt(cfg, next.currentLegIndex);
-      buttonLabel = def && def.toAid
-        ? `Sign In at ${def.toAid}`
-        : `Sign In · End ${def ? def.name : 'leg'}`;
+      const st = Race.stationAt(cfg, next.currentLegIndex);
+      buttonLabel = st && st.checkpoint
+        ? (st.name ? `Checkpoint Reached · ${st.name}` : 'Checkpoint Reached')
+        : (def && def.toAid ? `Check In at ${def.toAid}` : `Check In · End ${def ? def.name : 'leg'}`);
     } else if (next.state === 'in-pit') {
       const def = Race.course.legAt(cfg, next.nextLegIndex);
       buttonLabel = def && def.toAid

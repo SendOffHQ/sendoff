@@ -77,6 +77,14 @@ const isRaceData = (url) =>
   url.pathname === '/races/index.json' ||
   url.pathname === '/hub.json';
 
+// Only these get stored. An allowlist rather than "everything same-origin
+// except...", because the failure mode of getting that backwards is caching an
+// authenticated API response and serving it to whoever asks next.
+const isStaticAsset = (url) =>
+  /^\/(lib|brand)\//.test(url.pathname) ||
+  /\.(css|js|png|jpg|jpeg|svg|webp|woff2?|ico)$/i.test(url.pathname) ||
+  url.pathname === '/manifest.webmanifest';
+
 // Race JSON is fetched with a ?_=<now> buster, so every request is a distinct
 // URL. Storing them as they arrive means a new entry per poll, and race.html
 // polls every ten seconds: an afternoon of that is thousands of copies of the
@@ -203,5 +211,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(cacheFirst(SHELL, req, event).catch(() => fetch(req)));
+  if (isStaticAsset(url)) {
+    event.respondWith(cacheFirst(SHELL, req, event).catch(() => fetch(req)));
+  }
 });
