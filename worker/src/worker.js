@@ -31,6 +31,10 @@
 //     POST /share/revoke     { token }                                 → { ok: true }
 //     GET  /access?slug=...                                            → { people, editors, viewers, shareLinks, teamCanInvite }
 //     POST /access/team-invite { slug, allowed }                       → { teamCanInvite }
+//     GET  /profile[?email=&slug=]                                     → { profile, own }
+//     POST /profile          { displayName, targets, phaseTargets, notes } → { profile }
+//         Your own by default. A teammate's only via a race you can write
+//         and they are on. Writing is always your own.
 //         Creator only. Off by default: without it, only the creator can
 //         invite, add, remove, or hand out share links.
 //
@@ -258,6 +262,74 @@ async function createUserInKv(env, email, password, role) {
   await env.AUTH_KV.put('user:' + email, JSON.stringify({
     email, hash, salt, iterations, role: role || 'crew', createdAt: new Date().toISOString()
   }));
+}
+
+// ---------- profiles ----------
+// What a person brings to any race: what they aim to take in per hour, and the
+// notes a crew would otherwise be told out loud at the trailhead and forget by
+// mile 30. Kept per account rather than per race, because a runner's stomach
+// does not reset between events.
+//
+// Stored under its own KV key rather than on the user record, which holds the
+// password hash. A teammate is allowed to read your fuel defaults; nothing
+// should put them one field away from your credentials.
+const PROFILE_NOTES_MAX = 2000;
+
+function emptyProfile(email) {
+  return { email, displayName: '', targets: {}, phaseTargets: [], notes: '', updatedAt: null };
+}
+
+async function loadProfile(env, email) {
+  email = normalizeEmail(email);
+  if (!email || !env.AUTH_KV) return emptyProfile(email);
+  const raw = await env.AUTH_KV.get('profile:' + email);
+  if (!raw) return emptyProfile(email);
+  try {
+    const p = JSON.parse(raw);
+    return {
+      email,
+      displayName: typeof p.displayName === 'string' ? p.displayName : '',
+      targets: (p.targets && typeof p.targets === 'object' && !Array.isArray(p.targets)) ? p.targets : {},
+      phaseTargets: Array.isArray(p.phaseTargets) ? p.phaseTargets : [],
+      notes: typeof p.notes === 'string' ? p.notes : '',
+      updatedAt: p.updatedAt || null
+    };
+  } catch (e) { return emptyProfile(email); }
+}
+
+// Per-hour numbers only, and only sane ones. A profile is written by its owner
+// and read by their crew, so a bad number here would show up as a target
+// nobody set, and a huge object would be a way to fill the namespace.
+function cleanTargets(input) {
+  const out = {};
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return out;
+  for (const key of Object.keys(input).slice(0, 24)) {
+    if (!/^[A-Za-z0-9_]{1,40}PerHour$/.test(key)) continue;
+    const n = Number(input[key]);
+    if (!Number.isFinite(n) || n < 0 || n > 100000) continue;
+    out[key] = n;
+  }
+  return out;
+}
+
+// Hour-banded targets: "250 cal/hr for the first six hours, 180 after". Sorted
+// and de-duplicated on the way in so every reader can assume the bands are in
+// order and can take the last one whose start hour has passed.
+function cleanPhaseTargets(input) {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set();
+  const bands = [];
+  for (const raw of input.slice(0, 12)) {
+    if (!raw || typeof raw !== 'object') continue;
+    const fromHour = Number(raw.fromHour);
+    if (!Number.isFinite(fromHour) || fromHour < 0 || fromHour > 240) continue;
+    const h = Math.round(fromHour * 4) / 4;   // quarter-hour resolution
+    if (seen.has(h)) continue;
+    seen.add(h);
+    bands.push({ fromHour: h, label: typeof raw.label === 'string' ? raw.label.slice(0, 60) : '',
+                 targets: cleanTargets(raw.targets) });
+  }
+  return bands.sort((a, b) => a.fromHour - b.fromHour);
 }
 
 // ---------- GitHub Contents API helpers ----------
@@ -693,6 +765,7 @@ async function handleAccountDelete(req, env) {
     return json({ error: 'This account is in the USERS list: remove it with `wrangler secret put USERS`.' }, { status: 400 }, env, req);
   }
   await env.AUTH_KV.delete('user:' + email);
+  await env.AUTH_KV.delete('profile:' + email);
   return json({ ok: true }, {}, env, req);
 }
 
@@ -1332,6 +1405,59 @@ async function handleAccessRemove(req, env) {
 // owns the race decides whether the rest of the team can hand out access; a
 // team member who could flip it themselves would just be inviting by two steps
 // instead of one.
+// Your own profile, or a teammate's, and only ever through a race you both
+// work. Letting any signed-in account read any email's profile would turn this
+// into a way to ask "does this person have an account here", so the caller has
+// to name a race they can write and the subject has to be on it.
+async function handleProfileGet(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Profiles require AUTH_KV KV namespace binding' }, { status: 503 }, env, req);
+
+  const url = new URL(req.url);
+  const wanted = normalizeEmail(url.searchParams.get('email')) || normalizeEmail(session.email);
+  const slug = url.searchParams.get('slug');
+
+  if (wanted !== normalizeEmail(session.email)) {
+    if (!slug) return json({ error: 'slug required to read a teammate profile' }, { status: 400 }, env, req);
+    const raceCfg = await loadRaceConfig(env, slug);
+    if (!raceCfg) return json({ error: 'Race not found' }, { status: 404 }, env, req);
+    if (!canEditRace(raceCfg, session.email)) {
+      return json({ error: 'Forbidden, no write access on this race' }, { status: 403 }, env, req);
+    }
+    if (roleForRace(raceCfg, wanted) === null) {
+      return json({ error: 'That person is not on this race' }, { status: 404 }, env, req);
+    }
+  }
+
+  const profile = await loadProfile(env, wanted);
+  // Nothing here is secret to a teammate, but say plainly whose it is so a
+  // client cannot mistake someone else's numbers for the signed-in user's.
+  return json({ profile, own: wanted === normalizeEmail(session.email) }, {}, env, req);
+}
+
+// Your own, only. There is no reason for one account to write another's.
+async function handleProfileSave(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Profiles require AUTH_KV KV namespace binding' }, { status: 503 }, env, req);
+  let body;
+  try { body = await req.json(); }
+  catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+
+  const email = normalizeEmail(session.email);
+  const profile = {
+    email,
+    displayName: typeof body.displayName === 'string' ? body.displayName.trim().slice(0, 80) : '',
+    targets: cleanTargets(body.targets),
+    phaseTargets: cleanPhaseTargets(body.phaseTargets),
+    notes: typeof body.notes === 'string' ? body.notes.slice(0, PROFILE_NOTES_MAX) : '',
+    updatedAt: new Date().toISOString()
+  };
+  await env.AUTH_KV.put('profile:' + email, JSON.stringify(profile));
+  return json({ profile }, {}, env, req);
+}
+
 async function handleTeamInvite(req, env) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -1781,6 +1907,8 @@ export default {
     if (request.method === 'POST' && path === '/access/remove')   return handleAccessRemove(request, env);
     if (request.method === 'GET'  && path === '/access')          return handleAccessList(request, env);
     if (request.method === 'POST' && path === '/access/team-invite') return handleTeamInvite(request, env);
+    if (request.method === 'GET'  && path === '/profile')         return handleProfileGet(request, env);
+    if (request.method === 'POST' && path === '/profile')         return handleProfileSave(request, env);
     if (request.method === 'GET'  && path === '/my-races')        return handleMyRaces(request, env);
     if (request.method === 'GET'  && path === '/next-race-id')    return handleNextRaceId(request, env);
     if (request.method === 'POST' && path === '/race/delete')     return handleRaceDelete(request, env);
