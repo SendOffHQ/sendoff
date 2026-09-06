@@ -588,7 +588,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="lib/race-core.js?v=51"></script>
+<script src="lib/race-core.js?v=52"></script>
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
@@ -906,11 +906,14 @@
           // clocks differ by aid station time, and they differed by exactly as
           // much when the goal was a single flat number.
           const raceHours = (c.completedRaceSec || 0) / 3600;
-          const metrics = Race.fuel.metrics(cfg, raceHours);
+          // This runner's goals and bands, not the race's: two people on the
+          // same course are held to their own plan.
+          const plan = Race.fuel.forRunner(cfg, runner);
+          const metrics = Race.fuel.metrics(plan, raceHours);
           const goals = metrics.filter(m => m.expectedPerHour);
           if (!goals.length) return '';
-          const band = Race.fuel.bandAt(cfg, raceHours);
-          const banded = Race.fuel.bands(cfg).length > 0;
+          const band = Race.fuel.bandAt(plan, raceHours);
+          const banded = Race.fuel.bands(plan).length > 0;
           return `
         <div class="intake">
           <div class="intake-title">Intake / Hour${banded && band

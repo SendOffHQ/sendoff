@@ -316,6 +316,22 @@
     box-shadow: 0 8px 32px rgba(0,0,0,0.5);
     z-index: 50;
   }
+  .plan-for {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin: 0 0 12px;
+  }
+  .plan-for label {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim);
+  }
+  /* The themed select is width:100% by default, which pushed the hint onto its
+     own line and left the picker looking like a form of one field. */
+  .plan-for select {
+    width: auto; min-width: 170px; max-width: 100%;
+    border-radius: 3px; padding: 6px 8px; font-size: 12px;
+  }
+  .plan-for .fuel-hint { flex: 1 1 100%; margin: 0; }
+
   .crew-notes-input {
     width: 100%; box-sizing: border-box; resize: vertical;
     background: var(--bg-elevated); border: 1px solid var(--border);
@@ -323,9 +339,9 @@
     font-family: inherit; font-size: 13px; line-height: 1.5;
   }
   .crew-notes-card {
-    background: var(--bg-card); border: 1px solid var(--border);
+    background: var(--bg-elevated); border-top: 1px solid var(--border);
     border-left: 3px solid var(--accent);
-    border-radius: 4px; padding: 12px 16px; margin-bottom: 18px;
+    padding: 10px 16px 12px;
   }
   .crew-notes-card-head {
     font-family: 'JetBrains Mono', monospace; font-size: 11px;
@@ -384,13 +400,6 @@
 
 <div id="error" class="error-banner" style="display:none;"></div>
 
-<!-- What the runner wanted the crew to know. Above the board rather than inside
-     the editor, because it is read at an aid station and not while setting up. -->
-<section class="crew-notes-card" id="crew-notes-card" hidden>
-  <div class="crew-notes-card-head">Notes for the crew</div>
-  <div class="crew-notes-card-body" id="crew-notes-text"></div>
-</section>
-
 <section id="runners" class="runners"></section>
 
 <!-- Aid station editor (segments mode) -->
@@ -432,6 +441,13 @@
 
     <div class="fuel-editor">
       <div class="fuel-editor-title">Fueling</div>
+      <div class="plan-for" id="plan-for" hidden>
+        <label for="plan-runner">Plan for</label>
+        <select id="plan-runner"></select>
+        <span class="fuel-hint">The goal column, the hour bands and the crew
+          notes below are this runner's. The metric names, units and the
+          shorthand are the race's, shared by everyone on it.</span>
+      </div>
       <div class="table-scroll">
         <table class="aid-list" id="fuel-table">
           <thead>
@@ -479,7 +495,8 @@
       <p class="fuel-hint">
         The things you hand over by the item, not by the number. One tap on the
         pit form adds a serving, two taps adds two, and the crew counts flasks
-        instead of doing arithmetic at an aid station.
+        instead of doing arithmetic at an aid station. A flask is a flask
+        whoever drinks it, so these are the race's rather than one runner's.
       </p>
       <div class="table-scroll">
         <table class="aid-list" id="preset-table">
@@ -506,7 +523,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=51"></script>
+<script src="lib/race-core.js?v=52"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -526,6 +543,12 @@
   // Hour bands pulled from a profile, waiting on the next Save changes.
   let editingBands = null;
   let editingNotes = null;
+  // Goals, bands and notes belong to a runner, so the editor holds one plan per
+  // runner and shows whichever is picked. Keyed by a local key rather than by
+  // runner id: a runner added here has no id until the save that assigns one.
+  let editingPlans = null;
+  let planKey = null;
+  let newRunnerSeq = 0;
   // Reading a file back straight after writing it is the one thing that does
   // not work: neither Pages nor GitHub's contents API is read-after-write
   // consistent, so the poll that follows a save can hand back the version from
@@ -893,6 +916,11 @@
                      : next.state === 'in-pit'    ? 'In pit for'
                      : next.state === 'finished'  ? 'Total since start' : 'Awaiting start';
 
+    // What this runner wanted their crew to know. On the card rather than at the
+    // top of the page, because it is read at an aid station, next to the button
+    // the crew is about to press, and because it is theirs and not the race's.
+    const crewNotes = Race.fuel.notesFor(cfg, runner);
+
     // Intake panel: list completed legs (with startTime+endTime) for editing.
     const completedLegs = (runner.legs || []).filter(l => l.startTime && l.endTime).sort((a, b) => b.index - a.index);
     const stickyIdx = stickyIntakeLegByRunner[runner.id];
@@ -968,6 +996,10 @@
           <div class="state-badge state-${stateClass}">${stateLabel}</div>
         </div>
         <div class="where">${whereLine(runner, next)}</div>
+        ${crewNotes ? `<div class="crew-notes-card">
+          <div class="crew-notes-card-head">Notes for the crew</div>
+          <div class="crew-notes-card-body">${escapeHtml(crewNotes)}</div>
+        </div>` : ''}
         <div class="state-timer" data-since="${since}">
           <span class="label">${timerLabel}</span>
           <span class="value runner-timer">–</span>
@@ -989,11 +1021,6 @@
       return { ...r, ...dr };
     });
     document.getElementById('runners').innerHTML = merged.map(renderRunner).join('');
-
-    const notesCard = document.getElementById('crew-notes-card');
-    const notes = (cfg.crewNotes || '').trim();
-    notesCard.hidden = !notes;
-    document.getElementById('crew-notes-text').textContent = notes;
     document.getElementById('aid-editor').style.display = cfg.courseType === 'segments' ? '' : 'none';
     if (cfg.courseType === 'segments' && !editingAid) {
       // Initialize the editor with current aid stations
@@ -1011,15 +1038,17 @@
     }
     if (!editingRunners) {
       editingRunners = (cfg.runners || []).map(r => ({
-        id: r.id, name: r.name || '', bib: r.bib || '', color: r.color || RUNNER_COLORS[0]
+        key: r.id, id: r.id, name: r.name || '', bib: r.bib || '', color: r.color || RUNNER_COLORS[0]
       }));
+      // Anyone without a plan of their own opens on the race's, which is what
+      // they are already being held to on the board.
+      editingPlans = {};
+      for (const r of (cfg.runners || [])) editingPlans[r.id] = planFrom(Race.fuel.forRunner(cfg, r));
+      planKey = editingRunners.length ? editingRunners[0].key : null;
       editingFuel = Race.fuel.toRows(cfg);
-      editingBands = Race.fuel.bands(cfg).map(b => ({
-        fromHour: b.fromHour, label: b.label || '', targets: { ...b.targets }
-      }));
       editingPresets = Race.fuel.presets(cfg).map(pre => ({ name: pre.name, values: { ...pre.values } }));
-      editingNotes = cfg.crewNotes || '';
-      document.getElementById('crew-notes').value = editingNotes;
+      loadPlan();
+      renderPlanPicker();
       renderFuelRows();
       renderBandRows();
       renderPresetRows();
@@ -1191,19 +1220,95 @@
       const bandNote = theirs.length
         ? ` Plus ${theirs.length} hour band${theirs.length > 1 ? 's' : ''}, which you can retime below.` : '';
       const notesNote = notesTook ? ' Their crew notes are below.' : '';
+      // With more than one runner on the race, say whose plan just changed.
+      const forWho = (editingRunners || []).length > 1
+        ? ` for ${((editingRunners.find(r => r.key === planKey) || {}).name || 'this runner')}` : '';
       note.textContent = filled
-        ? `Filled ${filled} goal${filled > 1 ? 's' : ''} from ${who}.${bandNote}${notesNote} Press Save changes to keep them.`
+        ? `Filled ${filled} goal${filled > 1 ? 's' : ''} from ${who}${forWho}.${bandNote}${notesNote} Press Save changes to keep them.`
         : (theirs.length || notesTook
             ? `No matching goals, but took ${
                 [theirs.length ? `${theirs.length} hour band${theirs.length > 1 ? 's' : ''}` : '',
                  notesTook ? 'their crew notes' : ''].filter(Boolean).join(' and ')
-              } from ${who}.`
+              } from ${who}${forWho}.`
             : `${who} has no saved goals for the metrics this race tracks.`);
     } catch (err) {
       note.textContent = `Could not load that profile: ${err.message}`;
     } finally {
       btn.disabled = false;
     }
+  }
+
+  // ---------- per-runner plans ----------
+  // A plan is the three things that belong to a person rather than to a race:
+  // what they aim to take an hour, how that changes as the race wears on, and
+  // what they want their crew to know. Read out of a cfg-shaped view, so the
+  // same function reads a runner's own or the race's fallback.
+  function planFrom(view) {
+    return {
+      targets: { ...((view && view.targets) || {}) },
+      bands: Race.fuel.bands(view).map(b => ({
+        fromHour: b.fromHour, label: b.label || '', targets: { ...b.targets }
+      })),
+      notes: String((view && view.crewNotes) || '')
+    };
+  }
+
+  // The visible tables hold one runner's plan at a time. This puts what is on
+  // screen back where it belongs before anything moves it, so switching runners
+  // or saving never loses an edit that was never blurred.
+  function syncPlan() {
+    if (!planKey || !editingPlans) return;
+    const plan = editingPlans[planKey] || (editingPlans[planKey] = planFrom(null));
+    plan.targets = Race.fuel.fromRows(editingFuel).targets;
+    plan.bands = (editingBands || []).map(b => ({
+      fromHour: b.fromHour, label: b.label || '', targets: { ...(b.targets || {}) }
+    }));
+    plan.notes = editingNotes || '';
+  }
+
+  // The other direction: the picked runner's plan into the visible tables. The
+  // goal column rides on the metric rows, which are the race's, so only the
+  // numbers are swapped and the names stay put.
+  function loadPlan() {
+    const plan = (editingPlans && editingPlans[planKey]) || planFrom(null);
+    // fromRows derives a key for a row that has not been saved yet, in the same
+    // order as the rows, so a goal typed against a brand-new metric survives a
+    // switch between runners.
+    const keys = Race.fuel.fromRows(editingFuel).metrics.map(m => m.key);
+    let ki = 0;
+    for (const row of editingFuel) {
+      if (!(row.label || '').trim()) { row.target = ''; continue; }
+      const v = plan.targets[keys[ki++] + 'PerHour'];
+      // A zero is how "no goal" is stored; showing it as 0 would read as one.
+      row.target = (v == null || +v === 0) ? '' : v;
+    }
+    editingBands = plan.bands.map(b => ({
+      fromHour: b.fromHour, label: b.label || '', targets: { ...b.targets }
+    }));
+    editingNotes = plan.notes;
+    document.getElementById('crew-notes').value = editingNotes;
+  }
+
+  // One runner needs no picker: everything below the title is theirs already.
+  function renderPlanPicker() {
+    const host = document.getElementById('plan-for');
+    const sel = document.getElementById('plan-runner');
+    const named = (editingRunners || []).filter(r => (r.name || '').trim());
+    host.hidden = named.length < 2;
+    if (host.hidden) return;
+    // Blanking the picked runner's name takes them out of the picker, so the
+    // tables have to follow rather than keep showing a plan nobody is on. Their
+    // own edits are put away first, so retyping the name brings them back.
+    if (!named.some(r => r.key === planKey)) {
+      syncPlan();
+      planKey = named[0].key;
+      loadPlan();
+      renderFuelRows();
+      renderBandRows();
+    }
+    sel.innerHTML = named.map(r =>
+      `<option value="${escapeAttr(r.key)}" ${r.key === planKey ? 'selected' : ''}>${escapeHtml(r.name)}</option>`
+    ).join('');
   }
 
   function renderFuelRows() {
@@ -1244,6 +1349,10 @@
   }
 
   async function saveRunnerEditor() {
+    // Whatever is on screen belongs to the picked runner. Harvest it before
+    // reading any plan, or the edit that was never blurred is the one lost.
+    syncPlan();
+
     // Build the roster, keeping stable ids and assigning deduped ones to new runners.
     const used = new Set();
     const runners = [];
@@ -1259,19 +1368,32 @@
       }
       if (used.has(id)) { toast(`Duplicate runner id "${id}".`, 'error'); return; }
       used.add(id);
-      runners.push({ id, name, bib: (r.bib || '').trim() || name, color: r.color || RUNNER_COLORS[0] });
+      runners.push({ id, name, bib: (r.bib || '').trim() || name, color: r.color || RUNNER_COLORS[0],
+                     planKey: r.key });
     }
     if (!runners.length) { toast('At least one runner is required.', 'error'); return; }
 
     const fuelRows = Race.fuel.fromRows(editingFuel);
     const presets = Race.fuel.presetsFromRows(editingPresets, fuelRows.metrics);
-    // A band keeps only the metrics that survived this same save, so dropping
-    // Fluid does not leave every band carrying an orphaned fluid number.
-    const bands = Race.fuel.bandsFromRows(editingBands, fuelRows.metrics);
-    const clashes = Race.fuel.bandCollisions(editingBands, fuelRows.metrics);
+
+    // Every runner's plan is trimmed to the metrics that survived this same
+    // save, so dropping Fluid does not leave a goal or a band carrying an
+    // orphaned fluid number on anyone.
+    const liveKeys = new Set(fuelRows.metrics.map(m => m.key));
+    const clashes = [];
+    for (const r of runners) {
+      const plan = editingPlans[r.planKey] || planFrom(null);
+      r.targets = Object.fromEntries(Object.entries(plan.targets || {})
+        .filter(([k, v]) => liveKeys.has(k.replace(/PerHour$/, '')) && +v > 0));
+      r.phaseTargets = Race.fuel.bandsFromRows(plan.bands, fuelRows.metrics);
+      r.crewNotes = (plan.notes || '').trim().slice(0, 2000);
+      for (const c of Race.fuel.bandCollisions(plan.bands, fuelRows.metrics)) clashes.push({ ...c, who: r.name });
+      delete r.planKey;
+    }
+    const many = runners.length > 1;
     if (clashes.length && !confirm(
-        clashes.map(c => `Hour ${c.band.fromHour} has two bands. "${c.keeps.label || 'unnamed'}" keeps it; ` +
-          `"${c.band.label || 'unnamed'}" will be dropped.`).join('\n') +
+        clashes.map(c => `${many ? c.who + ': h' : 'H'}our ${c.band.fromHour} has two bands. ` +
+          `"${c.keeps.label || 'unnamed'}" keeps it; "${c.band.label || 'unnamed'}" will be dropped.`).join('\n') +
         '\n\nSave anyway?')) return;
 
     const dropped = droppedFuel();
@@ -1284,15 +1406,15 @@
 
     try {
       const writtenCfg = await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
+        // Each runner now carries their own goals, bands and notes.
         remote.runners = runners;
         remote.fuelMetrics = fuelRows.metrics;
         remote.fuelPresets = presets;
-        remote.phaseTargets = bands;
-        const notes = (editingNotes || '').trim().slice(0, 2000);
-        if (notes) remote.crewNotes = notes; else delete remote.crewNotes;
-        // Merged, not replaced: a goal belonging to a metric this race no longer
-        // tracks stays put, so turning that metric back on brings its goal with it.
-        remote.targets = { ...(remote.targets || {}), ...fuelRows.targets };
+        // The race-level three are left exactly as they were. They are the
+        // fallback a runner without a plan of their own reads, which is how a
+        // race written before this keeps working, and nothing reads them once
+        // every runner has one. Rewriting them here would mean two places
+        // claiming to hold the same goal.
         return remote;
       }, `pit: update runners & goals for ${slug}`);
 
@@ -1319,6 +1441,8 @@
       editingBands = null;
       editingPresets = null;
       editingNotes = null;
+      editingPlans = null;
+      planKey = null;
       adoptConfig(writtenCfg);
       await load();
     } catch (err) {
@@ -1543,20 +1667,48 @@
   document.getElementById('runner-editor-head').addEventListener('click', () => {
     document.getElementById('runner-editor').classList.toggle('collapsed');
   });
+  document.getElementById('plan-runner').addEventListener('change', (e) => {
+    syncPlan();
+    planKey = e.target.value;
+    loadPlan();
+    renderFuelRows();
+    renderBandRows();
+  });
   document.getElementById('add-runner-edit').addEventListener('click', () => {
-    editingRunners.push({ id: null, name: '', bib: '', color: RUNNER_COLORS[editingRunners.length % RUNNER_COLORS.length] });
+    // A new runner starts on the race's goals and bands rather than on nobody's,
+    // which is what they would have been held to before this existed. The notes
+    // start empty: they are the one part that is never someone else's.
+    const key = `new-${++newRunnerSeq}`;
+    editingRunners.push({ key, id: null, name: '', bib: '', color: RUNNER_COLORS[editingRunners.length % RUNNER_COLORS.length] });
+    const seed = planFrom(cfg);
+    seed.notes = '';
+    editingPlans[key] = seed;
     renderRunnerRows();
+    renderPlanPicker();
   });
   document.getElementById('runner-edit-rows').addEventListener('input', (e) => {
     const i = e.target.dataset.runner, k = e.target.dataset.k;
     if (i == null || !k) return;
     editingRunners[+i][k] = e.target.value;
+    // The picker lists runners by name, so a rename shows up in it as typed.
+    if (k === 'name') renderPlanPicker();
   });
   document.getElementById('runner-edit-rows').addEventListener('click', (e) => {
     const del = e.target.dataset.delRunner;
     if (del == null) return;
+    const gone = editingRunners[+del];
+    // The removed runner's plan goes with them; whoever is shown next brings
+    // their own into the tables.
     editingRunners.splice(+del, 1);
+    if (gone) delete editingPlans[gone.key];
+    if (gone && gone.key === planKey) {
+      planKey = editingRunners.length ? editingRunners[0].key : null;
+      loadPlan();
+      renderFuelRows();
+      renderBandRows();
+    }
     renderRunnerRows();
+    renderPlanPicker();
   });
   document.getElementById('add-fuel').addEventListener('click', () => {
     editingFuel.push({ key: '', label: '', unit: '', short: '', decimals: 0, step: 1, target: '' });
@@ -1648,7 +1800,7 @@
 
   document.getElementById('runner-reload').addEventListener('click', () => {
     editingRunners = null; editingFuel = null; editingBands = null; editingPresets = null;
-    editingNotes = null; render();
+    editingNotes = null; editingPlans = null; planKey = null; render();
   });
   document.getElementById('crew-notes').addEventListener('input', (e) => {
     editingNotes = e.target.value;
