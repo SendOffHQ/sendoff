@@ -245,7 +245,7 @@
     ],
     "startAid": {
       "crewAccess": true,
-      "crewNote": "New notes",
+      "crewNote": null,
       "pacerEligible": false,
       "dropBag": true
     }
