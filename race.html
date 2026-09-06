@@ -289,15 +289,17 @@
   .st-tag.pacer  { color: var(--green); }
   .st-tag.note   { color: var(--yellow); text-transform: none; letter-spacing: 0.04em; }
 
-  /* On a phone seven columns do not fit: the segment name wraps to four lines
-     and sodium falls off the right edge. Each leg becomes a block instead,
-     with the column names moving onto the values they label. Reads without
+  /* On a phone the columns do not fit: the segment name wraps to four lines
+     and the last fuel metric falls off the right edge, and a race is free to
+     track four or five of them. Each leg becomes a block instead, with the
+     column names moving onto the values they label, and the cells auto-fit so
+     the count of metrics decides how many rows it takes. Reads without
      sideways scrolling, which nobody does at an aid station. */
   @media (max-width: 560px) {
     .leglog thead { display: none; }
     .leglog table, .leglog tbody { display: block; width: 100%; }
     .leglog tr.leg-row {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 12px;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 10px 12px;
       padding: 12px 0; border-bottom: 1px solid var(--border);
     }
     .leglog tr.leg-row td { display: block; padding: 0; border-bottom: none; }
@@ -560,7 +562,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="lib/race-core.js?v=32"></script>
+<script src="lib/race-core.js?v=33"></script>
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
@@ -688,9 +690,14 @@
     }).join('');
   }
 
+  // The leg log is four fixed columns (#, Done, Leg, Pit) plus one per tracked
+  // fuel metric, so both live here rather than as a hardcoded 7 in three places.
+  function fuelMetrics() { return Race.fuel.metrics(cfg); }
+  function logCols() { return 4 + fuelMetrics().length; }
+
   function legLog(runner, c) {
     if (!runner.legs || runner.legs.length === 0) {
-      return `<tr class="empty"><td colspan="7">Awaiting first leg</td></tr>`;
+      return `<tr class="empty"><td colspan="${logCols()}">Awaiting first leg</td></tr>`;
     }
     return runner.legs.slice().sort((a, b) => a.index - b.index).map((l, i, arr) => {
       const segDef = Race.course.legAt(cfg, l.index);
@@ -711,7 +718,7 @@
       const oldCls = isOld ? ' leg-old' : '';
       const noteOldCls = isOld ? ' note-old' : '';
       const noteRow = noteParts.length
-        ? `<tr class="note-row${noteOldCls}"><td colspan="7">${escapeHtml(noteParts.join(' · '))}</td></tr>`
+        ? `<tr class="note-row${noteOldCls}"><td colspan="${logCols()}">${escapeHtml(noteParts.join(' · '))}</td></tr>`
         : '';
       // Show the leg name for segments and loops-with-aids; a simple
       // lap-only loop just shows the index.
@@ -737,9 +744,8 @@
           <td class="num" data-label="Done">${Race.fmt.clockTime(l.endTime)}</td>
           <td class="num" data-label="Leg">${dur ? Race.fmt.durationShort(dur) : '–'}</td>
           <td class="num" data-label="Pit">${pitCell}</td>
-          <td class="num" data-label="Cal">${l.calories || 0}</td>
-          <td class="num" data-label="Fluid">${l.fluidOz || 0}oz</td>
-          <td class="num" data-label="Na">${l.sodiumMg || 0}</td>
+          ${fuelMetrics().map(m => `<td class="num" data-label="${escapeHtml(m.short)}">${
+            l[m.key] != null && l[m.key] !== '' ? Race.fuel.fmt(m, l[m.key]) : '–'}</td>`).join('')}
         </tr>
         ${noteRow}`;
     }).join('');
@@ -758,7 +764,6 @@
 
   function renderRunner(runner) {
     const c = Race.compute.runner(runner, cfg);
-    const t = cfg.targets || {};
     const color = runner.color || 'var(--accent)';
     const totalDist = c.courseDist;
     const totalCutSec = (cfg.cutoffs?.totalHours || 0) * 3600;
@@ -853,31 +858,24 @@
           </div>
         </div>
 
-        ${(t.caloriesPerHour || t.fluidOzPerHour || t.sodiumMgPerHour) ? `
+        ${(() => {
+          const goals = fuelMetrics().filter(m => m.targetPerHour);
+          if (!goals.length) return '';
+          return `
         <div class="intake">
           <div class="intake-title">Intake / Hour</div>
-          ${t.caloriesPerHour ? `
+          ${goals.map(m => {
+            const per = c.intake[m.key]?.perHour || 0;
+            return `
             <div class="intake-row">
-              <span class="name">Calories</span>
-              <div class="bar-track"><div class="bar-fill ${intakeClass(c.calPerHr, t.caloriesPerHour)}" style="width: ${Math.min(100, (c.calPerHr / t.caloriesPerHour) * 100)}%"></div></div>
-              <span class="num">${Math.round(c.calPerHr)}</span>
-              <span class="target">/ ${t.caloriesPerHour}</span>
-            </div>` : ''}
-          ${t.fluidOzPerHour ? `
-            <div class="intake-row">
-              <span class="name">Fluid</span>
-              <div class="bar-track"><div class="bar-fill ${intakeClass(c.fluidPerHr, t.fluidOzPerHour)}" style="width: ${Math.min(100, (c.fluidPerHr / t.fluidOzPerHour) * 100)}%"></div></div>
-              <span class="num">${c.fluidPerHr.toFixed(1)} oz</span>
-              <span class="target">/ ${t.fluidOzPerHour} oz</span>
-            </div>` : ''}
-          ${t.sodiumMgPerHour ? `
-            <div class="intake-row">
-              <span class="name">Sodium</span>
-              <div class="bar-track"><div class="bar-fill ${intakeClass(c.sodiumPerHr, t.sodiumMgPerHour)}" style="width: ${Math.min(100, (c.sodiumPerHr / t.sodiumMgPerHour) * 100)}%"></div></div>
-              <span class="num">${Math.round(c.sodiumPerHr)} mg</span>
-              <span class="target">/ ${t.sodiumMgPerHour} mg</span>
-            </div>` : ''}
-        </div>` : ''}
+              <span class="name">${escapeHtml(m.label)}</span>
+              <div class="bar-track"><div class="bar-fill ${intakeClass(per, m.targetPerHour)}" style="width: ${Math.min(100, (per / m.targetPerHour) * 100)}%"></div></div>
+              <span class="num">${Race.fuel.fmt(m, per)}</span>
+              <span class="target">/ ${Race.fuel.fmt(m, m.targetPerHour)}</span>
+            </div>`;
+          }).join('')}
+        </div>`;
+        })()}
 
         <div class="legs-section">
           <div class="legs-head">
@@ -901,7 +899,7 @@
               <thead>
                 <tr>
                   <th>#</th><th>Done</th><th class="num">Leg</th><th class="num">Pit</th>
-                  <th class="num">Cal</th><th class="num">Fluid</th><th class="num">Na</th>
+                  ${fuelMetrics().map(m => `<th class="num">${escapeHtml(m.short)}</th>`).join('')}
                 </tr>
               </thead>
               <tbody>${legLog(runner, c)}</tbody>

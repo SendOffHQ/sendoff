@@ -174,6 +174,15 @@
     min-height: 60px; resize: vertical; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; font-size: 13px;
   }
   .intake-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .intake-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .preset-chip {
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    color: var(--text); border-radius: 999px; padding: 7px 12px;
+    font-size: 12px; font-weight: 600; cursor: pointer; line-height: 1;
+    min-height: 34px;
+  }
+  .preset-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .preset-chip:active { transform: translateY(1px); }
 
   /* aid station editor */
   .editor {
@@ -236,15 +245,17 @@
   table.aid-list input[type="color"] {
     width: 100%; height: 34px; padding: 2px; cursor: pointer;
   }
-  .goals-grid {
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 16px;
-  }
-  @media (max-width: 480px) { .goals-grid { grid-template-columns: 1fr; } }
-  .goal-field { display: flex; flex-direction: column; gap: 5px; }
-  .goal-field span {
+  .fuel-editor { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .fuel-editor-title {
     font-family: 'JetBrains Mono', monospace; font-size: 9px;
     letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted);
+    margin-bottom: 8px;
   }
+  .fuel-hint { font-size: 11px; color: var(--text-muted); margin: 0 0 10px; line-height: 1.5; }
+  /* One column per metric, so on a phone this scrolls sideways rather than
+     squeezing every number input down to nothing. */
+  .preset-scroll { overflow-x: auto; }
+  .preset-scroll table { min-width: 380px; }
 
   .toast {
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -330,7 +341,7 @@
 
 <section class="editor collapsed" id="runner-editor">
   <div class="editor-head" id="runner-editor-head">
-    <div class="editor-title">Runners &amp; goals</div>
+    <div class="editor-title">Runners &amp; fueling</div>
     <span class="editor-toggle">Edit</span>
   </div>
   <div class="editor-body">
@@ -343,13 +354,30 @@
     </table>
     <button class="add-row" type="button" id="add-runner-edit">+ Add runner</button>
 
-    <div class="goals-grid">
-      <label class="goal-field"><span>Calories / hr</span>
-        <input type="number" id="goal-cal" min="0" step="10" /></label>
-      <label class="goal-field"><span>Fluid oz / hr</span>
-        <input type="number" id="goal-fluid" min="0" step="1" /></label>
-      <label class="goal-field"><span>Sodium mg / hr</span>
-        <input type="number" id="goal-sodium" min="0" step="50" /></label>
+    <div class="fuel-editor">
+      <div class="fuel-editor-title">Fueling</div>
+      <table class="aid-list">
+        <thead>
+          <tr><th>Name</th><th>Unit</th><th>Short</th><th>Goal / hr</th><th></th></tr>
+        </thead>
+        <tbody id="fuel-rows"></tbody>
+      </table>
+      <button class="add-row" type="button" id="add-fuel">+ Add a fueling metric</button>
+      <div class="editor-warn" id="fuel-warn" style="display:none;"></div>
+
+      <div class="fuel-editor-title" style="margin-top:18px;">Shorthand</div>
+      <p class="fuel-hint">
+        The things you hand over by the item, not by the number. One tap on the
+        pit form adds a serving, two taps adds two, and the crew counts flasks
+        instead of doing arithmetic at an aid station.
+      </p>
+      <div class="preset-scroll">
+        <table class="aid-list" id="preset-table">
+          <thead><tr id="preset-head"></tr></thead>
+          <tbody id="preset-rows"></tbody>
+        </table>
+      </div>
+      <button class="add-row" type="button" id="add-preset">+ Add shorthand</button>
     </div>
 
     <div style="margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;">
@@ -368,7 +396,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=32"></script>
+<script src="lib/race-core.js?v=33"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -380,7 +408,9 @@
 
   let cfg = null, data = null;
   let editingAid = null; // local editable copy of aid stations
-  let editingRunners = null; // local editable copy of the runner roster
+  let editingRunners = null;
+  let editingFuel = null;
+  let editingPresets = null; // local editable copy of the runner roster
   let stickyIntakeLegByRunner = {}; // runnerId -> selected legIndex
   const RUNNER_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -635,15 +665,34 @@
   }
 
   // ---------- intake editor ----------
+  // Adds a preset's numbers to the boxes without saving. Two flasks is two
+  // taps, and a wrong tap is fixed by editing the number rather than by an
+  // undo the crew has to find.
+  function applyPreset(runnerId, presetIndex) {
+    const card = document.querySelector(`.runner[data-runner="${runnerId}"]`);
+    const preset = Race.fuel.presets(cfg)[presetIndex];
+    if (!card || !preset) return;
+    for (const m of Race.fuel.metrics(cfg)) {
+      const add = +preset.values[m.key];
+      if (!add) continue;
+      const el = card.querySelector(`[data-intake="${m.key}"]`);
+      if (!el) continue;
+      el.value = Race.fuel.round(m, (parseFloat(el.value) || 0) + add);
+    }
+    toast(`Added ${preset.name}. Save intake to keep it.`, 'ok');
+  }
+
   async function saveIntake(runnerId) {
     const sel = document.querySelector(`select[data-intake-leg][data-runner="${runnerId}"]`);
     const legIndex = sel ? +sel.value : null;
     if (!legIndex) return;
     const card = document.querySelector(`.runner[data-runner="${runnerId}"]`);
-    const get = name => card.querySelector(`[data-intake="${name}"]`).value.trim();
-    const cal    = get('calories');
-    const fluid  = get('fluidOz');
-    const sodium = get('sodiumMg');
+    const get = name => {
+      const el = card.querySelector(`[data-intake="${name}"]`);
+      return el ? el.value.trim() : '';
+    };
+    const metrics = Race.fuel.metrics(cfg);
+    const amounts = metrics.map(m => [m, get(m.key)]);
     const notes  = get('notes');
     const issues = get('issues');
     const meds   = get('meds');
@@ -655,9 +704,9 @@
         if (!r) throw new Error('Runner missing');
         const leg = (r.legs || []).find(l => l.index === legIndex);
         if (!leg) throw new Error('Leg missing');
-        if (cal    !== '') leg.calories  = parseFloat(cal);    else delete leg.calories;
-        if (fluid  !== '') leg.fluidOz   = parseFloat(fluid);  else delete leg.fluidOz;
-        if (sodium !== '') leg.sodiumMg  = parseFloat(sodium); else delete leg.sodiumMg;
+        for (const [m, v] of amounts) {
+          if (v !== '') leg[m.key] = Race.fuel.round(m, v); else delete leg[m.key];
+        }
         if (notes  !== '') leg.notes      = notes;             else delete leg.notes;
         if (issues !== '') leg.issues     = issues;            else delete leg.issues;
         if (meds   !== '') leg.meds       = meds;              else delete leg.meds;
@@ -749,26 +798,34 @@
       return `<option value="${l.index}" ${l.index === selectedLegIdx ? 'selected' : ''}>${escapeHtml(labelText)}</option>`;
     }).join('');
 
+    // One tap per flask or gel: the preset adds its numbers to whatever is
+    // already in the boxes, so a crew member counts servings instead of doing
+    // arithmetic at an aid station.
+    const fuelMetrics = Race.fuel.metrics(cfg);
+    const presets = Race.fuel.presets(cfg).filter(p => fuelMetrics.some(m => +p.values[m.key]));
+    const presetBtns = presets.length === 0 ? '' : `
+        <div class="intake-presets">
+          ${presets.map((p, i) => `<button type="button" class="preset-chip" data-action="preset"
+             data-runner="${runner.id}" data-preset="${i}"
+             title="${escapeAttr(fuelMetrics.filter(m => +p.values[m.key])
+                     .map(m => Race.fuel.fmt(m, p.values[m.key]) + ' ' + m.short).join(' · '))}"
+             >+ ${escapeHtml(p.name)}</button>`).join('')}
+        </div>`;
+
     const intakePanel = completedLegs.length === 0 ? '' : `
       <div class="intake-panel">
         <div class="intake-panel-head">
           <span class="intake-panel-title">Intake / notes</span>
           <select data-intake-leg data-runner="${runner.id}">${legOptions}</select>
         </div>
-        <div class="intake-grid">
+        ${fuelMetrics.length ? `<div class="intake-grid">
+          ${fuelMetrics.map(m => `
           <label class="field">
-            <span class="lbl">Calories</span>
-            <input type="number" data-intake="calories" min="0" step="10" value="${selectedLeg?.calories ?? ''}" />
-          </label>
-          <label class="field">
-            <span class="lbl">Fluid oz</span>
-            <input type="number" data-intake="fluidOz" min="0" step="1" value="${selectedLeg?.fluidOz ?? ''}" />
-          </label>
-          <label class="field">
-            <span class="lbl">Sodium mg</span>
-            <input type="number" data-intake="sodiumMg" min="0" step="50" value="${selectedLeg?.sodiumMg ?? ''}" />
-          </label>
-        </div>
+            <span class="lbl">${escapeHtml(m.label)}${m.unit ? ' ' + escapeHtml(m.unit) : ''}</span>
+            <input type="number" data-intake="${escapeAttr(m.key)}" min="0" step="${m.step}" value="${selectedLeg?.[m.key] ?? ''}" />
+          </label>`).join('')}
+        </div>` : ''}
+        ${presetBtns}
         <label class="field intake-notes">
           <span class="lbl">Notes</span>
           <textarea data-intake="notes">${escapeHtml(selectedLeg?.notes ?? '')}</textarea>
@@ -839,14 +896,55 @@
       editingRunners = (cfg.runners || []).map(r => ({
         id: r.id, name: r.name || '', bib: r.bib || '', color: r.color || RUNNER_COLORS[0]
       }));
-      const t = cfg.targets || {};
-      document.getElementById('goal-cal').value = t.caloriesPerHour ?? '';
-      document.getElementById('goal-fluid').value = t.fluidOzPerHour ?? '';
-      document.getElementById('goal-sodium').value = t.sodiumMgPerHour ?? '';
+      editingFuel = Race.fuel.toRows(cfg);
+      editingPresets = Race.fuel.presets(cfg).map(pre => ({ name: pre.name, values: { ...pre.values } }));
+      renderFuelRows();
+      renderPresetRows();
       renderRunnerRows();
     }
     tick();
     updateLastUpdatedLabel();
+  }
+
+  // A metric removed here stops being logged and stops appearing. The numbers
+  // already in data.json are left alone, so this is reversible, but the crew
+  // should be told before they lose a column mid-race.
+  function droppedFuel() {
+    const keep = new Set(Race.fuel.fromRows(editingFuel).metrics.map(m => m.key));
+    return Race.fuel.metrics(cfg).filter(m => !keep.has(m.key) &&
+      (data.runners || []).some(r => (r.legs || []).some(l => l[m.key] != null && l[m.key] !== '')));
+  }
+
+  // Presets are keyed off the metrics as they stand in the editor right now,
+  // not as they are saved, so adding Carbs immediately gives every shorthand a
+  // Carbs column to fill in.
+  function renderPresetRows() {
+    const metrics = Race.fuel.fromRows(editingFuel).metrics;
+    document.getElementById('preset-head').innerHTML =
+      '<th>Name</th>' + metrics.map(m =>
+        `<th>${escapeHtml(m.short)}</th>`).join('') + '<th></th>';
+    document.getElementById('preset-rows').innerHTML = editingPresets.map((pre, i) => `
+      <tr>
+        <td><input type="text" data-preset="${i}" data-k="name" value="${escapeAttr(pre.name)}" placeholder="e.g. Tailwind flask" /></td>
+        ${metrics.map(m => `<td><input type="number" data-preset="${i}" data-mk="${escapeAttr(m.key)}"
+             min="0" step="${m.step || 1}" value="${escapeAttr(pre.values[m.key] ?? '')}" placeholder="0" /></td>`).join('')}
+        <td><button class="row-del" type="button" data-del-preset="${i}" aria-label="Delete">×</button></td>
+      </tr>
+    `).join('');
+  }
+
+  function renderFuelRows() {
+    document.getElementById('fuel-rows').innerHTML = editingFuel.map((m, i) => `
+      <tr>
+        <td><input type="text" data-fuel="${i}" data-k="label" value="${escapeAttr(m.label)}" placeholder="e.g. Carbs" /></td>
+        <td><input type="text" data-fuel="${i}" data-k="unit" value="${escapeAttr(m.unit)}" placeholder="g" /></td>
+        <td><input type="text" data-fuel="${i}" data-k="short" value="${escapeAttr(m.short)}" placeholder="Carb" /></td>
+        <td><input type="number" data-fuel="${i}" data-k="target" min="0" step="${m.step || 1}" value="${escapeAttr(m.target)}" placeholder="0" /></td>
+        <td><button class="row-del" type="button" data-del-fuel="${i}" aria-label="Delete">×</button></td>
+      </tr>
+    `).join('');
+    renderWarnOnly();
+    if (editingPresets) renderPresetRows();
   }
 
   function renderRunnerRows() {
@@ -891,11 +989,22 @@
     }
     if (!runners.length) { toast('At least one runner is required.', 'error'); return; }
 
-    const targets = {
-      caloriesPerHour: parseFloat(document.getElementById('goal-cal').value) || 0,
-      fluidOzPerHour:  parseFloat(document.getElementById('goal-fluid').value) || 0,
-      sodiumMgPerHour: parseFloat(document.getElementById('goal-sodium').value) || 0
-    };
+    const fuelRows = Race.fuel.fromRows(editingFuel);
+    // Only the amounts for metrics that survive are kept, so removing Fluid does
+    // not leave every shorthand carrying an orphaned fluid number.
+    const liveKeys = new Set(fuelRows.metrics.map(m => m.key));
+    const presets = editingPresets
+      .filter(pre => (pre.name || '').trim())
+      .map(pre => ({
+        name: pre.name.trim(),
+        values: Object.fromEntries(Object.entries(pre.values)
+          .filter(([k, v]) => liveKeys.has(k) && +v))
+      }))
+      .filter(pre => Object.keys(pre.values).length);
+
+    const dropped = droppedFuel();
+    if (dropped.length && !confirm(
+        `${dropped.map(d => d.label).join(', ')} will stop being tracked. Numbers already logged stay in the data but no longer appear anywhere. Continue?`)) return;
 
     const keep = new Set(runners.map(r => r.id));
     const orphaned = (data.runners || []).filter(d => !keep.has(d.id) && (d.legs || []).some(l => l.startTime || l.endTime));
@@ -904,7 +1013,11 @@
     try {
       await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
         remote.runners = runners;
-        remote.targets = targets;
+        remote.fuelMetrics = fuelRows.metrics;
+        remote.fuelPresets = presets;
+        // Merged, not replaced: a goal belonging to a metric this race no longer
+        // tracks stays put, so turning that metric back on brings its goal with it.
+        remote.targets = { ...(remote.targets || {}), ...fuelRows.targets };
         return remote;
       }, `pit: update runners & goals for ${slug}`);
 
@@ -925,8 +1038,10 @@
         }, `pit: refresh index runners for ${slug}`);
       }
 
-      toast('Runners & goals saved', 'ok');
+      toast('Runners & fueling saved', 'ok');
       editingRunners = null;
+      editingFuel = null;
+      editingPresets = null;
       await load();
     } catch (err) {
       toast(`Save failed: ${err.message}`, 'error');
@@ -1056,6 +1171,7 @@
     if (action === 'press') press(t.dataset.runner);
     else if (action === 'undo') deleteLastEvent(t.dataset.runner);
     else if (action === 'save-intake') saveIntake(t.dataset.runner);
+    else if (action === 'preset') applyPreset(t.dataset.runner, +t.dataset.preset);
     else if (action === 'edit-time') editEventTime(t.dataset.runner, +t.dataset.leg, t.dataset.field);
   });
 
@@ -1107,8 +1223,55 @@
     editingRunners.splice(+del, 1);
     renderRunnerRows();
   });
+  document.getElementById('add-fuel').addEventListener('click', () => {
+    editingFuel.push({ key: '', label: '', unit: '', short: '', decimals: 0, step: 1, target: '' });
+    renderFuelRows();
+  });
+  document.getElementById('fuel-rows').addEventListener('input', (e) => {
+    const i = e.target.dataset.fuel, k = e.target.dataset.k;
+    if (i == null || !k) return;
+    editingFuel[+i][k] = e.target.value;
+    if (k === 'label') renderWarnOnly();
+  });
+  document.getElementById('fuel-rows').addEventListener('click', (e) => {
+    const del = e.target.dataset.delFuel;
+    if (del == null) return;
+    editingFuel.splice(+del, 1);
+    renderFuelRows();
+  });
+  // Refresh the warning without redrawing the rows, which would steal focus
+  // out of the field being typed in.
+  function renderWarnOnly() {
+    const warn = document.getElementById('fuel-warn');
+    const dropped = droppedFuel();
+    warn.style.display = dropped.length ? '' : 'none';
+    if (dropped.length) warn.textContent = `${dropped.map(d => d.label).join(', ')} has logged numbers. Saving stops tracking it.`;
+  }
+
+  document.getElementById('add-preset').addEventListener('click', () => {
+    editingPresets.push({ name: '', values: {} });
+    renderPresetRows();
+  });
+  document.getElementById('preset-rows').addEventListener('input', (e) => {
+    const i = e.target.dataset.preset;
+    if (i == null) return;
+    const pre = editingPresets[+i];
+    if (e.target.dataset.k === 'name') pre.name = e.target.value;
+    else if (e.target.dataset.mk) {
+      const v = e.target.value.trim();
+      if (v === '') delete pre.values[e.target.dataset.mk];
+      else pre.values[e.target.dataset.mk] = parseFloat(v) || 0;
+    }
+  });
+  document.getElementById('preset-rows').addEventListener('click', (e) => {
+    const del = e.target.dataset.delPreset;
+    if (del == null) return;
+    editingPresets.splice(+del, 1);
+    renderPresetRows();
+  });
+
   document.getElementById('runner-reload').addEventListener('click', () => {
-    editingRunners = null; render();
+    editingRunners = null; editingFuel = null; editingPresets = null; render();
   });
   document.getElementById('runner-save').addEventListener('click', saveRunnerEditor);
 
