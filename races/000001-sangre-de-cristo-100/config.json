@@ -12,7 +12,7 @@
   "people": [],
   "editors": [],
   "viewers": [],
-  "teamCanInvite": false,
+  "teamCanInvite": true,
   "cutoffs": {
     "totalHours": 38
   },
