@@ -146,26 +146,74 @@ footer.site {
 }
 .account-bar .account-email {
   color: var(--text-dim); letter-spacing: 0.04em;
-  max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.account-bar button.account-signout,
-.account-bar button.account-pw,
-.account-bar button.account-profile,
-.account-bar button.account-signin,
-.account-bar a.account-admin {
+.account-bar button.account-signin {
   font-family: 'JetBrains Mono', monospace; font-size: 10px;
   letter-spacing: 0.12em; text-transform: uppercase;
   background: transparent; border: 1px solid var(--border);
   color: var(--text-muted); padding: 5px 10px; border-radius: 3px;
   cursor: pointer; text-decoration: none;
 }
-.account-bar button.account-signout:hover,
-.account-bar button.account-pw:hover,
-.account-bar button.account-profile:hover,
-.account-bar button.account-signin:hover,
-.account-bar a.account-admin:hover {
-  color: var(--accent); border-color: var(--accent);
+.account-bar button.account-signin:hover { color: var(--accent); border-color: var(--accent); }
+
+/* The menu button: three bars drawn from a border and two pseudo-elements, so
+   there is no icon font or SVG to load for something this small. Sized to the
+   44px touch target a thumb expects, with the bars centred inside it. */
+.account-bar { position: relative; }
+.account-bar .account-menu-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 34px; padding: 0; flex: none; position: relative;
+  background: transparent; border: 1px solid var(--border);
+  border-radius: 3px; cursor: pointer;
 }
+/* The drawn button is 40x34; the thing a thumb has to hit is 44 square. */
+.account-bar .account-menu-btn::after {
+  content: ''; position: absolute; top: 50%; left: 50%;
+  width: 44px; height: 44px; transform: translate(-50%, -50%);
+}
+.account-bar .account-menu-btn:hover { border-color: var(--accent); }
+.account-bar .account-menu-btn:hover .account-bars,
+.account-bar .account-menu-btn:hover .account-bars::before,
+.account-bar .account-menu-btn:hover .account-bars::after { background: var(--accent); }
+.account-bar .account-menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.account-bars, .account-bars::before, .account-bars::after {
+  display: block; width: 15px; height: 1.5px; border-radius: 1px;
+  background: var(--text-dim); transition: background 0.12s ease;
+}
+.account-bars { position: relative; }
+.account-bars::before, .account-bars::after { content: ''; position: absolute; left: 0; }
+.account-bars::before { top: -5px; }
+.account-bars::after  { top: 5px; }
+
+.account-bar .account-menu {
+  position: absolute; top: calc(100% - 2px); right: 0; z-index: 900;
+  min-width: 190px; max-width: min(88vw, 320px);
+  background: var(--bg-card); border: 1px solid var(--border-bright);
+  border-radius: 5px; padding: 5px; box-shadow: 0 10px 28px rgba(0,0,0,0.55);
+  display: flex; flex-direction: column; gap: 1px;
+}
+/* display:flex above would otherwise win against the [hidden] default and
+   leave the menu on screen permanently. */
+.account-bar .account-menu[hidden] { display: none; }
+.account-bar .account-menu-who {
+  font-size: 10px; letter-spacing: 0.04em; color: var(--text-muted);
+  padding: 7px 10px 8px; border-bottom: 1px solid var(--border);
+  margin-bottom: 4px; overflow-wrap: anywhere; text-transform: none;
+}
+.account-bar .account-menu-item {
+  display: block; width: 100%; text-align: left;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  background: transparent; border: 0; border-radius: 3px;
+  color: var(--text-dim); padding: 10px; cursor: pointer; text-decoration: none;
+}
+.account-bar .account-menu-item:hover,
+.account-bar .account-menu-item:focus-visible {
+  background: var(--bg-elevated); color: var(--accent); outline: none;
+}
+.account-bar .account-menu-item.danger:hover,
+.account-bar .account-menu-item.danger:focus-visible { color: var(--red); }
 @media print { .account-bar { display: none !important; } }
 
 /* Modal dialog (injected by race-core.js: sign-in, change-password) */
