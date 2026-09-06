@@ -245,7 +245,7 @@
     ],
     "startAid": {
       "crewAccess": true,
-      "crewNote": "New new noites",
+      "crewNote": null,
       "pacerEligible": false,
       "dropBag": true
     }
