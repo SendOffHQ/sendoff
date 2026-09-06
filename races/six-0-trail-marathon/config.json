@@ -105,14 +105,5 @@
       "decimals": 0,
       "step": 50
     }
-  ],
-  "fuelPresets": [
-    {
-      "name": "LMNT Flask",
-      "values": {
-        "fluidOz": 500,
-        "sodiumMg": 1000
-      }
-    }
   ]
 }
