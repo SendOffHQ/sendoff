@@ -471,7 +471,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=49"></script>
+<script src="lib/race-core.js?v=50"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -493,6 +493,22 @@
   // Set once this session writes config.json, so later reads stop going to a
   // Pages copy that has not caught up yet.
   let configEdited = false;
+  // Reading a file back straight after writing it is the one thing that does
+  // not work: neither Pages nor GitHub's contents API is read-after-write
+  // consistent, so the poll that follows a save can hand back the version from
+  // before it and undo the edit on screen. The writer already knows what it
+  // wrote, so it says so, and polls are ignored for long enough that the far
+  // side has certainly caught up.
+  const CONFIG_SETTLE_MS = 20000;
+  let configWrittenUntil = 0;
+
+  function adoptConfig(written) {
+    if (!written) return;
+    cfg = written;
+    configEdited = true;
+    configWrittenUntil = Date.now() + CONFIG_SETTLE_MS;
+    render();
+  }
   let stickyIntakeLegByRunner = {}; // runnerId -> selected legIndex
   const RUNNER_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -1212,8 +1228,7 @@
     if (orphaned.length && !confirm(`${orphaned.length} removed runner(s) have logged legs. Saving deletes that data. Continue?`)) return;
 
     try {
-      configEdited = true;
-      await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
+      const writtenCfg = await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
         remote.runners = runners;
         remote.fuelMetrics = fuelRows.metrics;
         remote.fuelPresets = presets;
@@ -1246,6 +1261,7 @@
       editingFuel = null;
       editingBands = null;
       editingPresets = null;
+      adoptConfig(writtenCfg);
       await load();
     } catch (err) {
       toast(`Save failed: ${err.message}`, 'error');
@@ -1315,8 +1331,7 @@
 
     const newSegments = Race.course.segmentsFromAidStations(aids, cfg.course?.segments || []);
     try {
-      configEdited = true;
-      await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
+      const writtenCfg = await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
         remote.course = remote.course || {};
         remote.course.segments = newSegments;
         // The start has no arriving segment, so its settings are kept beside
@@ -1337,6 +1352,7 @@
 
       toast('Aid stations saved', 'ok');
       editingAid = null;
+      adoptConfig(writtenCfg);
       await load();
     } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
   }
@@ -1377,7 +1393,9 @@
         Race.gh.readRaceJson(slug, 'config.json', configEdited),
         Race.gh.readRaceJson(slug, 'data.json', true)
       ]);
-      cfg  = c;
+      // Within the settle window the copy we wrote wins, because a read that
+      // arrives stale would put the old value back on screen.
+      if (Date.now() >= configWrittenUntil) cfg = c;
       // Now that the roster is known, the pit board can appear for whoever is
       // allowed to work it.
       Race.nav.setRace(slug, 'pit', () => Race.roles.canEdit(cfg, Race.auth.email()));
