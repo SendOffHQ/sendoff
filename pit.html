@@ -412,7 +412,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=34"></script>
+<script src="lib/race-core.js?v=35"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -592,28 +592,18 @@
     if (throughCheckpoint) legFor(next.nextLegIndex + 1).startTime = now;
     render();
 
-    // Commit
+    // Commit. Both halves of a checkpoint go in one entry so they can never be
+    // split by a signal that drops between them.
+    const legs = { [next.nextLegIndex]: { [next.nextAction === 'out' ? 'startTime' : 'endTime']: now } };
+    if (throughCheckpoint) legs[next.nextLegIndex + 1] = { startTime: now };
+
+    const what = throughCheckpoint
+      ? `through checkpoint · leg ${next.nextLegIndex}`
+      : `${next.nextAction === 'out' ? 'sent off' : 'checked in'} · leg ${next.nextLegIndex}`;
     try {
-      await Race.gh.mutateJson(Race.auth.cfg(), DATA_PATH, (remote) => {
-        const r = (remote.runners || []).find(x => x.id === runnerId);
-        if (!r) throw new Error(`Runner "${runnerId}" not in remote data.json`);
-        r.legs = r.legs || [];
-        let leg = r.legs.find(l => l.index === next.nextLegIndex);
-        if (!leg) { leg = { index: next.nextLegIndex }; r.legs.push(leg); r.legs.sort((a, b) => a.index - b.index); }
-        const field = next.nextAction === 'out' ? 'startTime' : 'endTime';
-        if (leg[field] === now) return remote; // already applied
-        leg[field] = now;
-        if (throughCheckpoint) {
-          let nl = r.legs.find(l => l.index === next.nextLegIndex + 1);
-          if (!nl) { nl = { index: next.nextLegIndex + 1 }; r.legs.push(nl); r.legs.sort((a, b) => a.index - b.index); }
-          nl.startTime = now;
-        }
-        remote.lastUpdated = new Date().toISOString();
-        return remote;
-      }, `pit: ${runner.name || runnerId} sign-${next.nextAction} leg ${next.nextLegIndex}`);
-      toast(throughCheckpoint
-        ? `Saved · through checkpoint · leg ${next.nextLegIndex}`
-        : `Saved · ${next.nextAction === 'out' ? 'sent off' : 'checked in'} · leg ${next.nextLegIndex}`, 'ok');
+      const r = await Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId, legs },
+        `pit: ${runner.name || runnerId} sign-${next.nextAction} leg ${next.nextLegIndex}`);
+      toast(r.queued ? `No signal · ${what} saved on this phone` : `Saved · ${what}`, 'ok');
     } catch (err) {
       toast(`Save failed: ${err.message}`, 'error');
     }
@@ -638,15 +628,10 @@
     next.setHours(+m[1], +m[2], +(m[3] || 0), 0);
     const iso = next.toISOString();
     try {
-      await Race.gh.mutateJson(Race.auth.cfg(), DATA_PATH, (remote) => {
-        const r = (remote.runners || []).find(x => x.id === runnerId);
-        const lg = r && (r.legs || []).find(l => l.index === legIndex);
-        if (!lg) throw new Error('Leg not found');
-        lg[field] = iso;
-        remote.lastUpdated = new Date().toISOString();
-        return remote;
-      }, `pit: edit ${runnerId} leg ${legIndex} ${field}`);
-      toast('Time saved', 'ok');
+      const r = await Race.queue.write(DATA_PATH, 'setLegTimes',
+        { runnerId, legs: { [legIndex]: { [field]: iso } } },
+        `pit: edit ${runnerId} leg ${legIndex} ${field}`);
+      toast(r.queued ? 'No signal · time saved on this phone' : 'Time saved', 'ok');
       await load();
     } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
   }
@@ -666,16 +651,12 @@
     else return;
 
     try {
-      await Race.gh.mutateJson(Race.auth.cfg(), DATA_PATH, (remote) => {
-        const r = (remote.runners || []).find(x => x.id === runnerId);
-        const idx = (r.legs || []).findIndex(l => l.index === last.index);
-        if (idx < 0) return remote;
-        if (deleteWholeLeg) r.legs.splice(idx, 1);
-        else delete r.legs[idx][field];
-        remote.lastUpdated = new Date().toISOString();
-        return remote;
-      }, `pit: undo ${runnerId} leg ${last.index}`);
-      toast('Undone', 'ok');
+      const r = deleteWholeLeg
+        ? await Race.queue.write(DATA_PATH, 'removeLeg', { runnerId, legIndex: last.index },
+            `pit: undo ${runnerId} leg ${last.index}`)
+        : await Race.queue.write(DATA_PATH, 'clearLegField', { runnerId, legIndex: last.index, field },
+            `pit: undo ${runnerId} leg ${last.index}`);
+      toast(r.queued ? 'No signal · undo saved on this phone' : 'Undone', 'ok');
       await load();
     } catch (err) { toast(`Undo failed: ${err.message}`, 'error'); }
   }
@@ -714,23 +695,21 @@
     const meds   = get('meds');
     const gear   = get('gearChanges');
 
+    // null means "clear it", which is how an emptied box is told apart from one
+    // that was never filled in.
+    const fields = {};
+    for (const [m, v] of amounts) fields[m.key] = v === '' ? null : Race.fuel.round(m, v);
+    fields.notes       = notes  === '' ? null : notes;
+    fields.issues      = issues === '' ? null : issues;
+    fields.meds        = meds   === '' ? null : meds;
+    fields.gearChanges = gear   === '' ? null : gear;
+
     try {
-      await Race.gh.mutateJson(Race.auth.cfg(), DATA_PATH, (remote) => {
-        const r = (remote.runners || []).find(x => x.id === runnerId);
-        if (!r) throw new Error('Runner missing');
-        const leg = (r.legs || []).find(l => l.index === legIndex);
-        if (!leg) throw new Error('Leg missing');
-        for (const [m, v] of amounts) {
-          if (v !== '') leg[m.key] = Race.fuel.round(m, v); else delete leg[m.key];
-        }
-        if (notes  !== '') leg.notes      = notes;             else delete leg.notes;
-        if (issues !== '') leg.issues     = issues;            else delete leg.issues;
-        if (meds   !== '') leg.meds       = meds;              else delete leg.meds;
-        if (gear   !== '') leg.gearChanges = gear;             else delete leg.gearChanges;
-        remote.lastUpdated = new Date().toISOString();
-        return remote;
-      }, `pit: intake ${runnerId} leg ${legIndex}`);
-      toast(`Intake saved · leg ${legIndex}`, 'ok');
+      const r = await Race.queue.write(DATA_PATH, 'setLegFields', { runnerId, legIndex, fields },
+        `pit: intake ${runnerId} leg ${legIndex}`);
+      toast(r.queued
+        ? `No signal · intake for leg ${legIndex} saved on this phone`
+        : `Intake saved · leg ${legIndex}`, 'ok');
       await load();
     } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
   }
@@ -1152,7 +1131,11 @@
         Race.gh.readRaceJson(slug, 'data.json', true)
       ]);
       cfg  = c;
-      data = d;
+      // Anything still waiting to sync is replayed on top of what came back,
+      // so a check-in made with no signal reads as done rather than vanishing
+      // on the next poll. Survives a reload too, which matters when the phone
+      // is in a vest pocket and the browser drops the tab.
+      data = Race.queue.applyTo(DATA_PATH, d);
       document.title = `Pit · ${cfg.name}`;
       document.getElementById('race-title').textContent = cfg.name;
       document.getElementById('error').style.display = 'none';

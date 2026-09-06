@@ -562,7 +562,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="lib/race-core.js?v=34"></script>
+<script src="lib/race-core.js?v=35"></script>
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
@@ -953,7 +953,11 @@
       // signed-in crew read it through the worker so a pit press shows up
       // within a poll instead of waiting on the Pages rebuild.
       cfg  = await Race.gh.readRaceJson(slug, 'config.json', true);
-      data = await Race.gh.readRaceJson(slug, 'data.json', true);
+      // Replay anything this device logged but has not managed to send yet, so
+      // a solo runner watching their own dashboard sees the split they just
+      // pressed instead of wondering whether it took.
+      data = Race.queue.applyTo(`races/${slug}/data.json`,
+        await Race.gh.readRaceJson(slug, 'data.json', true));
       lastFetchAt = new Date();
 
       document.title = `${cfg.name} · SendOff`;
