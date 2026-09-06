@@ -18,7 +18,7 @@
 // claims clients immediately so a fixed worker takes over on the next load
 // rather than waiting for every tab to close.
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL = `sendoff-shell-${VERSION}`;
 const DATA = `sendoff-data-${VERSION}`;
 const OURS = [SHELL, DATA];
@@ -28,7 +28,7 @@ const OURS = [SHELL, DATA];
 // with every cache-bust, and the day it is forgotten the worker serves last
 // week's JavaScript.
 const SHELL_URLS = [
-  '/', '/index.html', '/race.html', '/pit.html', '/setup.html',
+  '/', '/index.html', '/race.html', '/pit.html', '/settings.html', '/setup.html',
   '/charts.html', '/print-report.html', '/signup.html', '/reset.html', '/admin.html',
   '/manifest.webmanifest',
   '/brand/sendoffprimaryonDark.svg',
