@@ -136,6 +136,11 @@
   }
   .add-row:hover { color: var(--accent); border-color: var(--accent); }
 
+  .editor-warn {
+    background: rgba(255, 176, 122, 0.08); border: 1px solid rgba(255, 176, 122, 0.4);
+    color: var(--yellow); padding: 10px 12px; border-radius: 4px;
+    font-size: 11px; margin: 10px 0 0;
+  }
   .fuel-shorthand { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 16px; }
   .sub-title {
     font-family: 'JetBrains Mono', monospace; font-size: 9px;
@@ -531,6 +536,7 @@
         </table>
       </div>
       <button type="button" class="add-row" id="add-band">+ Add an hour band</button>
+      <div class="editor-warn" id="band-warn" style="display:none;"></div>
     </div>
 
     <div class="fuel-shorthand">
@@ -571,7 +577,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=47"></script>
+<script src="lib/race-core.js?v=48"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -860,6 +866,21 @@
     return metrics;
   }
 
+  // Two bands cannot start at the same hour: the save keeps the first of any
+  // pair, so say which one loses while it is still a typo.
+  function bandWarn() {
+    const el = document.getElementById('band-warn');
+    if (!el) return [];
+    const clashes = Race.fuel.bandCollisions(state.fuelBands, Race.fuel.fromRows(state.fuelMetrics).metrics);
+    el.style.display = clashes.length ? '' : 'none';
+    if (clashes.length) {
+      el.textContent = clashes.map(c =>
+        `Two bands start at hour ${c.band.fromHour}: "${c.keeps.label || 'unnamed'}" keeps it and ` +
+        `"${c.band.label || 'unnamed'}" is dropped when you save.`).join(' ');
+    }
+    return clashes;
+  }
+
   function renderBandRows() {
     const metrics = renderBandHead();
     document.getElementById('band-rows').innerHTML = state.fuelBands.map((b, i) => `
@@ -871,6 +892,7 @@
              value="${escapeAttr(b.targets[m.key + 'PerHour'] ?? '')}" placeholder="\u2014" /></td>`).join('')}
         <td><button type="button" class="row-del" data-band-del="${i}" aria-label="Delete">×</button></td>
       </tr>`).join('');
+    bandWarn();
   }
 
   // Whoever is on the roster and might have a profile worth starting from. In
@@ -1072,6 +1094,12 @@
     const proxy = isProxyMode();
     const me = proxy ? (Race.auth.email() || '') : '';
     const fuelRows = Race.fuel.fromRows(state.fuelMetrics);
+    const bandClashes = Race.fuel.bandCollisions(state.fuelBands, fuelRows.metrics);
+    if (bandClashes.length) {
+      showError(bandClashes.map(c => `Two hour bands start at hour ${c.band.fromHour}. ` +
+        `Give one of them a different hour.`).join(' '));
+      return;
+    }
 
     const cfg = {
       name, location, startTime,
@@ -1435,6 +1463,7 @@
       b.fromHour = e.target.value;
       const cell = e.target.closest('tr').querySelector('.band-clock');
       if (cell) cell.textContent = bandClock(b.fromHour);
+      bandWarn();
     } else if (e.target.dataset.bk === 'label') {
       b.label = e.target.value;
     } else if (e.target.dataset.bt) {
