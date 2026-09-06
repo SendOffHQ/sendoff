@@ -471,7 +471,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=48"></script>
+<script src="lib/race-core.js?v=49"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -1274,7 +1274,7 @@
             ${aidToggle(i, 'crewAccess', 'Crew can meet', a.crewAccess !== false)}
             ${aidToggle(i, 'dropBag', 'Drop bag', !!a.dropBag)}
             ${aidToggle(i, 'pacerEligible', 'Pacer pickup', !!a.pacerEligible)}
-            ${aidToggle(i, 'checkpoint', 'Checkpoint only', !!a.checkpoint)}
+            ${i === 0 ? '' : aidToggle(i, 'checkpoint', 'Checkpoint only', !!a.checkpoint)}
             <input type="text" class="aid-note" data-aid="${i}" data-k="crewNote"
                    value="${escapeAttr(a.crewNote || '')}" placeholder="Crew note (lot, walk-in…)"
                    ${a.crewAccess === false ? 'disabled' : ''} />
@@ -1319,6 +1319,9 @@
       await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
         remote.course = remote.course || {};
         remote.course.segments = newSegments;
+        // The start has no arriving segment, so its settings are kept beside
+        // them rather than on one.
+        remote.course.startAid = Race.course.startAidFrom(editingAid[0]);
         return remote;
       }, `pit: update aid stations for ${slug}`);
 

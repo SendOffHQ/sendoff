@@ -577,7 +577,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=48"></script>
+<script src="lib/race-core.js?v=49"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -771,7 +771,7 @@
             ${aidToggle(i, 'crewAccess', 'Crew can meet', a.crewAccess !== false)}
             ${aidToggle(i, 'dropBag', 'Drop bag', !!a.dropBag)}
             ${aidToggle(i, 'pacerEligible', 'Pacer pickup', !!a.pacerEligible)}
-            ${aidToggle(i, 'checkpoint', 'Checkpoint only', !!a.checkpoint)}
+            ${i === 0 ? '' : aidToggle(i, 'checkpoint', 'Checkpoint only', !!a.checkpoint)}
             <input type="text" class="aid-note" data-aid="${i}" data-k="crewNote"
                    value="${escapeAttr(a.crewNote || '')}" placeholder="Crew note (lot, walk-in…)"
                    ${a.crewAccess === false ? 'disabled' : ''} />
@@ -1154,7 +1154,10 @@
           crewAccess: a.crewAccess !== false, crewNote: (a.crewNote || '').trim() || null,
           pacerEligible: !!a.pacerEligible, dropBag: !!a.dropBag, checkpoint: !!a.checkpoint }))
         .filter(a => a.name && a.mileage != null && !isNaN(a.mileage));
-      cfg.course = { segments: Race.course.segmentsFromAidStations(aids) };
+      cfg.course = {
+        segments: Race.course.segmentsFromAidStations(aids),
+        startAid: Race.course.startAidFrom(aids[0])
+      };
     }
     return cfg;
   }
