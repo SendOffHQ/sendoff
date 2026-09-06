@@ -247,7 +247,80 @@
     "fluidOzPerHour": 32,
     "sodiumMgPerHour": 1000
   },
-  "phaseTargets": [],
+  "phaseTargets": [
+    {
+      "fromHour": 0,
+      "label": "Dark, cold (~35–45°F), pre-dawn",
+      "targets": {
+        "caloriesPerHour": 250,
+        "fluidOzPerHour": 16,
+        "sodiumMgPerHour": 500
+      }
+    },
+    {
+      "fromHour": 3,
+      "label": "Dawn, Warming",
+      "targets": {
+        "caloriesPerHour": 275,
+        "fluidOzPerHour": 20,
+        "sodiumMgPerHour": 700
+      }
+    },
+    {
+      "fromHour": 6,
+      "label": "Day, warm, high-altitude sun",
+      "targets": {
+        "caloriesPerHour": 275,
+        "fluidOzPerHour": 26,
+        "sodiumMgPerHour": 1200
+      }
+    },
+    {
+      "fromHour": 13,
+      "label": "Evening, cooling fast",
+      "targets": {
+        "caloriesPerHour": 250,
+        "fluidOzPerHour": 20,
+        "sodiumMgPerHour": 900
+      }
+    },
+    {
+      "fromHour": 16,
+      "label": "Night two, cold",
+      "targets": {
+        "caloriesPerHour": 250,
+        "fluidOzPerHour": 16,
+        "sodiumMgPerHour": 500
+      }
+    },
+    {
+      "fromHour": 27,
+      "label": "Day two, warming",
+      "targets": {
+        "caloriesPerHour": 225,
+        "fluidOzPerHour": 20,
+        "sodiumMgPerHour": 800
+      }
+    },
+    {
+      "fromHour": 31,
+      "label": "Warm, deep fatigue",
+      "targets": {
+        "caloriesPerHour": 200,
+        "fluidOzPerHour": 24,
+        "sodiumMgPerHour": 1000
+      }
+    },
+    {
+      "fromHour": 35,
+      "label": "Survival mode",
+      "targets": {
+        "caloriesPerHour": 200,
+        "fluidOzPerHour": 24,
+        "sodiumMgPerHour": 1000
+      }
+    }
+  ],
   "fuelMetrics": [
     {
       "key": "calories",
