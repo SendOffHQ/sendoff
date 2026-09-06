@@ -110,16 +110,6 @@ h1.site {
 h1.site em { font-style: italic; color: var(--accent); font-weight: 600; }
 @media (max-width: 600px) { h1.site { font-size: 32px; } }
 
-a.nav-link {
-  font-family: 'JetBrains Mono', monospace; font-size: 11px;
-  letter-spacing: 0.15em; text-transform: uppercase;
-  color: var(--text); text-decoration: none;
-  border: 1px solid var(--border-bright); padding: 8px 12px; border-radius: 4px;
-  background: var(--bg-elevated);
-}
-a.nav-link:hover, a.nav-link:active {
-  color: var(--accent); border-color: var(--accent); background: var(--accent-glow);
-}
 
 .btn {
   font-family: 'JetBrains Mono', monospace; font-size: 11px;

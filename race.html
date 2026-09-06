@@ -32,7 +32,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=27">
+<link rel="stylesheet" href="lib/race-theme.css?v=28">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   .cutoffs {
@@ -542,7 +542,6 @@
     <div class="brand-meta">
       <span class="pulse"></span>
       <a class="wordmark" href="index.html" aria-label="SendOff · home"><svg viewBox="-130 -130 3781.0 1317.6" aria-hidden="true"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 544.24 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 489.41 469.6 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></a><span>·</span>
-      <a href="index.html" style="color: var(--accent); text-decoration: none;">← Hub</a>
     </div>
     <h1 class="site" id="race-title">Loading…</h1>
     <div class="race-place" id="brand-subtitle"></div>
@@ -552,9 +551,6 @@
       <span class="label" id="elapsed-label">Race Time Elapsed</span>
       <span class="time" id="elapsed">--:--:--</span>
     </div>
-    <a class="nav-link" id="lk-pit" href="#" style="display:none;">Pit →</a>
-    <a class="nav-link" id="lk-charts" href="#">Charts →</a>
-    <a class="nav-link" id="lk-print" href="#">Print →</a>
   </div>
 </header>
 
@@ -590,16 +586,13 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="lib/race-core.js?v=46"></script>
+<script src="lib/race-core.js?v=47"></script>
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
 
   // Update nav links to carry the slug
-  document.getElementById('lk-pit').href    = `pit.html?id=${encodeURIComponent(slug)}`;
-  document.getElementById('lk-charts').href = `charts.html?id=${encodeURIComponent(slug)}`;
-  document.getElementById('lk-print').href  = `print-report.html?id=${encodeURIComponent(slug)}`;
 
   let cfg = null, data = null;
   let lastFetchAt = null;
@@ -1037,7 +1030,9 @@
       document.getElementById('error').style.display = 'none';
       renderShareBanner();
       maybeShowAccessPanel();
-      document.getElementById('lk-pit').style.display = canEdit() ? '' : 'none';
+      // The other three pages of this race, and the hub. The pit board only
+      // appears for someone who can actually work it.
+      Race.nav.setRace(slug, 'race', canEdit);
       updateLastUpdated();
       tick();
       initCourseVisuals();
