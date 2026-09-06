@@ -316,6 +316,10 @@
     box-shadow: 0 8px 32px rgba(0,0,0,0.5);
     z-index: 50;
   }
+  /* The Name column holds a picker once there is a roster to pick from, so it
+     takes the full cell the way the text field it replaces does. */
+  .runner-who { width: 100%; padding: 8px 10px; font-size: 12px; }
+
   .plan-for {
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     margin: 0 0 12px;
@@ -388,6 +392,17 @@
 <div id="error" class="error-banner" style="display:none;"></div>
 
 <section id="runners" class="runners"></section>
+
+<!-- Same panel the dashboard has, mounted from Race.access. It sits here too
+     because this is the page where the roster is edited, and assigning a runner
+     to an account only makes sense next to the invites that create one. -->
+<section id="access" class="access" style="display:none;">
+  <div class="access-head">
+    <span class="access-head-title">Manage access</span>
+    <span class="access-head-toggle">Expand</span>
+  </div>
+  <div class="access-body" id="access-body"></div>
+</section>
 
 <!-- Aid station editor (segments mode) -->
 <section class="editor collapsed" id="aid-editor" style="display:none;">
@@ -510,7 +525,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=52"></script>
+<script src="lib/race-core.js?v=53"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -536,6 +551,42 @@
   let editingPlans = null;
   let planKey = null;
   let newRunnerSeq = 0;
+  // Everyone on this race who might be running it: the creator, plus anyone
+  // invited as a racer, with the name off their account. Fetched once so the
+  // runner rows can offer them without waiting for the access panel to open.
+  let accountPeople = [];
+
+  async function loadAccountPeople() {
+    if (!Race.auth.has() || !Race.hub.isProxyMode()) return;
+    if (!Race.roles.canEdit(cfg, Race.auth.email())) return;
+    try {
+      const s = await Race.api.accessList(slug);
+      const out = [];
+      if (s.createdBy) {
+        out.push({ email: String(s.createdBy).toLowerCase(), role: 'owner', displayName: s.createdByName || '' });
+      }
+      for (const p of (s.people || [])) {
+        const email = String(p.email || '').toLowerCase();
+        if (!email || email === String(s.createdBy || '').toLowerCase()) continue;
+        if (p.role !== 'racer') continue;
+        out.push({ email, role: p.role, displayName: p.displayName || '' });
+      }
+      accountPeople = out;
+      // The rows can offer the roster now, and the goals picker can say who
+      // people are rather than only what their address is.
+      if (editingRunners) { renderRunnerRows(); renderProfilePicker(); }
+    } catch (err) {
+      // No signal, or not allowed to read the roster. The rows fall back to a
+      // plain name field, which is what they were before this existed.
+      accountPeople = [];
+    }
+  }
+
+  // What to call someone: the name off their profile, or the part of their
+  // address before the @, which is nearly always their name anyway.
+  function personName(p) {
+    return (p && p.displayName) ? p.displayName : String((p && p.email) || '').split('@')[0];
+  }
   // Reading a file back straight after writing it is the one thing that does
   // not work: neither Pages nor GitHub's contents API is read-after-write
   // consistent, so the poll that follows a save can hand back the version from
@@ -1016,7 +1067,8 @@
     }
     if (!editingRunners) {
       editingRunners = (cfg.runners || []).map(r => ({
-        key: r.id, id: r.id, name: r.name || '', bib: r.bib || '', color: r.color || RUNNER_COLORS[0]
+        key: r.id, id: r.id, name: r.name || '', bib: r.bib || '',
+        color: r.color || RUNNER_COLORS[0], email: r.email || ''
       }));
       // Anyone without a plan of their own opens on the race's, which is what
       // they are already being held to on the board.
@@ -1033,8 +1085,36 @@
       renderProfilePicker();
       renderRunnerRows();
     }
+    maybeShowAccessPanel();
+    if (!accountPeople.length) loadAccountPeople();
     tick();
     updateLastUpdatedLabel();
+  }
+
+  // ---------- manage access ----------
+  // The dashboard's panel, mounted here as well. Only someone who can manage
+  // the race sees it; the panel decides that for itself.
+  let accessPanel = null;
+  function maybeShowAccessPanel() {
+    const sec = document.getElementById('access');
+    if (!sec) return;
+    if (!accessPanel) {
+      accessPanel = Race.access.mount(sec, {
+        slug,
+        cfg: () => cfg,
+        data: () => data,
+        // Units change how every distance on the board reads.
+        onUnitsSaved: () => render(),
+        // The roster is what the runner picker offers, so a person invited as a
+        // racer can be assigned to a runner without a reload.
+        onRosterChanged: (panel) => {
+          accountPeople = panel.racers();
+          if (editingRunners) renderRunnerRows();
+        }
+      });
+    } else {
+      accessPanel.refresh();
+    }
   }
 
   // A metric removed here stops being logged and stops appearing. The numbers
@@ -1142,9 +1222,19 @@
     const seen = new Set();
     const rows = people.filter(p => p.email && !seen.has(p.email) && seen.add(p.email))
       .sort((a, b) => (a.role === 'racer' ? -1 : 0) - (b.role === 'racer' ? -1 : 0));
-    sel.innerHTML = rows.map(p =>
-      `<option value="${escapeAttr(p.email)}"${p.email === me ? ' selected' : ''}>` +
-      `${escapeHtml(p.email)} · ${escapeHtml(Race.roles.label(p.role))}${p.email === me ? ' (you)' : ''}</option>`).join('');
+    // Whoever the plan on screen belongs to, if that runner is tied to an
+    // account. Otherwise you, since on a solo race the only profile is yours.
+    // With one runner there is no plan picker, so the plan on screen is theirs.
+    const rs = editingRunners || [];
+    const current = rs.find(r => r.key === planKey) || (rs.length === 1 ? rs[0] : null);
+    const planned = (current || {}).email;
+    const want = String(planned || me || '').toLowerCase();
+    sel.innerHTML = rows.map(p => {
+      const named = accountPeople.find(a => a.email === p.email);
+      const label = named ? `${personName(named)} · ${p.email}` : p.email;
+      return `<option value="${escapeAttr(p.email)}"${p.email === want ? ' selected' : ''}>` +
+        `${escapeHtml(label)} · ${escapeHtml(Race.roles.label(p.role))}${p.email === me ? ' (you)' : ''}</option>`;
+    }).join('');
     const wrap = sel.closest('.fuel-from-profile');
     if (wrap) wrap.style.display = rows.length ? '' : 'none';
     const note = document.getElementById('fuel-profile-note');
@@ -1304,11 +1394,37 @@
     if (editingPresets) renderPresetRows();
   }
 
+  // The Name column. With a roster to offer, it is a picker of the people on
+  // this race who might be running it, because tying a runner to an account is
+  // what lets that person log their own splits later. Anyone not on the race,
+  // or a race with no roster loaded, still just gets a name field.
+  function runnerNameCell(r, i) {
+    const nameInput = `<input type="text" data-runner="${i}" data-k="name" value="${escapeAttr(r.name)}" placeholder="Runner name" />`;
+    if (!accountPeople.length) return nameInput;
+
+    const linked = r.email ? String(r.email).toLowerCase() : '';
+    const known = accountPeople.some(p => p.email === linked);
+    const opts = accountPeople.map(p =>
+      `<option value="${escapeAttr(p.email)}"${p.email === linked ? ' selected' : ''}>` +
+      `${escapeHtml(personName(p))}${p.role === 'owner' ? ' (owner)' : ''}</option>`).join('');
+    // Someone who was on the race and has since been removed still shows, so a
+    // saved link is never dropped silently by a roster change.
+    const stale = (linked && !known)
+      ? `<option value="${escapeAttr(linked)}" selected>${escapeHtml(linked)} (no longer on this race)</option>` : '';
+
+    return `
+      <select data-runner="${i}" data-k="who" class="runner-who" aria-label="Account for runner ${i + 1}">
+        <option value=""${linked ? '' : ' selected'}>Not linked · type a name</option>
+        ${opts}${stale}
+      </select>
+      ${linked ? '' : nameInput}`;
+  }
+
   function renderRunnerRows() {
     const tbody = document.getElementById('runner-edit-rows');
     tbody.innerHTML = editingRunners.map((r, i) => `
       <tr>
-        <td><input type="text" data-runner="${i}" data-k="name" value="${escapeAttr(r.name)}" placeholder="Runner name" /></td>
+        <td>${runnerNameCell(r, i)}</td>
         <td><input type="text" data-runner="${i}" data-k="bib" value="${escapeAttr(r.bib)}" placeholder="#42 or label" /></td>
         <td class="color-cell"><input type="color" data-runner="${i}" data-k="color" value="${r.color || RUNNER_COLORS[0]}" /></td>
         <td>${editingRunners.length > 1 ? `<button class="row-del" data-del-runner="${i}" type="button" aria-label="Delete">×</button>` : ''}</td>
@@ -1346,8 +1462,13 @@
       }
       if (used.has(id)) { toast(`Duplicate runner id "${id}".`, 'error'); return; }
       used.add(id);
-      runners.push({ id, name, bib: (r.bib || '').trim() || name, color: r.color || RUNNER_COLORS[0],
-                     planKey: r.key });
+      const runner = { id, name, bib: (r.bib || '').trim() || name, color: r.color || RUNNER_COLORS[0],
+                       planKey: r.key };
+      // Which account is this person. What racer mode will read to know whose
+      // splits it is looking at, and what picks their profile for their goals.
+      const email = String(r.email || '').trim().toLowerCase();
+      if (email) runner.email = email;
+      runners.push(runner);
     }
     if (!runners.length) { toast('At least one runner is required.', 'error'); return; }
 
@@ -1651,6 +1772,7 @@
     loadPlan();
     renderFuelRows();
     renderBandRows();
+    renderProfilePicker();
   });
   document.getElementById('add-runner-edit').addEventListener('click', () => {
     // A new runner starts on the race's goals and bands rather than on nobody's,
@@ -1666,10 +1788,31 @@
   });
   document.getElementById('runner-edit-rows').addEventListener('input', (e) => {
     const i = e.target.dataset.runner, k = e.target.dataset.k;
-    if (i == null || !k) return;
+    if (i == null || !k || k === 'who') return;
     editingRunners[+i][k] = e.target.value;
-    // The picker lists runners by name, so a rename shows up in it as typed.
+    // The plan picker lists runners by name, so a rename shows up as typed.
     if (k === 'name') renderPlanPicker();
+  });
+  // Linking a runner to an account takes the name off that account, so the
+  // board says "Jason Dupree" rather than an address, and the link is what
+  // will let them log their own splits.
+  document.getElementById('runner-edit-rows').addEventListener('change', (e) => {
+    const i = e.target.dataset.runner;
+    if (i == null || e.target.dataset.k !== 'who') return;
+    const r = editingRunners[+i];
+    const email = e.target.value;
+    if (email) {
+      // Linking says this runner is that account, so the name comes from it.
+      // To show something else, unlink and type it, or change it in the profile.
+      r.email = email;
+      r.name = personName(accountPeople.find(p => p.email === email) || { email });
+    } else {
+      delete r.email;
+    }
+    renderRunnerRows();
+    renderPlanPicker();
+    // Linking changes whose goals "Load their goals" would fetch.
+    renderProfilePicker();
   });
   document.getElementById('runner-edit-rows').addEventListener('click', (e) => {
     const del = e.target.dataset.delRunner;

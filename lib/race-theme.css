@@ -348,3 +348,136 @@ label.field > .hint {
   display: block;
   font-size: 11px; color: var(--text-muted); margin-top: 4px;
 }
+
+/* ---------- Manage access panel ----------
+   Mounted by Race.access on any page that can manage a race: the dashboard and
+   the pit board both host it, from this one set of rules. */
+/* Manage access panel */
+.access {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 6px; margin: 0 0 24px;
+}
+.access-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 22px; cursor: pointer; user-select: none;
+  border-bottom: 1px solid transparent;
+}
+.access.open .access-head { border-bottom-color: var(--border); }
+.access:not(.open) .access-body { display: none; }
+.access-head-title {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted);
+}
+.access-head-toggle {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim);
+  border: 1px solid var(--border-bright); border-radius: 3px; padding: 4px 9px;
+}
+.access-head:hover .access-head-toggle { color: var(--accent); border-color: var(--accent); }
+.access:not(.open) .access-head-toggle::before { content: '▶ '; }
+.access.open .access-head-toggle::before { content: '▼ '; }
+.access-body { padding: 18px 22px 22px; }
+.access-section { margin-bottom: 22px; }
+.access-section:last-child { margin-bottom: 0; }
+.access-section-title {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.access-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.access-list .row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 12px;
+  align-items: center; padding: 8px 12px;
+  background: var(--bg-elevated); border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+}
+.access-list .row .who { color: var(--text); word-break: break-all; }
+.access-list .row .tag {
+  font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 2px; color: var(--text-muted);
+  border: 1px solid var(--border-bright);
+}
+.seg-row.start .num { color: var(--text-muted); }
+.seg-row.start .nm { color: var(--text-dim); }
+.access-list .row .tag.creator { color: var(--green); border-color: var(--green); }
+/* The role is a control, not a label: changing someone from Viewer to Pacer
+   is one choice here rather than a revoke followed by a re-invite. */
+.access-list .row .role-pick {
+  background: var(--bg-card); border: 1px solid var(--border-bright);
+  color: var(--text); border-radius: 3px; padding: 4px 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer;
+}
+.access-list .row .role-pick:hover { border-color: var(--accent); }
+.access-list .row .role-pick:disabled { opacity: 0.5; cursor: default; }
+.switch-row {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  font-size: 13px; color: var(--text); margin-bottom: 8px;
+}
+.switch-row input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+.switch-row input:disabled { cursor: default; opacity: 0.5; }
+@media (max-width: 480px) {
+  .access-list .row { grid-template-columns: 1fr auto; row-gap: 8px; }
+  .access-list .row .who { grid-column: 1 / -1; }
+}
+.access-list .row button {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-muted); padding: 4px 8px; border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; cursor: pointer;
+}
+.access-list .row button:hover { color: var(--red); border-color: var(--red); }
+.access-list .empty {
+  padding: 10px 12px; color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  font-style: italic;
+}
+.access-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.access-add input[type="email"] {
+  flex: 1 1 200px; padding: 8px 12px;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+}
+.access-add select {
+  padding: 8px 10px; background: var(--bg-elevated);
+  border: 1px solid var(--border-bright); border-radius: 4px;
+  color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 12px;
+}
+.access-add button {
+  padding: 8px 14px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+}
+.access-help {
+  font-size: 11px; color: var(--text-dim); line-height: 1.55;
+  background: var(--bg-elevated); padding: 10px 12px; border-radius: 4px;
+  border-left: 2px solid var(--accent); margin-top: 10px;
+}
+.access-invite-result, .access-share-result {
+  margin-top: 10px; padding: 10px 12px;
+  background: var(--bg-elevated); border: 1px solid rgba(110, 231, 168, 0.4);
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  word-break: break-all;
+}
+.access-invite-result .url, .access-share-result .url { color: var(--green); margin-top: 6px; display: block; }
+.access-invite-result .copy, .access-share-result .copy {
+  margin-top: 8px; padding: 6px 10px;
+  font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+}
+.access-err { color: var(--red); margin-top: 8px; font-size: 11px; }
+/* Set apart from the rest of the panel: everything above it is reversible. */
+.danger-zone { border-top: 1px solid var(--border); padding-top: 18px; }
+.danger-zone .access-section-title { color: var(--red); }
+.danger-zone .access-help { border-left-color: var(--red); }
+
+.share-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 8px 12px;
+  background: var(--bg-elevated); border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; align-items: center; }
+.share-row .lbl { color: var(--text-muted); }
+.share-row .url { color: var(--text); word-break: break-all; }
+.share-row button {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-muted); padding: 4px 8px; border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; cursor: pointer;
+}
+.share-row button.copy:hover { color: var(--accent); border-color: var(--accent); }
+.share-row button.revoke:hover { color: var(--red); border-color: var(--red); }
