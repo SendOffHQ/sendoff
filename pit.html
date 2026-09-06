@@ -438,6 +438,7 @@
         </table>
       </div>
       <button class="add-row" type="button" id="add-band">+ Add an hour band</button>
+      <div class="editor-warn" id="band-warn" style="display:none; margin:10px 0 0;"></div>
 
       <div class="fuel-editor-title" style="margin-top:18px;">Shorthand</div>
       <p class="fuel-hint">
@@ -470,7 +471,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=47"></script>
+<script src="lib/race-core.js?v=48"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -489,6 +490,9 @@
   let editingPresets = null;
   // Hour bands pulled from a profile, waiting on the next Save changes.
   let editingBands = null;
+  // Set once this session writes config.json, so later reads stop going to a
+  // Pages copy that has not caught up yet.
+  let configEdited = false;
   let stickyIntakeLegByRunner = {}; // runnerId -> selected legIndex
   const RUNNER_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -1008,6 +1012,22 @@
     return metrics;
   }
 
+  // Two bands cannot start at the same hour, and the save keeps the first of
+  // any pair. Say so while it is still a typo rather than after it has eaten a
+  // band on the way to the file.
+  function bandWarn() {
+    const el = document.getElementById('band-warn');
+    if (!el) return [];
+    const clashes = Race.fuel.bandCollisions(editingBands, Race.fuel.fromRows(editingFuel).metrics);
+    el.style.display = clashes.length ? '' : 'none';
+    if (clashes.length) {
+      el.textContent = clashes.map(c =>
+        `Two bands start at hour ${c.band.fromHour}: "${c.keeps.label || 'unnamed'}" keeps it and ` +
+        `"${c.band.label || 'unnamed'}" is dropped when you save.`).join(' ');
+    }
+    return clashes;
+  }
+
   function renderBandRows() {
     const metrics = renderBandHead();
     document.getElementById('band-rows').innerHTML = editingBands.map((b, i) => `
@@ -1019,6 +1039,7 @@
              value="${escapeAttr(b.targets[m.key + 'PerHour'] ?? '')}" placeholder="\u2014" /></td>`).join('')}
         <td><button class="row-del" type="button" data-band-del="${i}" aria-label="Delete">×</button></td>
       </tr>`).join('');
+    bandWarn();
   }
 
   // Presets are keyed off the metrics as they stand in the editor right now,
@@ -1176,6 +1197,11 @@
     // A band keeps only the metrics that survived this same save, so dropping
     // Fluid does not leave every band carrying an orphaned fluid number.
     const bands = Race.fuel.bandsFromRows(editingBands, fuelRows.metrics);
+    const clashes = Race.fuel.bandCollisions(editingBands, fuelRows.metrics);
+    if (clashes.length && !confirm(
+        clashes.map(c => `Hour ${c.band.fromHour} has two bands. "${c.keeps.label || 'unnamed'}" keeps it; ` +
+          `"${c.band.label || 'unnamed'}" will be dropped.`).join('\n') +
+        '\n\nSave anyway?')) return;
 
     const dropped = droppedFuel();
     if (dropped.length && !confirm(
@@ -1186,6 +1212,7 @@
     if (orphaned.length && !confirm(`${orphaned.length} removed runner(s) have logged legs. Saving deletes that data. Continue?`)) return;
 
     try {
+      configEdited = true;
       await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
         remote.runners = runners;
         remote.fuelMetrics = fuelRows.metrics;
@@ -1288,6 +1315,7 @@
 
     const newSegments = Race.course.segmentsFromAidStations(aids, cfg.course?.segments || []);
     try {
+      configEdited = true;
       await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
         remote.course = remote.course || {};
         remote.course.segments = newSegments;
@@ -1333,10 +1361,17 @@
   async function load() {
     try {
       // data.json reads through the worker when signed in (GitHub API, no
-      // Pages rebuild lag) so a pit press shows on other devices within a
-      // poll; config stays on Pages.
+      // Pages rebuild lag) so a pit press shows on other devices within a poll.
+      //
+      // config.json normally comes off Pages, which is a CDN in front of a site
+      // that rebuilds after each commit: a minute or so behind a write. That is
+      // fine while nobody is editing and wrong the moment somebody is, because
+      // this is the page the aid stations, roster and fuelling are edited from,
+      // and saving then re-reading a stale copy makes an edit look like it did
+      // not take. Once this session has written config, it reads config through
+      // the worker too.
       const [c, d] = await Promise.all([
-        Race.gh.readRaceJson(slug, 'config.json'),
+        Race.gh.readRaceJson(slug, 'config.json', configEdited),
         Race.gh.readRaceJson(slug, 'data.json', true)
       ]);
       cfg  = c;
@@ -1494,6 +1529,7 @@
       // Only the clock cell, so the number being typed in keeps focus.
       const cell = e.target.closest('tr').querySelector('.band-clock');
       if (cell) cell.textContent = bandClock(b.fromHour);
+      bandWarn();
     } else if (e.target.dataset.bk === 'label') {
       b.label = e.target.value;
     } else if (e.target.dataset.bt) {
