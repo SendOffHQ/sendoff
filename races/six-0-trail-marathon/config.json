@@ -79,5 +79,40 @@
     "caloriesPerHour": 275,
     "fluidOzPerHour": 32,
     "sodiumMgPerHour": 1200
-  }
+  },
+  "fuelMetrics": [
+    {
+      "key": "calories",
+      "label": "Calories",
+      "unit": "cal",
+      "short": "Cal",
+      "decimals": 0,
+      "step": 10
+    },
+    {
+      "key": "fluidOz",
+      "label": "Fluid",
+      "unit": "oz",
+      "short": "Fluid",
+      "decimals": 1,
+      "step": 1
+    },
+    {
+      "key": "sodiumMg",
+      "label": "Sodium",
+      "unit": "mg",
+      "short": "Na",
+      "decimals": 0,
+      "step": 50
+    }
+  ],
+  "fuelPresets": [
+    {
+      "name": "LMNT Flask",
+      "values": {
+        "fluidOz": 500,
+        "sodiumMg": 1000
+      }
+    }
+  ]
 }
