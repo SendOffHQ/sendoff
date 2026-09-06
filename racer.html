@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#0a0f14" />
+<meta name="description" content="The crew board: send the runner off, log arrivals, pits, nutrition and notes from the aid station.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="canonical" href="https://sendoff.run/pit.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SendOff">
+<meta property="og:title" content="SendOff · Pit Board">
+<meta property="og:description" content="The crew board: send the runner off, log arrivals, pits, nutrition and notes from the aid station.">
+<meta property="og:url" content="https://sendoff.run/pit.html">
+<meta property="og:image" content="https://sendoff.run/brand/og-default.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SendOff · live crew tracking for ultras">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SendOff · Pit Board">
+<meta name="twitter:description" content="The crew board: send the runner off, log arrivals, pits, nutrition and notes from the aid station.">
+<meta name="twitter:image" content="https://sendoff.run/brand/og-default.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SendOff">
+<title>SendOff · Racer</title>
+<link rel="icon" href="brand/sendoff-favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lib/race-theme.css?v=28">
+<style>
+  /* The screen for the person running, when there is no crew at this aid
+     station. One job: say where you stand, and take one press. Everything
+     above the action bar is glance-only; everything you can press is in the
+     bar, so checking a number can never become a press you did not mean. */
+  body { padding: 0; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 16px 16px 0; min-height: 100vh; display: flex; flex-direction: column; }
+
+  header.site { margin-bottom: 12px; }
+
+  .racer-readout { flex: 1; }
+  .rblock { padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .rblock:first-child { padding-top: 4px; }
+  .rlbl {
+    display: block; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted);
+    margin-bottom: 2px;
+  }
+  /* The one number that answers "am I still in this race". */
+  .rclock {
+    display: block; font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    font-weight: 700; font-size: 64px; line-height: 0.92;
+    font-variant-numeric: tabular-nums;
+  }
+  .rmargin { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; margin-top: 6px; }
+  .rmargin.ok    { color: var(--green); }
+  .rmargin.tight { color: var(--yellow); }
+  .rmargin.late  { color: var(--red); }
+  .rmargin.none  { color: var(--text-muted); }
+
+  .raid {
+    display: block; font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    font-weight: 700; font-size: 32px; line-height: 1.04;
+  }
+  .rmeta { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+  .rband { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--accent); margin: 2px 0 10px; }
+
+  /* The value column holds "1,200mg / 1,200mg" on one line: wrapped, it reads
+     as two numbers rather than as one comparison. */
+  .rfuel { display: grid; grid-template-columns: 46px 1fr 132px; align-items: center; gap: 10px; padding: 6px 0;
+           font-family: 'JetBrains Mono', monospace; font-size: 11.5px; }
+  .rfuel .n { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rfuel .v { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rtrack { height: 7px; background: var(--bg); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
+  .rfill { height: 100%; display: block; }
+  .rfill.ok { background: var(--green); } .rfill.low { background: var(--yellow); } .rfill.bad { background: var(--red); }
+  .v.ok { color: var(--green); } .v.low { color: var(--yellow); } .v.bad { color: var(--red); }
+
+  /* One tap is one serving. Nobody types a number into a phone with cold
+     hands, so the race's shorthand is the whole intake UI here. */
+  .rchips { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+  .rchip {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    width: 100%; min-height: 58px; padding: 10px 16px; text-align: left;
+    background: var(--bg-card); color: var(--text);
+    border: 1px solid var(--border-bright); border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; cursor: pointer;
+  }
+  .rchip:hover { border-color: var(--accent); }
+  .rchip:disabled { opacity: 0.5; cursor: default; }
+  .rchip .sub { display: block; font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+  .rchip .cnt { font-size: 13px; color: var(--accent); min-width: 26px; text-align: right; }
+
+  .rnote {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--yellow);
+    border: 1px dashed rgba(255,176,122,0.35); border-radius: 4px; padding: 7px 10px; margin-top: 12px;
+  }
+
+  /* The act zone. Sticky at the bottom so the press is always where the thumb
+     already is, whatever the readout above has grown to. */
+  .ract {
+    position: sticky; bottom: 0; margin: 0 -16px; padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg-elevated); border-top: 1px solid var(--border);
+  }
+  .rbtn {
+    width: 100%; min-height: 88px; display: block; padding: 14px 12px;
+    background: rgba(15,184,191,0.13); color: var(--accent);
+    border: 1px solid rgba(15,184,191,0.5); border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 16px;
+    letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer;
+  }
+  .rbtn:hover:not(:disabled) { background: rgba(15,184,191,0.2); border-color: var(--accent); }
+  .rbtn:disabled { opacity: 0.55; cursor: default; }
+  .rbtn .sub { display: block; font-size: 11px; font-weight: 400; letter-spacing: 0.03em;
+               text-transform: none; color: var(--text-muted); margin-top: 7px; }
+
+  /* Undo takes the button's own place, so the fix for a pocket press is under
+     the thumb that made it. */
+  .rundo { display: flex; align-items: center; gap: 12px; min-height: 88px; }
+  .rundo-msg { flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+  .rundo-msg .stamp { display: block; color: var(--green); font-size: 15px; font-weight: 700; }
+  .rundo-msg .fade { display: block; color: var(--text-muted); font-size: 11px; margin-top: 4px; }
+  .rundo-btn {
+    min-height: 62px; padding: 0 22px; background: transparent; color: var(--text-dim);
+    border: 1px solid var(--border-bright); border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+  }
+  .rundo-btn:hover { color: var(--red); border-color: var(--red); }
+
+  .rpick { padding: 20px 0; }
+  .rpick p { color: var(--text-dim); font-size: 14px; margin: 0 0 12px; line-height: 1.6; }
+
+  .toast {
+    position: fixed; bottom: 116px; left: 50%; transform: translateX(-50%);
+    background: var(--bg-card); border: 1px solid var(--border-bright);
+    color: var(--text); padding: 10px 16px; border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5); z-index: 50; max-width: 90vw;
+  }
+  .toast.error { color: var(--red); border-color: var(--red); }
+  .toast.ok { color: var(--green); border-color: rgba(110,231,168,0.4); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header class="site">
+  <div class="brand">
+    <div class="brand-meta">
+      <a class="wordmark" href="index.html" aria-label="SendOff · home"><svg viewBox="-130 -130 3781.0 1317.6" aria-hidden="true"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 544.24 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 489.41 469.6 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></a><span>·</span><span>Racer</span><span>·</span>
+    </div>
+    <h1 class="site" id="race-title" style="font-size: 22px;">Loading…</h1>
+  </div>
+</header>
+
+<div id="error" class="error-banner" style="display:none;"></div>
+
+<section class="racer-readout" id="readout"></section>
+<div class="ract" id="act"></div>
+
+</div>
+
+<div id="toast" style="display:none;"></div>
+
+<script src="lib/race-core.js?v=54"></script>
+<script>
+  const slug = Race.qs('id');
+  if (!slug) { window.location = 'index.html'; }
+  Race.nav.setRace(slug, 'racer', false);
+
+  const DATA_PATH = `races/${slug}/data.json`;
+  // Which board this device wants for this race. Set by choosing one; the
+  // pit board reads it too, so choosing the crew board there is remembered.
+  const MODE_KEY = `sendoff-mode-${slug}`;
+
+  let cfg = null, data = null;
+  let meId = null;
+  // A press is committed immediately and undone from the bar that replaces the
+  // button, rather than guarded by a confirm nobody reads at mile eighty.
+  const UNDO_MS = 15000;
+  let undoUntil = 0;
+  let undoLabel = '';
+
+  function toast(text, kind) {
+    const el = document.getElementById('toast');
+    el.textContent = text;
+    el.className = 'toast' + (kind ? ' ' + kind : '');
+    el.style.display = 'block';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.display = 'none'; }, 3200);
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // ---------- who am I ----------
+  // The runner record tied to this account. Settings is where that link is
+  // made; a race with a single runner needs no link to be unambiguous.
+  function resolveMe() {
+    const runners = (cfg && cfg.runners) || [];
+    if (!runners.length) return null;
+    const asked = Race.qs('runner');
+    if (asked && runners.some(r => r.id === asked)) return asked;
+    const me = (Race.auth.email() || '').toLowerCase();
+    const mine = runners.filter(r => String(r.email || '').toLowerCase() === me);
+    if (mine.length === 1) return mine[0].id;
+    if (runners.length === 1) return runners[0].id;
+    return null;
+  }
+
+  function merged() {
+    const meta = ((cfg.runners || []).find(r => r.id === meId)) || {};
+    const dr = ((data.runners || []).find(r => r.id === meId)) || { id: meId, legs: [] };
+    return { ...meta, ...dr };
+  }
+
+  // ---------- cutoff ----------
+  // The number a runner actually decides on is how much room is left, not how
+  // much time has passed. The aid ahead has its own cutoff on some courses; on
+  // the rest the only one is the finish, and that is the one shown.
+  function cutoffFor(next) {
+    if (!cfg.startTime) return null;
+    const startMs = new Date(cfg.startTime).getTime();
+    const segs = (cfg.course && cfg.course.segments) || [];
+    let hours = null, what = null;
+    if (next.nextAction === 'in' && next.nextLegIndex) {
+      const h = segs[next.nextLegIndex - 1] && segs[next.nextLegIndex - 1].arriveCutoffHours;
+      if (h != null && h !== '' && isFinite(+h)) {
+        hours = +h;
+        const def = Race.course.legAt(cfg, next.nextLegIndex);
+        what = (def && def.toAid) || `leg ${next.nextLegIndex}`;
+      }
+    }
+    if (hours == null) {
+      const total = cfg.cutoffs && cfg.cutoffs.totalHours;
+      if (!total) return null;
+      hours = +total; what = 'the finish';
+    }
+    const at = startMs + hours * 3600000;
+    return { at, what, leftMs: at - Date.now() };
+  }
+
+  function marginLine() {
+    const runner = merged();
+    const next = Race.compute.nextActionFor(runner, cfg);
+    if (next.state === 'finished') return '<div class="rmargin ok">Finished.</div>';
+    const c = cutoffFor(next);
+    if (!c) return '<div class="rmargin none">No cutoff set for this race.</div>';
+    const clock = new Date(c.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (c.leftMs < 0) {
+      return `<div class="rmargin late">${Race.fmt.duration(-c.leftMs / 1000)} past ${esc(c.what)} · closed ${clock}</div>`;
+    }
+    // An hour of room is the point where this stops being a comfortable number.
+    const cls = c.leftMs < 3600000 ? 'tight' : 'ok';
+    return `<div class="rmargin ${cls}">${Race.fmt.duration(c.leftMs / 1000)} on ${esc(c.what)} · closes ${clock}</div>`;
+  }
+
+  // ---------- readout ----------
+  function fuelRows(runner) {
+    const c = Race.compute.runner(runner, cfg);
+    const raceHours = (c.completedRaceSec || 0) / 3600;
+    const plan = Race.fuel.forRunner(cfg, runner);
+    const metrics = Race.fuel.metrics(plan, raceHours);
+    const goals = metrics.filter(m => m.expectedPerHour);
+    if (!goals.length) return '';
+    const band = Race.fuel.bandAt(plan, raceHours);
+    const banded = Race.fuel.bands(plan).length > 0;
+    const rows = goals.map(m => {
+      const per = (c.intake[m.key] && c.intake[m.key].perHour) || 0;
+      const goal = m.expectedPerHour;
+      const pct = Math.max(0, Math.min(100, (per / goal) * 100));
+      const cls = pct >= 90 ? 'ok' : pct >= 70 ? 'low' : 'bad';
+      return `<div class="rfuel">
+        <span class="n">${esc(m.short || m.label)}</span>
+        <span class="rtrack"><span class="rfill ${cls}" style="width:${pct.toFixed(1)}%"></span></span>
+        <span class="v ${cls}">${Race.fuel.fmt(m, per)} / ${Race.fuel.fmt(m, goal)}</span>
+      </div>`;
+    }).join('');
+    return `<div class="rblock">
+      <span class="rlbl">Per hour so far</span>
+      ${banded && band ? `<div class="rband">${esc(band.label || `from hour ${band.fromHour}`)}</div>` : '<div style="height:6px"></div>'}
+      ${rows}
+    </div>`;
+  }
+
+  function renderReadout() {
+    const runner = merged();
+    const next = Race.compute.nextActionFor(runner, cfg);
+    const c = Race.compute.runner(runner, cfg);
+    const out = [];
+
+    const elapsed = next.state === 'idle' ? 0 : (c.completedRaceSec || 0) + (() => {
+      // The clock keeps running through the leg in progress, which is the only
+      // version of it a runner recognises.
+      const since = next.lastTs ? (Date.now() - new Date(next.lastTs).getTime()) / 1000 : 0;
+      return Math.max(0, since);
+    })();
+    out.push(`<div class="rblock">
+      <span class="rlbl">Race time</span>
+      <span class="rclock" id="rclock">${Race.fmt.duration(elapsed)}</span>
+      ${marginLine()}
+    </div>`);
+
+    if (next.state === 'in-pit') {
+      const def = Race.course.legAt(cfg, next.currentLegIndex);
+      const st = Race.stationAt(cfg, next.currentLegIndex);
+      const bits = [];
+      if (st && st.dropBag) bits.push('drop bag');
+      if (st && st.pacerEligible) bits.push('pacer');
+      out.push(`<div class="rblock">
+        <span class="rlbl">In aid${def && def.toAid ? ' · ' + esc(def.toAid) : ''}</span>
+        <span class="raid" id="raid-timer" data-since="${next.lastTs}">${Race.fmt.duration((Date.now() - new Date(next.lastTs).getTime()) / 1000)}</span>
+        <div class="rmeta">Arrived ${new Date(next.lastTs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}${bits.length ? ' · ' + bits.join(' · ') : ''}</div>
+        ${st && st.crewNote ? `<div class="rnote">${esc(st.crewNote)}</div>` : ''}
+      </div>`);
+    } else if (next.nextLegIndex) {
+      const def = Race.course.legAt(cfg, next.nextLegIndex);
+      const st = Race.stationAt(cfg, next.nextLegIndex);
+      const bits = [];
+      if (def && def.distanceMi) bits.push(`${Race.units.distance(def.distanceMi, cfg)} to go`);
+      if (def && def.cumulativeMi) bits.push(`mile ${Race.units.distanceVal(def.cumulativeMi, cfg).toFixed(1)}`);
+      if (st && st.dropBag) bits.push('drop bag');
+      out.push(`<div class="rblock">
+        <span class="rlbl">Next</span>
+        <span class="raid">${esc((def && def.toAid) || `Leg ${next.nextLegIndex}`)}</span>
+        <div class="rmeta">${esc(bits.join(' · '))}</div>
+      </div>`);
+    }
+
+    out.push(fuelRows(runner));
+
+    // Logging what you took belongs at the aid station, where you are standing
+    // still. On the move there is nothing here to press by mistake.
+    if (next.state === 'in-pit') {
+      const presets = Race.fuel.presets(cfg);
+      const metrics = Race.fuel.metrics(cfg);
+      const usable = presets.filter(p => metrics.some(m => +p.values[m.key]));
+      if (usable.length) {
+        const leg = (runner.legs || []).find(l => l.index === next.currentLegIndex) || {};
+        out.push(`<div class="rblock">
+          <span class="rlbl">Log what you took</span>
+          <div class="rchips">
+            ${usable.map((p, i) => `<button class="rchip" type="button" data-preset="${i}">
+              <span>+ ${esc(p.name)}<span class="sub">${esc(metrics.filter(m => +p.values[m.key])
+                  .map(m => Race.fuel.fmt(m, p.values[m.key]) + ' ' + (m.short || m.label)).join(' · '))}</span></span>
+              <span class="cnt">${leg[`preset_${i}`] ? '\u00d7' + leg[`preset_${i}`] : ''}</span>
+            </button>`).join('')}
+          </div>
+        </div>`);
+      }
+    }
+
+    document.getElementById('readout').innerHTML = out.join('');
+  }
+
+  function renderAct() {
+    const act = document.getElementById('act');
+    if (Date.now() < undoUntil) {
+      const left = Math.ceil((undoUntil - Date.now()) / 1000);
+      act.innerHTML = `<div class="rundo">
+        <span class="rundo-msg">
+          <span class="stamp">${esc(undoLabel)}</span>
+          <span class="fade">Undo for ${left}s</span>
+        </span>
+        <button class="rundo-btn" type="button" id="undo">Undo</button>
+      </div>`;
+      document.getElementById('undo').addEventListener('click', undoLast);
+      return;
+    }
+    const runner = merged();
+    const next = Race.compute.nextActionFor(runner, cfg);
+    if (!next.nextAction) {
+      act.innerHTML = `<button class="rbtn" type="button" disabled>Finished</button>`;
+      return;
+    }
+    const def = Race.course.legAt(cfg, next.nextLegIndex);
+    const label = next.nextAction === 'in'
+      ? `Arrived at ${(def && def.toAid) || 'the next aid'}`
+      : (next.state === 'idle'
+          ? `Start · ${(def && def.toAid) ? 'to ' + def.toAid : 'leg 1'}`
+          : `Leaving · to ${(def && def.toAid) || 'the next aid'}`);
+    const queued = Race.queue.pending().length;
+    const sub = queued
+      ? `${queued} saved on this phone · sends when you have signal`
+      : (next.nextAction === 'in' ? 'Logs your arrival' : 'Starts the next leg');
+    act.innerHTML = `<button class="rbtn" type="button" id="go">${esc(label)}<span class="sub">${esc(sub)}</span></button>`;
+    document.getElementById('go').addEventListener('click', pressGo);
+  }
+
+  function render() {
+    if (!cfg || !data || !meId) return;
+    renderReadout();
+    renderAct();
+  }
+
+  // The race clock and the aid timer, in place. Nothing else on the readout
+  // changes without a press or a poll, and redrawing it every second would
+  // pull a shorthand chip out from under a thumb that is already on it.
+  function tickClocks() {
+    const clock = document.getElementById('rclock');
+    if (clock) {
+      const runner = merged();
+      const next = Race.compute.nextActionFor(runner, cfg);
+      const c = Race.compute.runner(runner, cfg);
+      const since = (next.state !== 'idle' && next.lastTs)
+        ? Math.max(0, (Date.now() - new Date(next.lastTs).getTime()) / 1000) : 0;
+      clock.textContent = Race.fmt.duration(next.state === 'idle' ? 0 : (c.completedRaceSec || 0) + since);
+    }
+    const aid = document.getElementById('raid-timer');
+    if (aid && aid.dataset.since) {
+      aid.textContent = Race.fmt.duration((Date.now() - new Date(aid.dataset.since).getTime()) / 1000);
+    }
+  }
+
+  // ---------- the press ----------
+  async function pressGo() {
+    const runner = merged();
+    const next = Race.compute.nextActionFor(runner, cfg);
+    if (!next.nextAction) return;
+    const now = new Date().toISOString();
+
+    // A checkpoint is passed, not worked: arriving closes the leg and starts
+    // the next in the same instant, so nobody presses twice going by.
+    const st = Race.stationAt(cfg, next.nextLegIndex);
+    const through = next.nextAction === 'in' && st && st.checkpoint
+                    && next.nextLegIndex < Race.course.legCount(cfg);
+
+    const dr = (data.runners || []).find(r => r.id === meId);
+    const legFor = (idx) => {
+      let l = (dr.legs || []).find(x => x.index === idx);
+      if (!l) { l = { index: idx }; dr.legs = (dr.legs || []).concat([l]).sort((a, b) => a.index - b.index); }
+      return l;
+    };
+    legFor(next.nextLegIndex)[next.nextAction === 'out' ? 'startTime' : 'endTime'] = now;
+    if (through) legFor(next.nextLegIndex + 1).startTime = now;
+
+    const def = Race.course.legAt(cfg, next.nextLegIndex);
+    undoLabel = (next.nextAction === 'in' ? 'Arrived' : 'Out') +
+      ` ${new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` +
+      ((def && def.toAid) ? ` · ${def.toAid}` : '');
+    undoUntil = Date.now() + UNDO_MS;
+    render();
+
+    const legs = { [next.nextLegIndex]: { [next.nextAction === 'out' ? 'startTime' : 'endTime']: now } };
+    if (through) legs[next.nextLegIndex + 1] = { startTime: now };
+    try {
+      await Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId: meId, legs },
+        `racer: ${runner.name || meId} ${next.nextAction === 'out' ? 'out' : 'in'} leg ${next.nextLegIndex}`);
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, 'error');
+    }
+  }
+
+  async function undoLast() {
+    undoUntil = 0;
+    const dr = (data.runners || []).find(r => r.id === meId);
+    if (!dr || !(dr.legs || []).length) { render(); return; }
+    const sorted = dr.legs.slice().sort((a, b) => a.index - b.index);
+    const last = sorted[sorted.length - 1];
+    const hasIn = !!last.endTime, hasOut = !!last.startTime;
+    let field, whole = false;
+    if (hasIn && hasOut) field = 'endTime';
+    else if (hasOut) { field = 'startTime'; whole = true; }
+    else { render(); return; }
+    if (whole) dr.legs = dr.legs.filter(l => l.index !== last.index);
+    else delete last[field];
+    render();
+    try {
+      await (whole
+        ? Race.queue.write(DATA_PATH, 'removeLeg', { runnerId: meId, legIndex: last.index }, `racer: undo leg ${last.index}`)
+        : Race.queue.write(DATA_PATH, 'clearLegField', { runnerId: meId, legIndex: last.index, field }, `racer: undo leg ${last.index}`));
+      toast('Undone', 'ok');
+    } catch (err) { toast(`Undo failed: ${err.message}`, 'error'); }
+  }
+
+  // One tap is one serving, added to what the leg already carries. The count on
+  // the chip is kept alongside so a second tap reads as two rather than as a
+  // number nobody can check.
+  async function tapPreset(i) {
+    const runner = merged();
+    const next = Race.compute.nextActionFor(runner, cfg);
+    if (next.state !== 'in-pit') return;
+    const legIndex = next.currentLegIndex;
+    const preset = Race.fuel.presets(cfg)[i];
+    if (!preset) return;
+    const dr = (data.runners || []).find(r => r.id === meId);
+    let leg = (dr.legs || []).find(l => l.index === legIndex);
+    if (!leg) return;
+
+    const fields = {};
+    for (const m of Race.fuel.metrics(cfg)) {
+      const add = +preset.values[m.key];
+      if (!add) continue;
+      fields[m.key] = Race.fuel.round(m, (parseFloat(leg[m.key]) || 0) + add);
+    }
+    fields[`preset_${i}`] = (+leg[`preset_${i}`] || 0) + 1;
+    Object.assign(leg, fields);
+    render();
+    try {
+      await Race.queue.write(DATA_PATH, 'setLegFields', { runnerId: meId, legIndex, fields },
+        `racer: ${preset.name} leg ${legIndex}`);
+    } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
+  }
+
+  document.getElementById('readout').addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-preset]');
+    if (chip) tapPreset(+chip.dataset.preset);
+  });
+
+  // ---------- which runner ----------
+  function askWhoAmI() {
+    const runners = (cfg.runners || []);
+    document.getElementById('readout').innerHTML = `
+      <div class="rpick">
+        <p>More than one runner on this race, and none of them is tied to your
+        account yet. Pick yourself, or link the account on the settings page and
+        this screen will know next time.</p>
+        <div class="rchips">
+          ${runners.map(r => `<button class="rchip" type="button" data-me="${esc(r.id)}">${esc(r.name || r.id)}</button>`).join('')}
+        </div>
+      </div>`;
+    document.getElementById('act').innerHTML = '';
+    document.getElementById('readout').querySelectorAll('[data-me]').forEach(b => {
+      b.addEventListener('click', () => {
+        meId = b.dataset.me;
+        try { localStorage.setItem(`sendoff-me-${slug}`, meId); } catch (e) {}
+        render();
+      });
+    });
+  }
+
+  function noRunners() {
+    document.getElementById('readout').innerHTML =
+      `<div class="rpick"><p>This race has no runners yet. Add one on the settings page.</p></div>`;
+    document.getElementById('act').innerHTML = '';
+  }
+
+  // ---------- data ----------
+  async function load() {
+    try {
+      const [c, d] = await Promise.all([
+        Race.gh.readRaceJson(slug, 'config.json', Race.auth.has()),
+        Race.gh.readRaceJson(slug, 'data.json', true)
+      ]);
+      cfg = c;
+      data = Race.queue.applyTo(DATA_PATH, d);
+      Race.nav.setRace(slug, 'racer', () => Race.roles.canEdit(cfg, Race.auth.email()));
+      document.title = `Racer · ${cfg.name}`;
+      document.getElementById('race-title').textContent = cfg.name;
+      document.getElementById('error').style.display = 'none';
+
+      if (!meId) {
+        let saved = null;
+        try { saved = localStorage.getItem(`sendoff-me-${slug}`); } catch (e) {}
+        if (saved && (cfg.runners || []).some(r => r.id === saved)) meId = saved;
+        else meId = resolveMe();
+      }
+      if (!meId) {
+        if (!(cfg.runners || []).length) noRunners(); else askWhoAmI();
+        return;
+      }
+      render();
+    } catch (err) {
+      const e = document.getElementById('error');
+      e.style.display = 'block';
+      e.textContent = `Error: ${err.message}`;
+    }
+  }
+
+  // Going to the crew board is a choice, and it sticks: the pit board stops
+  // sending you here until you come back. The link itself is the menu's, so
+  // the intent is read off the click rather than duplicated as a button that
+  // would compete with the one press this screen is for.
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest && e.target.closest('a[href]');
+    if (!a) return;
+    if (!/(^|\/)pit\.html(\?|$)/.test(a.getAttribute('href') || '')) return;
+    try { localStorage.setItem(MODE_KEY, 'crew'); } catch (err) {}
+  }, true);
+
+  (async () => {
+    await Race.hub.load();
+    await load();
+    // The clock and the undo countdown are the only things that move on their
+    // own; a full poll is slower here than on the crew board because a runner
+    // is the one making the changes.
+    // Only the two numbers that move are touched each second. Redrawing the
+    // whole readout would take a chip out from under a thumb already on it.
+    setInterval(() => {
+      if (!cfg || !data || !meId) return;
+      if (undoUntil && Date.now() >= undoUntil) { undoUntil = 0; renderAct(); load(); }
+      else if (undoUntil) renderAct();
+      tickClocks();
+    }, 1000);
+    setInterval(() => { if (!undoUntil) load(); }, 30000);
+  })();
+</script>
+
+</body>
+</html>

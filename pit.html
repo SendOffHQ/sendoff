@@ -184,6 +184,15 @@
   .preset-chip:hover { border-color: var(--accent); color: var(--accent); }
   .preset-chip:active { transform: translateY(1px); }
 
+  .racer-switch {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    flex-wrap: wrap; margin-bottom: 16px; padding: 10px 14px;
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent); border-radius: 4px;
+    font-size: 13px; color: var(--text-dim);
+  }
+  .racer-switch strong { color: var(--text); }
+
   .toast {
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
     background: var(--bg-card); border: 1px solid var(--border-bright);
@@ -252,7 +261,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=53"></script>
+<script src="lib/race-core.js?v=54"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -731,6 +740,62 @@
     updateLastUpdatedLabel();
   }
 
+  // ---------- racer mode ----------
+  // Someone running this race wants the racer screen, not the crew board. The
+  // clock decides the default: before the start there is nothing to log and
+  // this page is where a race gets set up, so the switch only happens once it
+  // is under way. It is a default and never a lock: choosing the crew board
+  // here is remembered for this race on this device.
+  const MODE_KEY = `sendoff-mode-${slug}`;
+
+  function myRunner() {
+    const runners = (cfg && cfg.runners) || [];
+    const me = (Race.auth.email() || '').toLowerCase();
+    if (!me) return null;
+    const mine = runners.filter(r => String(r.email || '').toLowerCase() === me);
+    return mine.length === 1 ? mine[0] : null;
+  }
+
+  function raceStarted() {
+    if (!cfg || !cfg.startTime) return false;
+    return Date.now() >= new Date(cfg.startTime).getTime();
+  }
+
+  function maybeOfferRacerMode() {
+    const mine = myRunner();
+    if (!mine) return;
+    let mode = null;
+    try { mode = localStorage.getItem(MODE_KEY); } catch (e) {}
+    // At most once per tab, so opening the app lands you on the racer screen
+    // but coming back here deliberately, later, stays here. Without that the
+    // two pages would bounce a runner between them.
+    let bounced = false;
+    try { bounced = sessionStorage.getItem(`sendoff-bounced-${slug}`) === '1'; } catch (e) {}
+    if (mode !== 'crew' && !bounced && raceStarted()) {
+      try { sessionStorage.setItem(`sendoff-bounced-${slug}`, '1'); } catch (e) {}
+      // replace, not assign: the back button should not land back here and go
+      // round again.
+      location.replace(`racer.html?id=${encodeURIComponent(slug)}`);
+      return;
+    }
+    showRacerSwitch(mine);
+  }
+
+  function showRacerSwitch(mine) {
+    if (document.getElementById('racer-switch')) return;
+    const bar = document.createElement('div');
+    bar.id = 'racer-switch';
+    bar.className = 'racer-switch';
+    bar.innerHTML = `<span>You are running this as <strong>${escapeHtml(mine.name || mine.id)}</strong>.</span>` +
+      `<button class="btn" type="button" id="to-racer">Racer screen</button>`;
+    const anchorEl = document.getElementById('runners');
+    anchorEl.parentNode.insertBefore(bar, anchorEl);
+    document.getElementById('to-racer').addEventListener('click', () => {
+      try { localStorage.setItem(MODE_KEY, 'racer'); } catch (e) {}
+      location.href = `racer.html?id=${encodeURIComponent(slug)}`;
+    });
+  }
+
   // ---------- tick / data ----------
   function tick() {
     document.querySelectorAll('.runner').forEach(card => {
@@ -781,6 +846,7 @@
       document.title = `Pit · ${cfg.name}`;
       document.getElementById('race-title').textContent = cfg.name;
       document.getElementById('error').style.display = 'none';
+      maybeOfferRacerMode();
       render();
     } catch (err) {
       const e = document.getElementById('error');
