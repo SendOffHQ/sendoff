@@ -174,7 +174,7 @@
     min-height: 60px; resize: vertical; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; font-size: 13px;
   }
   .intake-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  .intake-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .intake-presets { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 14px; }
   .preset-chip {
     background: var(--bg-elevated); border: 1px solid var(--border);
     color: var(--text); border-radius: 999px; padding: 7px 12px;
@@ -252,10 +252,24 @@
     margin-bottom: 8px;
   }
   .fuel-hint { font-size: 11px; color: var(--text-muted); margin: 0 0 10px; line-height: 1.5; }
-  /* One column per metric, so on a phone this scrolls sideways rather than
-     squeezing every number input down to nothing. */
-  .preset-scroll { overflow-x: auto; }
-  .preset-scroll table { min-width: 380px; }
+  /* Both fueling tables have more columns than a phone is wide, and the
+     shorthand grows a column for every metric the race adds. Squeezing them to
+     fit turns "Calories" into "Calo"; scrolling sideways keeps every field
+     usable, so the cells claim the width they need and the wrapper scrolls. */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table-scroll > table { width: 100%; table-layout: fixed; }
+  .table-scroll th { white-space: nowrap; }
+  /* Name / Unit / Short / Goal / delete. Fixed shares rather than letting the
+     browser divide by content, so the goal box never wins space off the name. */
+  #fuel-table { min-width: 480px; }
+  #fuel-table th:nth-child(1), #fuel-table td:nth-child(1) { width: 33%; }
+  #fuel-table th:nth-child(2), #fuel-table td:nth-child(2) { width: 16%; }
+  #fuel-table th:nth-child(3), #fuel-table td:nth-child(3) { width: 20%; }
+  #fuel-table th:nth-child(4), #fuel-table td:nth-child(4) { width: 21%; }
+  #fuel-table th:last-child,   #fuel-table td:last-child   { width: 10%; }
+  /* The shorthand grows a column per metric, so JS sets its min-width. */
+  #preset-table th:first-child, #preset-table td:first-child { width: 150px; }
+  #preset-table th:last-child,  #preset-table td:last-child  { width: 46px; }
 
   .toast {
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -356,12 +370,14 @@
 
     <div class="fuel-editor">
       <div class="fuel-editor-title">Fueling</div>
-      <table class="aid-list">
-        <thead>
-          <tr><th>Name</th><th>Unit</th><th>Short</th><th>Goal / hr</th><th></th></tr>
-        </thead>
-        <tbody id="fuel-rows"></tbody>
-      </table>
+      <div class="table-scroll">
+        <table class="aid-list" id="fuel-table">
+          <thead>
+            <tr><th>Name</th><th>Unit</th><th>Short</th><th>Goal / hr</th><th></th></tr>
+          </thead>
+          <tbody id="fuel-rows"></tbody>
+        </table>
+      </div>
       <button class="add-row" type="button" id="add-fuel">+ Add a fueling metric</button>
       <div class="editor-warn" id="fuel-warn" style="display:none;"></div>
 
@@ -371,7 +387,7 @@
         pit form adds a serving, two taps adds two, and the crew counts flasks
         instead of doing arithmetic at an aid station.
       </p>
-      <div class="preset-scroll">
+      <div class="table-scroll">
         <table class="aid-list" id="preset-table">
           <thead><tr id="preset-head"></tr></thead>
           <tbody id="preset-rows"></tbody>
@@ -396,7 +412,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=33"></script>
+<script src="lib/race-core.js?v=34"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -821,7 +837,7 @@
         ${fuelMetrics.length ? `<div class="intake-grid">
           ${fuelMetrics.map(m => `
           <label class="field">
-            <span class="lbl">${escapeHtml(m.label)}${m.unit ? ' ' + escapeHtml(m.unit) : ''}</span>
+            <span class="lbl">${escapeHtml(Race.fuel.fieldLabel(m))}</span>
             <input type="number" data-intake="${escapeAttr(m.key)}" min="0" step="${m.step}" value="${selectedLeg?.[m.key] ?? ''}" />
           </label>`).join('')}
         </div>` : ''}
@@ -918,11 +934,18 @@
   // Presets are keyed off the metrics as they stand in the editor right now,
   // not as they are saved, so adding Carbs immediately gives every shorthand a
   // Carbs column to fill in.
-  function renderPresetRows() {
+  function renderPresetHead() {
     const metrics = Race.fuel.fromRows(editingFuel).metrics;
+    // 150 for the name, 46 for the delete button, 92 per metric: enough that a
+    // four-digit sodium amount is not clipped, and the wrapper scrolls past it.
+    document.getElementById('preset-table').style.minWidth = (196 + 92 * metrics.length) + 'px';
     document.getElementById('preset-head').innerHTML =
-      '<th>Name</th>' + metrics.map(m =>
-        `<th>${escapeHtml(m.short)}</th>`).join('') + '<th></th>';
+      '<th>Name</th>' + metrics.map(m => `<th>${escapeHtml(m.short)}</th>`).join('') + '<th></th>';
+    return metrics;
+  }
+
+  function renderPresetRows() {
+    const metrics = renderPresetHead();
     document.getElementById('preset-rows').innerHTML = editingPresets.map((pre, i) => `
       <tr>
         <td><input type="text" data-preset="${i}" data-k="name" value="${escapeAttr(pre.name)}" placeholder="e.g. Tailwind flask" /></td>
@@ -990,17 +1013,7 @@
     if (!runners.length) { toast('At least one runner is required.', 'error'); return; }
 
     const fuelRows = Race.fuel.fromRows(editingFuel);
-    // Only the amounts for metrics that survive are kept, so removing Fluid does
-    // not leave every shorthand carrying an orphaned fluid number.
-    const liveKeys = new Set(fuelRows.metrics.map(m => m.key));
-    const presets = editingPresets
-      .filter(pre => (pre.name || '').trim())
-      .map(pre => ({
-        name: pre.name.trim(),
-        values: Object.fromEntries(Object.entries(pre.values)
-          .filter(([k, v]) => liveKeys.has(k) && +v))
-      }))
-      .filter(pre => Object.keys(pre.values).length);
+    const presets = Race.fuel.presetsFromRows(editingPresets, fuelRows.metrics);
 
     const dropped = droppedFuel();
     if (dropped.length && !confirm(
@@ -1232,6 +1245,8 @@
     if (i == null || !k) return;
     editingFuel[+i][k] = e.target.value;
     if (k === 'label') renderWarnOnly();
+    // Only the header, so focus stays in the field being typed in.
+    if ((k === 'label' || k === 'short') && editingPresets) renderPresetHead();
   });
   document.getElementById('fuel-rows').addEventListener('click', (e) => {
     const del = e.target.dataset.delFuel;

@@ -136,6 +136,31 @@
   }
   .add-row:hover { color: var(--accent); border-color: var(--accent); }
 
+  .fuel-shorthand { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 16px; }
+  .sub-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  /* Both fueling tables have more columns than a phone is wide, and the
+     shorthand grows a column for every metric the race adds. Squeezing them to
+     fit turns "Calories" into "Calo"; scrolling sideways keeps every field
+     usable, so the cells claim the width they need and the wrapper scrolls. */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table-scroll > table { width: 100%; table-layout: fixed; }
+  .table-scroll th { white-space: nowrap; }
+  /* Name / Unit / Short / Goal / delete. Fixed shares rather than letting the
+     browser divide by content, so the goal box never wins space off the name. */
+  #fuel-table { min-width: 480px; }
+  #fuel-table th:nth-child(1), #fuel-table td:nth-child(1) { width: 33%; }
+  #fuel-table th:nth-child(2), #fuel-table td:nth-child(2) { width: 16%; }
+  #fuel-table th:nth-child(3), #fuel-table td:nth-child(3) { width: 20%; }
+  #fuel-table th:nth-child(4), #fuel-table td:nth-child(4) { width: 21%; }
+  #fuel-table th:last-child,   #fuel-table td:last-child   { width: 10%; }
+  /* The shorthand grows a column per metric, so JS sets its min-width. */
+  #preset-table th:first-child, #preset-table td:first-child { width: 150px; }
+  #preset-table th:last-child,  #preset-table td:last-child  { width: 46px; }
+
   .config-help {
     font-size: 11px; color: var(--text-dim); line-height: 1.5;
     background: var(--bg-elevated); padding: 12px; border-radius: 4px;
@@ -450,19 +475,37 @@
       want calories, fluid and sodium. Add carbs or caffeine if you track them,
       remove any you do not.
     </p>
-    <table class="list" id="fuel-table">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Unit</th>
-          <th>Short</th>
-          <th>Goal / hr</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="fuel-rows"></tbody>
-    </table>
+    <div class="table-scroll">
+      <table class="list" id="fuel-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Unit</th>
+            <th>Short</th>
+            <th>Goal / hr</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="fuel-rows"></tbody>
+      </table>
+    </div>
     <button type="button" class="add-row" id="add-fuel">+ Add a fueling metric</button>
+
+    <div class="fuel-shorthand">
+      <div class="sub-title">Shorthand (optional)</div>
+      <p style="margin: 0 0 10px; color: var(--text-muted); font-size:11px; line-height:1.5;">
+        The things you hand over by the item, not by the number. One tap on the pit
+        form adds a serving, two taps adds two, and the crew counts flasks instead
+        of doing arithmetic at an aid station. You can add these later too.
+      </p>
+      <div class="table-scroll">
+        <table class="list" id="preset-table">
+          <thead><tr id="preset-head"></tr></thead>
+          <tbody id="preset-rows"></tbody>
+        </table>
+      </div>
+      <button type="button" class="add-row" id="add-preset">+ Add shorthand</button>
+    </div>
   </section>
 
   <!-- GPX -->
@@ -486,7 +529,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=33"></script>
+<script src="lib/race-core.js?v=34"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -509,6 +552,8 @@
     fuelMetrics: Race.fuel.toRows(null).map(m => ({
       ...m, target: { calories: 250, fluidOz: 20, sodiumMg: 500 }[m.key] ?? ''
     })),
+    // Named bundles the crew hands over whole: { name, values: { <key>: amount } }.
+    fuelPresets: [],
     gpxText: null
   };
 
@@ -738,6 +783,30 @@
     `).join('');
   }
 
+  // Columns follow the metrics as they stand in the editor right now, so adding
+  // Carbs immediately gives every shorthand a Carbs box to fill in.
+  function renderPresetHead() {
+    const metrics = Race.fuel.fromRows(state.fuelMetrics).metrics;
+    // 150 for the name, 46 for the delete button, 92 per metric: enough that a
+    // four-digit sodium amount is not clipped, and the wrapper scrolls past it.
+    document.getElementById('preset-table').style.minWidth = (196 + 92 * metrics.length) + 'px';
+    document.getElementById('preset-head').innerHTML =
+      '<th>Name</th>' + metrics.map(m => `<th>${escapeAttr(m.short)}</th>`).join('') + '<th></th>';
+    return metrics;
+  }
+
+  function renderPresetRows() {
+    const metrics = renderPresetHead();
+    document.getElementById('preset-rows').innerHTML = state.fuelPresets.map((pre, i) => `
+      <tr>
+        <td><input type="text" data-preset="${i}" data-k="name" value="${escapeAttr(pre.name)}" placeholder="e.g. Tailwind flask" /></td>
+        ${metrics.map(m => `<td><input type="number" data-preset="${i}" data-mk="${escapeAttr(m.key)}"
+             min="0" step="${m.step || 1}" value="${escapeAttr(pre.values[m.key] ?? '')}" placeholder="0" /></td>`).join('')}
+        <td><button type="button" class="row-del" data-del-preset="${i}" aria-label="Delete">×</button></td>
+      </tr>
+    `).join('');
+  }
+
   function renderFuelRows() {
     const tbody = document.getElementById('fuel-rows');
     tbody.innerHTML = state.fuelMetrics.map((m, i) => `
@@ -887,6 +956,7 @@
           color: r.color
         })),
       fuelMetrics: fuelRows.metrics,
+      fuelPresets: Race.fuel.presetsFromRows(state.fuelPresets, fuelRows.metrics),
       targets: fuelRows.targets
     };
     if (!isNaN(lastLegStartHours)) cfg.cutoffs.lastLegStartHours = lastLegStartHours;
@@ -1176,18 +1246,45 @@
   document.getElementById('add-fuel').addEventListener('click', () => {
     state.fuelMetrics.push({ key: '', label: '', unit: '', short: '', decimals: 0, step: 1, target: '' });
     renderFuelRows();
+    renderPresetRows();
   });
   document.getElementById('fuel-rows').addEventListener('input', (e) => {
     const idx = e.target.dataset.fuel;
     const k = e.target.dataset.k;
     if (idx == null || !k) return;
     state.fuelMetrics[+idx][k] = e.target.value;
+    // The shorthand columns are named after the metrics, so a relabel shows up
+    // there straight away. Only the header is redrawn, so focus stays put.
+    if (k === 'label' || k === 'short') renderPresetHead();
   });
   document.getElementById('fuel-rows').addEventListener('click', (e) => {
     const del = e.target.dataset.delFuel;
     if (del == null) return;
     state.fuelMetrics.splice(+del, 1);
     renderFuelRows();
+    renderPresetRows();
+  });
+
+  document.getElementById('add-preset').addEventListener('click', () => {
+    state.fuelPresets.push({ name: '', values: {} });
+    renderPresetRows();
+  });
+  document.getElementById('preset-rows').addEventListener('input', (e) => {
+    const i = e.target.dataset.preset;
+    if (i == null) return;
+    const pre = state.fuelPresets[+i];
+    if (e.target.dataset.k === 'name') pre.name = e.target.value;
+    else if (e.target.dataset.mk) {
+      const v = e.target.value.trim();
+      if (v === '') delete pre.values[e.target.dataset.mk];
+      else pre.values[e.target.dataset.mk] = parseFloat(v) || 0;
+    }
+  });
+  document.getElementById('preset-rows').addEventListener('click', (e) => {
+    const del = e.target.dataset.delPreset;
+    if (del == null) return;
+    state.fuelPresets.splice(+del, 1);
+    renderPresetRows();
   });
 
   document.getElementById('gpx-file').addEventListener('change', async (e) => {
@@ -1232,6 +1329,7 @@
     renderLoopAidRows();
     renderRunnerRows();
     renderFuelRows();
+    renderPresetRows();
     setCourseType(state.courseType);
     updateSlug();
   })();
