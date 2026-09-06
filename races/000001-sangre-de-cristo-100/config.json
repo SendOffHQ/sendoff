@@ -344,7 +344,7 @@
       "name": "Flask of LMNT",
       "values": {
         "fluidOz": 17,
-        "sodiumMg": 1200
+        "sodiumMg": 1000
       }
     }
   ]
