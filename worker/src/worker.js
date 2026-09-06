@@ -4,7 +4,7 @@
 //
 //   Auth & users
 //     POST /login            { email, password }                      → { token, email, role, expiresAt }
-//     POST /accept-invite    { token, password }                      → { token, email, role, expiresAt, slug, role: 'editor'|'viewer' }
+//     POST /accept-invite    { token, password }                      → { token, email, expiresAt, slug, role }
 //     POST /change-password  { currentPassword, newPassword }          → { ok: true }  (session required)
 //     POST /reset-link       { email }                                 → { url, token } (admin only)
 //     GET  /reset-info?token=...                                        → { email }
@@ -21,13 +21,15 @@
 //     GET  /get?path=...     [?t=<share-token>]                       → GitHub Contents response (reader ACL enforced)
 //
 //   Access management (session required; creator/editor only)
-//     POST /invite           { slug, email, role: 'editor'|'viewer' } → { url, token, expiresAt }
+//     POST /invite           { slug, email, role }                    → { url, token, expiresAt }
+//         role is crew | racer | pacer | viewer. The first three can write;
+//         viewer is read-only. "editor" is still accepted and means crew.
 //     POST /share-link       { slug, role: 'view'|'edit',
 //                              expiresAt? }                            → { url, token, expiresAt? }
-//     POST /access/add       { slug, email, role }                    → { editors, viewers }
-//     POST /access/remove    { slug, email, role }                    → { editors, viewers }
+//     POST /access/add       { slug, email, role }                    → { people, editors, viewers }
+//     POST /access/remove    { slug, email }                          → { people, editors, viewers }
 //     POST /share/revoke     { token }                                 → { ok: true }
-//     GET  /access?slug=...                                            → { editors, viewers, shareLinks }
+//     GET  /access?slug=...                                            → { people, editors, viewers, shareLinks }
 //
 //   Race listing for logged-in users
 //     GET  /my-races                                                   → { races: [...] }
@@ -340,19 +342,69 @@ async function loadRaceConfig(env, slug) {
   return r.missing ? null : r.data;
 }
 
-function canEditRace(raceCfg, email) {
-  if (!raceCfg) return false;
+// Access is a role per person. Crew, Racer and Pacer all work the board during
+// a race, so all three can write; Viewer is the read-only seat. The distinction
+// between the three writing roles is not about permission, it is about who a
+// person is, which is what makes a roster readable and what the per-person
+// defaults will hang off later.
+const RACE_ROLES = ['crew', 'racer', 'pacer', 'viewer'];
+const WRITING_ROLES = new Set(['owner', 'crew', 'racer', 'pacer']);
+
+// Races written before roles existed carry editors[] and viewers[]. Rather than
+// migrate every config on disk, they are read as the roles they always meant:
+// an editor was crew, a viewer was a viewer.
+function racePeople(raceCfg) {
+  if (!raceCfg) return [];
+  if (Array.isArray(raceCfg.people)) {
+    return raceCfg.people
+      .filter(p => p && p.email)
+      .map(p => ({
+        email: normalizeEmail(p.email),
+        role: RACE_ROLES.includes(p.role) ? p.role : 'viewer'
+      }));
+  }
+  return [
+    ...(raceCfg.editors || []).map(e => ({ email: normalizeEmail(e), role: 'crew' })),
+    ...(raceCfg.viewers || []).map(v => ({ email: normalizeEmail(v), role: 'viewer' }))
+  ].filter(p => p.email);
+}
+
+// Writes the roster, and keeps editors[]/viewers[] in step with it. A phone
+// still running a cached copy of the old client reads those two arrays to
+// decide whether to show an editing UI, and a crew member handed a read-only
+// screen at mile 40 because their browser had not refreshed yet is a real
+// failure, not a cosmetic one. The worker itself only ever trusts people[].
+function setRacePeople(cfg, people) {
+  const seen = new Set();
+  const clean = [];
+  for (const p of people) {
+    const email = normalizeEmail(p.email);
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    clean.push({ email, role: RACE_ROLES.includes(p.role) ? p.role : 'viewer' });
+  }
+  cfg.people = clean;
+  cfg.editors = clean.filter(p => p.role !== 'viewer').map(p => p.email);
+  cfg.viewers = clean.filter(p => p.role === 'viewer').map(p => p.email);
+  return cfg;
+}
+
+function roleForRace(raceCfg, email) {
+  if (!raceCfg) return null;
   email = normalizeEmail(email);
-  if (!email) return false;
-  if (normalizeEmail(raceCfg.createdBy) === email) return true;
-  return (raceCfg.editors || []).some(e => normalizeEmail(e) === email);
+  if (!email) return null;
+  if (normalizeEmail(raceCfg.createdBy) === email) return 'owner';
+  const p = racePeople(raceCfg).find(x => x.email === email);
+  return p ? p.role : null;
+}
+
+function canEditRace(raceCfg, email) {
+  return WRITING_ROLES.has(roleForRace(raceCfg, email));
 }
 function canViewRace(raceCfg, email) {
   if (!raceCfg) return false;
   if (raceCfg.visibility === 'public') return true;
-  if (canEditRace(raceCfg, email)) return true;
-  email = normalizeEmail(email);
-  return (raceCfg.viewers || []).some(v => normalizeEmail(v) === email);
+  return roleForRace(raceCfg, email) !== null;
 }
 
 // ---------- handlers ----------
@@ -670,8 +722,7 @@ async function handleAccountRaces(req, env) {
     try { cfg = await loadRaceConfig(env, slug); } catch (e) { continue; }
     if (!cfg) continue;
     let role = null;
-    if (canEditRace(cfg, email)) role = 'editor';
-    else if ((cfg.viewers || []).some(v => normalizeEmail(v) === email)) role = 'viewer';
+    role = roleForRace(cfg, email);
     if (role) {
       races.push({
         slug, name: cfg.name,
@@ -1095,7 +1146,7 @@ async function requireRaceAdmin(env, slug, sessionEmail) {
   const raceCfg = await loadRaceConfig(env, slug);
   if (!raceCfg) throw Object.assign(new Error('Race not found'), { status: 404 });
   if (!canEditRace(raceCfg, sessionEmail)) {
-    throw Object.assign(new Error('Forbidden, not an editor on this race'), { status: 403 });
+    throw Object.assign(new Error('Forbidden, no write access on this race'), { status: 403 });
   }
   return raceCfg;
 }
@@ -1154,6 +1205,9 @@ async function handleAccessList(req, env) {
   return json({
     slug,
     createdBy: raceCfg.createdBy || null,
+    people: racePeople(raceCfg),
+    // Derived, and still sent so a client that has not picked up the new
+    // shape yet renders the roster instead of an empty panel.
     editors: raceCfg.editors || [],
     viewers: raceCfg.viewers || [],
     shareLinks,
@@ -1170,22 +1224,27 @@ async function handleAccessAdd(req, env) {
   const { slug } = body || {};
   const email = normalizeEmail(body && body.email);
   const role = body && body.role;
-  if (!slug || !email || !['editor', 'viewer'].includes(role)) {
-    return json({ error: 'slug, email, role (editor|viewer) required' }, { status: 400 }, env, req);
+  // "editor" is still accepted so an older client, or a share link built before
+  // roles existed, keeps working; it means what it always meant.
+  const wanted = role === 'editor' ? 'crew' : role;
+  if (!slug || !email || !RACE_ROLES.includes(wanted)) {
+    return json({ error: `slug, email, role (${RACE_ROLES.join('|')}) required` }, { status: 400 }, env, req);
   }
   let raceCfg;
   try { raceCfg = await requireRaceAdmin(env, slug, session.email); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
 
   const updated = await mutateRaceConfig(env, slug, (cfg) => {
-    cfg.editors = (cfg.editors || []).filter(e => normalizeEmail(e) !== email);
-    cfg.viewers = (cfg.viewers || []).filter(v => normalizeEmail(v) !== email);
-    if (role === 'editor') cfg.editors.push(email);
-    else cfg.viewers.push(email);
-    return cfg;
-  }, `hub: add ${role} ${email} to ${slug}`, session.email);
+    const people = racePeople(cfg).filter(p => p.email !== email);
+    people.push({ email, role: wanted });
+    return setRacePeople(cfg, people);
+  }, `hub: add ${wanted} ${email} to ${slug}`, session.email);
 
-  return json({ editors: updated.editors || [], viewers: updated.viewers || [] }, {}, env, req);
+  return json({
+    people: updated.people || [],
+    editors: updated.editors || [],
+    viewers: updated.viewers || []
+  }, {}, env, req);
 }
 
 async function handleAccessRemove(req, env) {
@@ -1206,13 +1265,15 @@ async function handleAccessRemove(req, env) {
     return json({ error: 'Cannot remove the creator' }, { status: 400 }, env, req);
   }
 
-  const updated = await mutateRaceConfig(env, slug, (cfg) => {
-    cfg.editors = (cfg.editors || []).filter(e => normalizeEmail(e) !== email);
-    cfg.viewers = (cfg.viewers || []).filter(v => normalizeEmail(v) !== email);
-    return cfg;
-  }, `hub: revoke access for ${email} on ${slug}`, session.email);
+  const updated = await mutateRaceConfig(env, slug, (cfg) =>
+    setRacePeople(cfg, racePeople(cfg).filter(p => p.email !== email)),
+    `hub: revoke access for ${email} on ${slug}`, session.email);
 
-  return json({ editors: updated.editors || [], viewers: updated.viewers || [] }, {}, env, req);
+  return json({
+    people: updated.people || [],
+    editors: updated.editors || [],
+    viewers: updated.viewers || []
+  }, {}, env, req);
 }
 
 async function handleInvite(req, env) {
@@ -1225,8 +1286,11 @@ async function handleInvite(req, env) {
   const { slug } = body || {};
   const email = normalizeEmail(body && body.email);
   const role = body && body.role;
-  if (!slug || !email || !['editor', 'viewer'].includes(role)) {
-    return json({ error: 'slug, email, role (editor|viewer) required' }, { status: 400 }, env, req);
+  // "editor" is still accepted so an older client, or a share link built before
+  // roles existed, keeps working; it means what it always meant.
+  const wanted = role === 'editor' ? 'crew' : role;
+  if (!slug || !email || !RACE_ROLES.includes(wanted)) {
+    return json({ error: `slug, email, role (${RACE_ROLES.join('|')}) required` }, { status: 400 }, env, req);
   }
   try { await requireRaceAdmin(env, slug, session.email); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
@@ -1234,7 +1298,7 @@ async function handleInvite(req, env) {
   const token = randomToken(24);
   const expiresAt = Date.now() + INVITE_TTL_DAYS * 24 * 3600 * 1000;
   await env.AUTH_KV.put('invite:' + token, JSON.stringify({
-    email, slug, role,
+    email, slug, role: wanted,
     createdBy: session.email,
     createdAt: new Date().toISOString(),
     expiresAt
@@ -1305,10 +1369,10 @@ async function handleAcceptInvite(req, env) {
   try {
     await mutateRaceConfig(env, inv.slug, (cfg) => {
       const email = normalizeEmail(inv.email);
-      cfg.editors = (cfg.editors || []).filter(e => normalizeEmail(e) !== email);
-      cfg.viewers = (cfg.viewers || []).filter(v => normalizeEmail(v) !== email);
-      if (inv.role === 'editor') cfg.editors.push(email);
-      else cfg.viewers.push(email);
+      const role = inv.role === 'editor' ? 'crew' : inv.role;
+      const people = racePeople(cfg).filter(p => p.email !== email);
+      people.push({ email, role: RACE_ROLES.includes(role) ? role : 'viewer' });
+      setRacePeople(cfg, people);
       return cfg;
     }, `hub: accept invite for ${inv.email} on ${inv.slug}`, inv.email);
   } catch (err) {
@@ -1486,7 +1550,7 @@ async function handleMyRaces(req, env) {
       cutoffHours: cfg.cutoffs && cfg.cutoffs.totalHours || null,
       visibility: 'private',
       createdBy: cfg.createdBy || null,
-      role: canEditRace(cfg, session.email) ? 'editor' : 'viewer'
+      role: roleForRace(cfg, session.email) || 'viewer'
     });
     seen.add(slug);
   }

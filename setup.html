@@ -529,7 +529,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=35"></script>
+<script src="lib/race-core.js?v=36"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -943,7 +943,10 @@
       units: { distance: state.units.distance, elevation: state.units.elevation },
       visibility: proxy ? state.visibility : 'public',
       createdBy: me || null,
-      editors: me ? [me] : [],
+      // people[] is the roster; editors/viewers are written alongside it so a
+      // client still running a cached copy of the old code reads it correctly.
+      people: [],
+      editors: [],
       viewers: [],
       cutoffs: { totalHours },
       course: {},

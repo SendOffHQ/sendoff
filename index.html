@@ -271,7 +271,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=35"></script>
+<script src="lib/race-core.js?v=36"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
@@ -369,11 +369,13 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
       : '–';
     const dist = r.totalDistanceMi != null ? Race.units.distance(r.totalDistanceMi, { units: r.units }) : '–';
     let badge = '';
+    // "editor" still arrives from a worker that has not been redeployed yet.
+    const roleName = r.role ? Race.roles.label(r.role === 'editor' ? 'crew' : r.role) : '';
     if (r.visibility === 'private') {
       const cls = r.role === 'viewer' ? 'viewer' : '';
-      badge = `<span class="card-badge ${cls}">Private${r.role ? ' · ' + r.role : ''}</span>`;
-    } else if (r.role === 'editor') {
-      badge = `<span class="card-badge">Editor</span>`;
+      badge = `<span class="card-badge ${cls}">Private${roleName ? ' · ' + roleName : ''}</span>`;
+    } else if (roleName && r.role !== 'viewer') {
+      badge = `<span class="card-badge">${roleName}</span>`;
     }
     return `
       <a class="card status-${status}" href="race.html?id=${encodeURIComponent(r.slug)}">
