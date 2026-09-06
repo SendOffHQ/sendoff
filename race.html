@@ -380,6 +380,8 @@
     padding: 2px 6px; border-radius: 2px; color: var(--text-muted);
     border: 1px solid var(--border-bright);
   }
+  .seg-row.start .num { color: var(--text-muted); }
+  .seg-row.start .nm { color: var(--text-dim); }
   .access-list .row .tag.creator { color: var(--green); border-color: var(--green); }
   /* The role is a control, not a label: changing someone from Viewer to Pacer
      is one choice here rather than a revoke followed by a re-invite. */
@@ -586,7 +588,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="lib/race-core.js?v=48"></script>
+<script src="lib/race-core.js?v=49"></script>
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
@@ -683,7 +685,19 @@
 
   function segmentRows(runner, c) {
     const segs = Race.course.legs(cfg);
-    return segs.map((s, i) => {
+    // The start is not a leg, so it has no row of its own, but a bag left there
+    // or a lot the crew parks in is worth saying before the race begins.
+    const st = Race.course.startAidTags(cfg);
+    const startRow = !st ? '' : `
+        <div class="seg-row start">
+          <span class="num">–</span>
+          <span class="nm">
+            ${escapeHtml(Race.course.aidStations(cfg)[0]?.name || 'Start')}${stationTags(st)}
+            <div class="meta">Before the start</div>
+          </span>
+          <span class="col-dur"></span><span class="col-cut"></span><span class="col-pit"></span>
+        </div>`;
+    return startRow + segs.map((s, i) => {
       const entry = (runner.legs || []).find(l => l.index === s.index);
       const dur = entry && entry.startTime && entry.endTime
         ? (new Date(entry.endTime) - new Date(entry.startTime)) / 1000 : null;
