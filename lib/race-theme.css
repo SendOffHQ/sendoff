@@ -150,6 +150,7 @@ footer.site {
 }
 .account-bar button.account-signout,
 .account-bar button.account-pw,
+.account-bar button.account-profile,
 .account-bar button.account-signin,
 .account-bar a.account-admin {
   font-family: 'JetBrains Mono', monospace; font-size: 10px;
@@ -160,6 +161,7 @@ footer.site {
 }
 .account-bar button.account-signout:hover,
 .account-bar button.account-pw:hover,
+.account-bar button.account-profile:hover,
 .account-bar button.account-signin:hover,
 .account-bar a.account-admin:hover {
   color: var(--accent); border-color: var(--accent);
