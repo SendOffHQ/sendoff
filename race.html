@@ -277,6 +277,17 @@
   .leglog tr.note-row:last-child td { border-bottom: none; }
   .leglog tr.empty td { color: var(--text-muted); font-style: italic; text-align: center; padding: 24px; }
   .leglog .leg-seg { color: var(--text-muted); font-size: 10px; display: block; }
+  .st-tag {
+    display: inline-block; margin-left: 5px; padding: 1px 5px; border-radius: 2px;
+    font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid currentColor;
+    vertical-align: 1px; white-space: nowrap;
+  }
+  .st-tag.cp     { color: var(--blue); }
+  .st-tag.nocrew { color: var(--red); }
+  .st-tag.bag    { color: var(--accent); }
+  .st-tag.pacer  { color: var(--green); }
+  .st-tag.note   { color: var(--yellow); text-transform: none; letter-spacing: 0.04em; }
 
   /* On a phone seven columns do not fit: the segment name wraps to four lines
      and sodium falls off the right edge. Each leg becomes a block instead,
@@ -549,7 +560,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="lib/race-core.js?v=31"></script>
+<script src="lib/race-core.js?v=32"></script>
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
@@ -705,8 +716,21 @@
       // Show the leg name for segments and loops-with-aids; a simple
       // lap-only loop just shows the index.
       const showName = segDef && segDef.name && !isSimpleLoop();
+      const st = Race.stationAt(cfg, l.index);
+      const tags = [];
+      if (st) {
+        if (st.checkpoint) tags.push(['cp', 'Checkpoint']);
+        else if (!st.crewAccess) tags.push(['nocrew', 'No crew']);
+        if (st.dropBag) tags.push(['bag', 'Drop bag']);
+        if (st.pacerEligible) tags.push(['pacer', 'Pacer']);
+        if (st.crewNote) tags.push(['note', st.crewNote]);
+      }
+      const tagHtml = tags.length
+        ? ' ' + tags.map(([c, t]) => `<span class="st-tag ${c}">${escapeHtml(t)}</span>`).join('')
+        : '';
       const legLabel = showName
-        ? `${l.index} <span class="leg-seg">${escapeHtml(segDef.name)}</span>` : l.index;
+        ? `${l.index} <span class="leg-seg">${escapeHtml(segDef.name)}${tagHtml}</span>`
+        : `${l.index}${tagHtml}`;
       return `
         <tr class="leg-row${oldCls}">
           <td class="leg-num">${legLabel}</td>

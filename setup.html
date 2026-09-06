@@ -108,6 +108,18 @@
     height: 36px; padding: 2px; cursor: pointer;
     width: 100%;
   }
+  .aid-opts-row td { padding-top: 0 !important; border-top: 0 !important; }
+  .aid-opts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 0 0 10px; }
+  .aid-chip {
+    display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.06em;
+    padding: 5px 9px; border-radius: 3px; white-space: nowrap;
+    border: 1px solid var(--border-bright); color: var(--text-muted); background: var(--bg-elevated);
+  }
+  .aid-chip.on { color: var(--accent); border-color: var(--accent); }
+  .aid-chip input { margin: 0; accent-color: var(--accent); }
+  .aid-note { flex: 1 1 160px; min-width: 120px; font-size: 11px !important; padding: 5px 8px !important; }
+  .aid-note:disabled { opacity: 0.35; }
   table.list .row-del {
     background: transparent; border: 1px solid var(--border);
     color: var(--text-muted); cursor: pointer;
@@ -469,7 +481,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=31"></script>
+<script src="lib/race-core.js?v=32"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -627,6 +639,13 @@
   }
 
   // ---------- aid stations ----------
+  // Four settings per station would make the table unreadably wide, so they sit
+  // on a second line as toggles rather than columns.
+  function aidToggle(i, key, label, on) {
+    return `<label class="aid-chip${on ? ' on' : ''}">
+      <input type="checkbox" data-aid="${i}" data-k="${key}" ${on ? 'checked' : ''} />${label}</label>`;
+  }
+
   function renderAidRows() {
     const tbody = document.getElementById('aid-rows');
     tbody.innerHTML = state.aidStations.map((a, i) => `
@@ -636,6 +655,20 @@
         <td><input type="number" data-aid="${i}" data-k="mileage" value="${a.mileage === '' || a.mileage == null ? '' : a.mileage}" step="0.1" min="0" placeholder="0.0" ${i === 0 ? 'readonly style="opacity:0.6"' : ''} /></td>
         <td><input type="number" data-aid="${i}" data-k="arriveCutoffHours" value="${a.arriveCutoffHours === '' || a.arriveCutoffHours == null ? '' : a.arriveCutoffHours}" step="0.25" min="0" placeholder="–" ${i === 0 ? 'readonly style="opacity:0.6"' : ''} /></td>
         <td>${i > 1 ? `<button type="button" class="row-del" data-del-aid="${i}" aria-label="Delete">×</button>` : ''}</td>
+      </tr>
+      <tr class="aid-opts-row">
+        <td></td>
+        <td colspan="4">
+          <div class="aid-opts">
+            ${aidToggle(i, 'crewAccess', 'Crew can meet', a.crewAccess !== false)}
+            ${aidToggle(i, 'dropBag', 'Drop bag', !!a.dropBag)}
+            ${aidToggle(i, 'pacerEligible', 'Pacer pickup', !!a.pacerEligible)}
+            ${aidToggle(i, 'checkpoint', 'Checkpoint only', !!a.checkpoint)}
+            <input type="text" class="aid-note" data-aid="${i}" data-k="crewNote"
+                   value="${escapeAttr(a.crewNote || '')}" placeholder="Crew note (lot, walk-in…)"
+                   ${a.crewAccess === false ? 'disabled' : ''} />
+          </div>
+        </td>
       </tr>
     `).join('');
     renderAidSummary();
@@ -856,7 +889,11 @@
       }
     } else {
       const aids = state.aidStations
-        .map(a => ({ ...a, mileage: a.mileage === '' ? null : Race.units.toMiles(a.mileage, { units: state.units }), arriveCutoffHours: a.arriveCutoffHours === '' ? null : parseFloat(a.arriveCutoffHours) }))
+        .map(a => ({ ...a,
+          mileage: a.mileage === '' ? null : Race.units.toMiles(a.mileage, { units: state.units }),
+          arriveCutoffHours: a.arriveCutoffHours === '' ? null : parseFloat(a.arriveCutoffHours),
+          crewAccess: a.crewAccess !== false, crewNote: (a.crewNote || '').trim() || null,
+          pacerEligible: !!a.pacerEligible, dropBag: !!a.dropBag, checkpoint: !!a.checkpoint }))
         .filter(a => a.name && a.mileage != null && !isNaN(a.mileage));
       cfg.course = { segments: Race.course.segmentsFromAidStations(aids) };
     }
@@ -1052,7 +1089,20 @@
     const idx = e.target.dataset.aid;
     const key = e.target.dataset.k;
     if (idx == null || !key) return;
-    state.aidStations[+idx][key] = e.target.value;
+    const a = state.aidStations[+idx];
+    if (e.target.type === 'checkbox') {
+      a[key] = e.target.checked;
+      // A checkpoint is a timing point, not a station: nothing to crew, no bag
+      // to leave, nobody to pick up. Turning it on clears the rest rather than
+      // letting a contradictory pair of settings be saved.
+      if (key === 'checkpoint' && e.target.checked) {
+        a.crewAccess = false; a.dropBag = false; a.pacerEligible = false; a.crewNote = '';
+      }
+      if (key === 'crewAccess' && !e.target.checked) a.crewNote = '';
+      renderAidRows();
+      return;
+    }
+    a[key] = e.target.value;
     renderAidSummary();
   });
   document.getElementById('aid-rows').addEventListener('click', (e) => {
