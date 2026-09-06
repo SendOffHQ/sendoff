@@ -50,6 +50,18 @@
     font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted);
   }
+  .crew-notes-card {
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px; padding: 14px 24px; margin-bottom: 24px;
+  }
+  .crew-notes-label {
+    display: block; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .crew-notes-body { white-space: pre-wrap; font-size: 14px; line-height: 1.55; }
+
   .cutoff-item { display: flex; flex-direction: column; gap: 2px; }
   .cutoff-item .v { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; }
   .cutoff-item .l { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; }
@@ -213,6 +225,13 @@
       background: #f6f6f6 !important; border: 1px solid #bbb !important;
       page-break-inside: avoid;
     }
+    .crew-notes-card {
+      background: #f6f6f6 !important; border: 1px solid #bbb !important;
+      border-left: 3px solid #444 !important;
+      page-break-inside: avoid;
+    }
+    .crew-notes-label { color: #555 !important; }
+    .crew-notes-body { color: #111 !important; }
     .cutoff-item .v { color: #111 !important; }
     .cutoff-item.warn .v { color: #8a6700 !important; }
     .cutoff-item.danger .v { color: #a82626 !important; }
@@ -279,6 +298,10 @@
 
 <div id="error" class="error-banner" style="display:none;"></div>
 <div id="cutoffs" class="cutoffs" style="display:none;"></div>
+<div id="crew-notes-card" class="crew-notes-card" hidden>
+  <span class="crew-notes-label">Notes for the crew</span>
+  <div class="crew-notes-body" id="crew-notes-text"></div>
+</div>
 <div id="runners"></div>
 <div id="course-block" class="course-block" style="display:none;">
   <h2>Course</h2>
@@ -463,6 +486,11 @@
       document.title = `${cfg.name} · Report · SendOff`;
       document.getElementById('race-title').innerHTML = cfg.name.replace(/(\w+)$/, '<em>$1</em>');
       renderCutoffs();
+
+      // On paper this is the part nobody can look up later, so it prints.
+      const crewNotes = (cfg.crewNotes || '').trim();
+      document.getElementById('crew-notes-card').hidden = !crewNotes;
+      document.getElementById('crew-notes-text').textContent = crewNotes;
 
       const runners = (cfg.runners || []).map(r => {
         const dr = (data.runners || []).find(d => d.id === r.id) || { id: r.id, legs: [] };

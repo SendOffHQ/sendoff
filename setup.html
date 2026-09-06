@@ -522,6 +522,17 @@
     </div>
 
     <div class="fuel-shorthand">
+      <div class="sub-title">Notes for the crew (optional)</div>
+      <p style="margin: 0 0 10px; color: var(--text-muted); font-size:11px; line-height:1.5;">
+        What the runner wants the crew to know without being asked. Allergies,
+        what settles late, what to do when they go quiet. Loading their plan
+        brings these across from their profile.
+      </p>
+      <textarea id="crew-notes" rows="4" placeholder="Nothing yet."
+        style="width:100%; box-sizing:border-box; resize:vertical;"></textarea>
+    </div>
+
+    <div class="fuel-shorthand">
       <div class="sub-title">Hour bands (optional)</div>
       <p style="margin: 0 0 10px; color: var(--text-muted); font-size:11px; line-height:1.5;">
         When the goals should change as the race wears on. A band overrides only
@@ -604,6 +615,7 @@
     fuelPresets: [],
     // Hour bands: { fromHour, label, targets: { <key>PerHour: amount } }.
     fuelBands: [],
+    crewNotes: '',
     gpxText: null
   };
 
@@ -929,12 +941,26 @@
           fromHour: b.fromHour, label: b.label || '', targets: { ...(b.targets || {}) }
         }));
       }
+      // An existing note is not overwritten: the wizard may already carry
+      // something typed for this race that the profile does not know about.
+      const theirNotes = (profile.notes || '').trim();
+      let notesTook = false;
+      if (theirNotes) {
+        const here = (state.crewNotes || '').trim();
+        if (!here) { state.crewNotes = theirNotes; notesTook = true; }
+        else if (!here.includes(theirNotes)) { state.crewNotes = here + '\n\n' + theirNotes; notesTook = true; }
+      }
+      document.getElementById('crew-notes').value = state.crewNotes;
+
       renderFuelRows();
       renderBandRows();
-      note.textContent = (filled || bands.length)
-        ? `Filled ${filled} goal${filled === 1 ? '' : 's'}` +
-          (bands.length ? ` and ${bands.length} hour band${bands.length === 1 ? '' : 's'}` : '') +
-          '. Adjust anything before creating the race.'
+      const took = [
+        filled ? `${filled} goal${filled === 1 ? '' : 's'}` : '',
+        bands.length ? `${bands.length} hour band${bands.length === 1 ? '' : 's'}` : '',
+        notesTook ? 'their crew notes' : ''
+      ].filter(Boolean);
+      note.textContent = took.length
+        ? `Filled ${took.join(', ').replace(/, ([^,]*)$/, ' and $1')}. Adjust anything before creating the race.`
         : 'Your profile has no saved goals yet. Set them from the Profile button up top.';
     } catch (err) {
       note.textContent = `Could not load your profile: ${err.message}`;
@@ -1127,6 +1153,8 @@
       phaseTargets: Race.fuel.bandsFromRows(state.fuelBands, fuelRows.metrics),
       targets: fuelRows.targets
     };
+    const crewNotes = (state.crewNotes || '').trim().slice(0, 2000);
+    if (crewNotes) cfg.crewNotes = crewNotes;
     if (!isNaN(lastLegStartHours)) cfg.cutoffs.lastLegStartHours = lastLegStartHours;
 
     if (state.courseType === 'loops') {
@@ -1451,6 +1479,9 @@
     });
   }
 
+  document.getElementById('crew-notes').addEventListener('input', (e) => {
+    state.crewNotes = e.target.value;
+  });
   document.getElementById('seed-load').addEventListener('click', seedFromProfile);
 
   document.getElementById('add-band').addEventListener('click', () => {
