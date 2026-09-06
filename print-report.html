@@ -293,7 +293,7 @@
   <div>Auto-generated · race-dashboard hub</div>
 </footer>
 
-<script src="lib/race-core.js?v=32"></script>
+<script src="lib/race-core.js?v=33"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -326,6 +326,9 @@
   function renderRunner(runner) {
     const c = Race.compute.runner(runner, cfg);
     const color = runner.color || 'var(--accent)';
+    // Five fixed columns (#, Out, In, Leg, Aid) plus one per tracked metric.
+    const metrics = Race.fuel.metrics(cfg);
+    const cols = 5 + metrics.length;
     const legRows = (runner.legs || []).slice().sort((a, b) => a.index - b.index).map((l, i, arr) => {
       const def = Race.course.legAt(cfg, l.index);
       const dur = (l.startTime && l.endTime)
@@ -335,7 +338,7 @@
         ? (new Date(next.startTime) - new Date(l.endTime)) / 1000 : null;
       const noteParts = [l.gearChanges, l.meds, l.issues, l.notes].filter(Boolean);
       const noteRow = noteParts.length
-        ? `<tr class="note"><td colspan="8">${escapeHtml(noteParts.join(' · '))}</td></tr>`
+        ? `<tr class="note"><td colspan="${cols}">${escapeHtml(noteParts.join(' · '))}</td></tr>`
         : '';
       // Simple lap-only loops just show the index; segments and
       // loops-with-aids show the leg name beneath it.
@@ -350,9 +353,8 @@
           <td class="num">${Race.fmt.clockTimeSec(l.endTime)}</td>
           <td class="num">${dur ? Race.fmt.durationShort(dur) : '–'}</td>
           <td class="num">${pitSec != null ? Race.fmt.durationShort(pitSec) : '–'}</td>
-          <td class="num">${l.calories || 0}</td>
-          <td class="num">${l.fluidOz || 0}oz</td>
-          <td class="num">${l.sodiumMg || 0}</td>
+          ${metrics.map(m => `<td class="num">${
+            l[m.key] != null && l[m.key] !== '' ? Race.fuel.fmt(m, l[m.key]) : '–'}</td>`).join('')}
         </tr>
         ${noteRow}`;
     }).join('');
@@ -373,7 +375,13 @@
           <div class="summary-stat"><span class="l">Course</span><span class="v">${Race.fmt.duration(c.completedCourseSec)}</span><span class="s">avg leg ${Race.fmt.duration(c.avgLegSec)}</span></div>
           <div class="summary-stat"><span class="l">Pit / Aid</span><span class="v">${Race.fmt.duration(c.completedPitSec)}</span><span class="s">avg ${Race.fmt.duration(c.avgPitSec)}</span></div>
           <div class="summary-stat"><span class="l">Elevation</span><span class="v">${c.elevGainFt != null ? '+' + Math.round(Race.units.elevationVal(c.elevGainFt, cfg)).toLocaleString() + ' ' + Race.units.elevationLabel(cfg) : '–'}</span><span class="s">${c.elevGainFt != null ? '−' + Math.round(Race.units.elevationVal(c.elevLossFt || 0, cfg)).toLocaleString() + ' ' + Race.units.elevationLabel(cfg) + ' · est.' : 'no profile'}</span></div>
-          <div class="summary-stat"><span class="l">Pace</span><span class="v">${Race.units.pace(c.paceSecPerMile, cfg)}</span><span class="s">${c.totalCal.toLocaleString()} cal · ${c.totalFluid} oz · ${(c.totalSodium/1000).toFixed(1)} g Na</span></div>
+          <div class="summary-stat"><span class="l">Pace</span><span class="v">${Race.units.pace(c.paceSecPerMile, cfg)}</span><span class="s">${metrics.map(m => {
+            const v = Race.fuel.fmt(m, c.intake[m.key]?.total || 0);
+            // The short name only earns its space when it says something the
+            // unit does not: "5,654mg Na" is worth it, "2,009cal Cal" is not.
+            return (m.short && m.short.toLowerCase() !== (m.unit || '').toLowerCase())
+              ? v + ' ' + escapeHtml(m.short) : v;
+          }).join(' · ') || '&nbsp;'}</span></div>
         </div>
         <table class="legs">
           <thead>
@@ -383,12 +391,10 @@
               <th class="num">In</th>
               <th class="num">Leg</th>
               <th class="num">Aid</th>
-              <th class="num">Cal</th>
-              <th class="num">Fluid</th>
-              <th class="num">Na</th>
+              ${metrics.map(m => `<th class="num">${escapeHtml(m.short)}</th>`).join('')}
             </tr>
           </thead>
-          <tbody>${legRows || `<tr><td colspan="8" style="text-align:center; padding:24px; color: var(--text-muted); font-style: italic;">No legs yet</td></tr>`}</tbody>
+          <tbody>${legRows || `<tr><td colspan="${cols}" style="text-align:center; padding:24px; color: var(--text-muted); font-style: italic;">No legs yet</td></tr>`}</tbody>
         </table>
       </article>`;
   }

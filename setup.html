@@ -441,23 +441,28 @@
     <button type="button" class="add-row" id="add-runner">+ Add runner</button>
   </section>
 
-  <!-- Intake targets -->
+  <!-- Fueling -->
   <section class="section">
-    <div class="section-head"><div class="section-title">Hourly intake targets</div></div>
-    <div class="grid-3">
-      <label class="field">
-        <span class="lbl">Calories / hr</span>
-        <input type="number" id="t-cal" min="0" step="10" value="250" />
-      </label>
-      <label class="field">
-        <span class="lbl">Fluid oz / hr</span>
-        <input type="number" id="t-fluid" min="0" step="1" value="20" />
-      </label>
-      <label class="field">
-        <span class="lbl">Sodium mg / hr</span>
-        <input type="number" id="t-sodium" min="0" step="50" value="500" />
-      </label>
-    </div>
+    <div class="section-head"><div class="section-title">Fueling</div></div>
+    <p class="hint" style="margin-bottom:10px; color: var(--text-muted); font-size:11px;">
+      What the crew logs at each aid station, and the hourly goal for each. These
+      are the columns in the leg log and the lines on the intake charts. Most races
+      want calories, fluid and sodium. Add carbs or caffeine if you track them,
+      remove any you do not.
+    </p>
+    <table class="list" id="fuel-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Unit</th>
+          <th>Short</th>
+          <th>Goal / hr</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="fuel-rows"></tbody>
+    </table>
+    <button type="button" class="add-row" id="add-fuel">+ Add a fueling metric</button>
   </section>
 
   <!-- GPX -->
@@ -481,7 +486,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=32"></script>
+<script src="lib/race-core.js?v=33"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -499,6 +504,11 @@
     runners: [
       { name: '', bib: '', color: DEFAULT_COLORS[0] }
     ],
+    // Seeded from the built-in three. Race.fuel.metrics(null) returns the
+    // defaults, so this list and the app's fallback can never drift apart.
+    fuelMetrics: Race.fuel.toRows(null).map(m => ({
+      ...m, target: { calories: 250, fluidOz: 20, sodiumMg: 500 }[m.key] ?? ''
+    })),
     gpxText: null
   };
 
@@ -728,6 +738,19 @@
     `).join('');
   }
 
+  function renderFuelRows() {
+    const tbody = document.getElementById('fuel-rows');
+    tbody.innerHTML = state.fuelMetrics.map((m, i) => `
+      <tr>
+        <td><input type="text" data-fuel="${i}" data-k="label" value="${escapeAttr(m.label)}" placeholder="e.g. Carbs" /></td>
+        <td><input type="text" data-fuel="${i}" data-k="unit" value="${escapeAttr(m.unit)}" placeholder="g" /></td>
+        <td><input type="text" data-fuel="${i}" data-k="short" value="${escapeAttr(m.short)}" placeholder="Carb" /></td>
+        <td><input type="number" data-fuel="${i}" data-k="target" min="0" step="${m.step || 1}" value="${escapeAttr(m.target)}" placeholder="0" /></td>
+        <td><button type="button" class="row-del" data-del-fuel="${i}" aria-label="Delete">×</button></td>
+      </tr>
+    `).join('');
+  }
+
   // ---------- helpers ----------
   function escapeAttr(s) {
     return String(s == null ? '' : s)
@@ -843,6 +866,7 @@
     const lastLegStartHours = parseFloat(document.getElementById('race-last-leg-cutoff').value);
     const proxy = isProxyMode();
     const me = proxy ? (Race.auth.email() || '') : '';
+    const fuelRows = Race.fuel.fromRows(state.fuelMetrics);
 
     const cfg = {
       name, location, startTime,
@@ -862,11 +886,8 @@
           bib: r.bib.trim() || r.name.trim(),
           color: r.color
         })),
-      targets: {
-        caloriesPerHour: parseFloat(document.getElementById('t-cal').value) || 0,
-        fluidOzPerHour:  parseFloat(document.getElementById('t-fluid').value) || 0,
-        sodiumMgPerHour: parseFloat(document.getElementById('t-sodium').value) || 0
-      }
+      fuelMetrics: fuelRows.metrics,
+      targets: fuelRows.targets
     };
     if (!isNaN(lastLegStartHours)) cfg.cutoffs.lastLegStartHours = lastLegStartHours;
 
@@ -1152,6 +1173,23 @@
     renderRunnerRows();
   });
 
+  document.getElementById('add-fuel').addEventListener('click', () => {
+    state.fuelMetrics.push({ key: '', label: '', unit: '', short: '', decimals: 0, step: 1, target: '' });
+    renderFuelRows();
+  });
+  document.getElementById('fuel-rows').addEventListener('input', (e) => {
+    const idx = e.target.dataset.fuel;
+    const k = e.target.dataset.k;
+    if (idx == null || !k) return;
+    state.fuelMetrics[+idx][k] = e.target.value;
+  });
+  document.getElementById('fuel-rows').addEventListener('click', (e) => {
+    const del = e.target.dataset.delFuel;
+    if (del == null) return;
+    state.fuelMetrics.splice(+del, 1);
+    renderFuelRows();
+  });
+
   document.getElementById('gpx-file').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     const status = document.getElementById('gpx-status');
@@ -1193,6 +1231,7 @@
     renderAidRows();
     renderLoopAidRows();
     renderRunnerRows();
+    renderFuelRows();
     setCourseType(state.courseType);
     updateSlug();
   })();
