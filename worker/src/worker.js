@@ -29,7 +29,10 @@
 //     POST /access/add       { slug, email, role }                    → { people, editors, viewers }
 //     POST /access/remove    { slug, email }                          → { people, editors, viewers }
 //     POST /share/revoke     { token }                                 → { ok: true }
-//     GET  /access?slug=...                                            → { people, editors, viewers, shareLinks }
+//     GET  /access?slug=...                                            → { people, editors, viewers, shareLinks, teamCanInvite }
+//     POST /access/team-invite { slug, allowed }                       → { teamCanInvite }
+//         Creator only. Off by default: without it, only the creator can
+//         invite, add, remove, or hand out share links.
 //
 //   Race listing for logged-in users
 //     GET  /my-races                                                   → { races: [...] }
@@ -742,10 +745,22 @@ async function handleCommit(req, env) {
   let body;
   try { body = await req.json(); }
   catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
-  const { path, content, sha, message } = body || {};
-  if (!path || typeof content !== 'string' || !message) {
+  const { path, sha, message } = body || {};
+  const content0 = body && body.content;
+  if (!path || typeof content0 !== 'string' || !message) {
     return json({ error: 'Missing path, content, or message' }, { status: 400 }, env, req);
   }
+
+  // Who a race belongs to, who is on it, and who can see it. These never
+  // change through a file write. The client legitimately PUTs the whole
+  // config.json to save units or the roster of runners, and it round-trips
+  // whatever it read; letting a writer's copy of these fields win would mean
+  // anyone who can log a split could also write themselves in as the creator,
+  // hand out access, or make a private race public. They change only through
+  // the access endpoints, which check the right thing.
+  const ACL_FIELDS = ['createdBy', 'people', 'editors', 'viewers', 'teamCanInvite', 'visibility'];
+
+  let content = content0;
 
   // Path allowlist + ACL check.
   if (path === 'races/index.json') {
@@ -768,7 +783,19 @@ async function handleCommit(req, env) {
       // createdBy, the worst case is the race is owned by the wrong account;
       // they still had to authenticate to reach this endpoint.
     } else if (!canEditRace(raceCfg, session.email)) {
-      return json({ error: 'Forbidden, not an editor on this race' }, { status: 403 }, env, req);
+      return json({ error: 'Forbidden, no write access on this race' }, { status: 403 }, env, req);
+    } else if (path.endsWith('/config.json')) {
+      let submitted;
+      try { submitted = JSON.parse(content); }
+      catch (e) { return json({ error: 'config.json must be valid JSON' }, { status: 400 }, env, req); }
+      if (!submitted || typeof submitted !== 'object' || Array.isArray(submitted)) {
+        return json({ error: 'config.json must be an object' }, { status: 400 }, env, req);
+      }
+      for (const f of ACL_FIELDS) {
+        if (raceCfg[f] === undefined) delete submitted[f];
+        else submitted[f] = raceCfg[f];
+      }
+      content = JSON.stringify(submitted, null, 2) + '\n';
     }
   } else {
     return json({ error: 'Forbidden path' }, { status: 403 }, env, req);
@@ -1142,11 +1169,34 @@ function publicBaseUrl(env, req) {
   return (allowed[0] || '').replace(/\/+$/, '');
 }
 
-async function requireRaceAdmin(env, slug, sessionEmail) {
+// Anyone who can write the race. Enough to read the roster and see who else is
+// on it, which the whole team has a reason to do.
+async function requireRaceWriter(env, slug, sessionEmail) {
   const raceCfg = await loadRaceConfig(env, slug);
   if (!raceCfg) throw Object.assign(new Error('Race not found'), { status: 404 });
   if (!canEditRace(raceCfg, sessionEmail)) {
     throw Object.assign(new Error('Forbidden, no write access on this race'), { status: 403 });
+  }
+  return raceCfg;
+}
+
+// Handing out access, or taking it away, is a narrower thing than logging a
+// split. By default only the creator can do it. A creator who wants their crew
+// chief to be able to add people turns teamCanInvite on, and then everyone who
+// can write can also invite.
+function canManageAccess(raceCfg, email) {
+  if (roleForRace(raceCfg, email) === 'owner') return true;
+  return !!(raceCfg && raceCfg.teamCanInvite) && canEditRace(raceCfg, email);
+}
+
+async function requireAccessManager(env, slug, sessionEmail) {
+  const raceCfg = await loadRaceConfig(env, slug);
+  if (!raceCfg) throw Object.assign(new Error('Race not found'), { status: 404 });
+  if (!canManageAccess(raceCfg, sessionEmail)) {
+    throw Object.assign(new Error(
+      canEditRace(raceCfg, sessionEmail)
+        ? 'Forbidden, only the race creator can change who has access'
+        : 'Forbidden, no write access on this race'), { status: 403 });
   }
   return raceCfg;
 }
@@ -1158,7 +1208,7 @@ async function handleAccessList(req, env) {
   const slug = url.searchParams.get('slug');
   if (!slug) return json({ error: 'Missing slug' }, { status: 400 }, env, req);
   let raceCfg;
-  try { raceCfg = await requireRaceAdmin(env, slug, session.email); }
+  try { raceCfg = await requireRaceWriter(env, slug, session.email); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
 
   let shareLinks = [];
@@ -1205,6 +1255,8 @@ async function handleAccessList(req, env) {
   return json({
     slug,
     createdBy: raceCfg.createdBy || null,
+    teamCanInvite: !!raceCfg.teamCanInvite,
+    canManageAccess: canManageAccess(raceCfg, session.email),
     people: racePeople(raceCfg),
     // Derived, and still sent so a client that has not picked up the new
     // shape yet renders the roster instead of an empty panel.
@@ -1231,7 +1283,7 @@ async function handleAccessAdd(req, env) {
     return json({ error: `slug, email, role (${RACE_ROLES.join('|')}) required` }, { status: 400 }, env, req);
   }
   let raceCfg;
-  try { raceCfg = await requireRaceAdmin(env, slug, session.email); }
+  try { raceCfg = await requireAccessManager(env, slug, session.email); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
 
   const updated = await mutateRaceConfig(env, slug, (cfg) => {
@@ -1259,7 +1311,7 @@ async function handleAccessRemove(req, env) {
     return json({ error: 'slug and email required' }, { status: 400 }, env, req);
   }
   let raceCfg;
-  try { raceCfg = await requireRaceAdmin(env, slug, session.email); }
+  try { raceCfg = await requireAccessManager(env, slug, session.email); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
   if (normalizeEmail(raceCfg.createdBy) === email) {
     return json({ error: 'Cannot remove the creator' }, { status: 400 }, env, req);
@@ -1274,6 +1326,34 @@ async function handleAccessRemove(req, env) {
     editors: updated.editors || [],
     viewers: updated.viewers || []
   }, {}, env, req);
+}
+
+// Creator only, deliberately. The point of the switch is that the person who
+// owns the race decides whether the rest of the team can hand out access; a
+// team member who could flip it themselves would just be inviting by two steps
+// instead of one.
+async function handleTeamInvite(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  let body;
+  try { body = await req.json(); }
+  catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  const { slug } = body || {};
+  const allowed = !!(body && body.allowed);
+  if (!slug) return json({ error: 'slug required' }, { status: 400 }, env, req);
+
+  const raceCfg = await loadRaceConfig(env, slug);
+  if (!raceCfg) return json({ error: 'Race not found' }, { status: 404 }, env, req);
+  if (roleForRace(raceCfg, session.email) !== 'owner') {
+    return json({ error: 'Only the race creator can change this' }, { status: 403 }, env, req);
+  }
+
+  const updated = await mutateRaceConfig(env, slug, (cfg) => {
+    cfg.teamCanInvite = allowed;
+    return cfg;
+  }, `hub: ${allowed ? 'allow' : 'stop'} team invites on ${slug}`, session.email);
+
+  return json({ teamCanInvite: !!updated.teamCanInvite }, {}, env, req);
 }
 
 async function handleInvite(req, env) {
@@ -1292,7 +1372,7 @@ async function handleInvite(req, env) {
   if (!slug || !email || !RACE_ROLES.includes(wanted)) {
     return json({ error: `slug, email, role (${RACE_ROLES.join('|')}) required` }, { status: 400 }, env, req);
   }
-  try { await requireRaceAdmin(env, slug, session.email); }
+  try { await requireAccessManager(env, slug, session.email); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
 
   const token = randomToken(24);
@@ -1407,7 +1487,7 @@ async function handleShareLink(req, env) {
   if (role === 'edit') {
     return json({ error: 'Edit share links are not supported: invite an account instead' }, { status: 400 }, env, req);
   }
-  try { await requireRaceAdmin(env, slug, session.email); }
+  try { await requireAccessManager(env, slug, session.email); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
 
   const token = randomToken(18);
@@ -1449,7 +1529,7 @@ async function handleShareRevoke(req, env) {
     // Account invites aren't race-scoped: gate on the hub admin role.
     if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
   } else {
-    try { await requireRaceAdmin(env, rec.slug, session.email); }
+    try { await requireAccessManager(env, rec.slug, session.email); }
     catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
   }
   await env.AUTH_KV.delete(kvKey);
@@ -1700,6 +1780,7 @@ export default {
     if (request.method === 'POST' && path === '/access/add')      return handleAccessAdd(request, env);
     if (request.method === 'POST' && path === '/access/remove')   return handleAccessRemove(request, env);
     if (request.method === 'GET'  && path === '/access')          return handleAccessList(request, env);
+    if (request.method === 'POST' && path === '/access/team-invite') return handleTeamInvite(request, env);
     if (request.method === 'GET'  && path === '/my-races')        return handleMyRaces(request, env);
     if (request.method === 'GET'  && path === '/next-race-id')    return handleNextRaceId(request, env);
     if (request.method === 'POST' && path === '/race/delete')     return handleRaceDelete(request, env);

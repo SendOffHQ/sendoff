@@ -380,6 +380,12 @@
   }
   .access-list .row .role-pick:hover { border-color: var(--accent); }
   .access-list .row .role-pick:disabled { opacity: 0.5; cursor: default; }
+  .switch-row {
+    display: flex; align-items: center; gap: 10px; cursor: pointer;
+    font-size: 13px; color: var(--text); margin-bottom: 8px;
+  }
+  .switch-row input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+  .switch-row input:disabled { cursor: default; opacity: 0.5; }
   @media (max-width: 480px) {
     .access-list .row { grid-template-columns: 1fr auto; row-gap: 8px; }
     .access-list .row .who { grid-column: 1 / -1; }
@@ -574,7 +580,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="lib/race-core.js?v=36"></script>
+<script src="lib/race-core.js?v=37"></script>
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
@@ -1359,16 +1365,25 @@
     const people = Race.roles.people(s.people ? s : { editors: s.editors, viewers: s.viewers })
       .filter(p => p.email !== (s.createdBy || '').toLowerCase());
 
+    // The worker is the gate; this decides which controls are worth drawing.
+    // Someone who cannot change the roster still sees it, because knowing who
+    // else is on your race is not a privilege.
+    const mayInvite = s.canManageAccess !== undefined
+      ? !!s.canManageAccess
+      : Race.roles.canInvite({ ...cfg, teamCanInvite: s.teamCanInvite }, me);
+
     const personRow = (email, role, fixed) => `
       <div class="row">
         <span class="who">${escapeHtml(email)}${email.toLowerCase() === me ? ' <span style="color: var(--text-muted);">(you)</span>' : ''}</span>
         ${fixed
           ? `<span class="tag creator">Creator</span><span></span>`
-          : `<select class="role-pick" data-set-role="${escapeHtml(email)}" aria-label="Role for ${escapeHtml(email)}">
-               ${Race.roles.all.map(r =>
-                 `<option value="${r.key}"${r.key === role ? ' selected' : ''}>${escapeHtml(r.label)}</option>`).join('')}
-             </select>
-             <button data-revoke="${escapeHtml(email)}">Revoke</button>`}
+          : mayInvite
+            ? `<select class="role-pick" data-set-role="${escapeHtml(email)}" aria-label="Role for ${escapeHtml(email)}">
+                 ${Race.roles.all.map(r =>
+                   `<option value="${r.key}"${r.key === role ? ' selected' : ''}>${escapeHtml(r.label)}</option>`).join('')}
+               </select>
+               <button data-revoke="${escapeHtml(email)}">Revoke</button>`
+            : `<span class="tag">${escapeHtml(Race.roles.label(role))}</span><span></span>`}
       </div>`;
 
     const rosterHtml = (s.createdBy ? [personRow(s.createdBy, 'owner', true)] : [])
@@ -1437,6 +1452,7 @@
         </div>
       </div>
 
+      ${!mayInvite ? '' : `
       <div class="access-section">
         <div class="access-section-title">Invite someone</div>
         <div class="access-add">
@@ -1470,6 +1486,24 @@
           <div class="access-list">${pendingHtml}</div>
         </div>
       ` : ''}
+      `}
+
+      ${!isCreator() ? '' : `
+        <div class="access-section">
+          <div class="access-section-title">Who can invite</div>
+          <label class="switch-row">
+            <input type="checkbox" id="ax-team-invite" ${s.teamCanInvite ? 'checked' : ''} />
+            <span>Let the team invite people too</span>
+          </label>
+          <div class="access-help">
+            Off, and you are the only one who can add people, change a role, or
+            hand out a share link. On, and anyone who can log the race can do it
+            as well, which is worth it when a crew chief is assembling the team
+            for you. Either way, only you can delete the race.
+          </div>
+          <div id="ax-team-invite-result"></div>
+        </div>
+      `}
 
       ${isCreator() ? `
         <div class="access-section danger-zone">
@@ -1597,6 +1631,26 @@
         del.disabled = false; del.textContent = 'Delete race';
       }
     });
+
+    const teamToggle = body.querySelector('#ax-team-invite');
+    if (teamToggle) {
+      teamToggle.addEventListener('change', async () => {
+        const out = body.querySelector('#ax-team-invite-result');
+        const want = teamToggle.checked;
+        teamToggle.disabled = true;
+        try {
+          await Race.api.teamInvite(slug, want);
+          if (out) out.innerHTML = `<div class="access-invite-result">${want
+            ? 'The team can now invite people and hand out share links.'
+            : 'Only you can invite people now.'}</div>`;
+          await loadAccess();
+        } catch (err) {
+          teamToggle.checked = !want;
+          teamToggle.disabled = false;
+          if (out) out.innerHTML = `<div class="access-invite-result">Could not change that: ${escapeHtml(err.message)}</div>`;
+        }
+      });
+    }
 
     body.querySelectorAll('[data-revoke]').forEach(b => {
       b.addEventListener('click', async () => {
