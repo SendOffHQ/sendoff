@@ -338,5 +338,14 @@
       "decimals": 0,
       "step": 50
     }
+  ],
+  "fuelPresets": [
+    {
+      "name": "Flask of LMNT",
+      "values": {
+        "fluidOz": 17,
+        "sodiumMg": 1200
+      }
+    }
   ]
 }
