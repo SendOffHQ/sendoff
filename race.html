@@ -430,13 +430,6 @@
 <div id="error" class="error-banner" style="display:none;"></div>
 <div id="share-banner" class="share-banner" style="display:none;"></div>
 <div id="cutoffs" class="cutoffs" style="display:none;"></div>
-<section id="access" class="access" style="display:none;">
-  <div class="access-head">
-    <span class="access-head-title">Manage access</span>
-    <span class="access-head-toggle">Expand</span>
-  </div>
-  <div class="access-body" id="access-body"></div>
-</section>
 <section id="runners" class="runners"></section>
 
 <section id="course-map-section" style="display:none;">
@@ -917,7 +910,6 @@
 
       document.getElementById('error').style.display = 'none';
       renderShareBanner();
-      maybeShowAccessPanel();
       // The other three pages of this race, and the hub. The pit board only
       // appears for someone who can actually work it.
       Race.nav.setRace(slug, 'race', canEdit);
@@ -1223,9 +1215,9 @@
   }
 
   // ---------- access ----------
-  // The panel itself lives in Race.access, shared with the pit board. What
-  // stays here is the one question this page asks of it: may this person edit,
-  // which is what gates the Pit link in the menu.
+  // Managing a race happens on the settings page. What this page still needs
+  // to know is the one question that gates the Pit Board, Racer and Settings
+  // links in the menu: may this person edit.
   function isProxyMode() { return Race.hub.isProxyMode(); }
   function currentEmail() { return Race.auth.email(); }
   function canManage() {
@@ -1237,34 +1229,6 @@
   function canEdit() {
     return isProxyMode() ? canManage() : Race.config.has();
   }
-
-  let accessPanel = null;
-  function maybeShowAccessPanel() {
-    if (!accessPanel) {
-      accessPanel = Race.access.mount(document.getElementById('access'), {
-        slug,
-        cfg: () => cfg,
-        data: () => data,
-        // Units change how every number on this page reads, so the page
-        // redraws itself rather than reloading into GitHub's own lag.
-        onUnitsSaved: () => {
-          const rc = document.getElementById('runners');
-          if (rc && mergedRunners) rc.innerHTML = mergedRunners.map(renderRunner).join('');
-          tick();
-          if (courseGpxPts) {
-            const gd = Race.gpx.totalDistanceMi(courseGpxPts);
-            const ge = Race.gpx.totalElevation(courseGpxPts);
-            document.getElementById('course-map-meta').textContent =
-              `${Race.units.distance(gd, cfg)} · +${Math.round(Race.units.elevationVal(ge.gainFt, cfg)).toLocaleString()} / -${Math.round(Race.units.elevationVal(ge.lossFt, cfg)).toLocaleString()} ${Race.units.elevationLabel(cfg)}`;
-            try { renderElevationProfile(courseGpxPts, Race.course.aidStations(cfg)); updateTracking(); } catch (e) {}
-          }
-        }
-      });
-    } else {
-      accessPanel.refresh();
-    }
-  }
-
 
   function updateLastUpdated() {
     if (!data) return;
