@@ -1325,12 +1325,29 @@ async function handleAccessList(req, env) {
       } catch (e) {}
     }
   }
+  // Display names, so the roster and the runner picker can say "Jason Dupree"
+  // rather than an email address. Only for people already on this race, and
+  // only to someone who can write it, which is the same bar a caller already
+  // has to clear to read a teammate's profile at all.
+  const people = racePeople(raceCfg);
+  const named = [];
+  for (const p of people) {
+    const prof = await loadProfile(env, p.email);
+    named.push({ ...p, displayName: prof.displayName || '' });
+  }
+  let creatorName = '';
+  if (raceCfg.createdBy) {
+    const prof = await loadProfile(env, raceCfg.createdBy);
+    creatorName = prof.displayName || '';
+  }
+
   return json({
     slug,
     createdBy: raceCfg.createdBy || null,
+    createdByName: creatorName,
     teamCanInvite: !!raceCfg.teamCanInvite,
     canManageAccess: canManageAccess(raceCfg, session.email),
-    people: racePeople(raceCfg),
+    people: named,
     // Derived, and still sent so a client that has not picked up the new
     // shape yet renders the roster instead of an empty panel.
     editors: raceCfg.editors || [],
