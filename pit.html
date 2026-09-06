@@ -316,6 +316,25 @@
     box-shadow: 0 8px 32px rgba(0,0,0,0.5);
     z-index: 50;
   }
+  .crew-notes-input {
+    width: 100%; box-sizing: border-box; resize: vertical;
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    color: var(--text); border-radius: 4px; padding: 8px 10px;
+    font-family: inherit; font-size: 13px; line-height: 1.5;
+  }
+  .crew-notes-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px; padding: 12px 16px; margin-bottom: 18px;
+  }
+  .crew-notes-card-head {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 6px;
+  }
+  /* Written as prose, so the line breaks the runner typed are the ones shown. */
+  .crew-notes-card-body { white-space: pre-wrap; font-size: 14px; line-height: 1.55; }
+
   .toast.error { color: var(--red); border-color: var(--red); }
   .toast.ok { color: var(--green); border-color: rgba(110,231,168,0.4); }
 </style>
@@ -364,6 +383,13 @@
 </section>
 
 <div id="error" class="error-banner" style="display:none;"></div>
+
+<!-- What the runner wanted the crew to know. Above the board rather than inside
+     the editor, because it is read at an aid station and not while setting up. -->
+<section class="crew-notes-card" id="crew-notes-card" hidden>
+  <div class="crew-notes-card-head">Notes for the crew</div>
+  <div class="crew-notes-card-body" id="crew-notes-text"></div>
+</section>
 
 <section id="runners" class="runners"></section>
 
@@ -421,6 +447,15 @@
         <button class="btn" type="button" id="fuel-profile-load">Load their goals</button>
         <span class="fuel-hint" id="fuel-profile-note"></span>
       </div>
+
+      <div class="fuel-editor-title" style="margin-top:18px;">Notes for the crew</div>
+      <p class="fuel-hint">
+        What the runner wants the crew to know without being asked. Allergies,
+        what settles late, what to do when they go quiet. Loading their goals
+        brings these across from their profile; edit them here for this race.
+      </p>
+      <textarea id="crew-notes" class="crew-notes-input" rows="4"
+        placeholder="Nothing yet."></textarea>
 
       <div class="fuel-editor-title" style="margin-top:18px;">Hour bands</div>
       <p class="fuel-hint">
@@ -490,6 +525,7 @@
   let editingPresets = null;
   // Hour bands pulled from a profile, waiting on the next Save changes.
   let editingBands = null;
+  let editingNotes = null;
   // Reading a file back straight after writing it is the one thing that does
   // not work: neither Pages nor GitHub's contents API is read-after-write
   // consistent, so the poll that follows a save can hand back the version from
@@ -953,6 +989,11 @@
       return { ...r, ...dr };
     });
     document.getElementById('runners').innerHTML = merged.map(renderRunner).join('');
+
+    const notesCard = document.getElementById('crew-notes-card');
+    const notes = (cfg.crewNotes || '').trim();
+    notesCard.hidden = !notes;
+    document.getElementById('crew-notes-text').textContent = notes;
     document.getElementById('aid-editor').style.display = cfg.courseType === 'segments' ? '' : 'none';
     if (cfg.courseType === 'segments' && !editingAid) {
       // Initialize the editor with current aid stations
@@ -977,6 +1018,8 @@
         fromHour: b.fromHour, label: b.label || '', targets: { ...b.targets }
       }));
       editingPresets = Race.fuel.presets(cfg).map(pre => ({ name: pre.name, values: { ...pre.values } }));
+      editingNotes = cfg.crewNotes || '';
+      document.getElementById('crew-notes').value = editingNotes;
       renderFuelRows();
       renderBandRows();
       renderPresetRows();
@@ -1131,14 +1174,30 @@
           fromHour: b.fromHour, label: b.label || '', targets: { ...(b.targets || {}) }
         }));
       }
+      // The notes are the part a crew reads rather than computes, so they come
+      // across whole. An existing note is not overwritten silently: the crew may
+      // have written something for this race that the profile does not know about.
+      const theirNotes = (profile.notes || '').trim();
+      let notesTook = false;
+      if (theirNotes) {
+        const here = (editingNotes || '').trim();
+        if (!here || here === theirNotes) { editingNotes = theirNotes; notesTook = true; }
+        else if (!here.includes(theirNotes)) { editingNotes = here + '\n\n' + theirNotes; notesTook = true; }
+      }
+      document.getElementById('crew-notes').value = editingNotes || '';
+
       renderFuelRows();
       renderBandRows();
       const bandNote = theirs.length
         ? ` Plus ${theirs.length} hour band${theirs.length > 1 ? 's' : ''}, which you can retime below.` : '';
+      const notesNote = notesTook ? ' Their crew notes are below.' : '';
       note.textContent = filled
-        ? `Filled ${filled} goal${filled > 1 ? 's' : ''} from ${who}.${bandNote} Press Save changes to keep them.`
-        : (theirs.length
-            ? `No matching goals, but took ${theirs.length} hour band${theirs.length > 1 ? 's' : ''} from ${who}.`
+        ? `Filled ${filled} goal${filled > 1 ? 's' : ''} from ${who}.${bandNote}${notesNote} Press Save changes to keep them.`
+        : (theirs.length || notesTook
+            ? `No matching goals, but took ${
+                [theirs.length ? `${theirs.length} hour band${theirs.length > 1 ? 's' : ''}` : '',
+                 notesTook ? 'their crew notes' : ''].filter(Boolean).join(' and ')
+              } from ${who}.`
             : `${who} has no saved goals for the metrics this race tracks.`);
     } catch (err) {
       note.textContent = `Could not load that profile: ${err.message}`;
@@ -1229,6 +1288,8 @@
         remote.fuelMetrics = fuelRows.metrics;
         remote.fuelPresets = presets;
         remote.phaseTargets = bands;
+        const notes = (editingNotes || '').trim().slice(0, 2000);
+        if (notes) remote.crewNotes = notes; else delete remote.crewNotes;
         // Merged, not replaced: a goal belonging to a metric this race no longer
         // tracks stays put, so turning that metric back on brings its goal with it.
         remote.targets = { ...(remote.targets || {}), ...fuelRows.targets };
@@ -1257,6 +1318,7 @@
       editingFuel = null;
       editingBands = null;
       editingPresets = null;
+      editingNotes = null;
       adoptConfig(writtenCfg);
       await load();
     } catch (err) {
@@ -1585,7 +1647,11 @@
   });
 
   document.getElementById('runner-reload').addEventListener('click', () => {
-    editingRunners = null; editingFuel = null; editingBands = null; editingPresets = null; render();
+    editingRunners = null; editingFuel = null; editingBands = null; editingPresets = null;
+    editingNotes = null; render();
+  });
+  document.getElementById('crew-notes').addEventListener('input', (e) => {
+    editingNotes = e.target.value;
   });
   document.getElementById('runner-save').addEventListener('click', saveRunnerEditor);
 
