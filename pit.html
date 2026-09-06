@@ -338,19 +338,6 @@
     color: var(--text); border-radius: 4px; padding: 8px 10px;
     font-family: inherit; font-size: 13px; line-height: 1.5;
   }
-  .crew-notes-card {
-    background: var(--bg-elevated); border-top: 1px solid var(--border);
-    border-left: 3px solid var(--accent);
-    padding: 10px 16px 12px;
-  }
-  .crew-notes-card-head {
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
-    letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--text-dim); margin-bottom: 6px;
-  }
-  /* Written as prose, so the line breaks the runner typed are the ones shown. */
-  .crew-notes-card-body { white-space: pre-wrap; font-size: 14px; line-height: 1.55; }
-
   .toast.error { color: var(--red); border-color: var(--red); }
   .toast.ok { color: var(--green); border-color: rgba(110,231,168,0.4); }
 </style>
@@ -916,11 +903,6 @@
                      : next.state === 'in-pit'    ? 'In pit for'
                      : next.state === 'finished'  ? 'Total since start' : 'Awaiting start';
 
-    // What this runner wanted their crew to know. On the card rather than at the
-    // top of the page, because it is read at an aid station, next to the button
-    // the crew is about to press, and because it is theirs and not the race's.
-    const crewNotes = Race.fuel.notesFor(cfg, runner);
-
     // Intake panel: list completed legs (with startTime+endTime) for editing.
     const completedLegs = (runner.legs || []).filter(l => l.startTime && l.endTime).sort((a, b) => b.index - a.index);
     const stickyIdx = stickyIntakeLegByRunner[runner.id];
@@ -996,10 +978,6 @@
           <div class="state-badge state-${stateClass}">${stateLabel}</div>
         </div>
         <div class="where">${whereLine(runner, next)}</div>
-        ${crewNotes ? `<div class="crew-notes-card">
-          <div class="crew-notes-card-head">Notes for the crew</div>
-          <div class="crew-notes-card-body">${escapeHtml(crewNotes)}</div>
-        </div>` : ''}
         <div class="state-timer" data-since="${since}">
           <span class="label">${timerLabel}</span>
           <span class="value runner-timer">–</span>
