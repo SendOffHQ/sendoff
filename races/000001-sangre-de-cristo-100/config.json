@@ -242,7 +242,13 @@
         "dropBag": true,
         "checkpoint": false
       }
-    ]
+    ],
+    "startAid": {
+      "crewAccess": true,
+      "crewNote": null,
+      "pacerEligible": false,
+      "dropBag": true
+    }
   },
   "runners": [
     {
