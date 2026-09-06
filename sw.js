@@ -28,7 +28,7 @@ const OURS = [SHELL, DATA];
 // with every cache-bust, and the day it is forgotten the worker serves last
 // week's JavaScript.
 const SHELL_URLS = [
-  '/', '/index.html', '/race.html', '/pit.html', '/settings.html', '/setup.html',
+  '/', '/index.html', '/race.html', '/pit.html', '/racer.html', '/settings.html', '/setup.html',
   '/charts.html', '/print-report.html', '/signup.html', '/reset.html', '/admin.html',
   '/manifest.webmanifest',
   '/brand/sendoffprimaryonDark.svg',
