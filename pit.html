@@ -471,7 +471,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=50"></script>
+<script src="lib/race-core.js?v=51"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -490,9 +490,6 @@
   let editingPresets = null;
   // Hour bands pulled from a profile, waiting on the next Save changes.
   let editingBands = null;
-  // Set once this session writes config.json, so later reads stop going to a
-  // Pages copy that has not caught up yet.
-  let configEdited = false;
   // Reading a file back straight after writing it is the one thing that does
   // not work: neither Pages nor GitHub's contents API is read-after-write
   // consistent, so the poll that follows a save can hand back the version from
@@ -505,7 +502,6 @@
   function adoptConfig(written) {
     if (!written) return;
     cfg = written;
-    configEdited = true;
     configWrittenUntil = Date.now() + CONFIG_SETTLE_MS;
     render();
   }
@@ -1382,15 +1378,15 @@
       // data.json reads through the worker when signed in (GitHub API, no
       // Pages rebuild lag) so a pit press shows on other devices within a poll.
       //
-      // config.json normally comes off Pages, which is a CDN in front of a site
-      // that rebuilds after each commit: a minute or so behind a write. That is
-      // fine while nobody is editing and wrong the moment somebody is, because
-      // this is the page the aid stations, roster and fuelling are edited from,
-      // and saving then re-reading a stale copy makes an edit look like it did
-      // not take. Once this session has written config, it reads config through
-      // the worker too.
+      // config.json off Pages is a CDN in front of a site that rebuilds after
+      // each commit, so it runs a minute or so behind a write. Anyone signed in
+      // is a potential editor of this page, and reloading is the first thing
+      // someone does when unsure whether a save took, so a signed-in reader
+      // gets config through the worker from the very first load rather than
+      // only after this tab has written something. A reader with no account
+      // cannot edit anything and is happy with the CDN copy.
       const [c, d] = await Promise.all([
-        Race.gh.readRaceJson(slug, 'config.json', configEdited),
+        Race.gh.readRaceJson(slug, 'config.json', Race.auth.has()),
         Race.gh.readRaceJson(slug, 'data.json', true)
       ]);
       // Within the settle window the copy we wrote wins, because a read that
