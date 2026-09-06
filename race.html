@@ -585,7 +585,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="lib/race-core.js?v=39"></script>
+<script src="lib/race-core.js?v=40"></script>
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
@@ -667,6 +667,22 @@
     }).join('');
   }
 
+  // What waits at the end of a leg: a timing point with no aid, a stop the crew
+  // cannot drive to, the lot they park in. A crew needs this while planning the
+  // day, not only in the log after the leg is already run.
+  function stationTags(st) {
+    if (!st) return '';
+    const tags = [];
+    if (st.checkpoint) tags.push(['cp', 'Checkpoint']);
+    else if (!st.crewAccess) tags.push(['nocrew', 'No crew']);
+    if (st.dropBag) tags.push(['bag', 'Drop bag']);
+    if (st.pacerEligible) tags.push(['pacer', 'Pacer']);
+    if (st.crewNote) tags.push(['note', st.crewNote]);
+    return tags.length
+      ? ' ' + tags.map(([c, t]) => `<span class="st-tag ${c}">${escapeHtml(t)}</span>`).join('')
+      : '';
+  }
+
   function segmentRows(runner, c) {
     const segs = Race.course.legs(cfg);
     return segs.map((s, i) => {
@@ -703,7 +719,7 @@
         <div class="seg-row ${cls}">
           <span class="num">${s.index}</span>
           <span class="nm">
-            ${escapeHtml(s.name)}
+            ${escapeHtml(s.name)}${stationTags(Race.stationAt(cfg, s.index))}
             <div class="meta">${Race.units.distance(s.distanceMi, cfg)} · ${Race.units.distance(s.cumulativeMi, cfg)} total${s.elevationGainFt != null ? ` · +${Math.round(Race.units.elevationVal(s.elevationGainFt, cfg))}/-${Math.round(Race.units.elevationVal(Math.abs(s.elevationLossFt || 0), cfg))} ${Race.units.elevationLabel(cfg)}` : ''}</div>
           </span>
           ${durCell}
@@ -747,17 +763,7 @@
       // lap-only loop just shows the index.
       const showName = segDef && segDef.name && !isSimpleLoop();
       const st = Race.stationAt(cfg, l.index);
-      const tags = [];
-      if (st) {
-        if (st.checkpoint) tags.push(['cp', 'Checkpoint']);
-        else if (!st.crewAccess) tags.push(['nocrew', 'No crew']);
-        if (st.dropBag) tags.push(['bag', 'Drop bag']);
-        if (st.pacerEligible) tags.push(['pacer', 'Pacer']);
-        if (st.crewNote) tags.push(['note', st.crewNote]);
-      }
-      const tagHtml = tags.length
-        ? ' ' + tags.map(([c, t]) => `<span class="st-tag ${c}">${escapeHtml(t)}</span>`).join('')
-        : '';
+      const tagHtml = stationTags(st);
       const legLabel = showName
         ? `${l.index} <span class="leg-seg">${escapeHtml(segDef.name)}${tagHtml}</span>`
         : `${l.index}${tagHtml}`;
