@@ -53,7 +53,7 @@
   .crew-notes-card {
     background: var(--bg-elevated); border: 1px solid var(--border);
     border-left: 3px solid var(--accent);
-    border-radius: 4px; padding: 14px 24px; margin-bottom: 24px;
+    border-radius: 4px; padding: 14px 24px; margin: 16px 0 4px;
   }
   .crew-notes-label {
     display: block; font-family: 'JetBrains Mono', monospace; font-size: 11px;
@@ -298,10 +298,6 @@
 
 <div id="error" class="error-banner" style="display:none;"></div>
 <div id="cutoffs" class="cutoffs" style="display:none;"></div>
-<div id="crew-notes-card" class="crew-notes-card" hidden>
-  <span class="crew-notes-label">Notes for the crew</span>
-  <div class="crew-notes-body" id="crew-notes-text"></div>
-</div>
 <div id="runners"></div>
 <div id="course-block" class="course-block" style="display:none;">
   <h2>Course</h2>
@@ -315,7 +311,7 @@
   <div>Auto-generated · race-dashboard hub</div>
 </footer>
 
-<script src="lib/race-core.js?v=51"></script>
+<script src="lib/race-core.js?v=52"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -353,6 +349,9 @@
     // Five fixed columns (#, Out, In, Leg, Aid) plus one per tracked metric.
     const metrics = Race.fuel.metrics(cfg);
     const cols = 5 + metrics.length;
+    // On paper this is the part nobody can look up later, and it belongs to
+    // this runner rather than to the race, so it prints inside their block.
+    const crewNotes = Race.fuel.notesFor(cfg, runner);
     const legRows = (runner.legs || []).slice().sort((a, b) => a.index - b.index).map((l, i, arr) => {
       const def = Race.course.legAt(cfg, l.index);
       const dur = (l.startTime && l.endTime)
@@ -420,6 +419,10 @@
           </thead>
           <tbody>${legRows || `<tr><td colspan="${cols}" style="text-align:center; padding:24px; color: var(--text-muted); font-style: italic;">No legs yet</td></tr>`}</tbody>
         </table>
+        ${crewNotes ? `<div class="crew-notes-card">
+          <span class="crew-notes-label">Notes for the crew</span>
+          <div class="crew-notes-body">${escapeHtml(crewNotes)}</div>
+        </div>` : ''}
       </article>`;
   }
 
@@ -486,11 +489,6 @@
       document.title = `${cfg.name} · Report · SendOff`;
       document.getElementById('race-title').innerHTML = cfg.name.replace(/(\w+)$/, '<em>$1</em>');
       renderCutoffs();
-
-      // On paper this is the part nobody can look up later, so it prints.
-      const crewNotes = (cfg.crewNotes || '').trim();
-      document.getElementById('crew-notes-card').hidden = !crewNotes;
-      document.getElementById('crew-notes-text').textContent = crewNotes;
 
       const runners = (cfg.runners || []).map(r => {
         const dr = (data.runners || []).find(d => d.id === r.id) || { id: r.id, legs: [] };
