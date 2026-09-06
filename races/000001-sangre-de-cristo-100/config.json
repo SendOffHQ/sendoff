@@ -244,75 +244,10 @@
   ],
   "targets": {
     "caloriesPerHour": 275,
-    "fluidOzPerHour": 20,
-    "sodiumMgPerHour": 800
+    "fluidOzPerHour": 32,
+    "sodiumMgPerHour": 1000
   },
-  "phaseTargets": [
-    {
-      "fromHour": 0,
-      "label": "Night · cold",
-      "targets": {
-        "fluidOzPerHour": 14,
-        "sodiumMgPerHour": 500
-      }
-    },
-    {
-      "fromHour": 3,
-      "label": "Dawn · cool",
-      "targets": {
-        "fluidOzPerHour": 18,
-        "sodiumMgPerHour": 900
-      }
-    },
-    {
-      "fromHour": 4,
-      "label": "Day · warm",
-      "targets": {
-        "fluidOzPerHour": 22,
-        "sodiumMgPerHour": 1200
-      }
-    },
-    {
-      "fromHour": 11,
-      "label": "Evening · cool",
-      "targets": {
-        "fluidOzPerHour": 18,
-        "sodiumMgPerHour": 900
-      }
-    },
-    {
-      "fromHour": 14,
-      "label": "Night · cold",
-      "targets": {
-        "fluidOzPerHour": 14,
-        "sodiumMgPerHour": 500
-      }
-    },
-    {
-      "fromHour": 27,
-      "label": "Dawn · cool",
-      "targets": {
-        "fluidOzPerHour": 18,
-        "sodiumMgPerHour": 900
-      }
-    },
-    {
-      "fromHour": 28,
-      "label": "Day · warm",
-      "targets": {
-        "fluidOzPerHour": 22,
-        "sodiumMgPerHour": 1200
-      }
-    },
-    {
-      "fromHour": 35,
-      "label": "Evening · cool",
-      "targets": {
-        "fluidOzPerHour": 18,
-        "sodiumMgPerHour": 900
-      }
-    }
-  ],
+  "phaseTargets": [],
   "fuelMetrics": [
     {
       "key": "calories",
@@ -344,7 +279,7 @@
       "name": "Flask of LMNT",
       "values": {
         "fluidOz": 17,
-        "sodiumMg": 1000
+        "sodiumMg": 1200
       }
     }
   ]
