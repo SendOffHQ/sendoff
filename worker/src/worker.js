@@ -417,6 +417,40 @@ async function loadRaceConfig(env, slug) {
   return r.missing ? null : r.data;
 }
 
+// GitHub's Contents API is not read-after-write consistent, and the wizard
+// makes that worse than a coin flip. Reserving a race number GETs
+// races/<slug>/config.json to check the folder is free, which caches a 404 for
+// that exact URL; the wizard then writes the file and, a moment later, writes
+// data.json. Authorising that second write re-reads the same URL and is served
+// the cached miss, so a race the same session just created comes back "Race
+// not found". Public or private makes no difference: the write order is the
+// same either way.
+//
+// So a creation leaves a note behind. This is not a permission of its own. It
+// records only "this session created this slug just now", which is exactly
+// what the config read would have said had it been current, and it is reachable
+// only by having already made the config.json write that the code above
+// permits. Without AUTH_KV it does nothing and the old 404 stands.
+const CREATION_GRANT_TTL = 900;   // 15 minutes, far longer than any wizard run
+
+async function noteRaceCreated(env, slug, email) {
+  if (!env.AUTH_KV || !slug || !email) return;
+  try {
+    await env.AUTH_KV.put('created:' + slug,
+      JSON.stringify({ email: normalizeEmail(email), at: Date.now() }),
+      { expirationTtl: CREATION_GRANT_TTL });
+  } catch (e) { /* the grant is an optimisation; losing it only costs a retry */ }
+}
+
+async function createdBySession(env, slug, email) {
+  if (!env.AUTH_KV || !slug || !email) return false;
+  try {
+    const raw = await env.AUTH_KV.get('created:' + slug);
+    if (!raw) return false;
+    return normalizeEmail(JSON.parse(raw).email) === normalizeEmail(email);
+  } catch (e) { return false; }
+}
+
 // Access is a role per person. Crew, Racer and Pacer all work the board during
 // a race, so all three can write; Viewer is the read-only seat. The distinction
 // between the three writing roles is not about permission, it is about who a
@@ -834,6 +868,10 @@ async function handleCommit(req, env) {
   const ACL_FIELDS = ['createdBy', 'people', 'editors', 'viewers', 'teamCanInvite', 'visibility'];
 
   let content = content0;
+  // Set when this write is the config.json that brings a race into existence,
+  // so the grant above can be recorded once GitHub has accepted it.
+  let isCreation = false;
+  let creationSlug = null;
 
   // Path allowlist + ACL check.
   if (path === 'races/index.json') {
@@ -842,14 +880,20 @@ async function handleCommit(req, env) {
     // there; setup.html omits them from the entry it appends.
   } else if (isRacePath(path)) {
     const slug = racePathSlug(path);
+    creationSlug = slug;
     const raceCfg = await loadRaceConfig(env, slug);
     if (!raceCfg) {
       // Brand-new race: only allow writes to files under this slug if the body
       // looks like a self-creation. The wizard writes config.json first, then
       // data.json/course.gpx. For non-config writes against a missing race we
-      // reject to prevent slug-squatting.
+      // reject to prevent slug-squatting, unless this same session created the
+      // race moments ago and GitHub has not caught up yet.
       if (!path.endsWith('/config.json')) {
-        return json({ error: 'Race not found' }, { status: 404 }, env, req);
+        if (!(await createdBySession(env, slug, session.email))) {
+          return json({ error: 'Race not found' }, { status: 404 }, env, req);
+        }
+      } else {
+        isCreation = true;
       }
       // For the initial config.json write, trust the body, the wizard sets
       // createdBy to the session email. If a malicious client lies about
@@ -893,6 +937,9 @@ async function handleCommit(req, env) {
     body: JSON.stringify(ghBody)
   });
   const text = await res.text();
+  // Only once GitHub has actually taken the file: a grant for a write that
+  // failed would authorise data.json against a race that does not exist.
+  if (res.ok && isCreation) await noteRaceCreated(env, creationSlug, session.email);
   return new Response(text, {
     status: res.status,
     headers: { 'Content-Type': 'application/json', ...corsHeaders(env, req) }
