@@ -22,7 +22,7 @@ optional Cloudflare Worker auth proxy.
 - Cumulative progress with a pace-based projected-finish ray and cutoff line
 
 ## Sharing
-- Finish card (`lib/finish-card.js`): a 1080x1350 image drawn on the finisher's own device at the end of a race, with the course elevation profile, the splits marked on it, finish time, margin inside the cutoff, and the day's numbers. Save, or share straight to another app where the browser supports it. Nothing is uploaded and it works with no signal.
+- Finish card (`lib/finish-card.js`): a 1080x1350 image drawn on the finisher's own device at the end of a race, with the course elevation profile, the splits marked on it, finish time, margin inside the cutoff, and the day's numbers. Ten switches choose what is on it (location, cutoff margin, course profile, each stat, date); the layout reflows and the card crops to what it holds, and the choices are remembered on that device. Save, or share straight to another app where the browser supports it. Nothing is uploaded and it works with no signal.
 
 ## Reporting
 - Printable race report (`print-report.html`): cutoffs, per-runner leg tables, course elevation, and all charts, print-styled
