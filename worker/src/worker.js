@@ -544,8 +544,17 @@ async function mutateJsonAt(env, path, mutate, message, actor, onMissing) {
   throw new Error(`Too many sha conflicts updating ${path}`);
 }
 
+// Applies a change to a race's access list. It used to be a commit to
+// config.json, which is how the roster came to be published in the first
+// place; it is a KV write now. The mutate function still receives and returns
+// a config-shaped object, so the callers below read the same as they always
+// did.
 async function mutateRaceConfig(env, slug, mutate, message, actor) {
-  return mutateJsonAt(env, `races/${slug}/config.json`, mutate, message, actor, 'throw');
+  const cfg = await loadRaceConfig(env, slug);
+  if (!cfg) throw new Error(`Race not found: ${slug}`);
+  const next = mutate(Object.assign({}, cfg)) || cfg;
+  await writeAcl(env, slug, aclFromConfig(next));
+  return next;
 }
 
 // ---------- path / ACL helpers ----------
@@ -557,9 +566,108 @@ function racePathSlug(path) {
   return m ? m[1] : null;
 }
 
+// ---------- the access list ----------
+// Who owns a race and who is on it, kept in KV rather than in the race config.
+//
+// The config is a file in a public repository, published by Pages, so anything
+// in it is readable by anyone who asks for the URL. A roster is a list of
+// people's email addresses. It was being published for every race, private or
+// not, which is a thing nobody agreed to.
+//
+// KV rather than D1 on purpose. KV is already load-bearing here, so this adds
+// no new way for the app to fail; D1 would, and a fortnight before a race is
+// the wrong time to put access control on a dependency that has never carried
+// anything. It moves to D1 with the rest of the data afterwards.
+//
+// Races written before this keep their roster in the config, so a missing KV
+// entry falls back to the file and is copied across the first time it is read.
+const ACL_KEY = slug => 'acl:' + slug;
+
+// Which runner record belongs to which account. Set on the settings page so
+// racer mode knows whose splits it is looking at, and published in the config
+// until now for exactly the reason the roster was: nobody thought about the
+// file being world readable.
+function runnerLinksFromConfig(cfg) {
+  const out = {};
+  for (const r of ((cfg && cfg.runners) || [])) {
+    const email = normalizeEmail(r && r.email);
+    if (r && r.id && email) out[r.id] = email;
+  }
+  return out;
+}
+
+function aclFromConfig(cfg) {
+  return {
+    createdBy: normalizeEmail(cfg && cfg.createdBy) || null,
+    people: racePeople(cfg),
+    teamCanInvite: !!(cfg && cfg.teamCanInvite),
+    runnerEmails: runnerLinksFromConfig(cfg)
+  };
+}
+
+async function readAcl(env, slug) {
+  if (!env.AUTH_KV) return null;
+  try {
+    const raw = await env.AUTH_KV.get(ACL_KEY(slug));
+    if (!raw) return null;
+    const a = JSON.parse(raw);
+    return {
+      createdBy: normalizeEmail(a.createdBy) || null,
+      people: Array.isArray(a.people)
+        ? a.people.filter(p => p && p.email).map(p => ({
+            email: normalizeEmail(p.email),
+            role: RACE_ROLES.includes(p.role) ? p.role : 'viewer'
+          }))
+        : [],
+      teamCanInvite: !!a.teamCanInvite,
+      runnerEmails: (a.runnerEmails && typeof a.runnerEmails === 'object') ? a.runnerEmails : {}
+    };
+  } catch (e) { return null; }
+}
+
+async function writeAcl(env, slug, acl) {
+  if (!env.AUTH_KV) throw new Error('Access control requires AUTH_KV');
+  await env.AUTH_KV.put(ACL_KEY(slug), JSON.stringify({
+    createdBy: normalizeEmail(acl.createdBy) || null,
+    people: (acl.people || []).map(p => ({ email: normalizeEmail(p.email), role: p.role })),
+    teamCanInvite: !!acl.teamCanInvite,
+    runnerEmails: acl.runnerEmails || {},
+    updatedAt: new Date().toISOString()
+  }));
+}
+
+// Put the access list back onto the config, so every caller below reads the
+// same shape it always did whether the roster is in KV or still in the file.
+function withAcl(cfg, acl) {
+  if (!cfg || !acl) return cfg;
+  const out = Object.assign({}, cfg);
+  out.createdBy = acl.createdBy;
+  out.teamCanInvite = acl.teamCanInvite;
+  setRacePeople(out, acl.people);
+  const links = acl.runnerEmails || {};
+  out.runners = (cfg.runners || []).map(r => (
+    r && r.id && links[r.id] ? Object.assign({}, r, { email: links[r.id] }) : r));
+  return out;
+}
+
+// The config as the rest of the worker wants it: the file, plus the access
+// list, from KV when it is there and from the file itself when it is not. A
+// race read for the first time since this shipped has its roster copied into
+// KV, so the migration happens by being used.
+async function attachAcl(env, slug, cfg) {
+  if (!cfg) return cfg;
+  const stored = await readAcl(env, slug);
+  if (stored) return withAcl(cfg, stored);
+  const fromFile = aclFromConfig(cfg);
+  if (env.AUTH_KV && (fromFile.createdBy || fromFile.people.length)) {
+    try { await writeAcl(env, slug, fromFile); } catch (e) { /* read still works */ }
+  }
+  return withAcl(cfg, fromFile);
+}
+
 async function loadRaceConfig(env, slug) {
   const r = await githubGetJson(env, `races/${slug}/config.json`);
-  return r.missing ? null : r.data;
+  return r.missing ? null : attachAcl(env, slug, r.data);
 }
 
 // The same, off the shared read cache. Reads only. handleCommit deliberately
@@ -572,7 +680,7 @@ async function loadRaceConfigShared(env, slug) {
   if (!res.ok) return null;
   try {
     const j = await res.clone().json();
-    return JSON.parse(base64ToUtf8(j.content));
+    return attachAcl(env, slug, JSON.parse(base64ToUtf8(j.content)));
   } catch (e) { return null; }
 }
 
@@ -1081,6 +1189,10 @@ async function handleCommit(req, env) {
   // so the grant above can be recorded once GitHub has accepted it.
   let isCreation = false;
   let creationSlug = null;
+  // The access list lifted off a creating write, stored once GitHub accepts it.
+  let creationAcl = null;
+  // An access list lifted off an ordinary config write, stored once it lands.
+  let aclUpdate = null;
 
   // Path allowlist + ACL check.
   if (path === 'races/index.json') {
@@ -1114,10 +1226,21 @@ async function handleCommit(req, env) {
       let created;
       try { created = JSON.parse(content); } catch (e) { created = null; }
       if (created && typeof created === 'object' && !Array.isArray(created)) {
-        if (INJECTED_FIELDS.some(f => created[f] !== undefined)) {
-          for (const f of INJECTED_FIELDS) delete created[f];
-          content = JSON.stringify(created, null, 2) + '\n';
-        }
+        // The wizard sends createdBy and an empty roster. Both are the access
+        // list, so they go to KV and never into the commit.
+        creationAcl = {
+          createdBy: normalizeEmail(created.createdBy) || normalizeEmail(session.email),
+          people: racePeople(created),
+          teamCanInvite: !!created.teamCanInvite,
+          runnerEmails: runnerLinksFromConfig(created)
+        };
+        for (const f of ACL_FIELDS) if (f !== 'visibility') delete created[f];
+        for (const f of INJECTED_FIELDS) delete created[f];
+        created.runners = (created.runners || []).map(r => {
+          if (!r || r.email === undefined) return r;
+          const copy = Object.assign({}, r); delete copy.email; return copy;
+        });
+        content = JSON.stringify(created, null, 2) + '\n';
         const ent = entitlementsFor(await lookupUser(env, session.email));
         if (created.visibility === 'private' && !ent.privateRaces) {
           return json({
@@ -1150,11 +1273,23 @@ async function handleCommit(req, env) {
           code: 'plan_limit', limit: 'maxRunnersPerRace', plan: ent.plan
         }, { status: 402 }, env, req);
       }
-      for (const f of ACL_FIELDS) {
-        if (raceCfg[f] === undefined) delete submitted[f];
-        else submitted[f] = raceCfg[f];
-      }
+      // visibility stays in the file: it is not about a person, and a reader
+      // arriving from Pages needs it. Everything else here names people, and
+      // people do not belong in a file the whole internet can read. The access
+      // list lives in KV now, so these are dropped rather than carried over.
+      submitted.visibility = raceCfg.visibility === undefined
+        ? submitted.visibility : raceCfg.visibility;
+      for (const f of ACL_FIELDS) if (f !== 'visibility') delete submitted[f];
       for (const f of INJECTED_FIELDS) delete submitted[f];
+      // The runner-to-account link is an address too. It is kept, in KV, and
+      // taken out of the file. A writer can still change it: that is what the
+      // settings page does when somebody picks who a runner is.
+      const links = runnerLinksFromConfig(submitted);
+      submitted.runners = (submitted.runners || []).map(r => {
+        if (!r || r.email === undefined) return r;
+        const copy = Object.assign({}, r); delete copy.email; return copy;
+      });
+      aclUpdate = Object.assign(aclFromConfig(raceCfg), { runnerEmails: links });
       content = JSON.stringify(submitted, null, 2) + '\n';
     }
   } else {
@@ -1183,6 +1318,14 @@ async function handleCommit(req, env) {
   // Only once GitHub has actually taken the file: a grant for a write that
   // failed would authorise data.json against a race that does not exist.
   if (res.ok && isCreation) await noteRaceCreated(env, creationSlug, session.email);
+  // Only after the file lands: an access list for a race that failed to be
+  // created would outlive nothing and confuse the next attempt at the slug.
+  if (res.ok && isCreation && creationAcl) {
+    try { await writeAcl(env, creationSlug, creationAcl); } catch (e) { /* falls back to the file */ }
+  }
+  if (res.ok && aclUpdate && creationSlug) {
+    try { await writeAcl(env, creationSlug, aclUpdate); } catch (e) { /* falls back to the file */ }
+  }
   // The cached copy is now wrong. Dropping it means a press is visible on the
   // next poll rather than up to CACHE_TTL_S later, at least in this colo.
   if (res.ok) await purgeReadCache(env, path);
@@ -1201,6 +1344,10 @@ async function handleGet(req, env) {
   let sessionEmail = null;
   const session = await requireAuth(req, env);
   if (session && session.email) sessionEmail = session.email;
+  // The config with its access list attached, kept from the check below so the
+  // caller's role is worked out against the roster rather than against the
+  // file, which no longer carries one.
+  let aclCfg = null;
 
   // ACL check
   if (path === 'races/index.json') {
@@ -1211,7 +1358,8 @@ async function handleGet(req, env) {
     }
   } else if (isRacePath(path)) {
     const slug = racePathSlug(path);
-    const raceCfg = await loadRaceConfigShared(env, slug);
+    aclCfg = await loadRaceConfigShared(env, slug);
+    const raceCfg = aclCfg;
     if (!raceCfg) return json({ error: 'Not found' }, { status: 404 }, env, req);
     let allowed = false;
     if (sessionEmail && canViewRace(raceCfg, sessionEmail)) allowed = true;
@@ -1250,7 +1398,13 @@ async function handleGet(req, env) {
     try {
       const env0 = JSON.parse(text);
       const cfg = JSON.parse(base64ToUtf8(env0.content));
-      cfg.myRole = sessionEmail ? roleForRace(cfg, sessionEmail) : null;
+      cfg.myRole = sessionEmail ? roleForRace(aclCfg || cfg, sessionEmail) : null;
+      // Runner-to-account links come back only for somebody who works the
+      // race. Crew need them to load a runner's goals and racer mode needs
+      // them to know whose splits it is showing. A viewer does not, and an
+      // anonymous reader certainly does not, so for them the addresses stay
+      // where they now live, which is out of sight.
+      if (aclCfg && WRITING_ROLES.has(cfg.myRole)) cfg.runners = aclCfg.runners;
       env0.content = utf8ToBase64(JSON.stringify(cfg, null, 2) + '\n');
       text = JSON.stringify(env0);
     } catch (e) { /* hand back exactly what GitHub gave us */ }

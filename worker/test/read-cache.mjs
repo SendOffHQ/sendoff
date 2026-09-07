@@ -109,8 +109,12 @@ const anonPublic = await worker.fetch(
   new Request('https://w/get?path=' + encodeURIComponent(`races/${SLUG}/data.json`)), env);
 expect('public race, no session, warm cache', anonPublic.status, 200);
 
+// Access comes from KV now, not from the file: rewriting config.json no longer
+// rewrites who may see a race, which is the point of moving it. So the race is
+// made private and handed to somebody else in both places.
 repo.set(`races/${SLUG}/config.json`,
-  JSON.stringify({ name: 'Sangre', visibility: 'private', createdBy: 'someone@else.com', people: [] }));
+  JSON.stringify({ name: 'Sangre', visibility: 'private' }));
+kvStore.set('acl:' + SLUG, JSON.stringify({ createdBy: 'someone@else.com', people: [] }));
 cacheStore.clear();
 await read(`races/${SLUG}/config.json`).catch(() => {});   // warm it as the owner would
 const outsider = await read(`races/${SLUG}/data.json`);
