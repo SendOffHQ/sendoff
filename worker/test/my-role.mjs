@@ -69,7 +69,9 @@ await call('/commit', { token: t, body: {
 const stored = JSON.parse(repo.get(`races/${SLUG}/config.json`));
 ok('the rename landed', stored.name, 'Renamed');
 ok('myRole is not in the stored file', stored.myRole, undefined);
-ok('the roster is untouched', (stored.people||[]).length, 1);
+// The roster no longer lives in the file at all; acl-store.mjs covers where it
+// went. What matters here is that a write does not put it back.
+ok('the roster is not in the file', stored.people, undefined);
 
 console.log('\nnor on the write that creates a race');
 const t2 = await login(CREW);
