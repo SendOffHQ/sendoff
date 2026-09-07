@@ -605,7 +605,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=59"></script>
+<script src="lib/race-core.js?v=60"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -1236,8 +1236,9 @@
       units: cfg.units,
       totalDistanceMi: +Race.course.totalDistanceMi(cfg).toFixed(2),
       runnerNames: cfg.runners.map(r => r.name),
-      cutoffHours: cfg.cutoffs.totalHours,
-      createdBy: cfg.createdBy || null
+      cutoffHours: cfg.cutoffs.totalHours
+      // No createdBy. The hub manifest is a file anyone can read, and the
+      // creator is a person. /my-races says which races are yours instead.
     };
   }
 

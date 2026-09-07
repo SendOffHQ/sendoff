@@ -280,7 +280,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=59"></script>
+<script src="lib/race-core.js?v=60"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
@@ -345,8 +345,13 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
       rows.sort((a, b) => (a.r.name || '').localeCompare(b.r.name || ''));
     } else if (mode === 'owned') {
       rows.sort((a, b) => {
-        const ao = (a.r.createdBy || '').toLowerCase() === me ? 0 : 1;
-        const bo = (b.r.createdBy || '').toLowerCase() === me ? 0 : 1;
+        // `mine` comes from /my-races, which has a session to work it out
+        // with. The manifest itself names nobody, on purpose. createdBy is the
+        // fallback for an entry written before that changed.
+        const own = r => r.mine !== undefined
+          ? (r.mine ? 0 : 1)
+          : ((r.createdBy || '').toLowerCase() === me ? 0 : 1);
+        const ao = own(a.r), bo = own(b.r);
         return (ao - bo) || byStatusThenDate(a, b);
       });
     } else {
