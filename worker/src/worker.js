@@ -1071,6 +1071,10 @@ async function handleCommit(req, env) {
   // hand out access, or make a private race public. They change only through
   // the access endpoints, which check the right thing.
   const ACL_FIELDS = ['createdBy', 'people', 'editors', 'viewers', 'teamCanInvite', 'visibility'];
+  // Added by handleGet for the caller's benefit. A client that reads a config
+  // and writes it back would otherwise persist one person's role into the file
+  // everybody reads.
+  const INJECTED_FIELDS = ['myRole'];
 
   let content = content0;
   // Set when this write is the config.json that brings a race into existence,
@@ -1110,6 +1114,10 @@ async function handleCommit(req, env) {
       let created;
       try { created = JSON.parse(content); } catch (e) { created = null; }
       if (created && typeof created === 'object' && !Array.isArray(created)) {
+        if (INJECTED_FIELDS.some(f => created[f] !== undefined)) {
+          for (const f of INJECTED_FIELDS) delete created[f];
+          content = JSON.stringify(created, null, 2) + '\n';
+        }
         const ent = entitlementsFor(await lookupUser(env, session.email));
         if (created.visibility === 'private' && !ent.privateRaces) {
           return json({
@@ -1146,6 +1154,7 @@ async function handleCommit(req, env) {
         if (raceCfg[f] === undefined) delete submitted[f];
         else submitted[f] = raceCfg[f];
       }
+      for (const f of INJECTED_FIELDS) delete submitted[f];
       content = JSON.stringify(submitted, null, 2) + '\n';
     }
   } else {
@@ -1227,7 +1236,26 @@ async function handleGet(req, env) {
   }
 
   const res = await githubGetShared(env, path);
-  const text = await res.text();
+  let text = await res.text();
+
+  // A race config carries the roster, and the roster is a list of people's
+  // email addresses. Nobody reading a race needs anyone's address but their
+  // own role in it, so the copy handed back gains myRole. The stored copy is
+  // untouched here; taking the roster out of it is the next change, and this
+  // one has to ship first so that clients already know where to look.
+  //
+  // Computed per request, deliberately outside the shared cache above, because
+  // it is the one part of the answer that differs by caller.
+  if (res.status === 200 && isRacePath(path) && path.endsWith('/config.json')) {
+    try {
+      const env0 = JSON.parse(text);
+      const cfg = JSON.parse(base64ToUtf8(env0.content));
+      cfg.myRole = sessionEmail ? roleForRace(cfg, sessionEmail) : null;
+      env0.content = utf8ToBase64(JSON.stringify(cfg, null, 2) + '\n');
+      text = JSON.stringify(env0);
+    } catch (e) { /* hand back exactly what GitHub gave us */ }
+  }
+
   return new Response(text, {
     status: res.status,
     headers: { 'Content-Type': 'application/json', ...corsHeaders(env, req) }
