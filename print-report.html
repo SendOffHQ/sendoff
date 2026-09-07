@@ -463,12 +463,11 @@
   }
 
   async function loadGpx() {
-    try {
-      const res = await fetch(`races/${encodeURIComponent(slug)}/course.gpx?_=${Date.now()}`, { cache: 'no-store' });
-      if (!res.ok) return null;
-      const text = await res.text();
-      return Race.gpx.parse(text);
-    } catch (e) { return null; }
+    // Same path as the dashboard: the worker first, Pages as the fallback, so
+    // a printout run right after setup is not missing its course profile.
+    const text = await Race.gh.readRaceText(slug, 'course.gpx', true);
+    if (!text) return null;
+    try { return Race.gpx.parse(text); } catch (e) { return null; }
   }
 
   async function load() {
@@ -509,7 +508,9 @@
     }
   }
 
-  load();
+  // Wait for hub.json, or the first read goes to Pages regardless of what
+  // readRaceText prefers. See the same note in race.html.
+  Race.hub.load().then(load);
 </script>
 
 </body>

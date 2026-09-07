@@ -980,6 +980,16 @@
     } catch (err) {
       if (opts && opts.quiet) return false;
       const e = document.getElementById('error');
+      // A race still inside its settling window is not missing, it is young.
+      // Say so, and let the refresh loop keep trying. A dropped connection is
+      // not that, and still gets reported as itself.
+      if (!err.offline && stillSettling()) {
+        e.className = 'info-banner';
+        e.style.display = 'block';
+        e.textContent = 'Finishing setup. This takes a few seconds.';
+        return false;
+      }
+      e.className = 'error-banner';
       e.style.display = 'block';
       e.textContent = `Error loading race: ${err.message}`;
       return false;
@@ -995,6 +1005,27 @@
   // Only this one navigation is patient. A mistyped race URL still fails at
   // once, which is what someone who typed it wrong needs.
   const NEW_RACE_WAIT_MS = 45000;
+
+  // Dropping the ?new marker on first success left a gap: refresh a few
+  // seconds later and the patient path was gone, so a read that had not caught
+  // up yet drew the error banner over a race that was plainly fine. The marker
+  // therefore outlives the URL, in this tab, for as long as a new race can
+  // still be settling. A mistyped race URL has no note and still fails at
+  // once, which is what someone who typed it wrong needs.
+  const SETTLING_MS = 120000;
+  const settleKey = 'sendoff-settling-' + slug;
+
+  function noteSettling() {
+    try { sessionStorage.setItem(settleKey, String(Date.now() + SETTLING_MS)); } catch (e) {}
+  }
+  function stillSettling() {
+    try {
+      const until = parseInt(sessionStorage.getItem(settleKey) || '0', 10);
+      if (Date.now() < until) return true;
+      if (until) sessionStorage.removeItem(settleKey);
+    } catch (e) {}
+    return false;
+  }
 
   async function loadNewRace() {
     const title = document.getElementById('race-title');
@@ -1048,12 +1079,11 @@
   async function initCourseVisuals() {
     if (courseVisualsReady) return;
 
-    let gpxText;
-    try {
-      const res = await fetch(`races/${encodeURIComponent(slug)}/course.gpx?_=${Date.now()}`, { cache: 'no-store' });
-      if (!res.ok) return; // no GPX for this race (or Pages not republished yet)
-      gpxText = await res.text();
-    } catch (e) { return; }
+    // Through the worker first, like config.json and data.json, so the course
+    // is not the one thing on the page still waiting for the Pages rebuild.
+    // Null means no GPX, or none reachable yet; the refresh loop tries again.
+    const gpxText = await Race.gh.readRaceText(slug, 'course.gpx', true);
+    if (!gpxText) return;
 
     let pts;
     try { pts = Race.gpx.parse(gpxText); } catch (e) { return; }
@@ -1340,7 +1370,13 @@
     if (document.visibilityState === 'visible') load();
   });
 
-  if (Race.qs('new')) loadNewRace(); else load();
+  // hub.json is what says reads should go through the worker, and it is
+  // fetched asynchronously. Starting before it resolves meant the very first
+  // load, the one whose wait anyone actually notices, always took the Pages
+  // path and so waited on the rebuild no matter what the rest of this does.
+  Race.hub.load().then(() => {
+    if (Race.qs('new')) { noteSettling(); loadNewRace(); } else load();
+  });
   setInterval(tick, 1000);
   setInterval(updateLastUpdated, 1000);
   setInterval(load, REFRESH_MS);
