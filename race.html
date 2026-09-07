@@ -80,6 +80,25 @@
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
     background: linear-gradient(90deg, var(--runner-color, var(--accent)), transparent);
   }
+  /* The finish card's switches. A grid rather than a list, because there are
+     ten of them and they are all one word. */
+  .fc-parts {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 6px 12px; margin: 14px 0 4px; padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .fc-parts-title {
+    grid-column: 1 / -1; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted);
+    margin-bottom: 2px;
+  }
+  .fc-part {
+    display: flex; align-items: center; gap: 7px; font-size: 12.5px;
+    color: var(--text-dim); cursor: pointer; min-height: 26px;
+  }
+  .fc-part input { accent-color: var(--accent); margin: 0; }
+  .fc-part:hover { color: var(--text); }
+
   .runner-head-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
   .finish-card-btn {
     background: rgba(15,184,191,0.12); color: var(--accent);
@@ -465,7 +484,7 @@
      predicted position still draw with no signal. The tiles underneath are
      Esri's and will be missing offline; the map is useful without them. -->
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/finish-card.js?v=2"></script>
+<script src="lib/finish-card.js?v=5"></script>
 <script src="lib/race-core.js?v=55"></script>
 <script>
   const REFRESH_MS = 10000;
