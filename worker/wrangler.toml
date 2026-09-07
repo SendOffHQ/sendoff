@@ -8,6 +8,11 @@ compatibility_date = "2026-05-01"
 GITHUB_OWNER = "SendOffHQ"
 GITHUB_REPO = "sendoff"
 GITHUB_BRANCH = "main"
+# Serve race reads from D1 instead of the GitHub API. "false" (or absent) keeps
+# git as the read path. A race the mirror has not seen still falls back to git
+# either way, so flipping this on cannot make a race unreadable; flipping it
+# back is a one-line change and a deploy, with no data to undo.
+READ_FROM_D1 = "false"
 # If you mount the worker at a subpath (e.g. on a route like
 # api.example.com/race-dashboard/*), set MOUNT_PATH to that prefix.
 # Leave empty if the worker is at the root of its hostname.

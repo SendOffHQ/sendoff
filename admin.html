@@ -453,11 +453,18 @@
           <span class="note">${x.legs} leg(s)${x.gitLegs != null && x.gitLegs !== x.legs
             ? `, files say ${x.gitLegs}` : ''}</span>
           <span class="${x.matches ? 'ok' : 'bad'}">${x.matches ? 'matches' : 'does not match'}</span>
+          <span class="${x.servable ? 'ok' : 'note'}">${x.servable ? 'servable' : 'falls back to files'}</span>
           ${x.note ? `<span class="bad">${esc(x.note)}</span>` : ''}
         </div>`).join('') +
         `<div class="acl-row"><span class="slug">${r.allMatch
           ? 'The database agrees with the files for every race.'
-          : 'At least one race disagrees. Backfill, then check again.'}</span></div>`;
+          : 'At least one race disagrees. Backfill, then check again.'}</span></div>` +
+        `<div class="acl-row"><span class="slug">${r.readingFromD1
+          ? 'Reads are being served from the database.'
+          : 'Reads still come from the files.'}</span><span class="${r.allServable ? 'ok' : 'note'}">${
+          r.allServable
+            ? 'every race could be served from the database'
+            : 'some races would fall back to the files'}</span></div>`;
     };
     if (d1Btn) d1Btn.addEventListener('click', async () => {
       d1Btn.disabled = true; d1Out.textContent = 'Checking…';
