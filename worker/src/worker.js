@@ -293,7 +293,9 @@ async function createUserInKv(env, email, password, role) {
 // succeeded and the caller is told it worked, because it did. What the mirror
 // costs when it is wrong is a row that disagrees, and there is an admin page
 // that compares the two.
-async function mirrorToD1(env, path, content, actor) {
+// `content` is stored exactly as it was written, not re-serialized, so the
+// bytes and the sha beside them describe the same thing.
+async function mirrorToD1(env, path, content, actor, sha) {
   if (!env.DB) return { skipped: 'no DB binding' };
   const slug = racePathSlug(path);
   if (!slug) return { skipped: 'not a race path' };
@@ -303,14 +305,16 @@ async function mirrorToD1(env, path, content, actor) {
       const acl = (await readAcl(env, slug)) || aclFromConfig(cfg);
       const stmts = [
         env.DB.prepare(
-          `INSERT INTO races (slug, name, location, start_time, visibility, created_by, config, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          `INSERT INTO races (slug, name, location, start_time, visibility, created_by,
+                              config, config_sha, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
            ON CONFLICT(slug) DO UPDATE SET
              name=excluded.name, location=excluded.location, start_time=excluded.start_time,
              visibility=excluded.visibility, created_by=excluded.created_by,
-             config=excluded.config, updated_at=excluded.updated_at`
+             config=excluded.config, config_sha=excluded.config_sha,
+             updated_at=excluded.updated_at`
         ).bind(slug, cfg.name || '', cfg.location || null, cfg.startTime || null,
-               cfg.visibility || 'public', acl.createdBy || '', JSON.stringify(cfg)),
+               cfg.visibility || 'public', acl.createdBy || '', content, sha || null),
         env.DB.prepare('DELETE FROM race_people WHERE slug = ?').bind(slug)
       ];
       for (const person of (acl.people || [])) {
@@ -325,10 +329,14 @@ async function mirrorToD1(env, path, content, actor) {
     if (path.endsWith('/data.json')) {
       const data = JSON.parse(content);
       // The race row has to exist first, because legs reference it. A data
-      // write can arrive before its config on a brand new race.
+      // write can arrive before its config on a brand new race, which is why
+      // this inserts rather than assuming.
       const stmts = [env.DB.prepare(
-        `INSERT INTO races (slug, name, created_by, config) VALUES (?, '', '', '{}')
-         ON CONFLICT(slug) DO NOTHING`).bind(slug)];
+        `INSERT INTO races (slug, name, created_by, config, data, data_sha, updated_at)
+         VALUES (?, '', '', '{}', ?, ?, datetime('now'))
+         ON CONFLICT(slug) DO UPDATE SET
+           data=excluded.data, data_sha=excluded.data_sha, updated_at=excluded.updated_at`
+      ).bind(slug, content, sha || null)];
       let n = 0;
       for (const runner of (data.runners || [])) {
         if (!runner || !runner.id) continue;
@@ -590,7 +598,11 @@ async function githubGetJson(env, path) {
     throw new Error(`GET ${path} ${res.status}: ${text.slice(0, 200)}`);
   }
   const j = await res.json();
-  return { sha: j.sha, data: JSON.parse(base64ToUtf8(j.content)), missing: false };
+  // `text` is the file as it is stored. Callers that only want the object use
+  // `data`; the backfill needs the bytes, because the sha beside them
+  // describes those and not a re-serialization of them.
+  const text = base64ToUtf8(j.content);
+  return { sha: j.sha, data: JSON.parse(text), text, missing: false };
 }
 
 async function githubPutJson(env, path, data, sha, message, actor) {
@@ -766,7 +778,26 @@ async function loadRaceConfig(env, slug) {
 // keeps the uncached one: it reads the config to carry the ACL fields across a
 // write, and acting on a roster three seconds out of date is not a trade worth
 // making to save one API call.
+// The stored config, parsed, or null to mean "ask git". Shares its rules with
+// readFromD1 below: off unless READ_FROM_D1 says true, and a row that cannot
+// stand behind its own answer is not an answer.
+async function mirroredConfig(env, slug) {
+  if (!d1Enabled(env) || !env.DB || !slug) return null;
+  try {
+    const r = (await env.DB.prepare(
+      'SELECT config, config_sha FROM races WHERE slug = ?').bind(slug).all()).results[0];
+    if (!r || !r.config || r.config === '{}' || !r.config_sha) return null;
+    return JSON.parse(r.config);
+  } catch (e) { return null; }
+}
+
 async function loadRaceConfigShared(env, slug) {
+  // The ACL check runs on every read, including reads of data.json, so this is
+  // the second of the two GitHub calls a single poll used to cost. Serving it
+  // from the mirror is most of the point of serving reads from the mirror at
+  // all; leaving it here would mean flipping the flag and saving nothing.
+  const mirroredCfg = await mirroredConfig(env, slug);
+  if (mirroredCfg) return attachAcl(env, slug, mirroredCfg);
   const res = await githubGetShared(env, `races/${slug}/config.json`);
   if (res.status === 404) return null;
   if (!res.ok) return null;
@@ -1222,7 +1253,10 @@ async function handleD1Status(req, env) {
     let race = null, people = 0, legs = 0, gitLegs = null, note = null;
     try {
       race = (await env.DB.prepare(
-        'SELECT slug, name, created_by FROM races WHERE slug = ?').bind(slug).all()).results[0] || null;
+        `SELECT slug, name, created_by, config_sha, data_sha,
+                config IS NOT NULL AND config != '{}' AS has_config,
+                data   IS NOT NULL AND data   != '{}' AS has_data
+         FROM races WHERE slug = ?`).bind(slug).all()).results[0] || null;
       people = (await env.DB.prepare(
         'SELECT count(*) AS c FROM race_people WHERE slug = ?').bind(slug).all()).results[0].c;
       legs = (await env.DB.prepare(
@@ -1244,13 +1278,21 @@ async function handleD1Status(req, env) {
       kvPeople: acl ? acl.people.length : null,
       legs,
       gitLegs,
+      // Whether a read would actually be served from here, rather than quietly
+      // falling through to git. A row can match the files and still not be
+      // servable: it needs the document and the sha that goes with it, and the
+      // rows written before the mirror stored either have neither.
+      servable: !!(race && race.has_config && race.config_sha &&
+                   race.has_data && race.data_sha),
       matches: !!race && !!(race && race.created_by) &&
                (gitLegs === null || legs === gitLegs) &&
                (!acl || people === acl.people.length),
       note
     });
   }
-  return json({ races: rows, allMatch: rows.every(r => r.matches), dbError: null }, {}, env, req);
+  return json({ races: rows, allMatch: rows.every(r => r.matches),
+                allServable: rows.every(r => r.servable),
+                readingFromD1: d1Enabled(env), dbError: null }, {}, env, req);
 }
 
 // Replays every race through the same mirror the live writes use, rather than
@@ -1277,7 +1319,7 @@ async function handleD1Backfill(req, env) {
       if (r.missing) { row[file] = { skipped: 'not in the repository' }; continue; }
       // No actor: git knows who last wrote the file, but not who pressed
       // each individual split, and inventing one would be worse than a blank.
-      row[file] = await mirrorToD1(env, path, JSON.stringify(r.data), null);
+      row[file] = await mirrorToD1(env, path, r.text, null, r.sha);
     }
     rows.push(row);
   }
@@ -1580,7 +1622,12 @@ async function handleCommit(req, env) {
   // caller is about to be told it worked, because it did. Nothing reads D1 yet,
   // so this cannot change what anybody sees; when it disagrees, the admin page
   // is what says so.
-  if (res.ok) await mirrorToD1(env, path, content, session.email);
+  // GitHub's PUT response names the blob it just made. That sha is what the
+  // next writer sends back as their concurrency guard, so the mirror has to
+  // hold the same one or a read served from it would break every write.
+  let newSha = null;
+  if (res.ok) { try { newSha = (JSON.parse(text).content || {}).sha || null; } catch (e) {} }
+  if (res.ok) await mirrorToD1(env, path, content, session.email, newSha);
   // The cached copy is now wrong. Dropping it means a press is visible on the
   // next poll rather than up to CACHE_TTL_S later, at least in this colo.
   if (res.ok) await purgeReadCache(env, path);
@@ -1588,6 +1635,55 @@ async function handleCommit(req, env) {
     status: res.status,
     headers: { 'Content-Type': 'application/json', ...corsHeaders(env, req) }
   });
+}
+
+// ---------- serving a read from the mirror ----------
+// Off by default. READ_FROM_D1 turns it on, and setting it back turns it off
+// again without a deploy, which is the only reason it is a variable and not
+// just the way reads work.
+//
+// D1 first, git on a miss, never an error: a race the mirror has not seen is
+// served the way it always was rather than 404ing at a crew member who is
+// standing at an aid station. That is also what makes the flag safe to flip.
+// It is worth being plain about what this buys, because it is not the typed
+// tables: those are for later. It is that a read comes back from a database
+// that has already accepted the write, instead of from an API that may need
+// another minute to admit the write happened.
+function d1Enabled(env) {
+  return String(env.READ_FROM_D1 || '').toLowerCase() === 'true';
+}
+
+// The Contents API envelope the client already knows how to read. Same shape
+// whether it came from GitHub or from here, so nothing downstream has to care.
+function contentsEnvelope(path, text, sha) {
+  return JSON.stringify({
+    name: path.split('/').pop(), path, sha, size: text.length,
+    content: utf8ToBase64(text), encoding: 'base64'
+  });
+}
+
+// Returns the envelope, or null to mean "not mirrored, go and ask git".
+async function readFromD1(env, path) {
+  if (!d1Enabled(env) || !env.DB) return null;
+  const slug = racePathSlug(path);
+  if (!slug) return null;
+  const isConfig = path.endsWith('/config.json');
+  if (!isConfig && !path.endsWith('/data.json')) return null;
+  try {
+    const r = (await env.DB.prepare(
+      'SELECT config, config_sha, data, data_sha FROM races WHERE slug = ?'
+    ).bind(slug).all()).results[0];
+    if (!r) return null;
+    const text = isConfig ? r.config : r.data;
+    const sha = isConfig ? r.config_sha : r.data_sha;
+    // A row seeded by a data write before its config carries a placeholder
+    // config, and a sha of null would drop the next writer's guard. Either
+    // one means git is still the better answer.
+    if (!text || text === '{}' || !sha) return null;
+    return contentsEnvelope(path, text, sha);
+  } catch (e) {
+    return null;
+  }
 }
 
 async function handleGet(req, env) {
@@ -1638,8 +1734,11 @@ async function handleGet(req, env) {
     return json({ error: 'Forbidden path' }, { status: 403 }, env, req);
   }
 
-  const res = await githubGetShared(env, path);
-  let text = await res.text();
+  // The mirror answers if it can, and git answers if it cannot. A miss here
+  // is not a failure; it is a race the mirror has not caught up with.
+  const mirrored = await readFromD1(env, path);
+  const res = mirrored ? new Response(mirrored, { status: 200 }) : await githubGetShared(env, path);
+  let text = mirrored || await res.text();
 
   // A race config carries the roster, and the roster is a list of people's
   // email addresses. Nobody reading a race needs anyone's address but their

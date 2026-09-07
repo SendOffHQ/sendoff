@@ -13,7 +13,7 @@ const SLUG = 'r1';
 
 // A stand-in for the D1 binding with the same surface the worker uses.
 const db = new DatabaseSync(':memory:');
-for (const f of ['0001_initial.sql', '0002_leg_shape.sql']) {
+for (const f of ['0001_initial.sql', '0002_leg_shape.sql', '0003_documents.sql']) {
   db.exec(fs.readFileSync(new URL('../migrations/' + f, import.meta.url), 'utf8'));
 }
 const mkStmt = (sql) => ({
@@ -183,6 +183,10 @@ ok('a backfilled leg has no actor, because nobody pressed it',
 
 // Twice is the same as once: the button is safe to press again.
 await call('/d1-backfill', { token: t, method:'POST' });
+ok('and the backfill makes it servable, document and sha both',
+   (await status()).races.every(r => r.servable), true);
+ok('but reads are not coming from it yet', (await status()).readingFromD1, false);
+
 ok('running it again changes nothing',
    [(await status()).allMatch,
     db.prepare('select count(*) c from legs where slug=?').get(OLD).c,
