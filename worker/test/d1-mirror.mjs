@@ -56,9 +56,16 @@ async function cred(pw){
 const env = {
   GITHUB_OWNER:'o', GITHUB_REPO:'r', GITHUB_TOKEN:'t', GITHUB_BRANCH:'main',
   AUTH_KV: KV, DB, ALLOWED_ORIGINS:'*', JWT_SECRET:'s',
-  USERS: JSON.stringify([{ email:OWNER, ...await cred('pw') }, { email:CREW, ...await cred('pw') }]),
+  USERS: JSON.stringify([{ email:OWNER, ...await cred('pw'), role:'admin' },
+                         { email:CREW,  ...await cred('pw') }]),
 };
 globalThis.fetch = async (url, opts = {}) => {
+  // The backfill finds races by walking the git tree.
+  if (String(url).includes('/git/trees/')) {
+    return new Response(JSON.stringify({ tree: [...repo.keys()]
+      .filter(p => /^races\/[^/]+\/config\.json$/.test(p))
+      .map(path => ({ type:'blob', path })) }), { status: 200 });
+  }
   const m = String(url).match(/contents\/(.+?)(\?|$)/);
   const path = m ? decodeURIComponent(m[1]) : '';
   if ((opts.method || 'GET') === 'GET') {
@@ -137,6 +144,55 @@ const r = await worker.fetch(new Request('https://w/commit', { method:'POST',
   body: JSON.stringify({ path:`races/${SLUG}/data.json`, content:'{"runners":[]}', message:'x' }) }), broken);
 ok('the caller is still told it worked', r.status, 200);
 ok('and git has it', JSON.parse(repo.get(`races/${SLUG}/data.json`)).runners, []);
+
+
+// A race that predates the mirror: in git, with an access list in KV, but
+// never written through the worker since the mirror existed. This is every
+// race on the site right now, which is what the backfill is for.
+console.log('\nthe backfill brings in a race the mirror never saw');
+const OLD = 'r0';
+repo.set(`races/${OLD}/config.json`, JSON.stringify({ name:'An older race', location:'Elsewhere',
+  startTime:'2026-08-01T13:00:00Z', visibility:'public', runners:[{id:'pat',name:'Pat'}] }));
+repo.set(`races/${OLD}/data.json`, JSON.stringify({ runners:[{ id:'pat', legs:[leg(1), leg(2)] }] }));
+kv.set('acl:' + OLD, JSON.stringify({ createdBy: OWNER, people:[{email:CREW,role:'crew'}],
+  teamCanInvite:false, runnerEmails:{} }));
+
+const status = () => call('/d1-status', { token: t }).then(r => r.json());
+const before = (await status()).races.find(r => r.slug === OLD);
+ok('the older race is missing before', [before.inD1, before.legs, before.gitLegs], [false, 0, 2]);
+ok('and the check says so', (await status()).allMatch, false);
+// The write above went to git with D1 down, so r1's legs are now stale. The
+// check has to notice a drift like that too, not just a missing race: after
+// reads move over it is the only thing standing between a quiet divergence
+// and a race day run off the wrong numbers.
+const drifted = (await status()).races.find(r => r.slug === SLUG);
+ok('a leg count that has drifted is caught',
+   [drifted.inD1, drifted.legs, drifted.gitLegs, drifted.matches], [true, 3, 0, false]);
+
+const fill = await (await call('/d1-backfill', { token: t, method:'POST' })).json();
+ok('the backfill reports no failures', [fill.ok, fill.failed], [true, []]);
+
+const filled = (await status()).races.find(r => r.slug === OLD);
+ok('now it is there, with its roster and its legs',
+   [filled.inD1, filled.createdBy, filled.people, filled.legs, filled.gitLegs], [true, true, 1, 2, 2]);
+ok('every race agrees with its files', (await status()).allMatch, true);
+ok('the creator came from KV, not the file',
+   row(db.prepare('select created_by from races where slug=?').get(OLD)).created_by, OWNER);
+ok('a backfilled leg has no actor, because nobody pressed it',
+   row(db.prepare('select actor from legs where slug=? and idx=1').get(OLD)).actor, null);
+
+// Twice is the same as once: the button is safe to press again.
+await call('/d1-backfill', { token: t, method:'POST' });
+ok('running it again changes nothing',
+   [(await status()).allMatch,
+    db.prepare('select count(*) c from legs where slug=?').get(OLD).c,
+    db.prepare('select count(*) c from race_people where slug=?').get(OLD).c], [true, 2, 1]);
+
+console.log('\nand it is admins only');
+const ct = await login(CREW);
+ok('the crew cannot read the status', (await call('/d1-status', { token: ct })).status, 403);
+ok('the crew cannot run the backfill', (await call('/d1-backfill', { token: ct, method:'POST' })).status, 403);
+ok('and neither can a stranger', (await call('/d1-status')).status, 401);
 
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

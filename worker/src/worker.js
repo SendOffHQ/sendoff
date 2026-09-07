@@ -1176,6 +1176,100 @@ async function handleAclStatus(req, env) {
   return json({ races: rows, safeToStripAll: rows.every(r => r.safeToStrip) }, {}, env, req);
 }
 
+// ---------- the D1 mirror, seen and seeded ----------
+// Nothing reads D1 yet. These two are how the mirror gets checked and how the
+// races that predate it get in, and they are admin-only and separate on
+// purpose: the same mistake as last time (deleting first and hoping) would
+// here mean flipping reads to a database that is missing a race.
+
+// How many legs a data.json holds, counted the same way the mirror counts them.
+function legCountOf(data) {
+  let n = 0;
+  for (const runner of ((data && data.runners) || [])) {
+    if (!runner || !runner.id) continue;
+    for (const leg of (runner.legs || [])) if (leg && leg.index != null) n++;
+  }
+  return n;
+}
+
+async function handleD1Status(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
+  if (!env.DB) return json({ error: 'No DB bound' }, { status: 503 }, env, req);
+
+  const slugs = await listRaceSlugs(env);
+  if (!slugs) return json({ error: 'Could not list races' }, { status: 502 }, env, req);
+
+  const rows = [];
+  for (const slug of slugs) {
+    let race = null, people = 0, legs = 0, gitLegs = null, note = null;
+    try {
+      race = (await env.DB.prepare(
+        'SELECT slug, name, created_by FROM races WHERE slug = ?').bind(slug).all()).results[0] || null;
+      people = (await env.DB.prepare(
+        'SELECT count(*) AS c FROM race_people WHERE slug = ?').bind(slug).all()).results[0].c;
+      legs = (await env.DB.prepare(
+        'SELECT count(*) AS c FROM legs WHERE slug = ?').bind(slug).all()).results[0].c;
+    } catch (e) { note = e && e.message ? e.message : String(e); }
+    try {
+      const r = await githubGetJson(env, `races/${slug}/data.json`);
+      gitLegs = r.missing ? 0 : legCountOf(r.data);
+    } catch (e) { /* left null: unknown rather than zero */ }
+    const acl = await readAcl(env, slug);
+    rows.push({
+      slug,
+      inD1: !!race,
+      name: race ? race.name : null,
+      // The mirror takes the creator from KV, so a blank one here means the
+      // row was seeded by a data write that arrived before its config.
+      createdBy: !!(race && race.created_by),
+      people,
+      kvPeople: acl ? acl.people.length : null,
+      legs,
+      gitLegs,
+      matches: !!race && !!(race && race.created_by) &&
+               (gitLegs === null || legs === gitLegs) &&
+               (!acl || people === acl.people.length),
+      note
+    });
+  }
+  return json({ races: rows, allMatch: rows.every(r => r.matches) }, {}, env, req);
+}
+
+// Replays every race through the same mirror the live writes use, rather than
+// through a second copy of the SQL that could disagree with it. Upserts, so
+// running it twice is not different from running it once.
+async function handleD1Backfill(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
+  if (!env.DB) return json({ error: 'No DB bound' }, { status: 503 }, env, req);
+
+  const slugs = await listRaceSlugs(env);
+  if (!slugs) return json({ error: 'Could not list races' }, { status: 502 }, env, req);
+
+  const rows = [];
+  for (const slug of slugs) {
+    const row = { slug };
+    // Config first: a legs row references its race.
+    for (const file of ['config.json', 'data.json']) {
+      const path = `races/${slug}/${file}`;
+      let r;
+      try { r = await githubGetJson(env, path); }
+      catch (e) { row[file] = { error: e && e.message ? e.message : String(e) }; continue; }
+      if (r.missing) { row[file] = { skipped: 'not in the repository' }; continue; }
+      // No actor: git knows who last wrote the file, but not who pressed
+      // each individual split, and inventing one would be worse than a blank.
+      row[file] = await mirrorToD1(env, path, JSON.stringify(r.data), null);
+    }
+    rows.push(row);
+  }
+  const failed = rows.filter(r => (r['config.json'] && r['config.json'].error) ||
+                                  (r['data.json'] && r['data.json'].error));
+  return json({ races: rows, ok: failed.length === 0, failed: failed.map(r => r.slug) }, {}, env, req);
+}
+
 async function handleAccounts(req, env) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -2566,6 +2660,8 @@ export default {
     if (request.method === 'GET'  && path === '/account-invite-info') return handleAccountInviteInfo(request, env);
     if (request.method === 'POST' && path === '/accept-account-invite') return handleAcceptAccountInvite(request, env);
     if (request.method === 'GET'  && path === '/acl-status')      return handleAclStatus(request, env);
+    if (request.method === 'GET'  && path === '/d1-status')       return handleD1Status(request, env);
+    if (request.method === 'POST' && path === '/d1-backfill')     return handleD1Backfill(request, env);
     if (request.method === 'GET'  && path === '/entitlements')    return handleEntitlements(request, env);
     if (request.method === 'POST' && path === '/account/plan')    return handleAccountPlan(request, env);
     if (request.method === 'GET'  && path === '/accounts')        return handleAccounts(request, env);
