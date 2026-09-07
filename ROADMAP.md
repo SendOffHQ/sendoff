@@ -185,13 +185,14 @@ split, but "he ate a full quesadilla and looks brighter than he did at
 sixty."
 
 ### Finish card — *built*
-Shipped. Drawn on the finisher's own device at 1080x1350, with the course
-profile as the hero and the splits marked on it. Nothing is uploaded, so it
-works at a finish line with no signal. See `FEATURES.md`.
+Shipped. Drawn on the finisher's own device in four shapes (4:5, 1:1, 4:3,
+16:9), with the course profile as the hero and the splits marked on it, and a
+toggle for each part so a finisher chooses what goes on it. Nothing is
+uploaded, so it works at a finish line with no signal. See `FEATURES.md`.
 
-Two things deliberately left: there is no square or story crop yet, and the
-image is not used as the race page's own preview when a link is shared,
-which would need something to render it server-side.
+One thing deliberately left: the image is not used as the race page's own
+preview when a link is shared, which would need something to render it
+server-side.
 
 ### What this costs, honestly
 Three costs the rest of the roadmap does not have:
