@@ -1,3 +1,6 @@
-# Rendered output. The generator is the source of truth; these are disposable
-# and heavy enough to bloat a Pages repo.
-*.png
+# Working files only. The finished set is committed so it can be reached from
+# the web (github.com, or sendoff.run/brand/social/) without a local render.
+_strip.png
+_pin-sheet.png
+_prev-*.png
+_cand-*.png
