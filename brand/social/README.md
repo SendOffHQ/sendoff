@@ -35,8 +35,12 @@ python3 cut.py
 `shoot.js` reads `PLAYWRIGHT_BROWSERS_PATH` the usual way; if Chromium lives
 somewhere Playwright will not find on its own, set `CHROMIUM` to the binary.
 
-Outputs land in the same directory and are gitignored. The generator is the
-thing under version control; the PNGs are disposable.
+Outputs land in the same directory. The fifteen finished images are committed
+so they can be pulled from github.com or from
+`sendoff.run/brand/social/` without a local render; the working files
+(`_strip.png`, `_pin-sheet.png`, previews) are gitignored. Re-run both scripts
+and commit the result after any change to `ig.html`, or the committed images
+stop matching their source.
 
 ## Three things that are not obvious
 
