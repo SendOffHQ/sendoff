@@ -57,6 +57,11 @@
   .card-head {
     padding: 22px 24px 16px;
     border-bottom: 1px solid var(--border);
+    /* A column so the status chip starts exactly at the padding edge. As an
+       inline-flex box on a line box it picked up a few pixels of leading,
+       which is what put it out of line with the absolutely positioned
+       role badge opposite it. */
+    display: flex; flex-direction: column;
   }
   .card-name {
     font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; font-size: 24px;
@@ -89,7 +94,7 @@
   .card-status {
     display: inline-flex; align-items: center; gap: 5px; align-self: flex-start;
     font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
-    letter-spacing: 0.18em; text-transform: uppercase;
+    letter-spacing: 0.18em; text-transform: uppercase; line-height: 1;
     padding: 3px 7px; border-radius: 2px; border: 1px solid currentColor;
     margin-bottom: 10px;
   }
@@ -157,10 +162,14 @@
   }
   .hub-actions a, .hub-actions button { text-decoration: none; }
   .card-badge {
-    position: absolute; top: 14px; right: 14px;
+    position: absolute; top: 22px; right: 24px;
     font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700;
-    letter-spacing: 0.18em; text-transform: uppercase;
-    padding: 3px 7px; border-radius: 2px;
+    letter-spacing: 0.18em; text-transform: uppercase; line-height: 1;
+    /* A point smaller than the status chip, because "Private · Creator" is
+       long and at 9px it collides with it on a 320px screen. The extra half
+       pixel of padding makes the two boxes the same height anyway, so they
+       still line up exactly. */
+    padding: 3.5px 7px; border-radius: 2px;
     background: rgba(15, 184, 191, 0.15); color: var(--accent);
     border: 1px solid var(--accent);
   }
