@@ -157,5 +157,55 @@ const noSha = await (await get(d1Env, t, `races/${SLUG}/data.json`)).json();
 ok('a row with no sha falls through to git', ghReads > 0, true);
 ok('and git answers with a real one', typeof noSha.sha, 'string');
 
+// The failure the flag creates. git takes the write, the mirror does not, and
+// a read served from the mirror would show the old splits to a crew who have
+// just been told theirs landed.
+console.log('\na mirror that falls behind stops answering');
+let breakMirror = false;
+const flaky = { ...d1Env, DB: {
+  prepare: (sql) => {
+    const st = mkStmt(sql);
+    // The stand-down itself must still work; it is the whole recovery.
+    if (breakMirror && /INSERT INTO/i.test(sql)) st.run = async () => { throw new Error('D1 write failed'); };
+    return st;
+  },
+  async batch(stmts) {
+    if (breakMirror) throw new Error('D1 write failed');
+    return DB.batch(stmts);
+  },
+} };
+// The section above nulled the sha by hand; put the mirror back first, so
+// what follows is testing the stand-down and not that leftover.
+const cur = await (await get(gitEnv, t, `races/${SLUG}/data.json`)).json();
+await write(t, `races/${SLUG}/data.json`, dataText, cur.sha);
+ghReads = 0;
+const before = await (await get(d1Env, t, `races/${SLUG}/data.json`)).json();
+ok('the mirror is answering to begin with', ghReads, 0);
+
+breakMirror = true;
+const stale = dataText.replace('ok', 'newest split');
+const w = await worker.fetch(new Request('https://w/commit', { method:'POST',
+  headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+t },
+  body: JSON.stringify({ path:`races/${SLUG}/data.json`, content: stale,
+                         sha: before.sha, message:'x' }) }), flaky);
+ok('the write still succeeds, because git took it', w.status, 200);
+breakMirror = false;
+
+ghReads = 0;
+const after = await (await get(d1Env, t, `races/${SLUG}/data.json`)).json();
+ok('the next read goes to git rather than the stale mirror', ghReads > 0, true);
+ok('and shows the split that actually landed',
+   Buffer.from(after.content,'base64').toString('utf8').includes('newest split'), true);
+ok('the row stood itself down',
+   db.prepare('select data_sha from races where slug=?').get(SLUG).data_sha, null);
+
+// And it comes back on its own, without anybody pressing anything.
+await write(t, `races/${SLUG}/data.json`, stale.replace('newest split', 'later still'), after.sha);
+ghReads = 0;
+const healed = await (await get(d1Env, t, `races/${SLUG}/data.json`)).json();
+ok('a later write heals it', ghReads, 0);
+ok('and the mirror is current again',
+   Buffer.from(healed.content,'base64').toString('utf8').includes('later still'), true);
+
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

@@ -380,8 +380,32 @@ async function mirrorToD1(env, path, content, actor, sha) {
     }
     return { skipped: 'not mirrored' };
   } catch (e) {
-    return { error: e && e.message ? e.message : String(e) };
+    // git has the write and the mirror does not. That was harmless while git
+    // was the read path. Once reads come from here it is the worst failure in
+    // the system: the crew are told the split landed, and the dashboard goes
+    // on showing the old one for as long as nothing else is written.
+    //
+    // So a mirror that could not keep up stands down. Dropping the sha makes
+    // the row unservable, reads fall through to git, and git is right. It
+    // heals on the next successful write. If this fails too then D1 is not
+    // answering at all, and a read gets nothing from it either, which lands in
+    // the same place by a different road.
+    const reason = e && e.message ? e.message : String(e);
+    try { await standDown(env, path); } catch (e2) { /* see above */ }
+    return { error: reason, stoodDown: true };
   }
+}
+
+// Makes a race's mirrored document unservable without deleting anything. The
+// typed rows and the document stay for the admin check to compare against;
+// only the sha goes, and the sha is what a read requires.
+async function standDown(env, path) {
+  const slug = racePathSlug(path);
+  if (!slug || !env.DB) return;
+  const col = path.endsWith('/config.json') ? 'config_sha'
+            : path.endsWith('/data.json')   ? 'data_sha' : null;
+  if (!col) return;
+  await env.DB.prepare(`UPDATE races SET ${col} = NULL WHERE slug = ?`).bind(slug).run();
 }
 
 // ---------- plans and entitlements ----------
