@@ -9,8 +9,15 @@
   },
   "visibility": "public",
   "createdBy": "thebillyman@gmail.com",
-  "people": [],
-  "editors": [],
+  "people": [
+    {
+      "email": "anna.wesner23@gmail.com",
+      "role": "crew"
+    }
+  ],
+  "editors": [
+    "anna.wesner23@gmail.com"
+  ],
   "viewers": [],
   "teamCanInvite": true,
   "cutoffs": {
