@@ -465,7 +465,8 @@
       </table>
       <button type="button" class="add-row" id="add-aid">+ Add aid station</button>
       <p class="hint" style="margin-top:8px; color: var(--text-muted); font-size:11px;">
-        Per-segment elevation gain/loss is computed from the GPX file you upload below.
+        Per-segment elevation gain/loss is estimated from the GPX file you upload
+        below. Enter the race's published total there to override the estimate.
       </p>
     </div>
   </section>
@@ -575,8 +576,21 @@
     <div class="section-head"><div class="section-title">Course GPX (optional)</div></div>
     <input type="file" id="gpx-file" accept=".gpx,application/gpx+xml,text/xml" />
     <p class="hint" style="margin-top:8px; color: var(--text-muted); font-size:11px;" id="gpx-status">
-      Drives the course map on the dashboard and the elevation profile on the printout.
+      Drives the course map, the elevation profile, and each segment's climb.
     </p>
+    <div class="grid-2" style="margin-top:14px;">
+      <label class="field">
+        <span class="lbl">Official total climb (<span class="unit-e">ft</span>, optional)</span>
+        <input type="number" id="official-gain" min="0" step="1" />
+        <span class="hint">
+          The race's published figure, if it has one. Climb read off a GPX is an
+          estimate and can be out by a fifth either way: the answer depends on how
+          densely and how cleanly the file samples the ground, not just on the
+          course. Enter the real number and the segments are scaled to match it,
+          with the GPX deciding only which of them are the steep ones.
+        </span>
+      </label>
+    </div>
   </section>
 
   <div class="submit-bar">
@@ -619,7 +633,8 @@
     // Hour bands: { fromHour, label, targets: { <key>PerHour: amount } }.
     fuelBands: [],
     crewNotes: '',
-    gpxText: null
+    gpxText: null,
+    gpxPts: null
   };
 
   // ---------- auth UI ----------
@@ -1160,6 +1175,8 @@
     if (crewNotes) cfg.crewNotes = crewNotes;
     if (!isNaN(lastLegStartHours)) cfg.cutoffs.lastLegStartHours = lastLegStartHours;
 
+    const officialGainFt = Race.units.toFeet(document.getElementById('official-gain').value, { units: state.units });
+
     if (state.courseType === 'loops') {
       const loopGainFt = Race.units.toFeet(document.getElementById('loop-gain').value, { units: state.units });
       cfg.course = {
@@ -1172,6 +1189,13 @@
         // Loop with timed checkpoints: store one lap's segments.
         cfg.course.loopSegments = Race.course.segmentsFromAidStations(loopAids);
         cfg.course.loopDistanceMi = +loopAids[loopAids.length - 1].mileage;
+        // Lap one is the first loopDistance of the trace whether the file holds
+        // a single lap or the whole race, so the same mileage walk works either
+        // way. An official total is per race, so it is divided by the lap count
+        // before being handed to a single lap's segments.
+        const laps = cfg.course.loopCount || 1;
+        Race.course.fillSegmentElevation(cfg.course.loopSegments, state.gpxPts,
+          officialGainFt != null ? officialGainFt / laps : null);
       } else {
         // Simple lap-only loop.
         cfg.course.loopDistanceMi = Race.units.toMiles(document.getElementById('loop-distance').value, { units: state.units }) || 0;
@@ -1189,7 +1213,9 @@
         segments: Race.course.segmentsFromAidStations(aids),
         startAid: Race.course.startAidFrom(aids[0])
       };
+      Race.course.fillSegmentElevation(cfg.course.segments, state.gpxPts, officialGainFt);
     }
+    if (officialGainFt != null) cfg.course.elevationGainFt = officialGainFt;
     return cfg;
   }
 
@@ -1541,17 +1567,23 @@
   document.getElementById('gpx-file').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     const status = document.getElementById('gpx-status');
-    if (!file) { state.gpxText = null; status.textContent = 'Drives the course map on the dashboard and the elevation profile on the printout.'; return; }
+    if (!file) {
+      state.gpxText = null; state.gpxPts = null;
+      status.textContent = "Drives the course map, the elevation profile, and each segment's climb.";
+      return;
+    }
     try {
       const text = await file.text();
       const pts = Race.gpx.parse(text);
       const dist = Race.gpx.totalDistanceMi(pts);
       const elev = Race.gpx.totalElevation(pts);
       state.gpxText = text;
+      state.gpxPts = pts;
       status.style.color = 'var(--green)';
-      status.textContent = `${file.name} · ${pts.length.toLocaleString()} pts · ${Race.units.distance(dist, { units: state.units })} · +${Math.round(Race.units.elevationVal(elev.gainFt, { units: state.units })).toLocaleString()} / -${Math.round(Race.units.elevationVal(elev.lossFt, { units: state.units })).toLocaleString()} ${Race.units.elevationLabel({ units: state.units })}`;
+      status.textContent = `${file.name} · ${pts.length.toLocaleString()} pts · ${Race.units.distance(dist, { units: state.units })} · +${Math.round(Race.units.elevationVal(elev.gainFt, { units: state.units })).toLocaleString()} / -${Math.round(Race.units.elevationVal(elev.lossFt, { units: state.units })).toLocaleString()} ${Race.units.elevationLabel({ units: state.units })} (est.)`;
     } catch (err) {
       state.gpxText = null;
+      state.gpxPts = null;
       status.style.color = 'var(--red)';
       status.textContent = `Could not parse GPX: ${err.message}`;
     }
