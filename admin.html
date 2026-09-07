@@ -74,6 +74,15 @@
 
   /* accounts list */
   .acct-list { display: flex; flex-direction: column; gap: 6px; }
+  .acl-out { margin-top: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .acl-row {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    padding: 8px 12px; background: var(--bg-elevated); border-radius: 4px; margin-bottom: 6px;
+  }
+  .acl-row .slug { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; color: var(--text); }
+  .acl-row .ok   { color: var(--green); }
+  .acl-row .bad  { color: var(--red); }
+  .acl-row .note { color: var(--text-muted); }
   .acct-tag.plan { background: rgba(15,184,191,.14); color: var(--accent); border-color: var(--accent); }
   .acct-tag.plan.free { background: rgba(122,141,153,.14); color: var(--text-muted); border-color: var(--border); }
   .acct-plan {
@@ -218,6 +227,16 @@
     </section>
 
     <section class="panel">
+      <h2>Access lists</h2>
+      <p class="lead">Where each race keeps its roster. The config files in the
+        repository are public, so the rosters are moving into KV; this says
+        which races have made it across and which still have addresses in a
+        file anyone can read.</p>
+      <button class="btn" type="button" id="acl-check">Check</button>
+      <div id="acl-out" class="acl-out"></div>
+    </section>
+
+    <section class="card">
       <h2>Accounts</h2>
       <p class="lead">Everyone with a hub account. Tap a row to see the races
         they're an editor or viewer on.</p>
@@ -230,7 +249,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=58"></script>
+<script src="lib/race-core.js?v=59"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -373,6 +392,29 @@
     document.getElementById('reset-email').addEventListener('keydown', (e) => { if (e.key === 'Enter') genReset(); });
     loadAccounts();
     loadAccessRequests();
+    const aclBtn = document.getElementById('acl-check');
+    if (aclBtn) aclBtn.addEventListener('click', async () => {
+      const out = document.getElementById('acl-out');
+      aclBtn.disabled = true; out.textContent = 'Checking…';
+      try {
+        const r = await Race.api.aclStatus();
+        out.innerHTML = (r.races || []).map(x => `
+          <div class="acl-row">
+            <span class="slug">${esc(x.slug)}</span>
+            <span class="${x.inKv ? 'ok' : 'bad'}">${x.inKv ? 'in KV' : 'NOT in KV'}</span>
+            <span class="note">${x.kv ? `${x.kv.people} on the roster, ${x.kv.runnerLinks} runner link(s)` : ''}</span>
+            <span class="note">${x.file && (x.file.createdBy || x.file.people || x.file.runnerLinks)
+              ? 'file still names people' : 'file names nobody'}</span>
+            <span class="${x.safeToStrip ? 'ok' : 'bad'}">${x.safeToStrip ? 'safe to strip' : 'do not strip'}</span>
+          </div>`).join('') +
+          `<div class="acl-row"><span class="slug">${r.safeToStripAll
+            ? 'Every race has its access list in KV.'
+            : 'At least one race does not. Nothing should be stripped yet.'}</span></div>`;
+      } catch (err) {
+        out.innerHTML = `<div class="acl-row"><span class="bad">${esc(err.message || String(err))}</span></div>`;
+      }
+      aclBtn.disabled = false;
+    });
   })();
 
   async function genInvite() {
