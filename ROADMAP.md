@@ -50,6 +50,124 @@ findable only by people who read a roadmap.
 **Still to decide:** whether the cutoff is a date, the launch of billing, or
 a user count. A date is the most honest and the least flexible.
 
+## Where the data lives
+
+**Not built, and the largest single thing on this page.** Unnumbered because
+it sits under the numbered sections rather than beside them.
+
+Race data lives in a git repository, read through the GitHub Contents API and
+served by GitHub Pages. That was the right call to get here: no database to
+run, no bill, every split a signed commit, and the whole thing restorable from
+any clone. It is also the cause of every latency and reliability problem the
+app has, and they are not bugs. They are version control behaving correctly
+while being asked to be a database.
+
+Three symptoms, one mismatch:
+
+| Symptom | Cause |
+|---|---|
+| A new race 404s on its second file | The Contents API is not read-after-write consistent |
+| The map and profile lag a fresh race | Pages rebuilds per commit |
+| Roughly seven dashboards saturate it | 5,000 GitHub API calls per hour, and a 10s poll costs 720 per open tab |
+
+A split is a row that changes every few minutes for thirty hours. Git wants
+immutable, reviewed, atomic history. Every press becoming a commit is absurd
+on its face and works only because the volume is tiny.
+
+### The shape
+
+Split by how the data behaves, rather than moving everything at once.
+
+| | Goes to | Why |
+|---|---|---|
+| Splits, the live file | **D1** | Written constantly, read constantly, needs consistency |
+| `config.json` | **D1** | Written rarely, but must be readable the instant it is written |
+| `course.gpx` | **R2** | Large, immutable per race, wants a URL |
+| The app itself | **Pages, unchanged** | Static HTML that changes when you deploy, which is what Pages is for |
+
+The worker stops being a proxy to GitHub and becomes the API. It is already
+the gate for access, so the ACL work does not move.
+
+Rows rather than a JSON blob is the point, not an implementation detail. A leg
+becomes one insert, so the sha-conflict retry loop disappears, and a client can
+ask for `?since=<timestamp>` and be sent only what changed. That last one is
+impossible against a static file and is what actually removes the read ceiling:
+the poll stops costing a whole race every ten seconds.
+
+Sketch:
+
+```
+races(slug PK, name, location, start_time, config JSON, visibility, created_by, updated_at)
+race_people(slug, email, role)          -- the ACL the worker already enforces
+legs(slug, runner_id, idx, start_time, end_time, calories, fluid_oz, sodium_mg)
+```
+
+### Does it fit in free
+
+Checked against Cloudflare's published limits on 2026-09-07, not from memory.
+
+- **D1 free:** 5 million rows read/day, 100,000 rows written/day, 500MB per
+  database, 5GB per account.
+- **R2 free:** 10GB-month, 1M class A and 10M class B operations/month, and no
+  egress charge.
+
+A hundred miler with 16 segments and four runners is on the order of 128 leg
+writes for the whole race. Against 100,000 a day that is not a constraint in
+any believable future.
+
+Reads are the side to watch, and only if the client keeps asking for
+everything. A 64-leg race polled every ten seconds is about 23,000 rows an hour
+per open tab, so roughly 215 tab-hours a day. Better than GitHub's seven
+concurrent dashboards, but still finite. With `?since=` it stops being a
+number worth tracking.
+
+### What this costs, and it is not nothing
+
+**The repository is currently the backup.** Not a backup strategy anyone
+chose, but a real one: the data is in git, cloned wherever it has been cloned,
+and restorable to any commit. D1 replaces that with Time Travel, which is
+seven days on the free plan. Seven days is a rollback, not an archive, and a
+race someone ran is worth keeping for longer than that.
+
+The answer is to keep git as the archive rather than the store: write to D1
+during the race, and commit a final `data.json` once when the race finishes.
+The audit trail and the `git log` per race survive; the latency does not. That
+also keeps the thing that is genuinely nice about today's design, which is that
+a finished race is a plain file anyone can read without an account.
+
+**Losing per-split authorship.** Every press today is a commit with an author
+and a timestamp. The finish-time archive keeps the record but flattens who
+pressed what. If that matters, an `actor` column on `legs` costs nothing and
+keeps it.
+
+**Region.** D1 has one primary. For a race in Colorado written from a worker at
+a Denver PoP this is not worth thinking about; it is worth thinking about
+before promising an event in another hemisphere.
+
+### Doing it without a big bang
+
+1. Worker gains D1-backed endpoints beside the GitHub ones and **writes to
+   both**. Nothing reads D1 yet, so a bug is invisible.
+2. Reads move to D1. GitHub becomes a write-only mirror, still correct, still
+   the fallback.
+3. New races stop writing to GitHub except the archive commit at finish.
+4. Backfill the existing races and delete the dual-write.
+
+Stopping after step 1 leaves the app exactly as it is today, which is the
+property that makes it safe to start.
+
+### When
+
+The optimisations already shipped make the current design behave for a crew of
+six, and the two still on the table, dropping the `config.json` poll and
+coalescing reads in the worker with the Cache API, would take it to roughly
+twenty-five dashboards for about an hour of work. So there is no emergency.
+
+The signals that say do it now rather than later: two races on the same day,
+one race with a crew big enough to hit the ceiling, or the moment spectator
+traffic is routed through the worker instead of Pages, because then request
+count scales with audience rather than crew and the ceiling arrives at once.
+
 ## 0. The thing the pricing plan assumes and nobody has built
 
 **Billing and plan enforcement.** There is no payment processor, no
@@ -267,6 +385,12 @@ The graphic and the reasoning behind the sequence:
 
 In short:
 
+0. **Where the data lives** sits under all of it. Nothing below requires it
+   first, and the current design has been optimised far enough to run a real
+   race, so it is not a blocker. It is on the list ahead of everything because
+   every week spent building on the repository-as-database is a week of work to
+   port later, and because the ceiling it imposes arrives without warning: the
+   day two races overlap.
 1. **Ship the season you are in.** Race-to-race transfer and the goal-time
    planner are the two things that make a second race easier than the first.
    Both are small, both are self-contained, and neither needs billing.
