@@ -510,8 +510,8 @@
                 <span class="acct-tag plan ${a.plan === 'free' ? 'free' : ''}">${esc(a.plan || 'pro')}${a.earlyAccess ? ' · early' : ''}</span>
                 ${a.source === 'kv' ? `<select class="acct-plan" data-plan-for="${esc(a.email)}" title="Plan">
                     <option value="pro"${a.plan !== 'free' ? ' selected' : ''}>Pro</option>
-                    <option value="free"${a.plan === 'free' ? ' selected' : ''}>Free</option>
-                    <option value="free-capped"${a.plan === 'free' && !a.earlyAccess ? ' selected' : ''}>Free, capped</option>
+                    <option value="free"${a.plan === 'free' && a.earlyAccess ? ' selected' : ''}>Free · early</option>
+                    <option value="free-capped"${a.plan === 'free' && !a.earlyAccess ? ' selected' : ''}>Free</option>
                   </select>` : ''}
                 ${canRemove ? `<button type="button" class="acct-del" data-del="${esc(a.email)}">Remove</button>` : ''}
                 <span class="acct-caret">&#9654;</span>
