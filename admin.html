@@ -74,6 +74,13 @@
 
   /* accounts list */
   .acct-list { display: flex; flex-direction: column; gap: 6px; }
+  .acct-tag.plan { background: rgba(15,184,191,.14); color: var(--accent); border-color: var(--accent); }
+  .acct-tag.plan.free { background: rgba(122,141,153,.14); color: var(--text-muted); border-color: var(--border); }
+  .acct-plan {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    background: var(--bg-input, #121820); color: var(--text, #F0ECE3);
+    border: 1px solid var(--border); border-radius: 3px; padding: 2px 4px;
+  }
   .acct-row {
     background: var(--bg-elevated); border: 1px solid var(--border);
     border-radius: 4px; overflow: hidden;
@@ -480,6 +487,12 @@
               <div class="acct-head">
                 <span class="acct-email">${esc(a.email)}</span>
                 <span class="acct-tag ${a.role === 'admin' ? 'admin' : ''}">${esc(a.role)}</span>
+                <span class="acct-tag plan ${a.plan === 'free' ? 'free' : ''}">${esc(a.plan || 'pro')}${a.earlyAccess ? ' · early' : ''}</span>
+                ${a.source === 'kv' ? `<select class="acct-plan" data-plan-for="${esc(a.email)}" title="Plan">
+                    <option value="pro"${a.plan !== 'free' ? ' selected' : ''}>Pro</option>
+                    <option value="free"${a.plan === 'free' ? ' selected' : ''}>Free</option>
+                    <option value="free-capped"${a.plan === 'free' && !a.earlyAccess ? ' selected' : ''}>Free, no early access</option>
+                  </select>` : ''}
                 ${canRemove ? `<button type="button" class="acct-del" data-del="${esc(a.email)}">Remove</button>` : ''}
                 <span class="acct-caret">&#9654;</span>
               </div>
@@ -488,7 +501,33 @@
         : '<div class="acct-races muted">No accounts yet.</div>';
 
       list.querySelectorAll('.acct-head').forEach(h => {
-        h.addEventListener('click', () => toggleAccount(h.closest('.acct-row')));
+        h.addEventListener('click', (e) => {
+          if (e.target.closest('.acct-plan')) return;   // the picker is not a row toggle
+          toggleAccount(h.closest('.acct-row'));
+        });
+      });
+      // Nothing is charged for yet, so this is how a free account comes to
+      // exist at all: an admin makes one, to see what a free account sees.
+      // "Free, no early access" is the genuinely capped version, since
+      // everyone signing up today is grandfathered into the four features that
+      // ship free. See ROADMAP.md.
+      list.querySelectorAll('.acct-plan').forEach(sel => {
+        sel.addEventListener('click', e => e.stopPropagation());
+        sel.addEventListener('change', async () => {
+          const email = sel.dataset.planFor;
+          const v = sel.value;
+          const plan = v === 'pro' ? 'pro' : 'free';
+          const opts = v === 'free-capped' ? { earlyAccess: false }
+                     : v === 'free' ? { earlyAccess: true } : {};
+          sel.disabled = true;
+          try {
+            await Race.api.setPlan(email, plan, opts);
+            await loadAccounts();
+          } catch (err) {
+            alert('Could not change plan: ' + (err.message || err));
+            sel.disabled = false;
+          }
+        });
       });
       list.querySelectorAll('.acct-del').forEach(b => {
         b.addEventListener('click', async (e) => {

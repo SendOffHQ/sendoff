@@ -233,7 +233,9 @@ async function lookupUser(env, email) {
     if (raw) {
       try {
         const u = JSON.parse(raw);
-        return { email, hash: u.hash, salt: u.salt, iterations: u.iterations, role: u.role || 'crew', source: 'kv' };
+        return { email, hash: u.hash, salt: u.salt, iterations: u.iterations,
+                 role: u.role || 'crew', plan: u.plan || DEFAULT_PLAN,
+                 earlyAccess: u.earlyAccess !== false, source: 'kv' };
       } catch (e) {}
     }
   }
@@ -253,15 +255,97 @@ async function lookupUser(env, email) {
   return null;
 }
 
+// Merge into whatever is already stored rather than replacing it. Every writer
+// below used to reconstruct the record from the handful of fields it happened
+// to care about, so changing a password silently dropped createdAt, and would
+// have dropped a plan the moment one existed.
+async function putUserRecord(env, email, changes) {
+  email = normalizeEmail(email);
+  let existing = {};
+  const raw = await env.AUTH_KV.get('user:' + email);
+  if (raw) { try { existing = JSON.parse(raw) || {}; } catch (e) { existing = {}; } }
+  const next = Object.assign({}, existing, changes, { email });
+  if (!next.role) next.role = 'crew';
+  if (!next.plan) next.plan = DEFAULT_PLAN;
+  // Everyone signing up while these are free keeps them. See ROADMAP.md.
+  if (next.earlyAccess === undefined) next.earlyAccess = true;
+  await env.AUTH_KV.put('user:' + email, JSON.stringify(next));
+  return next;
+}
+
 async function createUserInKv(env, email, password, role) {
   if (!env.AUTH_KV) throw new Error('AUTH_KV is not configured');
   email = normalizeEmail(email);
   const existing = await lookupUser(env, email);
   if (existing) throw new Error('User already exists');
   const { hash, salt, iterations } = await hashPassword(password);
-  await env.AUTH_KV.put('user:' + email, JSON.stringify({
-    email, hash, salt, iterations, role: role || 'crew', createdAt: new Date().toISOString()
-  }));
+  await putUserRecord(env, email, {
+    hash, salt, iterations, role: role || 'crew', createdAt: new Date().toISOString()
+  });
+}
+
+// ---------- plans and entitlements ----------
+// One table, mirrored in lib/race-core.js for the UI. This one is the gate;
+// the copy in the client only decides which buttons to draw. Getting the
+// client's wrong shows somebody a button that fails. Getting this one wrong is
+// a hole.
+//
+// Nothing is charged for yet. Every account is created on `pro` with
+// `earlyAccess` set, deliberately, so the machinery can be exercised long
+// before there is a checkout. An account is moved to `free` by an admin, which
+// is how you test what a free account sees.
+const PLANS = {
+  free: {
+    label: 'Free',
+    maxRunnersPerRace: 1,
+    maxCrewPerRace: 2,
+    privateRaces: false,
+    shareLinks: false
+  },
+  pro: {
+    label: 'Pro',
+    maxRunnersPerRace: null,     // null means no cap
+    maxCrewPerRace: null,
+    privateRaces: true,
+    shareLinks: true
+  }
+};
+const DEFAULT_PLAN = 'pro';
+
+// The promise in ROADMAP.md: four things ship free today that the pricing plan
+// puts in Pro, and anyone using them before that changes keeps them. This is
+// that promise, as one line of code. It grants capabilities and never lifts the
+// scale caps, because the caps were never given away.
+const GRANDFATHERED = ['privateRaces', 'shareLinks'];
+
+function entitlementsFor(user) {
+  const plan = (user && PLANS[user.plan]) ? user.plan : DEFAULT_PLAN;
+  const out = Object.assign({ plan }, PLANS[plan]);
+  if (user && user.earlyAccess) {
+    for (const k of GRANDFATHERED) out[k] = true;
+    out.earlyAccess = true;
+  }
+  return out;
+}
+
+// Entitlements of whoever owns the race, not whoever is writing to it. A crew
+// member on Pro must not be able to raise a free account's race past its caps
+// by editing it.
+async function raceOwnerEntitlements(env, raceCfg) {
+  const owner = raceCfg && raceCfg.createdBy;
+  if (!owner) return entitlementsFor(null);
+  const user = await lookupUser(env, owner);
+  return entitlementsFor(user);
+}
+
+// A cap is checked against what is being asked for, never against what is
+// already stored. A race that is over its cap because the plan changed under it
+// keeps working; it just cannot grow. Bricking somebody's race on the morning
+// of it, over billing, would be indefensible.
+function overCap(cap, wanted, existing) {
+  if (cap == null) return false;
+  if (wanted <= cap) return false;
+  return wanted > Math.max(cap, existing);
 }
 
 // ---------- profiles ----------
@@ -629,10 +713,9 @@ async function handleChangePassword(req, env) {
   const ok = await verifyPassword(currentPassword, user.hash, user.salt, user.iterations);
   if (!ok) return json({ error: 'Current password is incorrect' }, { status: 401 }, env, req);
   const { hash, salt, iterations } = await hashPassword(newPassword);
-  await env.AUTH_KV.put('user:' + session.email, JSON.stringify({
-    email: session.email, hash, salt, iterations,
-    role: user.role || 'crew', updatedAt: new Date().toISOString()
-  }));
+  await putUserRecord(env, session.email, {
+    hash, salt, iterations, updatedAt: new Date().toISOString()
+  });
   return json({ ok: true }, {}, env, req);
 }
 
@@ -706,9 +789,9 @@ async function handleResetPassword(req, env) {
   const existing = await lookupUser(env, rec.email);
   const role = existing ? existing.role : 'crew';
   const { hash, salt, iterations } = await hashPassword(newPassword);
-  await env.AUTH_KV.put('user:' + rec.email, JSON.stringify({
-    email: rec.email, hash, salt, iterations, role, updatedAt: new Date().toISOString()
-  }));
+  await putUserRecord(env, rec.email, {
+    hash, salt, iterations, role, updatedAt: new Date().toISOString()
+  });
   await env.AUTH_KV.delete('reset:' + token);
 
   const exp = Date.now() + SESSION_HOURS * 3600 * 1000;
@@ -805,6 +888,47 @@ async function handleAcceptAccountInvite(req, env) {
 }
 
 // Admin-only: list hub accounts (USERS env + KV) and pending account invites.
+// What the signed-in account may do. The UI reads this to decide which
+// controls to draw; it is never what the gate reads. Every enforcement point
+// above looks the plan up again, so a client holding a stale or edited copy of
+// this gains nothing.
+async function handleEntitlements(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  const user = await lookupUser(env, session.email);
+  return json(entitlementsFor(user), {}, env, req);
+}
+
+// Admin-only: move an account between plans. This exists before billing does,
+// because the only way to see what a free account sees is to have one.
+async function handleAccountPlan(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Plans require AUTH_KV KV namespace binding' }, { status: 503 }, env, req);
+
+  let body;
+  try { body = await req.json(); }
+  catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  const email = normalizeEmail(body && body.email);
+  const plan = body && body.plan;
+  if (!email || !PLANS[plan]) {
+    return json({ error: `email and plan (${Object.keys(PLANS).join('|')}) required` }, { status: 400 }, env, req);
+  }
+  const existing = await lookupUser(env, email);
+  if (!existing) return json({ error: 'Account not found' }, { status: 404 }, env, req);
+  if (existing.source === 'env') {
+    return json({ error: 'This account is in the USERS list and has no stored record to change.' }, { status: 400 }, env, req);
+  }
+  // earlyAccess is a promise made to a person, not a property of a plan, so
+  // moving somebody to free does not quietly take it away. It is settable on
+  // its own, which is the only way to see a genuinely capped free account.
+  const changes = { plan, updatedAt: new Date().toISOString() };
+  if (typeof body.earlyAccess === 'boolean') changes.earlyAccess = body.earlyAccess;
+  const next = await putUserRecord(env, email, changes);
+  return json({ ok: true, email, entitlements: entitlementsFor(next) }, {}, env, req);
+}
+
 async function handleAccounts(req, env) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -816,7 +940,11 @@ async function handleAccounts(req, env) {
   try { envUsers = JSON.parse(env.USERS || '[]'); } catch (e) { envUsers = []; }
   for (const u of envUsers) {
     const email = normalizeEmail(u.email || u.username);
-    if (email) { envEmails.add(email); byEmail.set(email, { email, role: u.role || 'crew', source: 'env' }); }
+    if (email) {
+      envEmails.add(email);
+      byEmail.set(email, { email, role: u.role || 'crew', source: 'env',
+                           plan: u.plan || DEFAULT_PLAN, earlyAccess: u.earlyAccess !== false });
+    }
   }
   const pendingInvites = [];
   if (env.AUTH_KV) {
@@ -827,7 +955,9 @@ async function handleAccounts(req, env) {
       try {
         const u = JSON.parse(raw);
         const email = normalizeEmail(u.email || k.name.slice(5));
-        byEmail.set(email, { email, role: u.role || 'crew', source: 'kv' });
+        byEmail.set(email, { email, role: u.role || 'crew', source: 'kv',
+                             plan: u.plan || DEFAULT_PLAN,
+                             earlyAccess: u.earlyAccess !== false });
       } catch (e) {}
     }
     const invites = await env.AUTH_KV.list({ prefix: 'acct:' });
@@ -968,6 +1098,26 @@ async function handleCommit(req, env) {
       // createdBy to the session email. If a malicious client lies about
       // createdBy, the worst case is the race is owned by the wrong account;
       // they still had to authenticate to reach this endpoint.
+      //
+      // It is also the only moment a race's shape is set with nothing to
+      // compare against, so the plan is checked here against the creator.
+      let created;
+      try { created = JSON.parse(content); } catch (e) { created = null; }
+      if (created && typeof created === 'object' && !Array.isArray(created)) {
+        const ent = entitlementsFor(await lookupUser(env, session.email));
+        if (created.visibility === 'private' && !ent.privateRaces) {
+          return json({
+            error: `Private races are a Pro feature. You are on the ${PLANS[ent.plan].label} plan.`,
+            code: 'plan_limit', limit: 'privateRaces', plan: ent.plan
+          }, { status: 402 }, env, req);
+        }
+        if (overCap(ent.maxRunnersPerRace, (created.runners || []).length, 0)) {
+          return json({
+            error: `The ${PLANS[ent.plan].label} plan allows ${ent.maxRunnersPerRace} runner per race.`,
+            code: 'plan_limit', limit: 'maxRunnersPerRace', plan: ent.plan
+          }, { status: 402 }, env, req);
+        }
+      }
     } else if (!canEditRace(raceCfg, session.email)) {
       return json({ error: 'Forbidden, no write access on this race' }, { status: 403 }, env, req);
     } else if (path.endsWith('/config.json')) {
@@ -976,6 +1126,15 @@ async function handleCommit(req, env) {
       catch (e) { return json({ error: 'config.json must be valid JSON' }, { status: 400 }, env, req); }
       if (!submitted || typeof submitted !== 'object' || Array.isArray(submitted)) {
         return json({ error: 'config.json must be an object' }, { status: 400 }, env, req);
+      }
+      const ent = await raceOwnerEntitlements(env, raceCfg);
+      const wantRunners = (submitted.runners || []).length;
+      const haveRunners = (raceCfg.runners || []).length;
+      if (overCap(ent.maxRunnersPerRace, wantRunners, haveRunners)) {
+        return json({
+          error: `This race is on the ${PLANS[ent.plan].label} plan, which allows ${ent.maxRunnersPerRace} runner. Upgrade to add more.`,
+          code: 'plan_limit', limit: 'maxRunnersPerRace', plan: ent.plan
+        }, { status: 402 }, env, req);
       }
       for (const f of ACL_FIELDS) {
         if (raceCfg[f] === undefined) delete submitted[f];
@@ -1488,6 +1647,20 @@ async function handleAccessAdd(req, env) {
   try { raceCfg = await requireAccessManager(env, slug, session.email); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
 
+  // The cap belongs to whoever owns the race, and it counts the people who can
+  // write. Viewers are not crew and are never capped: telling somebody they may
+  // not be watched is not a business model.
+  if (WRITING_ROLES.has(wanted)) {
+    const ent = await raceOwnerEntitlements(env, raceCfg);
+    const current = racePeople(raceCfg).filter(pp => WRITING_ROLES.has(pp.role) && pp.email !== email);
+    if (overCap(ent.maxCrewPerRace, current.length + 1, current.length)) {
+      return json({
+        error: `This race is on the ${PLANS[ent.plan].label} plan, which allows ${ent.maxCrewPerRace} crew. Upgrade to add more.`,
+        code: 'plan_limit', limit: 'maxCrewPerRace', plan: ent.plan
+      }, { status: 402 }, env, req);
+    }
+  }
+
   const updated = await mutateRaceConfig(env, slug, (cfg) => {
     const people = racePeople(cfg).filter(p => p.email !== email);
     people.push({ email, role: wanted });
@@ -1742,8 +1915,17 @@ async function handleShareLink(req, env) {
   if (role === 'edit') {
     return json({ error: 'Edit share links are not supported: invite an account instead' }, { status: 400 }, env, req);
   }
-  try { await requireAccessManager(env, slug, session.email); }
+  let shareCfg;
+  try { shareCfg = await requireAccessManager(env, slug, session.email); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
+
+  const shareEnt = await raceOwnerEntitlements(env, shareCfg);
+  if (!shareEnt.shareLinks) {
+    return json({
+      error: `Share links are a Pro feature. This race is on the ${PLANS[shareEnt.plan].label} plan.`,
+      code: 'plan_limit', limit: 'shareLinks', plan: shareEnt.plan
+    }, { status: 402 }, env, req);
+  }
 
   const token = randomToken(18);
   const ttlDays = (typeof expiresInDays === 'number' && expiresInDays > 0)
@@ -2044,6 +2226,8 @@ export default {
     if (request.method === 'POST' && path === '/account-invite')  return handleAccountInvite(request, env);
     if (request.method === 'GET'  && path === '/account-invite-info') return handleAccountInviteInfo(request, env);
     if (request.method === 'POST' && path === '/accept-account-invite') return handleAcceptAccountInvite(request, env);
+    if (request.method === 'GET'  && path === '/entitlements')    return handleEntitlements(request, env);
+    if (request.method === 'POST' && path === '/account/plan')    return handleAccountPlan(request, env);
     if (request.method === 'GET'  && path === '/accounts')        return handleAccounts(request, env);
     if (request.method === 'POST' && path === '/account/delete')  return handleAccountDelete(request, env);
     if (request.method === 'GET'  && path === '/account-races')   return handleAccountRaces(request, env);
