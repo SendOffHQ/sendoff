@@ -80,6 +80,16 @@
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
     background: linear-gradient(90deg, var(--runner-color, var(--accent)), transparent);
   }
+  .runner-head-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+  .finish-card-btn {
+    background: rgba(15,184,191,0.12); color: var(--accent);
+    border: 1px solid rgba(15,184,191,0.45); border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase; padding: 6px 11px; cursor: pointer;
+  }
+  .finish-card-btn:hover { background: rgba(15,184,191,0.22); border-color: var(--accent); }
+  .finish-card-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
   .runner-head {
     padding: 24px 28px 20px; border-bottom: 1px solid var(--border);
     display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;
@@ -455,6 +465,7 @@
      predicted position still draw with no signal. The tiles underneath are
      Esri's and will be missing offline; the map is useful without them. -->
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
+<script src="lib/finish-card.js?v=2"></script>
 <script src="lib/race-core.js?v=55"></script>
 <script>
   const REFRESH_MS = 10000;
@@ -692,7 +703,11 @@
             <div class="runner-name">${escapeHtml(runner.name)}</div>
             <div class="runner-bib">${escapeHtml(runner.bib || '')}</div>
           </div>
-          <span class="status-badge status-${c.status}">${statusLabel(c.status)}</span>
+          <div class="runner-head-right">
+            ${c.status === 'finished'
+              ? `<button class="finish-card-btn" type="button" data-card="${escapeHtml(runner.id)}">Finish card</button>` : ''}
+            <span class="status-badge status-${c.status}">${statusLabel(c.status)}</span>
+          </div>
         </div>
 
         <div class="stats">
@@ -1226,6 +1241,17 @@
       banner.style.display = 'none';
     }
   }
+
+  // ---------- finish card ----------
+  // Offered only once someone has finished, because that is the only moment it
+  // is true. Drawn from what this page already has, on this device.
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('[data-card]');
+    if (!btn || !window.FinishCard) return;
+    const runner = (mergedRunners || []).find(r => r.id === btn.dataset.card);
+    if (!runner) return;
+    FinishCard.open({ cfg, runner, gpxPts: courseGpxPts });
+  });
 
   // ---------- access ----------
   // Managing a race happens on the settings page. What this page still needs

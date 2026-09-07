@@ -18,7 +18,7 @@
 // claims clients immediately so a fixed worker takes over on the next load
 // rather than waiting for every tab to close.
 
-const VERSION = 'v3';
+const VERSION = 'v4';
 const SHELL = `sendoff-shell-${VERSION}`;
 const DATA = `sendoff-data-${VERSION}`;
 const OURS = [SHELL, DATA];
@@ -35,6 +35,7 @@ const SHELL_URLS = [
   // a blank ground under a real route line is the honest version of that.
   '/vendor/leaflet-1.9.4/leaflet.js',
   '/vendor/leaflet-1.9.4/leaflet.css',
+  '/lib/finish-card.js',
   '/brand/sendoffprimaryonDark.svg',
   '/brand/sendoff-favicon.svg',
   '/brand/icon-192.png',

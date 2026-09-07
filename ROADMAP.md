@@ -184,10 +184,14 @@ page. This is what spectators actually want and refresh for: not another
 split, but "he ate a full quesadilla and looks brighter than he did at
 sixty."
 
-### Finish card — *not built*
-An auto-generated image at the finish: name, time, course profile, splits.
-The one thing here that spreads on its own, and it needs no social graph
-underneath it.
+### Finish card — *built*
+Shipped. Drawn on the finisher's own device at 1080x1350, with the course
+profile as the hero and the splits marked on it. Nothing is uploaded, so it
+works at a finish line with no signal. See `FEATURES.md`.
+
+Two things deliberately left: there is no square or story crop yet, and the
+image is not used as the race page's own preview when a link is shared,
+which would need something to render it server-side.
 
 ### What this costs, honestly
 Three costs the rest of the roadmap does not have:
@@ -207,8 +211,8 @@ Three costs the rest of the roadmap does not have:
 ### Where it goes in the order
 After billing, alongside spectator alerts, because both need the same two
 things that do not exist: an identity for people without accounts, and a
-delivery path. Build the cheer button and the finish card first; they need
-neither, and they are most of the warmth.
+delivery path. The finish card is done and needed neither.
+The cheer button is the other one that needs no plumbing.
 
 ## 4. Access & branding
 
