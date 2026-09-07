@@ -1,0 +1,3 @@
+# Rendered output. The generator is the source of truth; these are disposable
+# and heavy enough to bloat a Pages repo.
+*.png
