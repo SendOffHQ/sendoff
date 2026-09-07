@@ -284,6 +284,98 @@ async function createUserInKv(env, email, password, role) {
   });
 }
 
+// ---------- the database, written to but not yet read ----------
+// Every write that lands in git also lands here. Reads still come from git, so
+// nothing below can change what anybody sees: a bug here is invisible until
+// the reads move over, which is the whole point of doing it in this order.
+//
+// It never fails a request. If the mirror throws, the git write has already
+// succeeded and the caller is told it worked, because it did. What the mirror
+// costs when it is wrong is a row that disagrees, and there is an admin page
+// that compares the two.
+async function mirrorToD1(env, path, content, actor) {
+  if (!env.DB) return { skipped: 'no DB binding' };
+  const slug = racePathSlug(path);
+  if (!slug) return { skipped: 'not a race path' };
+  try {
+    if (path.endsWith('/config.json')) {
+      const cfg = JSON.parse(content);
+      const acl = (await readAcl(env, slug)) || aclFromConfig(cfg);
+      const stmts = [
+        env.DB.prepare(
+          `INSERT INTO races (slug, name, location, start_time, visibility, created_by, config, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+           ON CONFLICT(slug) DO UPDATE SET
+             name=excluded.name, location=excluded.location, start_time=excluded.start_time,
+             visibility=excluded.visibility, created_by=excluded.created_by,
+             config=excluded.config, updated_at=excluded.updated_at`
+        ).bind(slug, cfg.name || '', cfg.location || null, cfg.startTime || null,
+               cfg.visibility || 'public', acl.createdBy || '', JSON.stringify(cfg)),
+        env.DB.prepare('DELETE FROM race_people WHERE slug = ?').bind(slug)
+      ];
+      for (const person of (acl.people || [])) {
+        stmts.push(env.DB.prepare(
+          'INSERT INTO race_people (slug, email, role) VALUES (?, ?, ?)'
+        ).bind(slug, person.email, person.role));
+      }
+      await env.DB.batch(stmts);
+      return { wrote: 'race', people: (acl.people || []).length };
+    }
+
+    if (path.endsWith('/data.json')) {
+      const data = JSON.parse(content);
+      // The race row has to exist first, because legs reference it. A data
+      // write can arrive before its config on a brand new race.
+      const stmts = [env.DB.prepare(
+        `INSERT INTO races (slug, name, created_by, config) VALUES (?, '', '', '{}')
+         ON CONFLICT(slug) DO NOTHING`).bind(slug)];
+      let n = 0;
+      for (const runner of (data.runners || [])) {
+        if (!runner || !runner.id) continue;
+        for (const leg of (runner.legs || [])) {
+          if (!leg || leg.index == null) continue;
+          n++;
+          stmts.push(env.DB.prepare(
+            `INSERT INTO legs (slug, runner_id, idx, start_time, end_time, calories,
+                               fluid_oz, sodium_mg, intake_estimated, notes, issues, raw,
+                               actor, updated_at)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
+             ON CONFLICT(slug, runner_id, idx) DO UPDATE SET
+               start_time=excluded.start_time, end_time=excluded.end_time,
+               calories=excluded.calories, fluid_oz=excluded.fluid_oz,
+               sodium_mg=excluded.sodium_mg, intake_estimated=excluded.intake_estimated,
+               notes=excluded.notes, issues=excluded.issues, raw=excluded.raw,
+               actor=excluded.actor, updated_at=excluded.updated_at`
+          ).bind(slug, runner.id, leg.index,
+                 leg.startTime || null, leg.endTime || null,
+                 leg.calories == null ? null : leg.calories,
+                 leg.fluidOz == null ? null : leg.fluidOz,
+                 leg.sodiumMg == null ? null : leg.sodiumMg,
+                 leg.intakeEstimated ? 1 : 0,
+                 leg.notes || null,
+                 leg.issues ? JSON.stringify(leg.issues) : null,
+                 JSON.stringify(leg), actor || null));
+        }
+      }
+      // A leg the app has dropped must go here too, or a deleted split lives on.
+      const keep = [];
+      for (const runner of (data.runners || [])) {
+        for (const leg of (runner.legs || [])) {
+          if (runner.id && leg && leg.index != null) keep.push(`${runner.id}\u0000${leg.index}`);
+        }
+      }
+      stmts.push(env.DB.prepare(
+        `DELETE FROM legs WHERE slug = ? AND (runner_id || char(0) || idx) NOT IN
+         (SELECT value FROM json_each(?))`).bind(slug, JSON.stringify(keep)));
+      await env.DB.batch(stmts);
+      return { wrote: 'legs', legs: n };
+    }
+    return { skipped: 'not mirrored' };
+  } catch (e) {
+    return { error: e && e.message ? e.message : String(e) };
+  }
+}
+
 // ---------- plans and entitlements ----------
 // One table, mirrored in lib/race-core.js for the UI. This one is the gate;
 // the copy in the client only decides which buttons to draw. Getting the
@@ -1367,6 +1459,11 @@ async function handleCommit(req, env) {
   if (res.ok && aclUpdate && creationSlug) {
     try { await writeAcl(env, creationSlug, aclUpdate); } catch (e) { /* falls back to the file */ }
   }
+  // The mirror, last and on purpose. git has already accepted the write and the
+  // caller is about to be told it worked, because it did. Nothing reads D1 yet,
+  // so this cannot change what anybody sees; when it disagrees, the admin page
+  // is what says so.
+  if (res.ok) await mirrorToD1(env, path, content, session.email);
   // The cached copy is now wrong. Dropping it means a press is visible on the
   // next poll rather than up to CACHE_TTL_S later, at least in this colo.
   if (res.ok) await purgeReadCache(env, path);
