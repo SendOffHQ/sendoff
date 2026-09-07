@@ -15,6 +15,41 @@ Sources:
 
 ---
 
+## The promise about what is free today
+
+Four things ship free right now that the pricing draft prices into Pro:
+**offline logging**, **private races**, **expiring share links**, and
+**role-based permissions**. That was not a plan, it was the order the work
+happened in. It still has to be dealt with honestly.
+
+The commitment, in the words it should be published in:
+
+> Offline logging, private races, share links and roles are free today.
+> The pricing plan puts them in Pro, and when billing exists they will move
+> there. We would rather tell you that now than surprise you later.
+>
+> **If you are using them before that happens, you keep them.** Accounts
+> created while these are free keep them free, permanently, on the races
+> they already have and on new ones.
+
+Saying only the first half is honest and chilling: it puts a countdown clock
+on the exact adoption the free tier exists to create. The second half turns
+the same disclosure into a reason to sign up this season rather than next.
+It also means nothing is ever taken away from anyone, which is the part that
+would actually cost goodwill.
+
+What it costs: an `earlyAccess` flag on the account, checked alongside the
+plan wherever entitlements are. That is one more branch in the entitlement
+code, forever. Worth it, but it is a real and permanent cost, not a
+free gesture.
+
+Where this gets published: this file, once the repository is public, plus a
+line on the pricing page and on the account screen. It should not be
+findable only by people who read a roadmap.
+
+**Still to decide:** whether the cutoff is a date, the launch of billing, or
+a user count. A date is the most honest and the least flexible.
+
 ## 0. The thing the pricing plan assumes and nobody has built
 
 **Billing and plan enforcement.** There is no payment processor, no
@@ -109,7 +144,73 @@ as a feature.
 
 ---
 
-## 3. Access & branding
+## 3. Social & spectator
+
+Not in the pricing draft at all. Raised as a question, and worth its own
+section because the answer changes where it sits: **social is a growth
+feature, not a revenue one.** Paywalling it defeats the point of it. It
+belongs in free, funded by the tiers above.
+
+One reframe shapes most of it. **The runner is running.** They are not
+reading a comment wall at mile 80, and a phone that buzzes on a ridge is a
+liability. So the destination for anything a spectator sends is the *crew*,
+at an aid station, to be read out loud. That is a better product than a
+comment feed, and it is also the cheaper one to moderate.
+
+### Cheer button — *not built*
+One tap, no typing, no moderation surface. The pit board shows a count the
+crew can hand over as a sentence: "forty people cheered while you were on
+that climb." The smallest possible version of this whole section, and
+probably the one with the best ratio of warmth to work.
+
+### Messages for the next aid station — *not built*
+A spectator writes a line; it queues; the pit board shows it when the runner
+is in the aid station, and a crew member reads it out. Never pushed to the
+runner's own screen. The racer screen stays one button.
+
+### Follow a runner — *not built*
+Person-level rather than race-level: their next race appears in your feed,
+and you are told when it starts. Needs something that does not exist yet, a
+public identity for a runner, since a runner today is a name on one race.
+Pairs with the account link already built for racer mode, and with the race
+archive in section 2.
+
+### Follow a race — *not built*
+The same, for an event rather than a person. Cheap once following exists.
+
+### Crew updates from the aid station — *not built*
+A line of text and optionally a photo, posted by the crew to the public race
+page. This is what spectators actually want and refresh for: not another
+split, but "he ate a full quesadilla and looks brighter than he did at
+sixty."
+
+### Finish card — *not built*
+An auto-generated image at the finish: name, time, course profile, splits.
+The one thing here that spreads on its own, and it needs no social graph
+underneath it.
+
+### What this costs, honestly
+Three costs the rest of the roadmap does not have:
+
+- **Moderation.** The moment a stranger can send words that reach a runner,
+  you own that problem. Mitigations are in the design above: messages go to
+  the crew rather than the runner, the crew can hide a sender, and cheers
+  carry no text at all. Approved-followers-only should be the default.
+- **Privacy.** Following implies people are findable. Races are public by
+  URL today, but *people* are not indexed. Being discoverable has to be
+  opt-in, and a runner who does not want it must not be listed anywhere.
+- **Running cost.** Social is the classic thing that sounds free and is the
+  most expensive to operate: storage, spam, abuse reports, notification
+  volume. It is also the one part of this roadmap that cannot be a static
+  file in a repository.
+
+### Where it goes in the order
+After billing, alongside spectator alerts, because both need the same two
+things that do not exist: an identity for people without accounts, and a
+delivery path. Build the cheer button and the finish card first; they need
+neither, and they are most of the warmth.
+
+## 4. Access & branding
 
 ### Custom accent + logo — *not built*
 The theme is already token-driven (`lib/race-theme.css`), so the mechanism
@@ -126,7 +227,7 @@ something already shipped is the worse of the two.
 
 ---
 
-## 4. Organizer tooling
+## 5. Organizer tooling
 
 None of this is built. It is also where the pricing plan says the revenue is,
 which is worth sitting with: the whole tier is greenfield.
@@ -143,7 +244,7 @@ which is worth sitting with: the whole tier is greenfield.
 
 ---
 
-## 5. Enterprise
+## 6. Enterprise
 
 Custom-priced, and every item is unbuilt. Not worth detailing until one real
 customer asks.
@@ -168,12 +269,15 @@ In short:
    because the free-tier caps need to exist before they can be enforced.
 3. **Then the Pro features that justify the price**: alerts, export, weather,
    archive.
-4. **Then Club**, which is mostly a data-model change (an org above a race).
-5. **Organizer last and deliberately**, as its own project rather than a
+4. **Social alongside the alerts**, since they need the same two missing
+   pieces. It sits in free on purpose: it is what brings people in, not what
+   they pay for. The cheer button and the finish card need none of that
+   plumbing and can come whenever.
+5. **Then Club**, which is mostly a data-model change (an org above a race).
+6. **Organizer last and deliberately**, as its own project rather than a
    drip. It is the largest surface in the plan and the one with a real
    external dependency in timing hardware.
 
-The one ordering trap: offline logging is the wedge the pricing plan is
-built on, and it already ships to everyone for free. Putting it behind Pro
-later takes something away from people who already have it. Decide early
-whether that is the plan.
+The one ordering trap is the four features already shipped free. See the
+promise at the top: the answer is to say so plainly and to let everyone
+using them now keep them.
