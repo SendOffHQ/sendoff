@@ -188,6 +188,28 @@ ok('running it again changes nothing',
     db.prepare('select count(*) c from legs where slug=?').get(OLD).c,
     db.prepare('select count(*) c from race_people where slug=?').get(OLD).c], [true, 2, 1]);
 
+// The failure that actually happened: the migrations never applied, so every
+// query threw and the panel rendered four races with nothing in them, which
+// looks exactly like an empty mirror rather than a missing schema.
+console.log('\na database with no tables says so');
+const bare = new DatabaseSync(':memory:');
+const bareEnv = { ...env, DB: {
+  prepare: (sql) => ({ _sql: sql, _args: [], bind(...a){ this._args=a; return this; },
+    async all(){ return { results: bare.prepare(this._sql).all(...this._args) }; },
+    async run(){ return bare.prepare(this._sql).run(...this._args); } }),
+  async batch(){ throw new Error('no such table: races'); } } };
+const bareRes = await worker.fetch(new Request('https://w/d1-status',
+  { headers: { Authorization: 'Bearer ' + t } }), bareEnv);
+const bareJson = await bareRes.json();
+ok('it reports the database, not the races', [bareJson.races, bareJson.allMatch], [[], false]);
+ok('and says which table is missing', /no such table/.test(bareJson.dbError || ''), true);
+ok('with somewhere to go and look', /Apply D1 migrations/.test(bareJson.hint || ''), true);
+
+const bareFill = await (await worker.fetch(new Request('https://w/d1-backfill',
+  { method: 'POST', headers: { Authorization: 'Bearer ' + t } }), bareEnv)).json();
+ok('the backfill gives one reason rather than four',
+   [bareFill.ok, /no such table/.test(bareFill.why || '')], [false, true]);
+
 console.log('\nand it is admins only');
 const ct = await login(CREW);
 ok('the crew cannot read the status', (await call('/d1-status', { token: ct })).status, 403);

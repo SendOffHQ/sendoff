@@ -437,6 +437,13 @@
     const fillBtn = document.getElementById('d1-fill');
     const d1Out = document.getElementById('d1-out');
     const drawD1 = (r) => {
+      // A broken database is one message, not four rows of zeroes that read
+      // like an empty one.
+      if (r.dbError) {
+        d1Out.innerHTML = `<div class="acl-row"><span class="bad">${esc(r.dbError)}</span></div>` +
+          (r.hint ? `<div class="acl-row"><span class="note">${esc(r.hint)}</span></div>` : '');
+        return;
+      }
       d1Out.innerHTML = (r.races || []).map(x => `
         <div class="acl-row">
           <span class="slug">${esc(x.slug)}</span>
@@ -446,6 +453,7 @@
           <span class="note">${x.legs} leg(s)${x.gitLegs != null && x.gitLegs !== x.legs
             ? `, files say ${x.gitLegs}` : ''}</span>
           <span class="${x.matches ? 'ok' : 'bad'}">${x.matches ? 'matches' : 'does not match'}</span>
+          ${x.note ? `<span class="bad">${esc(x.note)}</span>` : ''}
         </div>`).join('') +
         `<div class="acl-row"><span class="slug">${r.allMatch
           ? 'The database agrees with the files for every race.'
@@ -465,7 +473,7 @@
         // it worked, which is the only one worth trusting.
         d1Out.textContent = r.ok
           ? `Replayed ${(r.races || []).length} race(s). Checking…`
-          : `Failed on: ${(r.failed || []).join(', ')}. Checking…`;
+          : `Failed on ${(r.failed || []).length} race(s): ${r.why || 'no reason given'}. Checking…`;
         drawD1(await Race.api.d1Status());
       } catch (err) {
         d1Out.innerHTML = `<div class="acl-row"><span class="bad">${esc(err.message || String(err))}</span></div>`;
