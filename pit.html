@@ -640,18 +640,24 @@
                      : next.state === 'in-pit'    ? 'In pit for'
                      : next.state === 'finished'  ? 'Total since start' : 'Awaiting start';
 
-    // Intake panel: list completed legs (with startTime+endTime) for editing.
-    const completedLegs = (runner.legs || []).filter(l => l.startTime && l.endTime).sort((a, b) => b.index - a.index);
+    // Intake panel: every leg that has been started, finished or not. A leg in
+    // progress belongs here because the send-off that began it is the thing
+    // most likely to need correcting: a crew watching a start rather than
+    // holding a phone presses a minute or two late, and until now there was
+    // nowhere to fix that until the runner had arrived somewhere.
+    const panelLegs = (runner.legs || []).filter(l => l.startTime).sort((a, b) => b.index - a.index);
     const stickyIdx = stickyIntakeLegByRunner[runner.id];
-    const selectedLegIdx = (stickyIdx && completedLegs.find(l => l.index === stickyIdx))
+    const selectedLegIdx = (stickyIdx && panelLegs.find(l => l.index === stickyIdx))
       ? stickyIdx
-      : (completedLegs[0]?.index || null);
-    const selectedLeg = completedLegs.find(l => l.index === selectedLegIdx);
+      : (panelLegs[0]?.index || null);
+    const selectedLeg = panelLegs.find(l => l.index === selectedLegIdx);
 
-    const legOptions = completedLegs.map(l => {
+    const legOptions = panelLegs.map(l => {
       const def = Race.course.legAt(cfg, l.index);
       const labelText = (def && def.name) ? def.name : `Leg ${l.index}`;
-      return `<option value="${l.index}" ${l.index === selectedLegIdx ? 'selected' : ''}>${escapeHtml(labelText)}</option>`;
+      // Said plainly, so nobody wonders why this one has no times to edit yet.
+      const running = l.endTime ? '' : ' · running';
+      return `<option value="${l.index}" ${l.index === selectedLegIdx ? 'selected' : ''}>${escapeHtml(labelText)}${running}</option>`;
     }).join('');
 
     // One tap per flask or gel: the preset adds its numbers to whatever is
@@ -668,7 +674,7 @@
              >+ ${escapeHtml(p.name)}</button>`).join('')}
         </div>`;
 
-    const intakePanel = completedLegs.length === 0 ? '' : `
+    const intakePanel = panelLegs.length === 0 ? '' : `
       <div class="intake-panel">
         <div class="intake-panel-head">
           <span class="intake-panel-title">Intake / notes</span>
@@ -703,7 +709,7 @@
         <div class="intake-actions">
           <button class="btn primary" data-action="save-intake" data-runner="${runner.id}">Save intake</button>
           <button class="btn" data-action="edit-time" data-runner="${runner.id}" data-leg="${selectedLeg?.index || ''}" data-field="startTime">Edit start time</button>
-          <button class="btn" data-action="edit-time" data-runner="${runner.id}" data-leg="${selectedLeg?.index || ''}" data-field="endTime">Edit end time</button>
+          ${selectedLeg?.endTime ? `<button class="btn" data-action="edit-time" data-runner="${runner.id}" data-leg="${selectedLeg.index}" data-field="endTime">Edit end time</button>` : ''}
         </div>
       </div>
     `;
