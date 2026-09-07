@@ -77,6 +77,12 @@
   .acct-tag.plan { background: rgba(15,184,191,.14); color: var(--accent); border-color: var(--accent); }
   .acct-tag.plan.free { background: rgba(122,141,153,.14); color: var(--text-muted); border-color: var(--border); }
   .acct-plan {
+    /* Sized by its content, not by whatever is left on the line: growing made
+       it push Remove onto a third row. */
+    /* race-theme.css gives every select width:100%, which is right for a form
+       field and wrong for a control sharing a row. Sized by its content here,
+       or it takes the whole line and pushes Remove onto a third one. */
+    flex: 0 0 auto; width: auto; max-width: 100%;
     font-family: 'JetBrains Mono', monospace; font-size: 11px;
     background: var(--bg-input, #121820); color: var(--text, #F0ECE3);
     border: 1px solid var(--border); border-radius: 3px; padding: 2px 4px;
@@ -89,9 +95,23 @@
     display: flex; align-items: center; gap: 10px; padding: 10px 12px;
     cursor: pointer; user-select: none;
     font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    /* Wraps, because an address plus three controls does not fit a phone on one
+       line. Without this the email is handed a couple of characters of width
+       and break-all shatters it down the left edge. */
+    flex-wrap: wrap;
   }
   .acct-head:hover { background: #1f2a33; }
-  .acct-email { flex: 1; color: var(--text); word-break: break-all; }
+  .acct-email {
+    flex: 1 1 auto; min-width: 0; color: var(--text);
+    /* Breaks only where it has to, rather than at every character. */
+    overflow-wrap: anywhere;
+  }
+  /* On a phone the address takes the whole first line and the controls sit
+     under it, which is legible at any address length. */
+  @media (max-width: 560px) {
+    .acct-email { flex-basis: 100%; }
+    .acct-head { row-gap: 8px; }
+  }
   .acct-tag {
     font-size: 8px; letter-spacing: 0.15em; text-transform: uppercase;
     padding: 2px 6px; border-radius: 2px; border: 1px solid currentColor;
@@ -105,7 +125,7 @@
     letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer;
   }
   .acct-del:hover { color: var(--red); border-color: var(--red); }
-  .acct-caret { color: var(--text-muted); font-size: 10px; }
+  .acct-caret { color: var(--text-muted); font-size: 10px; margin-left: auto; }
   .acct-races {
     border-top: 1px solid var(--border); padding: 10px 12px;
     font-family: 'JetBrains Mono', monospace; font-size: 11px;
@@ -491,7 +511,7 @@
                 ${a.source === 'kv' ? `<select class="acct-plan" data-plan-for="${esc(a.email)}" title="Plan">
                     <option value="pro"${a.plan !== 'free' ? ' selected' : ''}>Pro</option>
                     <option value="free"${a.plan === 'free' ? ' selected' : ''}>Free</option>
-                    <option value="free-capped"${a.plan === 'free' && !a.earlyAccess ? ' selected' : ''}>Free, no early access</option>
+                    <option value="free-capped"${a.plan === 'free' && !a.earlyAccess ? ' selected' : ''}>Free, capped</option>
                   </select>` : ''}
                 ${canRemove ? `<button type="button" class="acct-del" data-del="${esc(a.email)}">Remove</button>` : ''}
                 <span class="acct-caret">&#9654;</span>
