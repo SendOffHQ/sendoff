@@ -173,6 +173,16 @@
   .intake-notes textarea {
     min-height: 60px; resize: vertical; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; font-size: 13px;
   }
+  .intake-times {
+    display: flex; flex-wrap: wrap; gap: 6px 18px; margin: -4px 0 12px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim);
+  }
+  .intake-times .k {
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--text-muted); margin-right: 4px;
+  }
+  .intake-times .missing { color: var(--yellow); }
+
   .intake-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .intake-presets { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 14px; }
   .preset-chip {
@@ -475,18 +485,31 @@
   async function editEventTime(runnerId, legIndex, field) {
     const runner = (data.runners || []).find(r => r.id === runnerId);
     const leg = runner && (runner.legs || []).find(l => l.index === legIndex);
-    if (!leg || !leg[field]) return;
-    const cur = new Date(leg[field]);
+    if (!leg) return;
+    const other = field === 'startTime' ? leg.endTime : leg.startTime;
+    // A time that was never recorded still needs a day to sit on: the leg's
+    // other end if it has one, otherwise the race start, otherwise today.
+    const base = new Date(leg[field] || other || cfg.startTime || Date.now());
     const pad = n => String(n).padStart(2, '0');
+    const seed = leg[field] ? new Date(leg[field]) : new Date();
     const input = prompt(
-      `Edit ${field} (24h, HH:MM or HH:MM:SS):`,
-      `${pad(cur.getHours())}:${pad(cur.getMinutes())}:${pad(cur.getSeconds())}`
+      `${leg[field] ? 'Edit' : 'Set'} ${field === 'startTime' ? 'send-off' : 'arrival'} (24h, HH:MM or HH:MM:SS):`,
+      `${pad(seed.getHours())}:${pad(seed.getMinutes())}:${pad(seed.getSeconds())}`
     );
     if (!input) return;
     const m = input.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
     if (!m) { alert('Bad format. Use HH:MM or HH:MM:SS.'); return; }
-    const next = new Date(cur);
+    const next = new Date(base);
     next.setHours(+m[1], +m[2], +(m[3] || 0), 0);
+    // A clock time has no day on it, and this race runs through two nights.
+    // Leaving 00:30 on the day of a 23:50 send-off would read as a leg that
+    // finished twenty-three hours before it started, so the day follows the
+    // only reading that makes sense against the leg's other end.
+    if (field === 'endTime' && leg.startTime && next < new Date(leg.startTime)) {
+      next.setDate(next.getDate() + 1);
+    } else if (field === 'startTime' && leg.endTime && next > new Date(leg.endTime)) {
+      next.setDate(next.getDate() - 1);
+    }
     const iso = next.toISOString();
     try {
       const r = await Race.queue.write(DATA_PATH, 'setLegTimes',
@@ -604,6 +627,21 @@
     return `In pit · next: <strong>${escapeHtml(nextDef ? nextDef.name : '?')}</strong>`;
   }
 
+  // The two times the selected leg actually holds, to the second. A press that
+  // went in a minute late, or one that never went in at all, is the thing a
+  // crew is scanning for, and neither shows up in a duration.
+  function legTimesLine(leg) {
+    if (!leg) return '';
+    const clock = ts => new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+    const cell = (label, ts) => ts
+      ? `<span><span class="k">${label}</span> ${escapeHtml(clock(ts))}</span>`
+      : `<span class="missing"><span class="k">${label}</span> not recorded</span>`;
+    const dur = (leg.startTime && leg.endTime)
+      ? `<span><span class="k">Leg</span> ${Race.fmt.duration((new Date(leg.endTime) - new Date(leg.startTime)) / 1000)}</span>`
+      : (leg.startTime ? '<span class="k">still out</span>' : '');
+    return `<div class="intake-times">${cell('Out', leg.startTime)}${cell('In', leg.endTime)}${dur}</div>`;
+  }
+
   function renderRunner(runner) {
     const next = Race.compute.nextActionFor(runner, cfg);
     let stateClass = next.state === 'on-course' ? 'course' :
@@ -645,7 +683,7 @@
     // most likely to need correcting: a crew watching a start rather than
     // holding a phone presses a minute or two late, and until now there was
     // nowhere to fix that until the runner had arrived somewhere.
-    const panelLegs = (runner.legs || []).filter(l => l.startTime).sort((a, b) => b.index - a.index);
+    const panelLegs = (runner.legs || []).filter(l => l.startTime || l.endTime).sort((a, b) => b.index - a.index);
     const stickyIdx = stickyIntakeLegByRunner[runner.id];
     const selectedLegIdx = (stickyIdx && panelLegs.find(l => l.index === stickyIdx))
       ? stickyIdx
@@ -656,7 +694,7 @@
       const def = Race.course.legAt(cfg, l.index);
       const labelText = (def && def.name) ? def.name : `Leg ${l.index}`;
       // Said plainly, so nobody wonders why this one has no times to edit yet.
-      const running = l.endTime ? '' : ' · running';
+      const running = !l.startTime ? ' · no send-off' : (l.endTime ? '' : ' · running');
       return `<option value="${l.index}" ${l.index === selectedLegIdx ? 'selected' : ''}>${escapeHtml(labelText)}${running}</option>`;
     }).join('');
 
@@ -680,6 +718,7 @@
           <span class="intake-panel-title">Intake / notes</span>
           <select data-intake-leg data-runner="${runner.id}">${legOptions}</select>
         </div>
+        ${legTimesLine(selectedLeg)}
         ${fuelMetrics.length ? `<div class="intake-grid">
           ${fuelMetrics.map(m => `
           <label class="field">
@@ -708,8 +747,8 @@
         </div>
         <div class="intake-actions">
           <button class="btn primary" data-action="save-intake" data-runner="${runner.id}">Save intake</button>
-          <button class="btn" data-action="edit-time" data-runner="${runner.id}" data-leg="${selectedLeg?.index || ''}" data-field="startTime">Edit start time</button>
-          ${selectedLeg?.endTime ? `<button class="btn" data-action="edit-time" data-runner="${runner.id}" data-leg="${selectedLeg.index}" data-field="endTime">Edit end time</button>` : ''}
+          <button class="btn" data-action="edit-time" data-runner="${runner.id}" data-leg="${selectedLeg?.index || ''}" data-field="startTime">${selectedLeg?.startTime ? 'Edit' : 'Set'} start time</button>
+          <button class="btn" data-action="edit-time" data-runner="${runner.id}" data-leg="${selectedLeg?.index || ''}" data-field="endTime">${selectedLeg?.endTime ? 'Edit' : 'Set'} end time</button>
         </div>
       </div>
     `;
