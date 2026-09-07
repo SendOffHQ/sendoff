@@ -8,11 +8,6 @@
     "elevation": "ft"
   },
   "visibility": "public",
-  "createdBy": "thebillyman@gmail.com",
-  "editors": [
-    "thebillyman@gmail.com"
-  ],
-  "viewers": [],
   "cutoffs": {
     "totalHours": 8.5
   },
@@ -20,7 +15,7 @@
     "loopCount": 2,
     "loopSegments": [
       {
-        "name": "Start → Lakeside",
+        "name": "Start \u2192 Lakeside",
         "fromAid": "Start",
         "toAid": "Lakeside",
         "distanceMi": 4.4,
@@ -29,7 +24,7 @@
         "arriveCutoffHours": null
       },
       {
-        "name": "Lakeside → Lakeside (around lake)",
+        "name": "Lakeside \u2192 Lakeside (around lake)",
         "fromAid": "Lakeside",
         "toAid": "Lakeside (around lake)",
         "distanceMi": 1.9,
@@ -38,7 +33,7 @@
         "arriveCutoffHours": null
       },
       {
-        "name": "Lakeside (around lake) → Mountainside",
+        "name": "Lakeside (around lake) \u2192 Mountainside",
         "fromAid": "Lakeside (around lake)",
         "toAid": "Mountainside",
         "distanceMi": 2.9,
@@ -47,7 +42,7 @@
         "arriveCutoffHours": null
       },
       {
-        "name": "Mountainside → Mountainside (loop)",
+        "name": "Mountainside \u2192 Mountainside (loop)",
         "fromAid": "Mountainside",
         "toAid": "Mountainside (loop)",
         "distanceMi": 0.5,
@@ -56,7 +51,7 @@
         "arriveCutoffHours": null
       },
       {
-        "name": "Mountainside (loop) → Pit/Finish",
+        "name": "Mountainside (loop) \u2192 Pit/Finish",
         "fromAid": "Mountainside (loop)",
         "toAid": "Pit/Finish",
         "distanceMi": 3.6,

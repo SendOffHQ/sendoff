@@ -25,13 +25,12 @@
       "runnerNames": [
         "Jason Dupree"
       ],
-      "cutoffHours": 8.5,
-      "createdBy": "thebillyman@gmail.com"
+      "cutoffHours": 8.5
     },
     {
       "slug": "000001-sangre-de-cristo-100",
       "name": "Sangre de Cristo 100",
-      "location": "Music Meadows Ranch · Westcliffe, CO",
+      "location": "Music Meadows Ranch \u00b7 Westcliffe, CO",
       "startTime": "2026-09-26T04:00:00-06:00",
       "courseType": "segments",
       "units": {
@@ -42,8 +41,7 @@
       "runnerNames": [
         "Jason"
       ],
-      "cutoffHours": 38,
-      "createdBy": "thebillyman@gmail.com"
+      "cutoffHours": 38
     }
   ],
   "lastUpdated": "2026-09-07T15:15:43.327Z"

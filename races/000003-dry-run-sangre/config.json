@@ -359,17 +359,12 @@
   "location": "Music Meadows Ranch \u00b7 Westcliffe, CO",
   "startTime": "2026-09-07T08:11:13.300565-06:00",
   "visibility": "private",
-  "createdBy": "thebillyman@gmail.com",
-  "people": [],
-  "editors": [],
-  "viewers": [],
   "runners": [
     {
       "id": "jason",
       "name": "Jason",
       "bib": "147",
-      "color": "#1bc318",
-      "email": "thebillyman@gmail.com"
+      "color": "#1bc318"
     }
   ],
   "crewNotes": "Dry run. Nothing here is real. See DRY-RUN.md in the repo for what to work through."

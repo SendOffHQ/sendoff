@@ -2295,7 +2295,8 @@ async function handleMyRaces(req, env) {
       runnerNames: (cfg.runners || []).map(r => r.name),
       cutoffHours: cfg.cutoffs && cfg.cutoffs.totalHours || null,
       visibility: 'private',
-      createdBy: cfg.createdBy || null,
+      mine: normalizeEmail(cfg.createdBy) === normalizeEmail(session.email),
+      myRole: roleForRace(cfg, session.email),
       role: roleForRace(cfg, session.email) || 'viewer'
     });
     seen.add(slug);
@@ -2306,7 +2307,19 @@ async function handleMyRaces(req, env) {
   // call. Editor status for public races is determined when the user opens
   // race.html (which fetches config.json once for that race and renders the
   // manage-access panel accordingly).
-  return json({ races: [...publicEntries, ...privateAccessible] }, {}, env, req);
+  // The public manifest is a file anyone can read, so it names nobody. Which
+  // of those races are the caller's own is answered here instead, where there
+  // is a session to answer it for.
+  const annotated = [];
+  for (const e of publicEntries) {
+    const cfg = await loadRaceConfig(env, e.slug).catch(() => null);
+    const role = cfg ? roleForRace(cfg, session.email) : null;
+    annotated.push(Object.assign({}, e, {
+      mine: !!(cfg && normalizeEmail(cfg.createdBy) === normalizeEmail(session.email)),
+      myRole: role
+    }));
+  }
+  return json({ races: [...annotated, ...privateAccessible] }, {}, env, req);
 }
 
 // ---------- race deletion ----------
