@@ -83,6 +83,8 @@
   .acl-row .ok   { color: var(--green); }
   .acl-row .bad  { color: var(--red); }
   .acl-row .note { color: var(--text-muted); }
+  /* Two buttons that must not turn into one squashed row on a phone. */
+  .row-btns { display: flex; flex-wrap: wrap; gap: 8px; }
   .acct-tag.plan { background: rgba(15,184,191,.14); color: var(--accent); border-color: var(--accent); }
   .acct-tag.plan.free { background: rgba(122,141,153,.14); color: var(--text-muted); border-color: var(--border); }
   .acct-plan {
@@ -234,6 +236,21 @@
         file anyone can read.</p>
       <button class="btn" type="button" id="acl-check">Check</button>
       <div id="acl-out" class="acl-out"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Database mirror</h2>
+      <p class="lead">Race data is being copied into a database as well as the
+        repository, ahead of reads moving over to it. Check compares what the
+        database holds against what the files hold. Backfill replays every race
+        through the same copy the live writes use, which is how races made
+        before the mirror existed get in. Running it twice is the same as
+        running it once.</p>
+      <div class="row-btns">
+        <button class="btn" type="button" id="d1-check">Check</button>
+        <button class="btn" type="button" id="d1-fill">Backfill</button>
+      </div>
+      <div id="d1-out" class="acl-out"></div>
     </section>
 
     <section class="card">
@@ -414,6 +431,46 @@
         out.innerHTML = `<div class="acl-row"><span class="bad">${esc(err.message || String(err))}</span></div>`;
       }
       aclBtn.disabled = false;
+    });
+
+    const d1Btn = document.getElementById('d1-check');
+    const fillBtn = document.getElementById('d1-fill');
+    const d1Out = document.getElementById('d1-out');
+    const drawD1 = (r) => {
+      d1Out.innerHTML = (r.races || []).map(x => `
+        <div class="acl-row">
+          <span class="slug">${esc(x.slug)}</span>
+          <span class="${x.inD1 ? 'ok' : 'bad'}">${x.inD1 ? 'in the database' : 'NOT in the database'}</span>
+          <span class="note">${x.people} on the roster${x.kvPeople != null && x.kvPeople !== x.people
+            ? ` (KV says ${x.kvPeople})` : ''}</span>
+          <span class="note">${x.legs} leg(s)${x.gitLegs != null && x.gitLegs !== x.legs
+            ? `, files say ${x.gitLegs}` : ''}</span>
+          <span class="${x.matches ? 'ok' : 'bad'}">${x.matches ? 'matches' : 'does not match'}</span>
+        </div>`).join('') +
+        `<div class="acl-row"><span class="slug">${r.allMatch
+          ? 'The database agrees with the files for every race.'
+          : 'At least one race disagrees. Backfill, then check again.'}</span></div>`;
+    };
+    if (d1Btn) d1Btn.addEventListener('click', async () => {
+      d1Btn.disabled = true; d1Out.textContent = 'Checking…';
+      try { drawD1(await Race.api.d1Status()); }
+      catch (err) { d1Out.innerHTML = `<div class="acl-row"><span class="bad">${esc(err.message || String(err))}</span></div>`; }
+      d1Btn.disabled = false;
+    });
+    if (fillBtn) fillBtn.addEventListener('click', async () => {
+      fillBtn.disabled = true; d1Btn.disabled = true; d1Out.textContent = 'Backfilling…';
+      try {
+        const r = await Race.api.d1Backfill();
+        // The backfill's own report says what it did; the check says whether
+        // it worked, which is the only one worth trusting.
+        d1Out.textContent = r.ok
+          ? `Replayed ${(r.races || []).length} race(s). Checking…`
+          : `Failed on: ${(r.failed || []).join(', ')}. Checking…`;
+        drawD1(await Race.api.d1Status());
+      } catch (err) {
+        d1Out.innerHTML = `<div class="acl-row"><span class="bad">${esc(err.message || String(err))}</span></div>`;
+      }
+      fillBtn.disabled = false; d1Btn.disabled = false;
     });
   })();
 
