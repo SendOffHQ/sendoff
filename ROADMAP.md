@@ -43,6 +43,19 @@ plan wherever entitlements are. That is one more branch in the entitlement
 code, forever. Worth it, but it is a real and permanent cost, not a
 free gesture.
 
+**Built, and only halfway.** The flag exists and is set on every account
+created (`worker/src/worker.js`, `GRANDFATHERED`), but it restores two of the
+four things named above: private races and share links. Offline logging and
+role-based permissions are missing from it because neither is gated by plan at
+all yet, so there is nothing for the flag to restore.
+
+That is a trap with a delay on it. The day either one is put behind a plan, it
+has to be added to `GRANDFATHERED` in the same change, or the promise silently
+breaks for everyone who signed up while it was free, and breaks quietly enough
+that nobody notices until somebody loses something. Whoever gates offline
+logging or roles should treat updating that list as part of the work, not as a
+follow-up.
+
 Where this gets published: this file, once the repository is public, plus a
 line on the pricing page and on the account screen. It should not be
 findable only by people who read a roadmap.
