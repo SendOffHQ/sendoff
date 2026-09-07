@@ -1,0 +1,153 @@
+<!-- Contact sheet for the social set.
+     Exists because Pages 404s a directory with no index, and the images are
+     most wanted on a phone, where a checkout and a Playwright run are not an
+     option. Long-press an image to save it; the caption link is the direct
+     file if you would rather download it outright. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SendOff · social assets</title>
+<link rel="icon" href="../sendoff-favicon.svg" type="image/svg+xml">
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<meta name="theme-color" content="#0A0F14">
+<meta name="description" content="The SendOff Instagram set: intro carousel, stories and the profile triptych.">
+<link rel="canonical" href="https://sendoff.run/brand/social/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SendOff">
+<meta property="og:title" content="SendOff · Social assets">
+<meta property="og:description" content="The SendOff Instagram set: intro carousel, stories and the profile triptych.">
+<meta property="og:url" content="https://sendoff.run/brand/social/">
+<meta property="og:image" content="https://sendoff.run/brand/social/sendoff-ig-01.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Barlow+Condensed:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--so-void);color:var(--so-ink-on-dark);
+    font-family:var(--so-font-body);font-size:15px;line-height:1.6;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:940px;margin:0 auto;padding:0 24px 96px}
+  a{color:var(--so-signal-on-dark)}
+  h1,h2{font-family:var(--so-font-display);margin:0;letter-spacing:-.02em}
+  h1{font-size:40px;font-weight:800;line-height:1.05}
+  h2{font-size:26px;font-weight:600}
+  p{margin:0;max-width:66ch}
+  .lede{color:var(--so-mute);font-size:17px;max-width:62ch}
+  .label{font-family:var(--so-font-mono);font-size:10px;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--so-mute)}
+  header.page{padding:72px 0 0;display:flex;flex-direction:column;gap:18px}
+  header.page .back{font-family:var(--so-font-mono);font-size:12px;
+    letter-spacing:.12em;text-transform:uppercase;text-decoration:none}
+  section{padding-top:64px;display:flex;flex-direction:column;gap:18px}
+  section>hr{border:0;border-top:1px solid var(--so-line);margin:0 0 4px}
+
+  /* Three across on a desktop, two on a phone. The tiles are portrait and
+     the point is to recognise them, not to read them, so they stay small. */
+  .grid{display:grid;gap:16px;grid-template-columns:repeat(3,1fr)}
+  .grid.stories{grid-template-columns:repeat(3,1fr)}
+  @media (max-width:640px){.grid,.grid.stories{grid-template-columns:repeat(2,1fr)}}
+  figure{margin:0;display:flex;flex-direction:column;gap:8px}
+  figure img{width:100%;height:auto;display:block;border-radius:10px;
+    border:1px solid var(--so-line);background:var(--so-panel)}
+  figcaption{font-family:var(--so-font-mono);font-size:11px;color:var(--so-mute)}
+  figcaption a{text-decoration:none}
+  figcaption a:hover{text-decoration:underline}
+
+  /* The triptych is one picture cut in three, so show it joined. */
+  .trip{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;
+    border-radius:10px;overflow:hidden;border:1px solid var(--so-line)}
+  .trip img{width:100%;height:auto;display:block}
+  .note{color:var(--so-mute);font-size:14px;max-width:62ch}
+  .note strong{color:var(--so-ink-on-dark);font-weight:600}
+  ol.steps{margin:0;padding-left:20px;color:var(--so-mute);max-width:62ch}
+  ol.steps li{margin-bottom:6px}
+  code{font-family:var(--so-font-mono);font-size:13px;color:var(--so-signal-on-dark)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <a class="back" href="../">&larr; Brand reference</a>
+  <p class="label">Social</p>
+  <h1>Instagram set</h1>
+  <p class="lede">Rendered from <code>ig.html</code> in headless Chromium, so
+  the slides use the app's own type, colour tokens and wordmark rather than an
+  approximation of them. Long-press any image to save it.</p>
+</header>
+
+<section>
+  <hr>
+  <h2>Intro carousel</h2>
+  <p class="note">Six slides at 1080&times;1350. Post them in order as one
+  carousel.</p>
+  <div class="grid" id="carousel"></div>
+</section>
+
+<section>
+  <hr>
+  <h2>Stories</h2>
+  <p class="note">The same six at 1080&times;1920. Redrawn rather than
+  rescaled: Instagram covers roughly the top and bottom 250px, so everything
+  readable sits between them and the extra height went into larger type.</p>
+  <div class="grid stories" id="stories"></div>
+</section>
+
+<section>
+  <hr>
+  <h2>Profile triptych</h2>
+  <p class="note">The wordmark across three tiles. Post them
+  <strong>3, then 2, then 1</strong>: the grid fills right to left along the
+  top row, so that order puts them left to right.</p>
+  <div class="trip" id="trip"></div>
+  <p class="note">The tiles overlap by 40px, about four screen pixels at grid
+  size. Too little to read as a repeat, enough that nothing lands in the
+  gutter between tiles.</p>
+  <div class="grid" id="triplinks"></div>
+</section>
+
+<section>
+  <hr>
+  <h2>Rebuilding the set</h2>
+  <ol class="steps">
+    <li>Edit <code>brand/social/ig.html</code>.</li>
+    <li><code>node shoot.js &amp;&amp; python3 cut.py</code> in that directory.</li>
+    <li>Commit the regenerated PNGs, or the images here stop matching their source.</li>
+  </ol>
+  <p class="note">The fonts are vendored locally on purpose. The first build
+  linked Google Fonts, the renderer had no network, and every image came out
+  in a system fallback before anyone noticed. <code>shoot.js</code> now exits
+  non-zero if a face is missing. See <a href="README.md">README.md</a>.</p>
+</section>
+
+</div>
+
+<script>
+  // Built from a list rather than typed out fifteen times, so adding a slide
+  // to ig.html means changing one number here.
+  const fill = (id, items) => {
+    document.getElementById(id).innerHTML = items.map(([file, cap]) => `
+      <figure>
+        <a href="${file}"><img src="${file}" alt="${cap}" loading="lazy"></a>
+        <figcaption><a href="${file}" download>${cap}</a></figcaption>
+      </figure>`).join('');
+  };
+  const n = i => String(i).padStart(2, '0');
+  const six = (prefix) => Array.from({length: 6}, (_, i) =>
+    [`sendoff-${prefix}-${n(i + 1)}.png`, `${i + 1} of 6`]);
+
+  fill('carousel', six('ig'));
+  fill('stories', six('story'));
+  fill('triplinks', [1, 2, 3].map(i =>
+    [`sendoff-pin-${i}-of-3.png`, `Tile ${i}`]));
+  document.getElementById('trip').innerHTML = [1, 2, 3].map(i =>
+    `<img src="sendoff-pin-${i}-of-3.png" alt="Wordmark tile ${i} of 3" loading="lazy">`
+  ).join('');
+</script>
+</body>
+</html>

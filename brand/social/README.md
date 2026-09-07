@@ -1,5 +1,7 @@
 # Social assets
 
+Contact sheet: <https://sendoff.run/brand/social/>
+
 The generator for SendOff's Instagram set. It renders HTML in headless
 Chromium and screenshots it, so the slides use the same type stack, colour
 tokens and wordmark as the app rather than an approximation of them drawn by
