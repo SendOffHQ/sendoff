@@ -1,0 +1,48 @@
+# Publishes the site from a workflow instead of letting Pages build the branch.
+#
+# The reason is the build limit, not the build. Every split a crew logs is a
+# commit, every commit to a branch-built Pages site is a build, and Pages soft
+# limits that to ten an hour. A crew working four runners through an aid
+# station passes ten in minutes, and the failure is quiet: builds queue, and the
+# copy of the data that spectators without an account are reading stops moving.
+# That limit does not apply to a site published by a workflow.
+#
+# Nothing about what is served changes. The whole repository root goes up, the
+# same as the branch build, minus .git and .github which the upload action drops
+# on its own. Hidden files are dropped too, which only affects .nojekyll, and
+# Jekyll never runs here anyway.
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+  # Lets you republish the current main without a commit.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time. Queued runs in between are dropped and the newest
+# wins, which is what a burst of split commits should do. In-progress runs are
+# deliberately not cancelled: a half-finished deployment is worse than a slow
+# one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
