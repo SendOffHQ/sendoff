@@ -1201,6 +1201,22 @@ async function handleD1Status(req, env) {
   const slugs = await listRaceSlugs(env);
   if (!slugs) return json({ error: 'Could not list races' }, { status: 502 }, env, req);
 
+  // Asked once, before anything per race. A database with no tables in it
+  // answers every count with an error, and reporting that four times as "this
+  // race has no legs" would read as an empty mirror rather than a broken one.
+  let dbError = null;
+  try {
+    await env.DB.prepare('SELECT count(*) AS c FROM races').all();
+    await env.DB.prepare('SELECT count(*) AS c FROM race_people').all();
+    await env.DB.prepare('SELECT count(*) AS c FROM legs').all();
+  } catch (e) {
+    dbError = e && e.message ? e.message : String(e);
+    return json({ races: [], allMatch: false, dbError,
+      hint: 'The tables are missing. Check the "Apply D1 migrations" step of the ' +
+            'last worker deploy: it is allowed to fail without failing the build.' },
+      {}, env, req);
+  }
+
   const rows = [];
   for (const slug of slugs) {
     let race = null, people = 0, legs = 0, gitLegs = null, note = null;
@@ -1234,7 +1250,7 @@ async function handleD1Status(req, env) {
       note
     });
   }
-  return json({ races: rows, allMatch: rows.every(r => r.matches) }, {}, env, req);
+  return json({ races: rows, allMatch: rows.every(r => r.matches), dbError: null }, {}, env, req);
 }
 
 // Replays every race through the same mirror the live writes use, rather than
@@ -1267,7 +1283,14 @@ async function handleD1Backfill(req, env) {
   }
   const failed = rows.filter(r => (r['config.json'] && r['config.json'].error) ||
                                   (r['data.json'] && r['data.json'].error));
-  return json({ races: rows, ok: failed.length === 0, failed: failed.map(r => r.slug) }, {}, env, req);
+  // One reason, not four copies of it: a missing table fails every race
+  // identically, and the reason is the only part worth reading.
+  const why = failed.length
+    ? ((failed[0]['config.json'] && failed[0]['config.json'].error) ||
+       (failed[0]['data.json'] && failed[0]['data.json'].error))
+    : null;
+  return json({ races: rows, ok: failed.length === 0,
+                failed: failed.map(r => r.slug), why }, {}, env, req);
 }
 
 async function handleAccounts(req, env) {
