@@ -516,6 +516,9 @@
   // Update nav links to carry the slug
 
   let cfg = null, data = null;
+  // How stale the race's own settings are allowed to get. See load().
+  const CFG_MAX_AGE_MS = 60000;
+  let cfgFetchedAt = 0;
   let lastFetchAt = null;
   const LEGLOG_KEY = `race-${slug}-leglog-collapsed-v1`;
 
@@ -933,10 +936,20 @@
       // when we move to private-backend storage this becomes mandatory).
       Race.share.captureFromUrl();
 
-      // config rarely changes: Pages is fine. data.json is the live file:
-      // signed-in crew read it through the worker so a pit press shows up
-      // within a poll instead of waiting on the Pages rebuild.
-      cfg  = await Race.gh.readRaceJson(slug, 'config.json', true);
+      // data.json is the live file and is read every poll. config.json is the
+      // course, the roster and the fueling plan: it changes when somebody edits
+      // the race, not when somebody presses a button, so re-reading it every
+      // ten seconds doubled the cost of watching a race to keep an eye on
+      // something that is almost never different. It is refreshed on the first
+      // load and then at most once a minute, which is well inside the time it
+      // takes anyone to walk from a laptop to an aid station.
+      //
+      // Both go through the worker for a signed-in reader, so a pit press
+      // shows up within a poll rather than waiting on the Pages rebuild.
+      if (!cfg || Date.now() - cfgFetchedAt > CFG_MAX_AGE_MS) {
+        cfg = await Race.gh.readRaceJson(slug, 'config.json', true);
+        cfgFetchedAt = Date.now();
+      }
       // Replay anything this device logged but has not managed to send yet, so
       // a solo runner watching their own dashboard sees the split they just
       // pressed instead of wondering whether it took.

@@ -345,6 +345,61 @@ async function githubGet(env, path) {
   return res;
 }
 
+// Reads coalesced in the edge cache.
+//
+// Watching a race is a poll, and every poll of a race file costs two GitHub
+// calls: one to read the race config for the access check, and one for the
+// file itself. Six polls a minute across two files is 1,440 calls an hour per
+// open dashboard, and GitHub allows 5,000, so three or four people watching
+// the same race was the whole budget. Cached, a hundred people watching one
+// race cost what one person costs.
+//
+// The window is deliberately shorter than any poll interval, and a write
+// purges the paths it touched, so the only staleness left is between readers
+// during the same three seconds. The purge is per-colo, which is what the
+// short window is really for: a reader somewhere else can still be up to
+// CACHE_TTL_S behind.
+//
+// The access check is not cached. It re-runs against the cached config on
+// every single request, so this changes how often GitHub is asked, never who
+// is allowed to see the answer.
+const CACHE_TTL_S = 3;
+
+function readCacheKey(env, path) {
+  const owner = env.GITHUB_OWNER, repo = env.GITHUB_REPO;
+  const branch = env.GITHUB_BRANCH || 'main';
+  return new Request(
+    `https://race-read-cache.invalid/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/` +
+    `${encodeURIComponent(branch)}/${encodeURIComponent(path)}`);
+}
+
+// Same contract as githubGet, plus a short shared cache. Only 200s are cached:
+// a cached 404 is the exact failure that made creating a race break.
+async function githubGetShared(env, path) {
+  let cache = null;
+  try { cache = caches.default; } catch (e) { /* no cache here, go direct */ }
+  const key = cache ? readCacheKey(env, path) : null;
+  if (cache) {
+    const hit = await cache.match(key);
+    if (hit) return hit;
+  }
+  const res = await githubGet(env, path);
+  if (cache && res.status === 200) {
+    const body = await res.clone().text();
+    const cacheable = new Response(body, {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${CACHE_TTL_S}` }
+    });
+    try { await cache.put(key, cacheable.clone()); } catch (e) { /* best effort */ }
+    return cacheable;
+  }
+  return res;
+}
+
+async function purgeReadCache(env, path) {
+  try { await caches.default.delete(readCacheKey(env, path)); } catch (e) { /* best effort */ }
+}
+
 async function githubGetJson(env, path) {
   const res = await githubGet(env, path);
   if (res.status === 404) return { sha: null, data: null, missing: true };
@@ -415,6 +470,20 @@ function racePathSlug(path) {
 async function loadRaceConfig(env, slug) {
   const r = await githubGetJson(env, `races/${slug}/config.json`);
   return r.missing ? null : r.data;
+}
+
+// The same, off the shared read cache. Reads only. handleCommit deliberately
+// keeps the uncached one: it reads the config to carry the ACL fields across a
+// write, and acting on a roster three seconds out of date is not a trade worth
+// making to save one API call.
+async function loadRaceConfigShared(env, slug) {
+  const res = await githubGetShared(env, `races/${slug}/config.json`);
+  if (res.status === 404) return null;
+  if (!res.ok) return null;
+  try {
+    const j = await res.clone().json();
+    return JSON.parse(base64ToUtf8(j.content));
+  } catch (e) { return null; }
 }
 
 // GitHub's Contents API is not read-after-write consistent, and the wizard
@@ -940,6 +1009,9 @@ async function handleCommit(req, env) {
   // Only once GitHub has actually taken the file: a grant for a write that
   // failed would authorise data.json against a race that does not exist.
   if (res.ok && isCreation) await noteRaceCreated(env, creationSlug, session.email);
+  // The cached copy is now wrong. Dropping it means a press is visible on the
+  // next poll rather than up to CACHE_TTL_S later, at least in this colo.
+  if (res.ok) await purgeReadCache(env, path);
   return new Response(text, {
     status: res.status,
     headers: { 'Content-Type': 'application/json', ...corsHeaders(env, req) }
@@ -965,7 +1037,7 @@ async function handleGet(req, env) {
     }
   } else if (isRacePath(path)) {
     const slug = racePathSlug(path);
-    const raceCfg = await loadRaceConfig(env, slug);
+    const raceCfg = await loadRaceConfigShared(env, slug);
     if (!raceCfg) return json({ error: 'Not found' }, { status: 404 }, env, req);
     let allowed = false;
     if (sessionEmail && canViewRace(raceCfg, sessionEmail)) allowed = true;
@@ -989,14 +1061,7 @@ async function handleGet(req, env) {
     return json({ error: 'Forbidden path' }, { status: 403 }, env, req);
   }
 
-  const ghUrl = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURI(path)}?ref=${encodeURIComponent(env.GITHUB_BRANCH || 'main')}`;
-  const res = await fetch(ghUrl, {
-    headers: {
-      Authorization: `token ${env.GITHUB_TOKEN}`,
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'race-dashboard-proxy'
-    }
-  });
+  const res = await githubGetShared(env, path);
   const text = await res.text();
   return new Response(text, {
     status: res.status,
