@@ -316,6 +316,12 @@ const DEFAULT_PLAN = 'pro';
 // puts in Pro, and anyone using them before that changes keeps them. This is
 // that promise, as one line of code. It grants capabilities and never lifts the
 // scale caps, because the caps were never given away.
+//
+// Two of the four, not four. The promise also covers offline logging and
+// role-based permissions, and neither is here because neither is gated by plan
+// yet, so there is nothing to restore. Gating either one means adding it to
+// this list in the same change. Leaving it for afterwards breaks the promise
+// for every account that signed up while it was free, and does it quietly.
 const GRANDFATHERED = ['privateRaces', 'shareLinks'];
 
 function entitlementsFor(user) {
