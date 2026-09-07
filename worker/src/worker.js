@@ -1043,6 +1043,47 @@ async function handleAccountPlan(req, env) {
   return json({ ok: true, email, entitlements: entitlementsFor(next) }, {}, env, req);
 }
 
+// Admin-only: what the access list holds for every race, and what the config
+// file still says. Exists because the roster is about to be deleted from those
+// files, and "the migration probably ran" is not a thing to act on when being
+// wrong locks a crew out of a race.
+async function handleAclStatus(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'No AUTH_KV bound' }, { status: 503 }, env, req);
+
+  const slugs = await listRaceSlugs(env);
+  if (!slugs) return json({ error: 'Could not list races' }, { status: 502 }, env, req);
+
+  const rows = [];
+  for (const slug of slugs) {
+    const stored = await readAcl(env, slug);
+    let file = null;
+    try {
+      const r = await githubGetJson(env, `races/${slug}/config.json`);
+      if (!r.missing) file = aclFromConfig(r.data);
+    } catch (e) { /* reported as null below */ }
+    rows.push({
+      slug,
+      inKv: !!stored,
+      kv: stored ? {
+        createdBy: !!stored.createdBy,
+        people: stored.people.length,
+        runnerLinks: Object.keys(stored.runnerEmails || {}).length
+      } : null,
+      file: file ? {
+        createdBy: !!file.createdBy,
+        people: file.people.length,
+        runnerLinks: Object.keys(file.runnerEmails || {}).length
+      } : null,
+      // The only thing that matters before the files are stripped.
+      safeToStrip: !!(stored && stored.createdBy)
+    });
+  }
+  return json({ races: rows, safeToStripAll: rows.every(r => r.safeToStrip) }, {}, env, req);
+}
+
 async function handleAccounts(req, env) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -2414,6 +2455,7 @@ export default {
     if (request.method === 'POST' && path === '/account-invite')  return handleAccountInvite(request, env);
     if (request.method === 'GET'  && path === '/account-invite-info') return handleAccountInviteInfo(request, env);
     if (request.method === 'POST' && path === '/accept-account-invite') return handleAcceptAccountInvite(request, env);
+    if (request.method === 'GET'  && path === '/acl-status')      return handleAclStatus(request, env);
     if (request.method === 'GET'  && path === '/entitlements')    return handleEntitlements(request, env);
     if (request.method === 'POST' && path === '/account/plan')    return handleAccountPlan(request, env);
     if (request.method === 'GET'  && path === '/accounts')        return handleAccounts(request, env);
