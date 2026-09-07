@@ -44,6 +44,11 @@ jobs:
 
       - run: npm ci
 
+      # The worker gates every write. A deploy that breaks it is worse than a
+      # deploy that does not happen, so the suite runs before anything reaches
+      # Cloudflare.
+      - run: npm test
+
       # A missing secret otherwise surfaces as an opaque wrangler auth error.
       - name: Check credentials are configured
         env:
