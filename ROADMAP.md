@@ -62,17 +62,42 @@ any clone. It is also the cause of every latency and reliability problem the
 app has, and they are not bugs. They are version control behaving correctly
 while being asked to be a database.
 
-Three symptoms, one mismatch:
+Four symptoms, one mismatch:
 
 | Symptom | Cause |
 |---|---|
 | A new race 404s on its second file | The Contents API is not read-after-write consistent |
 | The map and profile lag a fresh race | Pages rebuilds per commit |
-| Roughly seven dashboards saturate it | 5,000 GitHub API calls per hour, and a 10s poll costs 720 per open tab |
+| A handful of dashboards saturate it | 5,000 GitHub API calls an hour, against 1,440 per open tab before the read cache |
+| **A busy aid station throttles the site** | **Every press is a commit, every commit is a Pages build, and Pages soft-limits a branch-built site to 10 builds an hour** |
 
 A split is a row that changes every few minutes for thirty hours. Git wants
 immutable, reviewed, atomic history. Every press becoming a commit is absurd
 on its face and works only because the volume is tiny.
+
+The build limit is the one that arrives first and was the last to be noticed.
+This repository has already had hours of 15, 15, 12 and 11 commits, from
+development rather than a race, and Six-0 alone took 38 commits to `data.json`
+for a single runner over a marathon. Four runners cycling through an aid
+station inside ten minutes goes well past ten. Throttled builds do not fail
+loudly: the Pages copy of the data simply stops updating, which is exactly what
+a spectator without an account is reading.
+
+### Three shapes of load, and only one scales badly
+
+Worth separating before choosing anything, because they have nothing in common
+except the word traffic.
+
+| | Volume | Grows with |
+|---|---|---|
+| Crew writes | About 128 for a hundred miler | Nothing. Ten thousand concurrent races is 1.3M writes a day, which one small database does without noticing |
+| Crew reads | 2 to 10 tabs a race | Crew size, which physics bounds |
+| **Spectator reads** | **Unbounded** | **Audience. At any real scale this is almost all of it** |
+
+The saving grace is that every spectator of a race sees identical bytes. That
+makes the expensive path a caching problem rather than a database problem,
+which is the cheapest kind there is, but only if the app is arranged so the
+cache can do the work.
 
 ### The shape
 
@@ -156,17 +181,72 @@ before promising an event in another hemisphere.
 Stopping after step 1 leaves the app exactly as it is today, which is the
 property that makes it safe to start.
 
+### The published copy, and why it is a separate job
+
+Moving writes to a database fixes correctness and the build limit. It does not
+by itself fix spectators, because a thousand people watching would then be a
+thousand database reads every ten seconds for bytes that are all the same.
+
+So a race also has a **published copy**: one object per race, rewritten
+whenever something changes, served from the edge. KV or R2. The cost of one
+more viewer approaches nothing, and the database is never in the path of a
+spectator at all.
+
+Two things belong with it:
+
+- **Conditional requests.** An ETag and a 304 mean a poll that finds nothing
+  new does no origin work. This is most of the win for the least effort, and it
+  is worth doing even before the storage move.
+- **Push rather than poll**, eventually, over SSE or Durable Objects. Polling
+  is what makes an audience expensive.
+
+Rough cost at a scale that would count as working: a thousand simultaneous
+viewers polling every ten seconds is about 8.6M requests a day, which on
+Cloudflare's paid Workers plan is $5 a month plus $0.30 a million, so under a
+hundred dollars, and most of those never reach the worker once the published
+copy is cached. The infrastructure is not what makes this hard.
+
+### The fork worth picking deliberately
+
+The two halves of the pricing plan have opposite load shapes, and the answer
+above is only mandatory for one of them.
+
+- **Crew product:** many races, tiny audiences, spread across a calendar. Load
+  is diffuse and almost any design survives it.
+- **Organizer product:** one race, thousands of spectators, all of it inside a
+  single day. Load is spiky and concentrated, and this is the half the pricing
+  plan says the revenue is in.
+
+If organizer is real, the published copy is not an optimisation to reach for
+later. Retrofitting it underneath live spectator traffic is the worst available
+time to do it.
+
 ### When
 
-The optimisations already shipped make the current design behave for a crew of
-six, and the two still on the table, dropping the `config.json` poll and
-coalescing reads in the worker with the Cache API, would take it to roughly
-twenty-five dashboards for about an hour of work. So there is no emergency.
+An earlier draft of this section said there was no emergency and named two
+concurrent races as the trigger. That was wrong about which limit fires first.
 
-The signals that say do it now rather than later: two races on the same day,
-one race with a crew big enough to hit the ceiling, or the moment spectator
-traffic is routed through the worker instead of Pages, because then request
-count scales with audience rather than crew and the ceiling arrives at once.
+The read optimisations have shipped, and a tab now costs 420 worker requests an
+hour rather than 720, with GitHub asked at most once per path per three seconds
+however many people are watching. Measured, that is roughly ten dashboards open
+continuously, or fifteen across a race that straddles two days, and GitHub is no
+longer what runs out first.
+
+The build limit is, and it fires on race one. A crew working a busy aid station
+will exceed ten commits in an hour, and the failure is silent: builds queue, and
+the copy of the data that spectators without accounts are reading stops moving.
+Nothing shipped so far touches that, because the cause is the commit itself.
+
+So the honest ordering is:
+
+1. **Now.** Anything that stops a press from being a commit. This is step 1 of
+   the plan above, dual-writing, and the moment reads come off the database the
+   commits can be batched to one at the end of the race.
+2. **Before any race with an audience.** The published copy, or at minimum
+   conditional requests, so spectators are not paying database reads for bytes
+   they share with everyone else.
+3. **Whenever.** The rest: backfill, deleting the dual-write, the archive
+   commit at finish.
 
 ## 0. The thing the pricing plan assumes and nobody has built
 
@@ -385,12 +465,14 @@ The graphic and the reasoning behind the sequence:
 
 In short:
 
-0. **Where the data lives** sits under all of it. Nothing below requires it
-   first, and the current design has been optimised far enough to run a real
-   race, so it is not a blocker. It is on the list ahead of everything because
-   every week spent building on the repository-as-database is a week of work to
-   port later, and because the ceiling it imposes arrives without warning: the
-   day two races overlap.
+0. **Where the data lives** goes first, and not for tidiness. Every press is a
+   commit and every commit is a Pages build, against a soft limit of ten an
+   hour, so a crew working a busy aid station throttles the site and the copy
+   spectators read stops moving. That is not a ceiling somewhere out in the
+   future, it is race one. Only the part that stops a press being a commit is
+   urgent; the rest of the move can follow at its own pace. Everything below is
+   also a week of porting later for every week it is built on the current
+   design.
 1. **Ship the season you are in.** Race-to-race transfer and the goal-time
    planner are the two things that make a second race easier than the first.
    Both are small, both are self-contained, and neither needs billing.
