@@ -5,13 +5,59 @@ What is not built yet, and the order worth building it in.
 `FEATURES.md` is the other half of this: it describes what the app does
 today. Nothing here ships until it moves there.
 
-Status of every item below was checked against the codebase on 2026-09-07,
-not from memory. Where something is partly there, this says which part.
+Status of every item below was checked against the codebase on 2026-09-07 and
+the storage and ordering sections again on 2026-09-08, not from memory. Where
+something is partly there, this says which part.
 
 Sources:
 
 - The pricing draft (Pricing & Features, Draft v1) and its feature matrix
 - Ideas raised while building, recorded here rather than lost in a thread
+
+---
+
+## Next: the order to build in
+
+Written 2026-09-08, with the Sangre de Cristo 100 on the 26th and a code freeze
+on the 19th. The calendar decides more of this than the backlog does.
+
+**Nothing new ships before the freeze.** Two days of dry-run testing produced
+six real bugs in the offline path, three of them introduced that same week, and
+every one was found on a phone rather than by reading code. That is not a
+backlog problem, it is a "this has never been run in anger" problem, and more
+surface area is the wrong answer to it. The eleven days go to `DRY-RUN.md`.
+Step 1 there, a crew member signing in on her own phone, is still unrun and is
+the only step with no race-day workaround.
+
+After the race, in this order:
+
+1. **Finish the storage move** (steps 3 and 4 below). Not a feature, but now a
+   promise: the intro screen tells people a private race is unlisted rather
+   than sealed. That sentence stays until `races/**` stops being written and is
+   purged from history. It also makes everything after it cheaper, because the
+   published copy stops being a second source of truth to reason about.
+2. **The race archive.** The cheapest real feature here, because the logic
+   already ships: `Race.archive` in `lib/race-core.js` has the distance
+   buckets, `resultFor`, `records` and `sort`, and no page uses any of it. It
+   needs a page and a hub link. It also lands at the first moment there is a
+   finished race to show, and it gives the free tier's "last 3" cap something
+   to cap, which billing later depends on.
+3. **Goal-time planner.** Target finish in, per-aid target times out, live
+   delta against them. Self-contained, needs no billing, and it is what makes a
+   second race better than the first.
+4. **Data export.** CSV, JSON, GPX. Small, read-only, no race-day risk, and it
+   is what lets somebody trust a season of their racing to this: they can
+   always get it back out.
+
+Two held back on purpose:
+
+- **Race-to-race transfer** looks like an easy win and is not. Half of it is
+  already built through another door, as its own section below explains. The
+  decision comes before the code.
+- **Billing** is item zero for everything in the paid column and still the
+  wrong thing to start next. The free caps, one runner and two crew, are
+  enforceable in the worker today. Until something worth paying for is not
+  grandfathered, a checkout flow gates nothing.
 
 ---
 
@@ -184,15 +230,26 @@ before promising an event in another hemisphere.
 
 ### Doing it without a big bang
 
-1. Worker gains D1-backed endpoints beside the GitHub ones and **writes to
-   both**. Nothing reads D1 yet, so a bug is invisible.
-2. Reads move to D1. GitHub becomes a write-only mirror, still correct, still
-   the fallback.
+1. ~~Worker gains D1-backed endpoints beside the GitHub ones and **writes to
+   both**. Nothing reads D1 yet, so a bug is invisible.~~ **Done 2026-09-07.**
+2. ~~Reads move to D1. GitHub becomes a write-only mirror, still correct, still
+   the fallback.~~ **Done 2026-09-07**, behind `READ_FROM_D1` in
+   `worker/wrangler.toml`, which is on. A race the mirror has not seen still
+   falls back to git, so setting it back to `"false"` is the whole rollback.
 3. New races stop writing to GitHub except the archive commit at finish.
-4. Backfill the existing races and delete the dual-write.
+   **Not done.** This is the one that makes private mean private, because it is
+   what stops the files existing.
+4. ~~Backfill the existing races~~ **done 2026-09-08**, and delete the
+   dual-write. **Not done**, and it waits for 3.
 
 Stopping after step 1 leaves the app exactly as it is today, which is the
-property that makes it safe to start.
+property that made it safe to start.
+
+What is left after the race, in the order it has to happen: stop writing race
+data to git, purge `races/**` from history, then remove the client's fallback
+to the published copy. Privacy lands at the second of those, not the first: a
+file deleted from `main` is still readable in the history of a public
+repository.
 
 ### The published copy, and why it is a separate job
 
@@ -250,7 +307,7 @@ will exceed ten commits in an hour, and the failure is silent: builds queue, and
 the copy of the data that spectators without accounts are reading stops moving.
 Nothing shipped so far touches that, because the cause is the commit itself.
 
-So the honest ordering is:
+So the honest ordering was:
 
 1. **Now.** Anything that stops a press from being a commit. This is step 1 of
    the plan above, dual-writing, and the moment reads come off the database the
@@ -260,6 +317,17 @@ So the honest ordering is:
    they share with everyone else.
 3. **Whenever.** The rest: backfill, deleting the dual-write, the archive
    commit at finish.
+
+**What happened, 2026-09-08.** The build limit turned out to have a second
+answer that was cheaper than any of this: a Pages site published by a GitHub
+Actions workflow is not subject to the ten-an-hour branch-build limit at all.
+`.github/workflows/deploy-pages.yml` does that, so a press is still a commit
+and no longer throttles anything. The storage move went ahead regardless,
+because the build limit was never its only reason: read-after-write was, and a
+poll of a race now costs GitHub nothing rather than four API calls.
+
+That leaves item 2 as the only part of this section still ahead, and it is
+still only mandatory for the organizer half. See the fork above.
 
 ## 0. The thing the pricing plan assumes and nobody has built
 
@@ -345,9 +413,15 @@ same outcome.
 Per-runner goals, hour bands and crew notes exist and travel via profiles.
 A named, reusable playbook that is not tied to one person does not.
 
-### Race archive + PR tracking — *not built*
+### Race archive + PR tracking — *logic built, no page*
 The hub lists races. Nothing tracks a personal record across them, and the
 free tier's "last 3" cap has nothing to cap.
+
+The arithmetic is already written and already shipping: `Race.archive` in
+`lib/race-core.js` carries the distance buckets a race is filed under, along
+with `bucketFor`, `resultFor`, `records` and `sort`. No page calls any of it.
+What is missing is a page and a link from the hub, which is why this is the
+cheapest item on the list rather than a new feature.
 
 ### Data export, CSV / JSON / GPX — *not built*
 No export UI. The underlying files are JSON in a repo, which is not the same
@@ -505,3 +579,10 @@ In short:
 The one ordering trap is the four features already shipped free. See the
 promise at the top: the answer is to say so plainly and to let everyone
 using them now keep them.
+
+**Amended 2026-09-08.** Item 0 is done as far as it needs to be before the
+race, and the reason it was urgent turned out to be answered more cheaply
+elsewhere: see "What happened" above. The near-term order now lives in
+**Next: the order to build in** at the top of this file, which is the one to
+read first. This section is the shape of the year; that one is the shape of
+the next month.

@@ -66,15 +66,23 @@ const server = http.createServer((req, res) => {
     req.on('data', () => {});
     return req.on('end', () => send(200, '{"ok":true}', 'application/json'));
   }
+  if (url.pathname === '/api/feedback-count') {
+    const since = url.searchParams.get('since') || '';
+    const stamps = ['2026-09-26T17:41:00Z', '2026-09-27T09:00:00Z'];
+    return send(200, JSON.stringify({ total: stamps.length,
+      new: stamps.filter(x => !since || x > since).length,
+      newest: stamps[stamps.length - 1] }), 'application/json');
+  }
   if (url.pathname === '/api/feedback-list') {
+    // Newest first, the way the real endpoint sorts.
     return send(200, JSON.stringify({ items: [
+      { key: 'fb:2', message: 'No address on this one.', email: null, account: null,
+        page: '/index.html', version: 'v68', offline: false, queued: 0,
+        writtenAt: '2026-09-27T09:00:00Z', sentAt: '2026-09-27T09:00:00Z' },
       { key: 'fb:1', message: 'The elevation on leg 4 reads 2,800 ft\nbut the GPX says 1,900.',
         email: 'watcher@example.com', account: null, page: '/race.html?id=r1', race: 'r1',
         version: 'v68', offline: true, queued: 2, agent: 'Mobile Safari',
-        writtenAt: '2026-09-26T14:03:00Z', sentAt: '2026-09-26T17:41:00Z' },
-      { key: 'fb:2', message: 'No address on this one.', email: null, account: null,
-        page: '/index.html', version: 'v68', offline: false, queued: 0,
-        writtenAt: '2026-09-27T09:00:00Z', sentAt: '2026-09-27T09:00:00Z' }
+        writtenAt: '2026-09-26T14:03:00Z', sentAt: '2026-09-26T17:41:00Z' }
     ] }), 'application/json');
   }
   if (url.pathname.startsWith('/api/')) return send(200, '{}', 'application/json');

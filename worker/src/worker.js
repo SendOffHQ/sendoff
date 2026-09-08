@@ -2163,6 +2163,37 @@ async function handleFeedbackList(req, env) {
   return json({ items }, {}, env, req);
 }
 
+// How many reports there are, and how many are newer than the last one this
+// admin looked at.
+//
+// Counted off the key names alone. A feedback key is 'fb:' + an ISO timestamp,
+// so both the total and the "since" comparison fall out of one KV list without
+// reading a single value. That matters because this runs on every page load
+// for an admin, and reading twenty stored reports to draw a number would be a
+// silly way to spend a request budget.
+async function handleFeedbackCount(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Feedback requires AUTH_KV' }, { status: 503 }, env, req);
+
+  const url = new URL(req.url);
+  const since = clip(url.searchParams.get('since'), 40) || '';
+  const list = await env.AUTH_KV.list({ prefix: 'fb:' });
+
+  let total = 0, fresh = 0, newest = '';
+  for (const k of list.keys) {
+    total++;
+    const at = k.name.slice(3);            // the ISO stamp the key was built from
+    if (at > newest) newest = at;
+    if (since && at <= since) continue;
+    fresh++;
+  }
+  // With no marker every report is new, which is the right answer for an admin
+  // who has never opened the panel.
+  return json({ total, new: fresh, newest }, {}, env, req);
+}
+
 async function handleFeedbackDelete(req, env) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -2916,6 +2947,7 @@ export default {
     if (request.method === 'GET'  && path === '/health')          return json({ ok: true, kv: !!env.AUTH_KV }, {}, env, request);
     if (request.method === 'POST' && path === '/feedback')         return handleFeedback(request, env);
     if (request.method === 'GET'  && path === '/feedback-list')    return handleFeedbackList(request, env);
+    if (request.method === 'GET'  && path === '/feedback-count')   return handleFeedbackCount(request, env);
     if (request.method === 'POST' && path === '/feedback/delete')  return handleFeedbackDelete(request, env);
     if (request.method === 'POST' && path === '/access-request')  return handleAccessRequest(request, env);
     if (request.method === 'GET'  && path === '/access-requests') return handleAccessRequests(request, env);

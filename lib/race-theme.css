@@ -243,6 +243,16 @@ header.site { position: relative; }
 }
 .account-bar .account-menu-item.danger:hover,
 .account-bar .account-menu-item.danger:focus-visible { color: var(--red); }
+/* Only the item that carries a count becomes a row, so the rest keep the
+   block layout they were written for. */
+.account-bar .account-menu-item.has-count {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.menu-count {
+  font-size: 10px; letter-spacing: 0.06em; line-height: 1;
+  padding: 3px 6px; border-radius: 10px; flex: none;
+  background: var(--accent); color: var(--bg);
+}
 @media print { .account-bar { display: none !important; } }
 
 /* Modal dialog (injected by race-core.js: sign-in, change-password) */

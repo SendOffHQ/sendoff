@@ -99,5 +99,31 @@ ok('and it is gone', rows().length, n - 1);
 ok('but not some other key they made up',
    (await call('/feedback/delete', { token: at, body: { key: 'user:someone@example.com' } })).status, 400);
 
+console.log('\ncounting, without reading a single report');
+// The count runs on every page load for an admin, so it is built off the key
+// names alone. That is only correct while a key carries the time in it.
+ok('every key still carries its timestamp',
+   [...kv.keys()].filter(k => k.startsWith('fb:'))
+     .every(k => !isNaN(Date.parse(k.slice(3, 27)))), true);
+const all = await (await call('/feedback-count', { token: at })).json();
+ok('the total matches what is stored', all.total, rows().length);
+ok('with no marker, everything is new', all.new, all.total);
+ok('and it reports the newest stamp', all.newest > '2026-01-01', true);
+
+const seen = await (await call('/feedback-count', { token: at, })).json();
+const marked = await (await call('/feedback-count?since=' + encodeURIComponent(seen.newest),
+  { token: at })).json();
+ok('marked as read, nothing is new', marked.new, 0);
+ok('but the total is unchanged', marked.total, all.total);
+
+await call('/feedback', { ip: '198.51.100.9', body: { message: 'one more, after the mark' } });
+const after = await (await call('/feedback-count?since=' + encodeURIComponent(seen.newest),
+  { token: at })).json();
+ok('a report sent since the mark is new', after.new, 1);
+ok('and the total moved with it', after.total, all.total + 1);
+
+ok('a crew member cannot count', (await call('/feedback-count', { token: t })).status, 403);
+ok('nor a stranger', (await call('/feedback-count')).status, 401);
+
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);
