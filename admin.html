@@ -180,7 +180,7 @@
   }
   .areq-kind.is-reset { color: var(--yellow); border-color: var(--yellow); }
   .areq-kind.is-invite { color: var(--accent); border-color: var(--accent); }
-  .areq-actions { display: flex; gap: 8px; align-items: flex-start; flex-shrink: 0; }
+  .areq-actions { display: flex; gap: 8px; align-items: flex-start; flex-shrink: 0; flex-wrap: wrap; }
   .areq-out { margin-top: 8px; }
   .areq-out:empty { display: none; }
 </style>
@@ -280,7 +280,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=67"></script>
+<script src="lib/race-core.js?v=68"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -622,6 +622,32 @@
     }
   }
 
+  // A reply, drafted the same way the invite and reset mails are: Gmail first,
+  // because webmail is usually not registered to handle mailto, and the mail
+  // app alongside it for anyone whose is.
+  //
+  // Quotes what they wrote. A report answered days later, from an address that
+  // sends other mail, is otherwise a reply to nothing they can place.
+  function feedbackReply(f) {
+    const subject = 'Re: your SendOff feedback';
+    const when = String(f.writtenAt || f.sentAt || '').replace('T', ' ').slice(0, 16);
+    let quoted = String(f.message || '').split('\n').map(l => '> ' + l).join('\n');
+    // Gmail drops a compose URL that runs long, and a truncated draft is worse
+    // than a short one: the quote is context, not the message.
+    if (quoted.length > 1400) quoted = quoted.slice(0, 1400).replace(/\s\S*$/, '') + '\n> ...';
+    const body = 'Hi,\n\nThanks for sending this.\n\n\n' +
+      (when ? `On ${when} you wrote:\n\n` : 'You wrote:\n\n') + quoted + '\n';
+    const q = encodeURIComponent;
+    return {
+      gmail: 'https://mail.google.com/mail/?view=cm&fs=1&to=' + q(f.email) +
+             '&su=' + q(subject) + '&body=' + q(body),
+      // The address sits in the path, not a query, so the @ stays literal:
+      // some clients choke on mailto:someone%40example.com.
+      mailto: 'mailto:' + q(f.email).replace(/%40/g, '@') +
+              '?subject=' + q(subject) + '&body=' + q(body)
+    };
+  }
+
   async function loadFeedback() {
     const box = document.getElementById('fb-list');
     if (!box) return;
@@ -636,6 +662,7 @@
           f.queued ? f.queued + ' queued' : ''
         ].filter(Boolean).join(' · ');
         const late = f.writtenAt && f.sentAt && f.writtenAt.slice(0, 16) !== f.sentAt.slice(0, 16);
+        const reply = f.email ? feedbackReply(f) : null;
         return `
         <div class="acct-row">
           <div>
@@ -649,8 +676,8 @@
             </div>
           </div>
           <div class="areq-actions">
-            ${f.email ? `<a class="btn" href="mailto:${esc(f.email)}?subject=${
-              encodeURIComponent('Re: your SendOff feedback')}">Reply</a>` : ''}
+            ${reply ? `<a class="btn primary" href="${esc(reply.gmail)}" target="_blank" rel="noopener">Reply in Gmail</a>
+                       <a class="btn" href="${esc(reply.mailto)}">Mail app</a>` : ''}
             <button class="btn" type="button" data-fbclear="${esc(f.key)}">Clear</button>
           </div>
         </div>`;
