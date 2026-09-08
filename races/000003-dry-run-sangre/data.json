@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-09-08T01:18:43.302Z",
+  "lastUpdated": "2026-09-08T01:19:14.469Z",
   "runners": [
     {
       "id": "jason",
@@ -22,7 +22,10 @@
         {
           "index": 4,
           "startTime": "2026-09-08T01:18:19.094Z",
-          "endTime": "2026-09-08T01:18:43.225Z"
+          "endTime": "2026-09-08T01:18:43.225Z",
+          "fluidOz": 17,
+          "sodiumMg": 1200,
+          "preset_0": 1
         }
       ]
     }
