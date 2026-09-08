@@ -1,0 +1,9 @@
+{
+  "name": "sendoff-site",
+  "private": true,
+  "description": "The static site. The worker has its own package under worker/.",
+  "scripts": {
+    "test": "node test/offline-fallback.mjs"
+  },
+  "engines": { "node": ">=22" }
+}

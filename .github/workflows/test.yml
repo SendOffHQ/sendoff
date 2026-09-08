@@ -1,0 +1,33 @@
+# The client tests.
+#
+# Deliberately not part of the site deploy. Every split a crew logs is a commit,
+# and every commit deploys the site; making that path run a test suite would put
+# a job between a crew member's press and the copy spectators are reading, and a
+# red test would stop the race data moving. So this runs on changes to the code
+# and skips the race files entirely.
+name: Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'test/**'
+      - 'sw.js'
+      - '*.html'
+      - 'package.json'
+      - '.github/workflows/test.yml'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm test

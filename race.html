@@ -201,14 +201,19 @@
   }
 
   .intake { padding: 20px 28px 24px; border-bottom: 1px solid var(--border); }
+  /* Flex, not inline text. A band label like "dark, cold (~35-45F), pre-dawn"
+     wraps on a phone, and an inline span with a border wrapped mid-word draws
+     half a box around the end of the title and half around the rest. Laid out
+     as two items, the tag stays one box and wraps inside itself. */
   .intake-title {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
     font-family: 'JetBrains Mono', monospace; font-size: 10px;
     letter-spacing: 0.2em; text-transform: uppercase;
     color: var(--text-muted); margin-bottom: 14px;
   }
   .intake-band {
     color: var(--accent); border: 1px solid var(--accent); border-radius: 2px;
-    padding: 2px 6px; margin-left: 8px; letter-spacing: 0.12em;
+    padding: 2px 6px; letter-spacing: 0.12em; min-width: 0; overflow-wrap: anywhere;
   }
   .intake-now { color: var(--text-muted); font-size: 10px; margin-left: 4px; }
   .intake-row {
@@ -507,7 +512,7 @@
      Esri's and will be missing offline; the map is useful without them. -->
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8"></script>
-<script src="lib/race-core.js?v=60"></script>
+<script src="lib/race-core.js?v=61"></script>
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
