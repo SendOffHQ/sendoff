@@ -217,6 +217,10 @@
       --wm-signal: #0a8b92;
       --wm-letter: #0d1117;
     }
+    /* The badge prints too. A report handed to a crew should say what made it. */
+    .brand-meta .beta-badge {
+      color: #0a8b92 !important; border-color: #0a8b92 !important;
+    }
     header.site { padding-bottom: 10pt; margin-bottom: 12pt; border-bottom: 1px solid #999; }
     h1.site { color: #111 !important; font-size: 22pt; }
     h1.site em { color: #0a8b92 !important; }
@@ -311,7 +315,7 @@
   <div>Auto-generated · race-dashboard hub</div>
 </footer>
 
-<script src="lib/race-core.js?v=64"></script>
+<script src="lib/race-core.js?v=65"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
