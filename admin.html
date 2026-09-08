@@ -75,6 +75,11 @@
   /* accounts list */
   .acct-list { display: flex; flex-direction: column; gap: 6px; }
   /* The report itself, which is the part worth reading, so it gets the room. */
+  .panel-count {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em;
+    color: var(--accent); border: 1px solid var(--accent); border-radius: 3px;
+    padding: 3px 6px; vertical-align: 3px; margin-left: 8px; text-transform: uppercase;
+  }
   .fb-msg {
     white-space: pre-wrap; margin: 6px 0 6px; font-size: 13px; line-height: 1.55;
     color: var(--text); overflow-wrap: anywhere;
@@ -209,7 +214,7 @@
     </section>
 
     <section class="panel">
-      <h2>Feedback</h2>
+      <h2>Feedback <span id="fb-count" class="panel-count" hidden></span></h2>
       <p class="hint">What people have sent from the app, newest first. Each one carries the
         page, the race and the version it was written on, so a report does not have to
         describe those. A note written with no signal shows the time it was written as well as
@@ -280,7 +285,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=68"></script>
+<script src="lib/race-core.js?v=69"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -654,6 +659,22 @@
     try {
       const r = await Race.api.feedbackList();
       const list = r.items || [];
+      // Reading the panel is what counts as reading the reports, so the unread
+      // mark moves here rather than on any per-row action. Set before the early
+      // return, so an empty list clears a stale badge too.
+      const seenBefore = Race.feedback.seen();
+      // The newest of the whole list, not the first row. The endpoint does sort
+      // newest first, but marking every report read on the strength of another
+      // function's sort order is the kind of coupling that goes wrong quietly:
+      // get it backwards and reports are marked read that nobody has seen.
+      const newest = list.reduce((a, f) => ((f.sentAt || '') > a ? f.sentAt : a), '');
+      if (newest) Race.feedback.markSeen(newest);
+      const unread = list.filter(f => !seenBefore || (f.sentAt || '') > seenBefore).length;
+      const tag = document.getElementById('fb-count');
+      if (tag) {
+        tag.hidden = !list.length;
+        tag.textContent = unread ? `${list.length} · ${unread} new` : String(list.length);
+      }
       if (!list.length) { box.textContent = 'Nothing yet.'; return; }
       box.innerHTML = list.map(f => {
         const bits = [
