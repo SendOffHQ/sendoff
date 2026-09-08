@@ -78,10 +78,17 @@ const GPX = '<gpx><trk><trkseg><trkpt lat="1" lon="1"><ele>10</ele></trkpt></trk
 
 let online = true, served = [];
 let dataBody = '{"lastUpdated":"2026-09-26T20:01:00Z","runners":[]}';
+// Paths the service worker can answer from its own copy, even with no signal.
+const swCache = new Map();
 ctx.fetch = async (url) => {
   if (!online) throw new TypeError('Failed to fetch');
   served.push(String(url));
   const u = String(url);
+  if (u.startsWith('hub.json')) {
+    return { ok: true, status: 200, headers: { get: () => null },
+             json: async () => ({ auth: { proxyUrl: 'https://w' } }),
+             text: async () => '{"auth":{"proxyUrl":"https://w"}}' };
+  }
   if (u.includes('/get?path=')) {
     const path = decodeURIComponent(u.split('path=')[1]);
     const body = path.endsWith('config.json') ? WORKER_CONFIG
@@ -91,14 +98,22 @@ ctx.fetch = async (url) => {
              json: async () => ({ sha: 's', content: Buffer.from(body,'utf8').toString('base64') }),
              text: async () => body };
   }
+  if (swCache.has(u.split('?')[0])) {
+    const { body, date } = swCache.get(u.split('?')[0]);
+    // What the service worker hands back: the published file, stamped with
+    // when the origin served it and marked as having come from storage.
+    return { ok: true, status: 200,
+             headers: { get: h => (h === 'X-SendOff-Cache' ? 'hit' : h === 'date' ? date : null) },
+             json: async () => JSON.parse(body), text: async () => body };
+  }
   return { ok: false, status: 404, headers: { get: () => null }, text: async () => 'nope' };
 };
 // Signed in, proxy mode, so reads prefer the worker the way the real app does.
 ctx.localStorage.setItem('race-hub-session-v1', JSON.stringify({
   session: 'tok', proxyUrl: 'https://w', email: ME, expiresAt: Date.now() + 3600e3 }));
-// hub.json says the site is in proxy mode; loaded already, as it is on a page
-// that has been open a while.
-Race.hub._data = { auth: { proxyUrl: 'https://w' } };
+// One online page load, which is what tells this device the site puts writes
+// through the proxy.
+await Race.hub.load();
 
 console.log('\nonline, a read is written down');
 const cfg1 = await Race.gh.readRaceJson(SLUG, 'config.json', true);
@@ -117,6 +132,24 @@ ok('the course reads back',
    (await Race.gh.readRaceText(SLUG, 'course.gpx', true) || '').includes('trkpt'), true);
 ok('the page knows it is showing saved data', Race.offline.stale, true);
 
+console.log('\nan old published copy does not beat a newer one off the proxy');
+// The dry run hit this. Offline, the fetch of the published file still
+// "succeeds", because the service worker answers it from storage, and that copy
+// can be far older than what the proxy last gave this device. Taken as truth it
+// showed an empty leg list; written down as well it replaced the real splits.
+online = true; ctx.navigator.onLine = true;
+dataBody = '{"lastUpdated":"2026-09-26T20:30:00Z","runners":[{"id":"jason","legs":[{"index":1},{"index":2}]}]}';
+await Race.gh.readRaceJson(SLUG, 'data.json', true);   // the proxy's copy, now
+online = false; ctx.navigator.onLine = false;
+swCache.set('races/r1/data.json', {
+  body: '{"lastUpdated":"2026-09-26T09:00:00Z","runners":[]}',
+  date: new Date(Date.now() - 6 * 3600e3).toUTCString() });
+const offlineData = await Race.gh.readRaceJson(SLUG, 'data.json', true);
+ok('the splits are still there', (offlineData.runners[0] || {}).legs.length, 2);
+ok('and the old copy did not overwrite them',
+   JSON.parse(ctx.localStorage.getItem(`so:seen:${SLUG}:data.json`)).text.includes('20:30'), true);
+swCache.clear();
+
 console.log('\nand it still knows who you are');
 // The failure from the dry run. The published config names nobody, so a
 // fallback to it makes a crew member a stranger to their own race and the pit
@@ -125,6 +158,20 @@ ok('the saved copy kept the role', cfg2.myRole, 'crew');
 ok('so the crew member can still edit', Race.roles.canEdit(cfg2, ME), true);
 ok('which is what the published copy could not tell them',
    Race.roles.canEdit(JSON.parse(PAGES_CONFIG), ME), false);
+
+console.log('\nlosing signal does not turn the site into a different site');
+// hub.json says whether writes go through the proxy. Treating an unreachable
+// one as "no proxy" put the page into PAT mode, where "may this person edit" is
+// answered by whether the device holds a token, which offline is always no. The
+// crew member lost the pit and racer links at the moment they needed them.
+ok('proxy mode is remembered', Race.hub.isProxyMode(), true);
+Race.hub._data = null; Race.hub._promise = null;   // a fresh page load, still offline
+await Race.hub.load();
+ok('still proxy mode after a reload with no signal', Race.hub.isProxyMode(), true);
+ok('so the page still knows the account', Race.auth.email(), ME);
+// The exact chain race.html uses to decide whether to draw the pit and racer links.
+ok('and the pit and racer links are offered',
+   Race.hub.isProxyMode() && Race.auth.has() && Race.roles.canEdit(cfg2, Race.auth.email()), true);
 
 console.log('\na race never opened on this phone is still not invented');
 let threw = null;
