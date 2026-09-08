@@ -106,7 +106,10 @@
   /* The act zone. Sticky at the bottom so the press is always where the thumb
      already is, whatever the readout above has grown to. */
   .ract {
-    position: sticky; bottom: 0; margin: 0 -16px; padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+    /* Above the offline bar when there is one, so a status message never
+       covers the only button the runner has. */
+    position: sticky; bottom: var(--so-offline-h, 0px); margin: 0 -16px;
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
     background: var(--bg-elevated); border-top: 1px solid var(--border);
   }
   .rbtn {
@@ -117,6 +120,13 @@
     letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer;
   }
   .rbtn:hover:not(:disabled) { background: rgba(15,184,191,0.2); border-color: var(--accent); }
+  /* Same two colours the pit page uses, and for the same reason: green is
+     arriving, teal is leaving. A runner glancing at a phone mid-race reads the
+     colour before the words, and one that never changes tells them nothing. */
+  .rbtn.in {
+    background: rgba(110,231,168,0.13); color: var(--green); border-color: rgba(110,231,168,0.5);
+  }
+  .rbtn.in:hover:not(:disabled) { background: rgba(110,231,168,0.2); border-color: var(--green); }
   .rbtn:disabled { opacity: 0.55; cursor: default; }
   .rbtn .sub { display: block; font-size: 11px; font-weight: 400; letter-spacing: 0.03em;
                text-transform: none; color: var(--text-muted); margin-top: 7px; }
@@ -139,7 +149,7 @@
   .rpick p { color: var(--text-dim); font-size: 14px; margin: 0 0 12px; line-height: 1.6; }
 
   .toast {
-    position: fixed; bottom: 116px; left: 50%; transform: translateX(-50%);
+    position: fixed; bottom: calc(116px + var(--so-offline-h, 0px)); left: 50%; transform: translateX(-50%);
     background: var(--bg-card); border: 1px solid var(--border-bright);
     color: var(--text); padding: 10px 16px; border-radius: 4px;
     font-family: 'JetBrains Mono', monospace; font-size: 12px;
@@ -171,7 +181,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=60"></script>
+<script src="lib/race-core.js?v=61"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -392,7 +402,7 @@
     const sub = queued
       ? `${queued} saved on this phone · sends when you have signal`
       : (next.nextAction === 'in' ? 'Logs your arrival' : 'Starts the next leg');
-    act.innerHTML = `<button class="rbtn" type="button" id="go">${esc(label)}<span class="sub">${esc(sub)}</span></button>`;
+    act.innerHTML = `<button class="rbtn ${next.nextAction === 'in' ? 'in' : 'out'}" type="button" id="go">${esc(label)}<span class="sub">${esc(sub)}</span></button>`;
     document.getElementById('go').addEventListener('click', pressGo);
   }
 
