@@ -150,6 +150,21 @@ ok('and the old copy did not overwrite them',
    JSON.parse(ctx.localStorage.getItem(`so:seen:${SLUG}:data.json`)).text.includes('20:30'), true);
 swCache.clear();
 
+console.log('\na newer copy that names nobody does not win');
+// The subtle one. Visiting the hub makes the service worker cache the
+// published config, which is then newer than the proxy copy saved when the
+// race page was last opened. Recency alone picked the newer file, and a newer
+// file that names nobody still cannot say who you are.
+ok('the proxy copy beats a newer published one',
+   Race.lastSeen.better({ source: 'proxy',     at: '2026-09-26T10:00:00Z' },
+                        { source: 'published', at: '2026-09-26T18:00:00Z' }), true);
+ok('and within one source the newer wins',
+   Race.lastSeen.better({ source: 'proxy', at: '2026-09-26T18:00:00Z' },
+                        { source: 'proxy', at: '2026-09-26T10:00:00Z' }), true);
+ok('a published copy never displaces a proxy one',
+   Race.lastSeen.better({ source: 'published', at: '2026-09-26T18:00:00Z' },
+                        { source: 'proxy',     at: '2026-09-26T10:00:00Z' }), false);
+
 console.log('\nand it still knows who you are');
 // The failure from the dry run. The published config names nobody, so a
 // fallback to it makes a crew member a stranger to their own race and the pit

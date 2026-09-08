@@ -31,3 +31,11 @@ jobs:
         with:
           node-version: '22'
       - run: npm test
+
+      # The same paths again, but in a real browser with a real service worker.
+      # The bug this covers only appeared as an interaction between the page,
+      # the service worker cache and what the device had written down, and none
+      # of the three looked wrong on its own.
+      - run: npm ci || npm install
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser

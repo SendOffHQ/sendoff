@@ -280,7 +280,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=62"></script>
+<script src="lib/race-core.js?v=64"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
@@ -449,12 +449,24 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
       let races = publicRaces;
       let myErr = null;
       if (isAuthed) {
+        const me = Race.auth.email();
         try {
           const my = await Race.api.myRaces();
           races = (my && my.races) || races;
+          Race.lastSeen.saveRaces(me, races);
         } catch (err) {
-          myErr = err;
-          // Fall back to the public list; the error is rendered as a soft notice below.
+          // A private race is not in the published manifest at all, so with no
+          // signal the public list is not a smaller version of the answer: it
+          // is missing exactly the race a crew member is here for. Fall back to
+          // the list this device last saw for this account.
+          const saved = Race.lastSeen.loadRaces(me);
+          if (saved) {
+            races = saved.races;
+            Race.offline.noteSaved(saved.at, 'my-races');
+          } else {
+            myErr = err;
+            // Fall back to the public list; the error is rendered as a soft notice below.
+          }
         }
       }
 
