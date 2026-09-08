@@ -205,6 +205,15 @@
   color: var(--accent); border: 1px solid var(--border-bright); border-radius: 3px;
 }
 .intro-steps b { color: var(--text); font-weight: 600; }
+/* What "beta" actually means here, said once and in plain terms, above the
+   line rather than in the small print under it: somebody deciding whether to
+   trust this with their runner's race should not have to go looking. */
+.intro-beta {
+  font-size: 12.5px; line-height: 1.6; color: var(--text-dim);
+  background: rgba(15, 184, 191, 0.06); border: 1px solid var(--border-bright);
+  border-radius: 4px; padding: 12px 14px; margin: 0 0 16px;
+}
+.intro-beta .beta-badge { margin: 0 6px 0 0; vertical-align: 1px; }
 .intro-note {
   font-size: 12px; line-height: 1.55; color: var(--text-muted);
   border-top: 1px solid var(--border); padding-top: 14px; margin: 0 0 18px;
@@ -280,7 +289,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=64"></script>
+<script src="lib/race-core.js?v=65"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
@@ -569,6 +578,12 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
           <li><b>Send the link.</b> Family and friends follow live splits, pace against cutoff and
             elevation, updating as you log it.</li>
         </ol>
+        <p class="intro-beta"><span class="beta-badge">Beta</span> SendOff is new, and it is
+            being built while it is being used. It has run real races and the crew work is
+            solid, but things move week to week and you will find rough edges. If something
+            looks wrong on race day, the pit board keeps working with no signal and sends
+            what you logged once you have bars again. Tell us what breaks:
+            <a class="intro-note-link" href="mailto:info@sendoff.run">info@sendoff.run</a>.</p>
         <p class="intro-note">Watching needs no account and no app: anyone with the link can follow
             along. Running a race of your own needs an account, and while SendOff is new those
             are invite only. <button type="button" class="intro-link intro-note-link" data-request-invite>Request an invite</button>.</p>

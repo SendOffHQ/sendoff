@@ -92,6 +92,23 @@ header.site {
 /* A long place name may wrap, but "← Hub" is two words that mean one thing and
    should not be taken apart. */
 .brand-meta a:not(.wordmark) { white-space: nowrap; }
+/* Reads as a state of the app, not as a warning. Outlined rather than filled
+   so it sits beside the wordmark without competing with it, and pinned to the
+   wordmark's baseline area rather than to the taller row. */
+.beta-badge {
+  /* Its own type, not the row's: it appears in the header, where the row is
+     mono and uppercase, and in the intro dialog, where it is neither. */
+  display: inline-block;
+  font-family: 'JetBrains Mono', ui-monospace, monospace; text-transform: uppercase;
+  font-size: 9px; letter-spacing: 0.2em; line-height: 1;
+  padding: 4px 6px 3px; border-radius: 3px; white-space: nowrap;
+  color: var(--accent); border: 1px solid var(--accent);
+  margin-left: -6px;   /* closes most of the row's 14px gap: it belongs to the name */
+  cursor: default;
+}
+/* On a light ground, and on paper, the dark-ground teal is too pale to read. */
+.brand-meta .wordmark.on-light + .beta-badge,
+.on-light .beta-badge { color: var(--signal-on-light); border-color: var(--signal-on-light); }
 .pulse {
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--accent); box-shadow: 0 0 12px var(--accent);

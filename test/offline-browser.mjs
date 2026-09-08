@@ -12,6 +12,7 @@
 //   npm i --no-save playwright && npm run test:browser
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
+import net from 'node:net';
 import fs from 'node:fs';
 
 const BASE = 'http://localhost:8787';
@@ -30,9 +31,37 @@ const ok = (l, g, w) => {
   console.log(`  ${p ? 'ok  ' : 'FAIL'} ${l.padEnd(52)} ${JSON.stringify(g)}${p ? '' : ' expected ' + JSON.stringify(w)}`);
 };
 
+// Whether anything is listening. This test's whole second half rests on the
+// server being gone, and a leftover harness from an earlier run would answer
+// on the same port: the new one fails to bind, killing it kills nothing, and
+// every offline assertion is quietly made against a live network. A test that
+// can pass while testing nothing is worse than no test, so the port is checked
+// on both sides.
+const listening = () => new Promise((resolve) => {
+  const sock = net.connect(8787, '127.0.0.1');
+  const done = (v) => { sock.destroy(); resolve(v); };
+  sock.once('connect', () => done(true));
+  sock.once('error', () => done(false));
+  setTimeout(() => done(false), 500);
+});
+const waitFor = async (want, what) => {
+  for (let i = 0; i < 40; i++) {
+    if (await listening() === want) return;
+    await new Promise(r => setTimeout(r, 150));
+  }
+  console.error(`\n${what}\n`);
+  process.exit(2);
+};
+
+if (await listening()) {
+  console.error('\nPort 8787 is already in use. Something else is serving the site, so ' +
+                'this test would check a live network and call it offline. Stop it first.\n');
+  process.exit(2);
+}
+
 let server = spawn('node', [HARNESS], { stdio: 'ignore' });
 process.on('exit', () => { try { server.kill('SIGKILL'); } catch (e) {} });
-await new Promise(r => setTimeout(r, 900));
+await waitFor(true, 'The harness never started listening on 8787.');
 
 const browser = await chromium.launch(CHROME ? { executablePath: CHROME } : {});
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -72,7 +101,8 @@ ok('and the saved config still knows the role', await page.evaluate((s) => {
 
 console.log('\nthe server is gone');
 server.kill('SIGKILL');
-await new Promise(r => setTimeout(r, 600));
+await waitFor(false, 'The server is still answering on 8787 after being killed, so nothing ' +
+                     'below would actually be testing the offline path.');
 
 await page.goto(`${BASE}/race.html?id=${SLUG}`).catch(() => {});
 await page.waitForTimeout(4000);
