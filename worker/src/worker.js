@@ -2040,6 +2040,142 @@ async function handleAccessRequest(req, env) {
 }
 
 // Admin: the queue of people waiting on an invite.
+// ---------- feedback ----------
+// Built in rather than pointed at a form somewhere else, for three reasons
+// that all matter more than the hour it saves.
+//
+// A hosted form needs a network. The person most likely to hit a bug worth
+// hearing about is a crew member at an aid station with one bar, and that is
+// exactly who cannot open one. This queues on the device and sends when the
+// signal comes back.
+//
+// A report that says "the button did not work" is close to useless. This one
+// carries the page, the race, the version of the app that was running and
+// whether the device was offline at the time, gathered without asking.
+//
+// And addresses stay here. Taking crew emails out of published files was a
+// week of work; posting them to a third party through a form would put them
+// straight back out.
+const FEEDBACK_TTL_DAYS = 180;
+const FEEDBACK_PER_HOUR = 10;
+
+async function handleFeedback(req, env) {
+  if (!env.AUTH_KV) return json({ error: 'Feedback requires AUTH_KV' }, { status: 503 }, env, req);
+  let body;
+  try { body = await req.json(); }
+  catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+
+  // Honeypot, as on access requests: no person sees this field, so anything in
+  // it is a bot. Answered 200 so the bot learns nothing.
+  if (clip(body && body.website, 200)) return json({ ok: true }, {}, env, req);
+
+  const message = clip(body && body.message, 4000);
+  if (!message || message.trim().length < 3) {
+    return json({ error: 'Tell us what happened.' }, { status: 400 }, env, req);
+  }
+
+  const ip = req.headers.get('CF-Connecting-IP') || 'unknown';
+  const bucket = 'fbrl:' + ip;
+  const seen = parseInt((await env.AUTH_KV.get(bucket)) || '0', 10);
+  if (seen >= FEEDBACK_PER_HOUR) {
+    return json({ error: 'That is a lot of feedback at once. Try again later.' }, { status: 429 }, env, req);
+  }
+  await env.AUTH_KV.put(bucket, String(seen + 1), { expirationTtl: 3600 });
+
+  // Signed in is the common case and the address is then known for certain.
+  // Anonymous is allowed on purpose: somebody watching a race on a link is a
+  // reader too, and "the elevation looks wrong" is worth hearing from them.
+  const session = await requireAuth(req, env);
+  const account = session && session.email ? session.email : null;
+  const email = account || normalizeEmail(body && body.email) || null;
+
+  const now = new Date().toISOString();
+  const row = {
+    message, email, account,
+    // Context, gathered rather than asked for.
+    page: clip(body && body.page, 300),
+    race: clip(body && body.race, 120),
+    version: clip(body && body.version, 40),
+    offline: !!(body && body.offline),
+    queued: Math.max(0, Math.min(9999, parseInt((body && body.queued) || 0, 10) || 0)),
+    agent: clip(req.headers.get('User-Agent'), 300),
+    // When it was written, which on a queued report is not when it arrived.
+    writtenAt: clip(body && body.writtenAt, 40) || now,
+    sentAt: now
+  };
+  await env.AUTH_KV.put('fb:' + now + '-' + randomToken(6), JSON.stringify(row),
+    { expirationTtl: FEEDBACK_TTL_DAYS * 24 * 3600 });
+
+  // Never lets a mail failure fail the report: it is already stored, and the
+  // admin panel is the source of truth.
+  if (env.EMAIL && env.NOTIFY_EMAIL && env.NOTIFY_FROM) {
+    try {
+      const rows = [
+        ['From', email || 'not given'],
+        ['Account', account || 'signed out'],
+        ['Page', row.page], ['Race', row.race], ['Version', row.version],
+        ['Offline', row.offline ? 'yes' : 'no'],
+        ['Queued writes', row.queued ? String(row.queued) : ''],
+        ['Written', row.writtenAt !== row.sentAt ? row.writtenAt : ''],
+        ['Browser', row.agent]
+      ].filter(r => r[1])
+       .map(r => `<tr><td style="padding:2px 12px 2px 0;color:#7A8D99;vertical-align:top">${escHtml(r[0])}</td>` +
+                 `<td style="padding:2px 0">${escHtml(r[1])}</td></tr>`).join('');
+      const err = await sendMail(env, {
+        to: env.NOTIFY_EMAIL,
+        from: mailFrom(env, 'notify'),
+        subject: `SendOff feedback from ${email || 'someone signed out'}`,
+        html: mailShell(env, 'Feedback',
+          `<h1 style="margin:0 0 14px;font-size:22px;line-height:1.25;color:${MAIL_INK}">Feedback</h1>` +
+          `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;white-space:pre-wrap">${escHtml(message)}</p>` +
+          `<table style="border-collapse:collapse;font-size:13px">${rows}</table>` +
+          mailButton(`${mailBase(env)}/admin.html`, 'Open the admin panel')),
+        text: `Feedback
+
+${message}
+
+From: ${email || 'not given'}
+Page: ${row.page}
+`
+      });
+      if (err) throw new Error(err);
+    } catch (e) {
+      console.error('feedback notify failed:', e && e.message ? e.message : e);
+    }
+  }
+
+  return json({ ok: true }, {}, env, req);
+}
+
+async function handleFeedbackList(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Feedback requires AUTH_KV' }, { status: 503 }, env, req);
+
+  const list = await env.AUTH_KV.list({ prefix: 'fb:' });
+  const items = [];
+  for (const k of list.keys) {
+    const raw = await env.AUTH_KV.get(k.name);
+    if (raw) { try { items.push({ key: k.name, ...JSON.parse(raw) }); } catch (e) {} }
+  }
+  items.sort((a, b) => (b.sentAt || '').localeCompare(a.sentAt || ''));
+  return json({ items }, {}, env, req);
+}
+
+async function handleFeedbackDelete(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Feedback requires AUTH_KV' }, { status: 503 }, env, req);
+  let body;
+  try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  const key = clip(body && body.key, 120);
+  if (!key || !key.startsWith('fb:')) return json({ error: 'Bad key' }, { status: 400 }, env, req);
+  await env.AUTH_KV.delete(key);
+  return json({ ok: true }, {}, env, req);
+}
+
 async function handleAccessRequests(req, env) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -2778,6 +2914,9 @@ export default {
     path = path.replace(/\/+$/, '') || '/';
 
     if (request.method === 'GET'  && path === '/health')          return json({ ok: true, kv: !!env.AUTH_KV }, {}, env, request);
+    if (request.method === 'POST' && path === '/feedback')         return handleFeedback(request, env);
+    if (request.method === 'GET'  && path === '/feedback-list')    return handleFeedbackList(request, env);
+    if (request.method === 'POST' && path === '/feedback/delete')  return handleFeedbackDelete(request, env);
     if (request.method === 'POST' && path === '/access-request')  return handleAccessRequest(request, env);
     if (request.method === 'GET'  && path === '/access-requests') return handleAccessRequests(request, env);
     if (request.method === 'POST' && path === '/access-request/delete') return handleAccessRequestDelete(request, env);

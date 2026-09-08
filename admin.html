@@ -74,6 +74,11 @@
 
   /* accounts list */
   .acct-list { display: flex; flex-direction: column; gap: 6px; }
+  /* The report itself, which is the part worth reading, so it gets the room. */
+  .fb-msg {
+    white-space: pre-wrap; margin: 6px 0 6px; font-size: 13px; line-height: 1.55;
+    color: var(--text); overflow-wrap: anywhere;
+  }
   .acl-out { margin-top: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
   .acl-row {
     display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
@@ -204,6 +209,15 @@
     </section>
 
     <section class="panel">
+      <h2>Feedback</h2>
+      <p class="hint">What people have sent from the app, newest first. Each one carries the
+        page, the race and the version it was written on, so a report does not have to
+        describe those. A note written with no signal shows the time it was written as well as
+        the time it arrived.</p>
+      <div id="fb-list">Loading…</div>
+    </section>
+
+    <section class="panel">
       <h2>Invite someone to the hub</h2>
       <p class="lead">Generate a one-time signup link for someone you want to let
         create their own races. They open it, pick a password, and they're in.
@@ -266,7 +280,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=65"></script>
+<script src="lib/race-core.js?v=66"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -409,6 +423,7 @@
     document.getElementById('reset-email').addEventListener('keydown', (e) => { if (e.key === 'Enter') genReset(); });
     loadAccounts();
     loadAccessRequests();
+    loadFeedback();
     const aclBtn = document.getElementById('acl-check');
     if (aclBtn) aclBtn.addEventListener('click', async () => {
       const out = document.getElementById('acl-out');
@@ -604,6 +619,51 @@
       });
     } catch (e) {
       box.textContent = 'Could not load requests: ' + e.message;
+    }
+  }
+
+  async function loadFeedback() {
+    const box = document.getElementById('fb-list');
+    if (!box) return;
+    try {
+      const r = await Race.api.feedbackList();
+      const list = r.items || [];
+      if (!list.length) { box.textContent = 'Nothing yet.'; return; }
+      box.innerHTML = list.map(f => {
+        const bits = [
+          f.page, f.race ? 'race ' + f.race : '', f.version,
+          f.offline ? 'offline' : '',
+          f.queued ? f.queued + ' queued' : ''
+        ].filter(Boolean).join(' · ');
+        const late = f.writtenAt && f.sentAt && f.writtenAt.slice(0, 16) !== f.sentAt.slice(0, 16);
+        return `
+        <div class="acct-row">
+          <div>
+            <strong>${esc(f.email || 'no address given')}</strong>
+            ${f.account ? '' : ' <span class="hint">(signed out)</span>'}
+            <div class="fb-msg">${esc(f.message)}</div>
+            <div class="hint">${esc(bits)}
+              <br>${esc((f.sentAt || '').replace('T', ' ').slice(0, 16))}${
+                late ? ' &middot; written ' + esc((f.writtenAt || '').replace('T', ' ').slice(0, 16)) : ''}
+              ${f.agent ? '<br>' + esc(f.agent) : ''}
+            </div>
+          </div>
+          <div class="areq-actions">
+            ${f.email ? `<a class="btn" href="mailto:${esc(f.email)}?subject=${
+              encodeURIComponent('Re: your SendOff feedback')}">Reply</a>` : ''}
+            <button class="btn" type="button" data-fbclear="${esc(f.key)}">Clear</button>
+          </div>
+        </div>`;
+      }).join('');
+      box.querySelectorAll('[data-fbclear]').forEach(b => {
+        b.addEventListener('click', async () => {
+          b.disabled = true;
+          try { await Race.api.feedbackDelete(b.dataset.fbclear); loadFeedback(); }
+          catch (e) { b.disabled = false; }
+        });
+      });
+    } catch (e) {
+      box.textContent = 'Could not load feedback: ' + e.message;
     }
   }
 

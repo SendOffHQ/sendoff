@@ -214,6 +214,12 @@
   border-radius: 4px; padding: 12px 14px; margin: 0 0 16px;
 }
 .intro-beta .beta-badge { margin: 0 6px 0 0; vertical-align: 1px; }
+/* The one caveat that could cost somebody something, kept out of the small
+   print and given its own edge. */
+.intro-beta-warn {
+  font-size: 12.5px; line-height: 1.6; color: var(--text-dim);
+  border-left: 2px solid var(--yellow); padding: 2px 0 2px 12px; margin: 0 0 16px;
+}
 .intro-note {
   font-size: 12px; line-height: 1.55; color: var(--text-muted);
   border-top: 1px solid var(--border); padding-top: 14px; margin: 0 0 18px;
@@ -289,7 +295,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=65"></script>
+<script src="lib/race-core.js?v=66"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
@@ -582,8 +588,13 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
             being built while it is being used. It has run real races and the crew work is
             solid, but things move week to week and you will find rough edges. If something
             looks wrong on race day, the pit board keeps working with no signal and sends
-            what you logged once you have bars again. Tell us what breaks:
-            <a class="intro-note-link" href="mailto:info@sendoff.run">info@sendoff.run</a>.</p>
+            what you logged once you have bars again.
+            <button type="button" class="intro-link intro-note-link" data-feedback>Tell us what breaks</button>.</p>
+        <p class="intro-beta-warn">One thing worth knowing before you put a race in: a private
+            race is unlisted, not sealed. It stays off the public list and out of search, but
+            the files behind it are still served from a public host, so somebody who knew the
+            address could read it. Sealing that is the next piece of work. Until it lands,
+            treat a race page as something you would not mind a stranger seeing.</p>
         <p class="intro-note">Watching needs no account and no app: anyone with the link can follow
             along. Running a race of your own needs an account, and while SendOff is new those
             are invite only. <button type="button" class="intro-link intro-note-link" data-request-invite>Request an invite</button>.</p>
@@ -799,6 +810,15 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     ov.querySelector('[data-req-close]').addEventListener('click', close);
     ov.querySelector('#req-name').focus();
   }
+
+  // The intro is built and torn down, so this is delegated rather than bound to
+  // a button that may not exist yet.
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('[data-feedback]');
+    if (!b) return;
+    e.preventDefault();
+    Race.openFeedbackModal();
+  });
 
   document.querySelectorAll('[data-request-invite]').forEach(el => {
     el.addEventListener('click', e => { e.preventDefault(); openRequest('invite'); });

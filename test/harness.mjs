@@ -60,6 +60,12 @@ const server = http.createServer((req, res) => {
       startTime: cfg.startTime, location: cfg.location, visibility: 'private',
       mine: true, myRole: 'crew' }] }), 'application/json');
   }
+  // Drained before answering, the way the real endpoint does; a reply sent
+  // before the body arrives can leave the socket half read.
+  if (url.pathname === '/api/feedback') {
+    req.on('data', () => {});
+    return req.on('end', () => send(200, '{"ok":true}', 'application/json'));
+  }
   if (url.pathname.startsWith('/api/')) return send(200, '{}', 'application/json');
 
   // --- the site ---

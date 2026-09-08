@@ -284,6 +284,10 @@ header.site { position: relative; }
   margin-bottom: 5px;
 }
 .modal-hint { font-size: 11px; color: var(--text-muted); line-height: 1.5; margin: 4px 0 0; }
+/* A sentence of orientation above the fields, so the form does not have to be
+   guessed at. */
+.modal-lede { font-size: 12.5px; color: var(--text-dim); line-height: 1.55; margin: 0 0 14px; }
+.modal-field textarea { resize: vertical; min-height: 88px; font-family: inherit; }
 
 /* Hour bands in the profile modal. */
 .modal-addrow {
