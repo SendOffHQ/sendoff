@@ -174,6 +174,12 @@
     border: 1px solid var(--accent);
   }
   .card-badge.viewer { background: rgba(138, 169, 208, 0.12); color: var(--blue); border-color: var(--blue); }
+  /* Beside the course badge, quieter than it: the course shape changes how the
+     page is read, the discipline is context. */
+  .badge.activity {
+    background: transparent; color: var(--text-muted); border-color: var(--border-bright);
+    margin-left: 6px;
+  }
 
 /* ---- First-visit introduction ---- */
 .intro-box {
@@ -295,7 +301,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=69"></script>
+<script src="lib/race-core.js?v=70"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
@@ -392,6 +398,9 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     const finished = status === 'finished';
     const statusText = { live: 'Live', upcoming: 'Upcoming', finished: 'Finished' }[status];
     const courseLabel = r.courseType === 'loops' ? 'Loops' : 'Segments';
+    // Nothing at all for a race made before the field existed, rather than a
+    // guess. The short form, because the card is narrow on a phone.
+    const activityLabel = Race.activities.short(r);
     const runners = (r.runnerNames || []).join(' · ') || '–';
     const startDate = r.startTime
       ? new Date(r.startTime).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' })
@@ -417,7 +426,8 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
         <div class="card-body">
           <div class="card-row"><span class="k">Date</span><span class="v">${startDate}</span></div>
           <div class="card-row"><span class="k">Distance</span><span class="v">${dist}</span></div>
-          <div class="card-row"><span class="k">Course</span><span class="v"><span class="badge ${finished ? 'past' : r.courseType}">${courseLabel}</span></span></div>
+          <div class="card-row"><span class="k">Course</span><span class="v"><span class="badge ${finished ? 'past' : r.courseType}">${courseLabel}</span>${
+            activityLabel ? `<span class="badge activity">${escapeHtml(activityLabel)}</span>` : ''}</span></div>
           <div class="card-row"><span class="k">Runners</span><span class="v">${escapeHtml(runners)}</span></div>
         </div>
       </a>

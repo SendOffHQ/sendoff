@@ -48,6 +48,9 @@ const server = http.createServer((req, res) => {
       const cfg = JSON.parse(text);
       delete cfg.people; delete cfg.createdBy;
       cfg.myRole = 'crew';
+      // The dry run predates the activity field; give it one here so the
+      // browser check can see the label render.
+      if (!cfg.activity) cfg.activity = 'trail-run';
       text = JSON.stringify(cfg, null, 2) + '\n';
     }
     return send(200, JSON.stringify({ sha: 'stub-sha', path: p,
@@ -58,7 +61,7 @@ const server = http.createServer((req, res) => {
     const cfg = JSON.parse(raceFile(SLUG, 'config.json') || '{}');
     return send(200, JSON.stringify({ races: [{ slug: SLUG, name: cfg.name,
       startTime: cfg.startTime, location: cfg.location, visibility: 'private',
-      mine: true, myRole: 'crew' }] }), 'application/json');
+      activity: 'trail-run', mine: true, myRole: 'crew' }] }), 'application/json');
   }
   // Drained before answering, the way the real endpoint does; a reply sent
   // before the body arrives can leave the socket half read.
