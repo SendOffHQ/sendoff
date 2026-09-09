@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- The hub moved from / to /app/ when the landing page took the root. Every
+     link, script and fetch in this file is relative and was written against
+     the site root, so this keeps them all resolving exactly as before: the
+     move stays a move rather than a rewrite. -->
+<base href="/">
+<title>SendOff</title>
+<link rel="icon" href="brand/sendoff-favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0a0f14" />
+<meta name="description" content="Follow a racer live through an ultra. Crew log legs and pits from the aid station; anyone with the link watches without an account or an app.">
+<link rel="canonical" href="https://sendoff.run/app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SendOff">
+<meta property="og:title" content="SendOff · Race Hub">
+<meta property="og:description" content="Follow a racer live through an ultra. Crew log legs and pits from the aid station; anyone with the link watches without an account or an app.">
+<meta property="og:url" content="https://sendoff.run/app/">
+<meta property="og:image" content="https://sendoff.run/brand/og-default.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SendOff · live crew tracking for ultras">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SendOff · Race Hub">
+<meta name="twitter:description" content="Follow a racer live through an ultra. Crew log legs and pits from the aid station; anyone with the link watches without an account or an app.">
+<meta name="twitter:image" content="https://sendoff.run/brand/og-default.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SendOff">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lib/race-theme.css?v=29">
+<style>
+  .cards {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+  }
+  .card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden; position: relative;
+    text-decoration: none; color: inherit;
+    display: flex; flex-direction: column;
+    transition: border-color 0.15s ease, transform 0.05s ease;
+  }
+  .card:hover { border-color: var(--border-bright); }
+  .card:active { transform: scale(0.995); }
+  .card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+  .card.status-live::before     { background: linear-gradient(90deg, var(--green), transparent); }
+  .card.status-upcoming::before { background: linear-gradient(90deg, var(--blue), transparent); }
+  .card.status-finished::before { background: linear-gradient(90deg, var(--text-muted), transparent); }
+  .card-head {
+    padding: 22px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    /* A column so the status chip starts exactly at the padding edge. As an
+       inline-flex box on a line box it picked up a few pixels of leading,
+       which is what put it out of line with the absolutely positioned
+       role badge opposite it. */
+    display: flex; flex-direction: column;
+  }
+  .card-name {
+    font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; font-size: 24px;
+    font-weight: 600; letter-spacing: -0.02em; line-height: 1.15;
+  }
+  .card-loc {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text-muted); margin-top: 6px; letter-spacing: 0.06em;
+  }
+  .card-body {
+    padding: 16px 24px 20px; flex: 1;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .card-row {
+    display: flex; justify-content: space-between; gap: 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+  .card-row .k { color: var(--text-muted); letter-spacing: 0.1em; text-transform: uppercase; font-size: 10px; }
+  .card-row .v { color: var(--text); text-align: right; }
+  .badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    padding: 4px 8px; border-radius: 2px; border: 1px solid currentColor;
+  }
+  .badge.loops { color: var(--blue); }
+  .badge.segments { color: var(--accent); }
+  .badge.past { color: var(--text-muted); }
+
+  .card-status {
+    display: inline-flex; align-items: center; gap: 5px; align-self: flex-start;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; line-height: 1;
+    padding: 3px 7px; border-radius: 2px; border: 1px solid currentColor;
+    margin-bottom: 10px;
+  }
+  .card-status.status-live { color: var(--green); }
+  .card-status.status-upcoming { color: var(--blue); }
+  .card-status.status-finished { color: var(--text-muted); }
+  .live-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  .hub-filters {
+    margin-left: auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .sort-control, .search-control {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted);
+  }
+  .sort-control select, .search-control input {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    background: var(--bg-elevated); color: var(--text);
+    border: 1px solid var(--border-bright); border-radius: 4px;
+    padding: 8px 10px; text-transform: none; letter-spacing: 0;
+  }
+  .search-control input { width: 190px; }
+  .search-control input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .search-control input::placeholder { color: var(--text-muted); }
+  /* Filters own the row once they stop fitting beside the New race button. */
+  @media (max-width: 700px) {
+    .hub-filters { margin-left: 0; width: 100%; }
+    .search-control, .sort-control { flex: 1 1 100%; }
+    .search-control input, .sort-control select { flex: 1; min-width: 0; }
+  }
+  .no-matches {
+    background: var(--bg-card); border: 1px dashed var(--border-bright);
+    border-radius: 6px; padding: 28px 24px; text-align: center;
+    color: var(--text-muted); font-size: 13px;
+  }
+
+  .empty {
+    background: var(--bg-card); border: 1px dashed var(--border-bright);
+    border-radius: 6px; padding: 48px 32px; text-align: center;
+  }
+  .empty h2 {
+    font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; font-size: 28px;
+    font-weight: 600; letter-spacing: -0.02em; margin-bottom: 8px;
+  }
+  .empty p {
+    color: var(--text-dim); margin-bottom: 24px; line-height: 1.5;
+    max-width: 480px; margin-left: auto; margin-right: auto;
+  }
+  .empty .cta {
+    display: inline-block; padding: 14px 22px;
+    background: var(--accent); color: var(--accent-ink);
+    font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    font-size: 12px; letter-spacing: 0.15em; text-transform: uppercase;
+    border-radius: 4px; text-decoration: none;
+    border: 1px solid var(--accent);
+  }
+  .empty .cta:hover { background: var(--accent-hot); }
+
+  .hub-actions {
+    margin-bottom: 28px; display: flex; gap: 12px; flex-wrap: wrap;
+    align-items: center;
+  }
+  .hub-actions a, .hub-actions button { text-decoration: none; }
+  .card-badge {
+    position: absolute; top: 22px; right: 24px;
+    font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; line-height: 1;
+    /* A point smaller than the status chip, because "Private · Creator" is
+       long and at 9px it collides with it on a 320px screen. The extra half
+       pixel of padding makes the two boxes the same height anyway, so they
+       still line up exactly. */
+    padding: 3.5px 7px; border-radius: 2px;
+    background: rgba(15, 184, 191, 0.15); color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  .card-badge.viewer { background: rgba(138, 169, 208, 0.12); color: var(--blue); border-color: var(--blue); }
+  /* Beside the course badge, quieter than it: the course shape changes how the
+     page is read, the discipline is context. */
+  .badge.activity {
+    background: transparent; color: var(--text-muted); border-color: var(--border-bright);
+    margin-left: 6px;
+  }
+
+/* ---- First-visit introduction ---- */
+.intro-box {
+  background: var(--bg-card); border: 1px solid var(--border-bright); border-radius: 6px;
+  padding: 26px 28px 22px; width: 100%; max-width: 540px;
+  box-shadow: 0 18px 56px rgba(0, 0, 0, 0.55);
+}
+/* Left-aligned with everything else in the dialog: the kicker, heading, lede,
+   steps and note all start on one axis, and the wordmark anchors it. */
+.intro-box .wm { height: 46px; width: auto; display: block; margin-bottom: 20px; }
+.intro-kicker {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--accent); margin: 0 0 8px;
+}
+.intro-box h2 {
+  font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif;
+  font-size: 27px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 10px;
+}
+.intro-lede { margin: 0 0 20px; font-size: 14.5px; line-height: 1.6; color: var(--text-dim); }
+.intro-steps { list-style: none; margin: 0 0 18px; padding: 0; counter-reset: introstep; }
+.intro-steps li {
+  counter-increment: introstep; position: relative; padding-left: 34px; margin-bottom: 13px;
+  font-size: 13.5px; line-height: 1.55; color: var(--text-dim);
+}
+.intro-steps li::before {
+  content: counter(introstep); position: absolute; left: 0; top: -1px;
+  width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+  color: var(--accent); border: 1px solid var(--border-bright); border-radius: 3px;
+}
+.intro-steps b { color: var(--text); font-weight: 600; }
+/* What "beta" actually means here, said once and in plain terms, above the
+   line rather than in the small print under it: somebody deciding whether to
+   trust this with their runner's race should not have to go looking. */
+.intro-beta {
+  font-size: 12.5px; line-height: 1.6; color: var(--text-dim);
+  background: rgba(15, 184, 191, 0.06); border: 1px solid var(--border-bright);
+  border-radius: 4px; padding: 12px 14px; margin: 0 0 16px;
+}
+.intro-beta .beta-badge { margin: 0 6px 0 0; vertical-align: 1px; }
+/* The one caveat that could cost somebody something, kept out of the small
+   print and given its own edge. */
+.intro-beta-warn {
+  font-size: 12.5px; line-height: 1.6; color: var(--text-dim);
+  border-left: 2px solid var(--yellow); padding: 2px 0 2px 12px; margin: 0 0 16px;
+}
+.intro-note {
+  font-size: 12px; line-height: 1.55; color: var(--text-muted);
+  border-top: 1px solid var(--border); padding-top: 14px; margin: 0 0 18px;
+}
+.intro-note-link { color: var(--accent); }
+.intro-actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+.intro-link {
+  background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--text-muted); text-decoration: underline;
+}
+.intro-link:hover { color: var(--text); }
+.intro-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* The footer uppercases its text, which is right for labels and wrong for an
+   address: nobody writes INFO@SENDOFF.RUN. */
+footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
+@media (max-width: 560px) {
+  .intro-box { padding: 22px 20px 18px; }
+  .intro-box .wm { height: 38px; margin-bottom: 16px; }
+  .intro-box h2 { font-size: 23px; }
+  .intro-lede { font-size: 14px; margin-bottom: 16px; }
+  .intro-steps li { margin-bottom: 11px; }
+  .intro-actions { justify-content: stretch; }
+  .intro-actions .btn { flex: 1; text-align: center; }
+}
+
+/* ---- Request an invite ---- */
+.req-box { max-width: 460px; }
+.req-box h2 {
+  font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif;
+  font-size: 24px; font-weight: 600; margin: 0 0 8px;
+}
+.req-lede { margin: 0 0 18px; font-size: 13.5px; line-height: 1.55; color: var(--text-dim); }
+.req-field { display: block; margin-bottom: 12px; }
+.req-field > span {
+  display: block; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 5px;
+}
+.req-field input, .req-field textarea {
+  width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border-bright); border-radius: 4px; padding: 8px 10px;
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; font-size: 13.5px;
+}
+.req-field textarea { min-height: 68px; resize: vertical; }
+.req-field input:focus, .req-field textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.req-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 480px) { .req-row { grid-template-columns: 1fr; } }
+.req-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.req-msg { font-size: 12.5px; min-height: 17px; margin: 2px 0 12px; line-height: 1.5; }
+.req-msg.err { color: var(--red); }
+.req-msg.ok { color: var(--green); }
+.req-actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="brand">
+    <div class="brand-meta">
+      <span class="pulse"></span>
+      <a class="wordmark" href="index.html" aria-label="SendOff · home"><svg viewBox="-130 -130 3781.0 1317.6" aria-hidden="true"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 544.24 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 489.41 469.6 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></a>
+    </div>
+    <h1 class="site">Race <em>Hub</em></h1>
+  </div>
+</header>
+
+<div id="error" class="error-banner" style="display:none;"></div>
+<div id="body"></div>
+
+<footer class="site">
+  <div id="repo-link">–</div>
+  <div><button type="button" id="intro-open" class="intro-link">What is SendOff?</button>
+    <span aria-hidden="true"> · </span><button type="button" class="intro-link" data-request-invite>Request an invite</button>
+    <span aria-hidden="true"> · </span><a class="intro-link" href="terms.html">Terms</a>
+    <span aria-hidden="true"> · </span><a class="intro-link" href="privacy.html">Privacy</a>
+    <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
+</footer>
+
+<script src="lib/race-core.js?v=73"></script>
+<script>
+  const SORT_KEY = 'race-hub-sort-v1';
+  let loadedRaces = [];
+  // Slugs confirmed complete by checking the race data, a race can finish
+  // before its cutoff time, so the time window alone isn't enough.
+  const completedSlugs = new Set();
+
+  // upcoming → not started; live → started, within the cutoff window;
+  // finished → past the cutoff, OR every runner has finished. cutoffHours
+  // falls back to 36 for older manifest entries that predate the field.
+  function raceStatus(r) {
+    if (completedSlugs.has(r.slug)) return 'finished';
+    if (!r.startTime) return 'upcoming';
+    const start = new Date(r.startTime).getTime();
+    const now = Date.now();
+    if (now < start) return 'upcoming';
+    const end = start + (r.cutoffHours || 36) * 3600 * 1000;
+    return now < end ? 'live' : 'finished';
+  }
+
+  // True when every configured runner has completed the course.
+  function isRaceComplete(cfg, data) {
+    const runners = cfg.runners || [];
+    if (!runners.length) return false;
+    return runners.every(r => {
+      const d = (data.runners || []).find(x => x.id === r.id) || { legs: [] };
+      return Race.compute.nextActionFor(d, cfg).state === 'finished';
+    });
+  }
+
+  // For races still "live" by the clock, check the data: a runner may have
+  // finished early. Flips those cards to "Finished" without a page reload.
+  async function refineStatuses() {
+    const live = loadedRaces.filter(r => raceStatus(r) === 'live');
+    let changed = false;
+    for (const r of live) {
+      try {
+        const cfg = await Race.gh.readRaceJson(r.slug, 'config.json');
+        const data = await Race.gh.readRaceJson(r.slug, 'data.json');
+        if (isRaceComplete(cfg, data)) { completedSlugs.add(r.slug); changed = true; }
+      } catch (e) { /* leave it on the time-based status */ }
+    }
+    if (changed) renderList();
+  }
+
+  function statusRank(s) {
+    return { live: 0, upcoming: 1, finished: 2 }[s] != null
+      ? { live: 0, upcoming: 1, finished: 2 }[s] : 3;
+  }
+
+  function sortRaces(races, mode) {
+    const me = (Race.auth.email() || '').toLowerCase();
+    const rows = races.map(r => ({ r, s: raceStatus(r) }));
+    const t = r => r.startTime ? new Date(r.startTime).getTime() : Infinity;
+    const byStatusThenDate = (a, b) => {
+      const d = statusRank(a.s) - statusRank(b.s);
+      if (d) return d;
+      // live & upcoming: soonest first; finished: most recent first.
+      return a.s === 'finished' ? (t(b.r) - t(a.r)) : (t(a.r) - t(b.r));
+    };
+    if (mode === 'az') {
+      rows.sort((a, b) => (a.r.name || '').localeCompare(b.r.name || ''));
+    } else if (mode === 'owned') {
+      rows.sort((a, b) => {
+        // `mine` comes from /my-races, which has a session to work it out
+        // with. The manifest itself names nobody, on purpose. createdBy is the
+        // fallback for an entry written before that changed.
+        const own = r => r.mine !== undefined
+          ? (r.mine ? 0 : 1)
+          : ((r.createdBy || '').toLowerCase() === me ? 0 : 1);
+        const ao = own(a.r), bo = own(b.r);
+        return (ao - bo) || byStatusThenDate(a, b);
+      });
+    } else {
+      rows.sort(byStatusThenDate);
+    }
+    return rows.map(x => x.r);
+  }
+
+  // Matches on the things you would actually recall about a race: what it was
+  // called, where it was, and who ran it.
+  function filterRaces(races, q) {
+    q = (q || '').trim().toLowerCase();
+    if (!q) return races;
+    return races.filter(r =>
+      (r.name || '').toLowerCase().includes(q) ||
+      (r.location || '').toLowerCase().includes(q) ||
+      (r.runnerNames || []).some(n => (n || '').toLowerCase().includes(q))
+    );
+  }
+
+  function renderCard(r) {
+    const status = raceStatus(r);
+    const finished = status === 'finished';
+    const statusText = { live: 'Live', upcoming: 'Upcoming', finished: 'Finished' }[status];
+    const courseLabel = r.courseType === 'loops' ? 'Loops' : 'Segments';
+    // Nothing at all for a race made before the field existed, rather than a
+    // guess. The short form, because the card is narrow on a phone.
+    const activityLabel = Race.activities.short(r);
+    const runners = (r.runnerNames || []).join(' · ') || '–';
+    const startDate = r.startTime
+      ? new Date(r.startTime).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' })
+      : '–';
+    const dist = r.totalDistanceMi != null ? Race.units.distance(r.totalDistanceMi, { units: r.units }) : '–';
+    let badge = '';
+    // "editor" still arrives from a worker that has not been redeployed yet.
+    const roleName = r.role ? Race.roles.label(r.role === 'editor' ? 'crew' : r.role) : '';
+    if (r.visibility === 'private') {
+      const cls = r.role === 'viewer' ? 'viewer' : '';
+      badge = `<span class="card-badge ${cls}">Private${roleName ? ' · ' + roleName : ''}</span>`;
+    } else if (roleName && r.role !== 'viewer') {
+      badge = `<span class="card-badge">${roleName}</span>`;
+    }
+    return `
+      <a class="card status-${status}" href="race.html?id=${encodeURIComponent(r.slug)}">
+        ${badge}
+        <div class="card-head">
+          <div class="card-status status-${status}">${status === 'live' ? '<span class="live-dot"></span>' : ''}${statusText}</div>
+          <div class="card-name">${escapeHtml(r.name)}</div>
+          <div class="card-loc">${escapeHtml(r.location || '')}</div>
+        </div>
+        <div class="card-body">
+          <div class="card-row"><span class="k">Date</span><span class="v">${startDate}</span></div>
+          <div class="card-row"><span class="k">Distance</span><span class="v">${dist}</span></div>
+          <div class="card-row"><span class="k">Course</span><span class="v"><span class="badge ${finished ? 'past' : r.courseType}">${courseLabel}</span>${
+            activityLabel ? `<span class="badge activity">${escapeHtml(activityLabel)}</span>` : ''}</span></div>
+          <div class="card-row"><span class="k">Runners</span><span class="v">${escapeHtml(runners)}</span></div>
+        </div>
+      </a>
+    `;
+  }
+
+  function renderList() {
+    const sel = document.getElementById('sort-mode');
+    if (!sel) return;
+    localStorage.setItem(SORT_KEY, sel.value);
+    const search = document.getElementById('race-search');
+    const q = search ? search.value : '';
+    const shown = sortRaces(filterRaces(loadedRaces, q), sel.value);
+    document.getElementById('cards').innerHTML = shown.length
+      ? shown.map(renderCard).join('')
+      : `<div class="no-matches">No races match “${escapeHtml(q.trim())}”.</div>`;
+  }
+
+  function escapeHtml(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  async function load() {
+    try {
+      await Race.hub.load();
+      const isProxy = Race.hub.isProxyMode();
+      const isAuthed = isProxy && Race.auth.has();
+
+      // Public manifest (anonymous): always loaded direct from Pages so it
+      // works without a worker. Treats 404 as "no manifest yet" (empty hub).
+      let publicRaces = [];
+      try {
+        const res = await fetch('races/index.json?_=' + Date.now(), { cache: 'no-store' });
+        if (res.ok) {
+          const manifest = await res.json();
+          publicRaces = manifest.races || [];
+        }
+      } catch (e) { /* empty hub is fine */ }
+
+      // If the user is signed in via the proxy, /my-races merges public races
+      // (annotated with their role) plus any private races they're invited to.
+      let races = publicRaces;
+      let myErr = null;
+      if (isAuthed) {
+        const me = Race.auth.email();
+        try {
+          const my = await Race.api.myRaces();
+          races = (my && my.races) || races;
+          Race.lastSeen.saveRaces(me, races);
+        } catch (err) {
+          // A private race is not in the published manifest at all, so with no
+          // signal the public list is not a smaller version of the answer: it
+          // is missing exactly the race a crew member is here for. Fall back to
+          // the list this device last saw for this account.
+          const saved = Race.lastSeen.loadRaces(me);
+          if (saved) {
+            races = saved.races;
+            Race.offline.noteSaved(saved.at, 'my-races');
+          } else {
+            myErr = err;
+            // Fall back to the public list; the error is rendered as a soft notice below.
+          }
+        }
+      }
+
+      const body = document.getElementById('body');
+
+      if (races.length === 0) {
+        body.innerHTML = `
+          <div class="empty">
+            <h2>No races yet</h2>
+            <p>${isAuthed
+              ? "Set up your first race with the wizard. You'll be its only editor; you can invite crew and generate share links from the race page after creation."
+              : "Set up your first race with the wizard: it'll handle the GitHub commits for you, then you'll have a live dashboard and pit board ready for race day."}</p>
+            <a class="cta" href="setup.html">Set up a race →</a>
+            ${isProxy && !isAuthed ? `<p style="margin-top: 18px; font-size: 12px;"><a href="setup.html" style="color: var(--accent);">Sign in</a> to see private races you've been invited to.</p>` : ''}
+          </div>
+        `;
+      } else {
+        loadedRaces = races;
+        body.innerHTML = `
+          <div class="hub-actions">
+            <a class="btn primary" href="setup.html">+ New race</a>
+            <div class="hub-filters">
+              <label class="search-control">Search
+                <input type="search" id="race-search" placeholder="Name, place or racer"
+                       autocomplete="off" spellcheck="false" aria-label="Search races" />
+              </label>
+              <label class="sort-control">Sort
+                <select id="sort-mode">
+                  <option value="status">Live / upcoming / past</option>
+                  <option value="az">Name (A–Z)</option>
+                  ${isAuthed ? '<option value="owned">Owned first</option>' : ''}
+                </select>
+              </label>
+            </div>
+          </div>
+          ${myErr ? `<div class="error-banner" style="display:block; margin-bottom: 16px;">Could not load private races: ${escapeHtml(myErr.message)}</div>` : ''}
+          <div class="cards" id="cards"></div>
+        `;
+        const sel = document.getElementById('sort-mode');
+        const saved = localStorage.getItem(SORT_KEY) || 'status';
+        if ([...sel.options].some(o => o.value === saved)) sel.value = saved;
+        sel.addEventListener('change', renderList);
+        const search = document.getElementById('race-search');
+        search.addEventListener('input', renderList);
+        // Escape clears rather than leaving a filter you have to hunt for.
+        search.addEventListener('keydown', e => {
+          if (e.key === 'Escape' && search.value) { e.stopPropagation(); search.value = ''; renderList(); }
+        });
+        renderList();
+        refineStatuses();
+      }
+
+      // Repo link for footer
+      const cfg = Race.config.load() || Race.config.detectDefaults();
+      if (cfg.owner && cfg.repo) {
+        document.getElementById('repo-link').innerHTML =
+          `<a href="https://github.com/${cfg.owner}/${cfg.repo}" target="_blank" rel="noopener" style="color: inherit; text-decoration: underline;">${cfg.owner}/${cfg.repo}</a>`;
+      }
+    } catch (err) {
+      const e = document.getElementById('error');
+      e.style.display = 'block';
+      e.textContent = `Error: ${err.message}`;
+    }
+  }
+
+  // ---- First-visit introduction ---------------------------------------
+  // Shown once per browser. Storage can throw (private mode), so fall back to
+  // sessionStorage and, failing that, just show it, a storage error must
+  // never break the hub.
+  const INTRO_KEY = 'race-hub-intro-v1';
+  function introSeen() {
+    try { if (localStorage.getItem(INTRO_KEY) === '1') return true; } catch (e) {}
+    try { if (sessionStorage.getItem(INTRO_KEY) === '1') return true; } catch (e) {}
+    return false;
+  }
+  function markIntroSeen() {
+    try { localStorage.setItem(INTRO_KEY, '1'); return; } catch (e) {}
+    try { sessionStorage.setItem(INTRO_KEY, '1'); } catch (e) {}
+  }
+
+  function openIntro() {
+    if (document.querySelector('.intro-overlay')) return;
+    const previous = document.activeElement;
+    const ov = document.createElement('div');
+    ov.className = 'modal-overlay intro-overlay';
+    ov.innerHTML = `
+      <div class="intro-box" role="dialog" aria-modal="true" aria-labelledby="intro-heading">
+        <img class="wm" src="brand/sendoffprimaryonDark.svg" alt="SendOff">
+        <p class="intro-kicker">Live crew tracking for ultras</p>
+        <h2 id="intro-heading">Send them out, bring them home.</h2>
+        <p class="intro-lede">Crewing an ultra is hours of waiting and then a few minutes where
+          everything happens. While they are in front of you, you tend to the racer. You
+          check them in, you send them off. The rest goes in once they are back out on
+          course, and everyone at home sees it land.</p>
+        <ol class="intro-steps">
+          <li><b>Set up the race.</b> Lay out the course leg by leg, add your racers, set the cutoffs.</li>
+          <li><b>Work the pit board.</b> Check them in when they arrive, send them off when they
+            leave. That is all it asks of you while your hands are full. Fluids, food and
+            notes go in afterwards.</li>
+          <li><b>Send the link.</b> Family and friends follow live splits, pace against cutoff and
+            elevation, updating as you log it.</li>
+        </ol>
+        <p class="intro-beta"><span class="beta-badge">Beta</span> SendOff is new, and it is
+            being built while it is being used. It has run real races and the crew work is
+            solid, but things move week to week and you will find rough edges. If something
+            looks wrong on race day, the pit board keeps working with no signal and sends
+            what you logged once you have bars again.
+            <button type="button" class="intro-link intro-note-link" data-feedback>Tell us what breaks</button>.</p>
+        <p class="intro-beta-warn">One thing worth knowing before you put a race in: a private
+            race is unlisted, not sealed. It stays off the public list and out of search, but
+            the files behind it are still served from a public host, so somebody who knew the
+            address could read it. Sealing that is the next piece of work. Until it lands,
+            treat a race page as something you would not mind a stranger seeing.
+            <a class="intro-note-link" href="privacy.html">What is stored, and who can see it</a>.</p>
+        <p class="intro-note">Watching needs no account and no app: anyone with the link can follow
+            along, and every public race stays readable here afterwards, forever, by anybody.
+            Running a race of your own needs an account, and while SendOff is new those
+            are invite only. <button type="button" class="intro-link intro-note-link" data-request-invite>Request an invite</button>.</p>
+        <div class="intro-actions">
+          <button type="button" class="intro-link" data-intro-close>Look around first</button>
+          <a class="btn primary" href="setup.html">Set up a race &rarr;</a>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    const box = ov.querySelector('.intro-box');
+
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+      if (e.key !== 'Tab') return;
+      const f = box.querySelectorAll('a[href], button');
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    function close() {
+      markIntroSeen();
+      document.removeEventListener('keydown', onKey, true);
+      ov.remove();
+      if (previous && previous.focus) previous.focus();
+    }
+
+    document.addEventListener('keydown', onKey, true);
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    ov.querySelector('[data-intro-close]').addEventListener('click', close);
+    // Leaving for the wizard counts as having seen it.
+    ov.querySelector('.btn.primary').addEventListener('click', markIntroSeen);
+    // The CTA is the last thing in the dialog, so focusing it normally scrolls
+    // the box to the bottom and the wordmark and heading start out of view.
+    // Keep the focus for keyboard users, but open at the top.
+    (box.querySelector('.btn.primary') || box).focus({ preventScroll: true });
+    box.scrollTop = 0;
+  }
+
+  // ---- Request an invite ----------------------------------------------
+  // Posts to the worker, which stores it for an admin to action. If the
+  // worker has not been deployed with that endpoint yet, fall back to the
+  // address rather than leaving someone with a dead button.
+  const INVITE_EMAIL = 'invites@sendoff.run';
+
+  // mode is 'invite' or 'reset'. A reset asks only who you are: what race you
+  // are crewing has nothing to do with getting back into an account you own.
+  function openRequest(mode) {
+    if (document.querySelector('.req-overlay')) return;
+    const isReset = mode === 'reset';
+    const previous = document.activeElement;
+    const ov = document.createElement('div');
+    ov.className = 'modal-overlay req-overlay';
+    ov.innerHTML = `
+      <div class="intro-box req-box" role="dialog" aria-modal="true" aria-labelledby="req-heading">
+        <h2 id="req-heading">${isReset ? 'Request a password reset' : 'Request an invite'}</h2>
+        <p class="req-lede">${isReset
+          ? 'Tell us the email on your account and we will send you a link to set a new password.'
+          : 'Accounts are invite only while SendOff is new. Tell us who you are and what you are crewing, and we will get back to you.'}</p>
+        <form id="req-form" novalidate>
+          <label class="req-field"><span>Your name</span>
+            <input type="text" id="req-name" autocomplete="name" required></label>
+          <label class="req-field"><span>Email</span>
+            <input type="email" id="req-email" autocomplete="email" spellcheck="false" required></label>
+          ${isReset ? '' : `
+          <div class="req-row">
+            <label class="req-field"><span>Race</span>
+              <input type="text" id="req-race" placeholder="Which one?"></label>
+            <label class="req-field"><span>When</span>
+              <input type="text" id="req-when" placeholder="Month, or a date"></label>
+          </div>
+          <label class="req-field"><span>Anything else</span>
+            <textarea id="req-note" rows="3"></textarea></label>`}
+          <label class="req-hp" aria-hidden="true" tabindex="-1">Leave this empty
+            <input type="text" id="req-hp" tabindex="-1" autocomplete="off"></label>
+          <p class="req-msg" id="req-msg" role="status" aria-live="polite"></p>
+          <div class="req-actions">
+            <button type="button" class="intro-link" data-req-close>Cancel</button>
+            <button type="submit" class="btn primary" id="req-send">${isReset ? 'Send reset request' : 'Send request'}</button>
+          </div>
+        </form>
+      </div>`;
+    document.body.appendChild(ov);
+    const box = ov.querySelector('.req-box');
+    const msg = ov.querySelector('#req-msg');
+    const send = ov.querySelector('#req-send');
+
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+      if (e.key !== 'Tab') return;
+      const f = box.querySelectorAll('a[href], button, input, textarea');
+      const vis = [...f].filter(el => el.offsetParent !== null || el.tagName === 'A');
+      if (!vis.length) return;
+      const first = vis[0], last = vis[vis.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    function close() {
+      document.removeEventListener('keydown', onKey, true);
+      ov.remove();
+      if (previous && previous.focus) previous.focus();
+    }
+    function mailtoFallback(payload) {
+      const body = isReset
+        ? `Name: ${payload.name}\nEmail: ${payload.email}\n\nI need a password reset.\n`
+        : `Name: ${payload.name}\nEmail: ${payload.email}\n` +
+          `Race: ${payload.race}\nWhen: ${payload.when}\n\n${payload.note}\n`;
+      return 'mailto:' + INVITE_EMAIL +
+             '?subject=' + encodeURIComponent(isReset ? 'SendOff password reset request' : 'SendOff invite request') +
+             '&body=' + encodeURIComponent(body);
+    }
+
+    ov.querySelector('#req-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const val = (id) => { const el = ov.querySelector(id); return el ? el.value.trim() : ''; };
+      const payload = {
+        kind: isReset ? 'reset' : 'invite',
+        name: val('#req-name'),
+        email: val('#req-email'),
+        race: val('#req-race'),
+        when: val('#req-when'),
+        note: val('#req-note'),
+        website: ov.querySelector('#req-hp').value
+      };
+      if (!payload.name || !payload.email) {
+        msg.className = 'req-msg err'; msg.textContent = 'Name and email are required.'; return;
+      }
+      send.disabled = true; send.textContent = 'Sending…';
+      msg.className = 'req-msg'; msg.textContent = '';
+      const base = (Race.hub.proxyUrl() || '').replace(/\/+$/, '');
+      try {
+        if (!base) throw new Error('no proxy');
+        const res = await fetch(base + '/access-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          let m = `Could not send (${res.status}).`;
+          try { const j = await res.json(); if (j.error) m = j.error; } catch (err) {}
+          throw new Error(m);
+        }
+        let data = {};
+        try { data = await res.json(); } catch (err) {}
+
+        if (data.account === 'exists') {
+          // Say so, rather than a fake success that quietly drops the request.
+          box.innerHTML = `
+            <h2>You already have an account</h2>
+            <p class="req-lede">There is already an account for
+              <strong>${payload.email.replace(/[<>&"']/g, '')}</strong>. Sign in from the top of the
+              page. If you cannot remember the password, ask for a reset and we will send you a link.</p>
+            <p class="req-msg" id="req-msg2" role="status" aria-live="polite"></p>
+            <div class="req-actions">
+              <button type="button" class="intro-link" data-req-close>Close</button>
+              <button type="button" class="btn primary" id="req-reset">Request a password reset</button>
+            </div>`;
+          const rmsg = box.querySelector('#req-msg2');
+          const rbtn = box.querySelector('#req-reset');
+          box.querySelector('[data-req-close]').addEventListener('click', close);
+          rbtn.addEventListener('click', async () => {
+            rbtn.disabled = true; rbtn.textContent = 'Sending…';
+            try {
+              const rr = await fetch(base + '/access-request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kind: 'reset', email: payload.email, name: payload.name })
+              });
+              if (!rr.ok) throw new Error('failed');
+              box.innerHTML = `
+                <h2>Reset requested</h2>
+                <p class="req-lede">We will send a reset link to
+                  <strong>${payload.email.replace(/[<>&"']/g, '')}</strong> from
+                  <strong>${INVITE_EMAIL}</strong>.</p>
+                <div class="req-actions"><button type="button" class="btn primary" data-req-close>Close</button></div>`;
+              box.querySelector('[data-req-close]').addEventListener('click', close);
+              box.querySelector('[data-req-close]').focus();
+            } catch (err) {
+              rmsg.className = 'req-msg err';
+              rmsg.textContent = 'Could not send that. Try again shortly.';
+              rbtn.disabled = false; rbtn.textContent = 'Request a password reset';
+            }
+          });
+          rbtn.focus();
+          return;
+        }
+
+        // The worker answers a reset for an unknown address the same way it
+        // answers a known one, so that a stranger cannot use this form to find
+        // out who has an account. The wording here has to hold either way.
+        box.innerHTML = isReset ? `
+          <h2>Reset requested</h2>
+          <p class="req-lede">If there is a SendOff account for
+            <strong>${payload.email.replace(/[<>&"']/g, '')}</strong>, we will send a reset link to it.</p>
+          <div class="req-actions"><button type="button" class="btn primary" data-req-close>Close</button></div>` : `
+          <h2>Request sent</h2>
+          <p class="req-lede">Thanks. We will be in touch at
+            <strong>${INVITE_EMAIL}</strong>.</p>
+          <div class="req-actions"><button type="button" class="btn primary" data-req-close>Close</button></div>`;
+        box.querySelector('[data-req-close]').addEventListener('click', close);
+        box.querySelector('[data-req-close]').focus();
+        return;
+      } catch (err) {
+        msg.className = 'req-msg err';
+        msg.innerHTML = 'Could not send that from here. ' +
+          `<a href="${mailtoFallback(payload)}" style="color: var(--accent);">Email it instead</a>.`;
+        send.disabled = false; send.textContent = isReset ? 'Send reset request' : 'Send request';
+      }
+    });
+
+    document.addEventListener('keydown', onKey, true);
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    ov.querySelector('[data-req-close]').addEventListener('click', close);
+    ov.querySelector('#req-name').focus();
+  }
+
+  // The intro is built and torn down, so this is delegated rather than bound to
+  // a button that may not exist yet.
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('[data-feedback]');
+    if (!b) return;
+    e.preventDefault();
+    Race.openFeedbackModal();
+  });
+
+  document.querySelectorAll('[data-request-invite]').forEach(el => {
+    el.addEventListener('click', e => { e.preventDefault(); openRequest('invite'); });
+  });
+  document.querySelectorAll('[data-request-reset]').forEach(el => {
+    el.addEventListener('click', e => { e.preventDefault(); openRequest('reset'); });
+  });
+
+  // Deep links, used by the sign-in dialog on every other page: it lives in
+  // race-core and has no request form of its own to open.
+  const qp = new URLSearchParams(location.search);
+  if (qp.has('reset')) openRequest('reset');
+  else if (qp.has('invite')) openRequest('invite');
+
+  document.getElementById('intro-open').addEventListener('click', openIntro);
+  if (!introSeen()) openIntro();
+
+  load();
+</script>
+
+</body>
+</html>

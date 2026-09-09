@@ -18,7 +18,7 @@
 // claims clients immediately so a fixed worker takes over on the next load
 // rather than waiting for every tab to close.
 
-const VERSION = 'v4';
+const VERSION = 'v5';
 const SHELL = `sendoff-shell-${VERSION}`;
 const DATA = `sendoff-data-${VERSION}`;
 const OURS = [SHELL, DATA];
@@ -28,7 +28,11 @@ const OURS = [SHELL, DATA];
 // with every cache-bust, and the day it is forgotten the worker serves last
 // week's JavaScript.
 const SHELL_URLS = [
-  '/', '/index.html', '/race.html', '/pit.html', '/racer.html', '/settings.html', '/setup.html',
+  // '/' is the marketing page; the hub it used to be now lives at '/app/'.
+  // Both are precached: the first is what a stranger lands on, the second is
+  // what a crew member opens with no signal.
+  '/', '/index.html', '/app/', '/app/index.html',
+  '/race.html', '/pit.html', '/racer.html', '/settings.html', '/setup.html',
   '/charts.html', '/print-report.html', '/signup.html', '/reset.html', '/admin.html',
   '/manifest.webmanifest',
   // Leaflet, so the course map draws without signal. Its tiles are not cached:
@@ -197,6 +201,7 @@ self.addEventListener('fetch', (event) => {
       } catch (e) {
         const cache = await caches.open(SHELL);
         const hit = await cache.match(req, { ignoreSearch: true })
+                 || await cache.match('/app/index.html')
                  || await cache.match('/index.html');
         if (hit) return fromCache(hit);
         return new Response(

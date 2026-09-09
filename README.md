@@ -7,7 +7,13 @@ repo, edited live via the GitHub Contents API.
 
 ## Pages
 
-- `index.html`: hub landing. Lists every race from `races/index.json`.
+- `index.html`: the marketing page at the site root. Static, no account,
+  and the only page that is about SendOff rather than about a race.
+- `app/index.html`: the race hub. Lists every race from `races/index.json`.
+  It carries `<base href="/">` because it was written at the site root and
+  every link in it is relative: the tag is what keeps the move to `/app/`
+  a move rather than a rewrite. Every other page stayed where it was, so
+  share links, invites and reset links sent before the move still work.
 - `setup.html`: wizard. Asks for race name, runner(s), course type
   (loops vs. point-to-point segments), aid stations, cutoffs, intake
   targets, and a GPX file, then commits `races/<slug>/config.json`,
@@ -116,7 +122,8 @@ iteration.
 
 ```
 /
-  index.html              hub landing
+  index.html              marketing landing page (site root)
+  app/index.html          race hub (moved from / when the landing page took it)
   setup.html              new-race wizard
   race.html               per-race dashboard (?id=<slug>)
   pit.html                per-race pit board

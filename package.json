@@ -4,7 +4,8 @@
   "description": "The static site. The worker has its own package under worker/.",
   "scripts": {
     "test": "node test/offline-fallback.mjs",
-    "test:browser": "node test/offline-browser.mjs"
+    "test:browser": "node test/offline-browser.mjs",
+    "shots": "node tools/make-shots.mjs"
   },
   "engines": {
     "node": ">=22"

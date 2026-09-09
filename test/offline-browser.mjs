@@ -79,7 +79,14 @@ const navLinks = () => page.evaluate(() =>
 
 // Before signing in, because signed out is the state being tested.
 console.log('\na stranger with no account');
-await page.goto(BASE + '/index.html');
+await page.goto(BASE + '/');
+await page.waitForTimeout(600);
+ok('lands on the marketing page, not the app', await page.evaluate(() =>
+  !!document.querySelector('#beta-form') && !document.querySelector('a.card')), true);
+ok('which offers a way into the app', await page.evaluate(() =>
+  [...document.querySelectorAll('a')].some(a => new URL(a.href).pathname === '/app/')), true);
+
+await page.goto(BASE + '/app/');
 await page.waitForTimeout(2200);
 await page.evaluate(() => { const o = document.querySelector('.intro-overlay'); if (o) o.remove(); });
 const publicRaces = await page.evaluate(() =>
@@ -103,7 +110,7 @@ ok('with no error shown', await page.evaluate(() => {
 }), true);
 ok('and the charts and printout are offered', await navLinks(), ['Charts', 'Print']);
 
-await page.goto(BASE + '/index.html');
+await page.goto(BASE + '/app/');
 await page.evaluate(([me, base]) => {
   localStorage.setItem('race-hub-session-v1', JSON.stringify({
     session: 'stub-token', proxyUrl: base + '/api', email: me, role: 'crew',
@@ -122,7 +129,7 @@ await page.waitForTimeout(2200);
 ok('the crew member has their pages', await navLinks(), ['Pit Board', 'Racer', 'Settings', 'Charts', 'Print']);
 await page.goto(`${BASE}/pit.html?id=${SLUG}`);
 await page.waitForTimeout(1500);
-await page.goto(BASE + '/index.html');
+await page.goto(BASE + '/app/');
 await page.waitForTimeout(2000);
 ok('the service worker is in charge',
   await page.evaluate(() => !!navigator.serviceWorker.controller), true);
@@ -166,7 +173,7 @@ ok('it opens', (await page.evaluate(() => document.querySelectorAll('.big-btn').
 ok('and still offers the race and racer pages', await navLinks(), ['Racer', 'Settings', 'Charts', 'Print']);
 
 console.log('\nthe hub, with no signal');
-await page.goto(BASE + '/index.html').catch(() => {});
+await page.goto(BASE + '/app/').catch(() => {});
 await page.waitForTimeout(3000);
 // A private race is not in the published manifest at all, so without the saved
 // list the hub silently drops the one race the crew member is here for.
