@@ -32,9 +32,10 @@ the only step with no race-day workaround.
 After the race, in this order:
 
 1. **Finish the storage move** (steps 3 and 4 below). Not a feature, but now a
-   promise: the intro screen tells people a private race is unlisted rather
-   than sealed. That sentence stays until `races/**` stops being written and is
-   purged from history. It also makes everything after it cheaper, because the
+   promise: the setting is called unlisted rather than private, and the intro
+   screen says it is not sealed. Both stay until `races/**` stops being written
+   and is purged from history, at which point private becomes the honest word
+   again. It also makes everything after it cheaper, because the
    published copy stops being a second source of truth to reason about.
 2. **The race archive.** The cheapest real feature here, because the logic
    already ships: `Race.archive` in `lib/race-core.js` has the distance
@@ -45,7 +46,13 @@ After the race, in this order:
 3. **Goal-time planner.** Target finish in, per-aid target times out, live
    delta against them. Self-contained, needs no billing, and it is what makes a
    second race better than the first.
-4. **Data export.** CSV, JSON, GPX. Small, read-only, no race-day risk, and it
+4. **Printable crew sheet.** Checkpoints, cutoffs, racer details and room to
+   write, printed the night before. Every number on it already exists, so it
+   is mostly a second print template. It comes after the planner because
+   target times are the one column that is not already computable, and it is
+   the layer under the offline layer: paper has no battery and can be handed
+   to a pacer who just showed up.
+5. **Data export.** CSV, JSON, GPX. Small, read-only, no race-day risk, and it
    is what lets somebody trust a season of their racing to this: they can
    always get it back out.
 
@@ -482,6 +489,62 @@ Target finish time in, per-aid target times out, with a live delta against
 them. The racer screen already computes a cutoff margin, which is the same
 shape of arithmetic against a different number, so this is closer than it
 looks.
+
+### Printable crew sheet — *not built*
+Raised 2026-09-09. A sheet you print the night before and hand to each crew
+member: the checkpoints in order with their distances, the cutoff at each one,
+the racer's details, and room to write.
+
+Not the same thing as `print-report.html`, which already exists and is its
+mirror image. That one is printed **after** and says what happened. This one is
+printed **before** and says what is about to, which means most of its value is
+in the blank space rather than the printed data.
+
+What goes on it, in the order a crew member needs it:
+
+- **The racer**, per sheet: name and bib, which exist today. Phone numbers for
+  the racer and the crew, so a pacer who just showed up can reach somebody, and
+  allergies or medication if the racer chose to record them. **Those last are
+  the one part of this that is not already stored**, so the sheet either waits
+  on new optional profile fields or ships with blanks to fill in by hand.
+  Blanks are the better first version: it is a piece of paper, and a phone
+  number written on it is worth the same as a printed one.
+- **The checkpoints in order**, with cumulative distance, the cutoff time, and
+  the target time if the goal-time planner has landed. Cutoff wants to be a
+  clock time and not an elapsed one: nobody at 2am subtracts.
+- **Blank columns**: in, out, and a note line. Wide enough to write in with a
+  cold hand and a bad pen.
+- **Fueling targets** per hour or per leg, from the profile that already exists.
+- **The race page address**, printed as a URL and as a QR code, so a family
+  member who is handed the sheet can follow along without being told how.
+
+Why it is worth building even though the app works offline: paper does not have
+a battery, does not need a passcode, and can be handed to a stranger. The pit
+board keeps working with no signal, but it stops working at 4% and it cannot be
+given to the pacer who just showed up. The sheet is the layer under the offline
+layer, and a crew that has it is never fully in the dark.
+
+Cheap, too, if it ships with those blanks. Everything else on it already exists
+in `config.json`: legs, cumulative distance, cutoffs, racer names and bib
+numbers, fueling targets. No worker change, no schema change, and
+`print-report.html` already proves the print CSS. Mostly this is a second print
+template and a page that offers it.
+
+Two decisions to make when building it, both about paper rather than code:
+
+1. **One sheet per racer, or one per crew member?** They differ when a crew
+   works two racers, and the answer is probably per racer with the crew's
+   contacts repeated on each, because the sheet lives in a pocket next to the
+   racer it is about.
+2. **How much fits.** One page per racer is the target, and it is the
+   constraint that decides everything above. A course with 20 aid stations and
+   a full fueling plan will not fit, so the template needs an honest rule for
+   what is dropped first. Blank writing space is the last thing to go.
+
+Best built after the goal-time planner, since target times are the one column
+that is not already computable, and before the race archive, since a crew sheet
+is useful the first time somebody sets up a race and an archive needs a history
+to be worth opening.
 
 ### Spectator push / SMS alerts — *not built*
 Notify on each aid arrival. Needs a delivery path (web push, or a provider
