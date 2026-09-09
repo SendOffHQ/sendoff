@@ -53,10 +53,26 @@ means it gets answered. Buried in `#general`, it does not.
 ### RACES
 
 **`#race-feed`** — read only, webhook only.
-Automatic posts when a public race starts, when a racer finishes, and links to
-follow along. Nobody types in here. It is the channel that gives people a
-reason to come back on a weekend, and it is the one that will make the server
-feel alive before there are enough members to do that on their own.
+Nobody types in here. It is the channel that gives people a reason to come back
+on a weekend, and the one that will make the server feel alive before there are
+enough members to do that on their own.
+
+Built and shipped 2026-09-09. The Worker posts two things:
+
+- **a public race is created**, with its name, where and when, and a link
+- **a racer finishes one**, with their name and elapsed time, and a link
+
+Discord unfurls the link into a preview using the race page's own social tags,
+so each post carries the race's card without any of that being built twice.
+
+Three things it deliberately does not post: **anything about an unlisted race**,
+feedback, and access requests. The last two are full of names and email
+addresses and belong in the admin panel where they already are. The first is the
+whole point: an unlisted race's address is the only thing keeping it off the
+public list.
+
+It is off until `DISCORD_WEBHOOK` is set on the Worker. Unset, none of that code
+runs.
 
 ---
 
@@ -230,9 +246,12 @@ Four, because nobody reads seven.
    screening, verification Medium, AutoMod.
 3. Post `#welcome`, pin it, lock the channel.
 4. Post the `#announcements` message.
-5. Create the `#race-feed` webhook and put its URL in the Worker as a secret,
-   never in this repository. Discord resets tokens and webhooks it finds in
-   public repos, and this one is public.
+5. Create the `#race-feed` webhook (Server Settings, Integrations, Webhooks)
+   and put its URL in the Worker with `wrangler secret put DISCORD_WEBHOOK`.
+   Never in this repository: Discord resets webhooks it finds in public repos,
+   and anyone holding the URL can post to the channel as SendOff. Until the
+   secret is set the feature is inert, so there is no rush to do this before
+   the rest.
 6. Invite ten people you know. Not more. A server that is quiet with ten feels
    small; quiet with two hundred feels dead.
 
