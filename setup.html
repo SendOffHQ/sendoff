@@ -329,8 +329,11 @@
         <label>
           <input type="radio" name="vis" value="private" />
           <div class="radio-content">
-            <span class="title">Private</span>
-            <span class="desc">Not listed publicly. Crew + viewers you invite get access; share links let people view without an account.</span>
+            <span class="title">Unlisted</span>
+            <span class="desc">Kept off the hub and out of search, with an address that cannot be guessed.
+              Not sealed: the file is on a public host, so anybody who has the address can read it.
+              Crew and viewers you invite get access; share links let people view without an account.
+              <a href="/privacy.html#public" target="_blank" rel="noopener">What unlisted means</a>.</span>
           </div>
         </label>
       </div>
@@ -1354,7 +1357,7 @@
           return out;
         }, `hub: register race ${slug}`);
       } else {
-        progressLine(`Private race: skipping public manifest.`);
+        progressLine(`Unlisted race: skipping public manifest.`);
       }
 
       progressLine(`Done. Redirecting…`, 'ok');
@@ -1404,7 +1407,7 @@
       // Recompute slug preview since private races get the random suffix.
       updateSlug();
       document.getElementById('vis-note').textContent = state.visibility === 'private'
-        ? "Private, not listed on the hub. Slug gets a random suffix so it can't be guessed. You'll be the only editor at first; add crew + share links from the race page after creation."
+        ? "Unlisted: kept off the hub, and the address gets a random suffix so it can't be guessed. It is not sealed, so treat the address as the thing protecting it. You'll be the only editor at first; add crew + share links from the race page after creation."
         : "Public: anyone with the hub URL can find and view live. You'll be the only editor at first; add more crew from the race page.";
     });
   });

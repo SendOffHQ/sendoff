@@ -822,7 +822,7 @@
         ? races.map(rc => `
             <div class="race-row">
               <a href="race.html?id=${encodeURIComponent(rc.slug)}">${esc(rc.name || rc.slug)}</a>
-              <span class="role ${esc(rc.role)}">${rc.isCreator ? 'creator' : esc(rc.role)}${rc.visibility === 'private' ? ' &middot; private' : ''}</span>
+              <span class="role ${esc(rc.role)}">${rc.isCreator ? 'creator' : esc(rc.role)}${rc.visibility === 'private' ? ' &middot; unlisted' : ''}</span>
             </div>`).join('')
         : '<span class="muted">Not on any races.</span>';
     } catch (err) {

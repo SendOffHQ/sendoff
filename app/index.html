@@ -418,7 +418,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     const roleName = r.role ? Race.roles.label(r.role === 'editor' ? 'crew' : r.role) : '';
     if (r.visibility === 'private') {
       const cls = r.role === 'viewer' ? 'viewer' : '';
-      badge = `<span class="card-badge ${cls}">Private${roleName ? ' · ' + roleName : ''}</span>`;
+      badge = `<span class="card-badge ${cls}">Unlisted${roleName ? ' · ' + roleName : ''}</span>`;
     } else if (roleName && r.role !== 'viewer') {
       badge = `<span class="card-badge">${roleName}</span>`;
     }
@@ -512,7 +512,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
               ? "Set up your first race with the wizard. You'll be its only editor; you can invite crew and generate share links from the race page after creation."
               : "Set up your first race with the wizard: it'll handle the GitHub commits for you, then you'll have a live dashboard and pit board ready for race day."}</p>
             <a class="cta" href="setup.html">Set up a race →</a>
-            ${isProxy && !isAuthed ? `<p style="margin-top: 18px; font-size: 12px;"><a href="setup.html" style="color: var(--accent);">Sign in</a> to see private races you've been invited to.</p>` : ''}
+            ${isProxy && !isAuthed ? `<p style="margin-top: 18px; font-size: 12px;"><a href="setup.html" style="color: var(--accent);">Sign in</a> to see unlisted races you've been invited to.</p>` : ''}
           </div>
         `;
       } else {
@@ -534,7 +534,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
               </label>
             </div>
           </div>
-          ${myErr ? `<div class="error-banner" style="display:block; margin-bottom: 16px;">Could not load private races: ${escapeHtml(myErr.message)}</div>` : ''}
+          ${myErr ? `<div class="error-banner" style="display:block; margin-bottom: 16px;">Could not load unlisted races: ${escapeHtml(myErr.message)}</div>` : ''}
           <div class="cards" id="cards"></div>
         `;
         const sel = document.getElementById('sort-mode');
@@ -607,8 +607,8 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
             looks wrong on race day, the pit board keeps working with no signal and sends
             what you logged once you have bars again.
             <button type="button" class="intro-link intro-note-link" data-feedback>Tell us what breaks</button>.</p>
-        <p class="intro-beta-warn">One thing worth knowing before you put a race in: a private
-            race is unlisted, not sealed. It stays off the public list and out of search, but
+        <p class="intro-beta-warn">One thing worth knowing before you put a race in: a race
+            marked unlisted is not sealed. It stays off the public list and out of search, but
             the files behind it are still served from a public host, so somebody who knew the
             address could read it. Sealing that is the next piece of work. Until it lands,
             treat a race page as something you would not mind a stranger seeing.
