@@ -40,7 +40,8 @@ After the race, in this order:
    already ships: `Race.archive` in `lib/race-core.js` has the distance
    buckets, `resultFor`, `records` and `sort`, and no page uses any of it. It
    needs a page and a hub link. It also lands at the first moment there is a
-   finished race to show.
+   finished race to show. Build it together with the hub filters ("Finding a
+   race among many" below): both want the same chips over the same list.
 3. **Goal-time planner.** Target finish in, per-aid target times out, live
    delta against them. Self-contained, needs no billing, and it is what makes a
    second race better than the first.
@@ -95,6 +96,77 @@ it is a product decision, and "public" may read to a creator as "anyone with the
 link" rather than "listed on the front page". Worth a separate look before there
 are enough races for it to matter, and it does not change the commitment above:
 listed or not, a public race stays readable by anyone forever.
+
+---
+
+## Finding a race among many
+
+Measured 2026-09-09, because the section above is what makes it necessary: if
+every public race stays listed forever, the hub is the page that has to survive
+the pile.
+
+Today the hub loads `races/index.json`, renders **every** race in it, and on
+every keystroke in the search box rebuilds every card's HTML from scratch. There
+is no cap and no debounce. Synthetic manifests, measured in a real browser
+(phone = 390x844 with a 4x CPU throttle, which is roughly a mid-range Android):
+
+| races | first render | keystroke, desktop | keystroke, phone |
+|---|---|---|---|
+| 100 | 53 ms | 19 ms | 53 ms |
+| 500 | 256 ms | 61 ms | 291 ms |
+| 1,000 | 582 ms | 133 ms | 770 ms |
+| 5,000 | 4.5 s | 713 ms | 3.7 s |
+
+The manifest itself is 320 bytes per race: 294 kB at a thousand races, 1.5 MB at
+five thousand, and gzip takes those to about 59 kB and 297 kB. The DOM is about
+20 nodes per card, so five thousand races is a hundred thousand nodes.
+
+**Search breaks first, somewhere around 300 to 500 races on a phone**, and it
+breaks before either the manifest size or the node count is worth worrying
+about. A keystroke that costs a third of a second does not read as slow, it
+reads as broken: letters arrive out of order and the box feels stuck. That is
+the whole finding. Everything else has headroom.
+
+So the order is not the order it looks like:
+
+1. **Debounce the search and cap what is rendered.** Filter the full list in
+   memory, draw about 30 cards, and offer "show all N". This is the only item
+   that is about performance, it is perhaps thirty lines, and it moves the wall
+   from 500 races to somewhere past ten thousand. Everything below it is about
+   finding a race, not about speed.
+2. **Status as a filter, not only a sort.** Live, upcoming, finished. The one
+   people reach for during a race weekend, and it is a chip row over a field the
+   hub already computes.
+3. **Mine and all.** Once the hub is a public directory of everyone's races, the
+   default question a signed-in person has is "where is mine".
+4. **Activity.** The field landed this week and every race carries one. A filter
+   is nearly free, and it is the one that makes a mixed hub legible: a paddler
+   does not want to scroll past trail hundreds.
+5. **Year.** A single chip row, most recent first.
+
+**Not a date range selector.** It was considered and it is the wrong shape here.
+A range is two date pickers, which on a phone is two modals and four taps to
+answer a question that is nearly always "this year" or "last year". Races are
+annual and people remember them by year, not by span. A year chip is one tap and
+it composes with the other filters. If somebody ever genuinely needs a span, it
+is a power-user affordance on a wide screen, not the primary control.
+
+One bug found while measuring, worth fixing whenever the hub is next opened:
+`refineStatuses()` awaits config and data **sequentially** for each live race.
+At twenty live races that is forty serial round trips before the statuses settle.
+It should be a bounded `Promise.all`, and the bound matters more than the
+parallelism because the proxy is the thing being asked.
+
+Where this ends up: the single JSON manifest is a temporary shape. Once storage
+steps 5 and 6 land and D1 is the source of truth, the hub should ask a query
+endpoint for a page of races with the filters applied server-side, and the
+manifest becomes a fallback for the signed-out published path rather than the
+mechanism. That is not worth building before the D1 move, which is why none of
+this is urgent and item 1 is the only piece that is genuinely cheap now.
+
+Timing: after the race, alongside the archive. They want the same filter UI over
+the same list, and building either one first without the other means building
+the chips twice.
 
 ---
 
