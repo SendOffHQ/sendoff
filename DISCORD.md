@@ -1,0 +1,210 @@
+# The SendOff Discord
+
+How the server is laid out, why, and the copy that goes in it. Written
+2026-09-09, before launch.
+
+`ROADMAP.md` is what gets built. This is what gets said, and where.
+
+---
+
+## The constraint that decides everything else
+
+**One person runs this, and there are not many members yet.** Every choice
+below follows from that.
+
+A new server with fifteen channels reads as abandoned within a week, because
+fourteen of them are empty and the fifteenth has three messages. A new server
+with five channels reads as small, which is what it is and which is fine.
+Splitting conversation across channels at this size does not organise it, it
+kills it: the same twenty messages that make one channel look alive make five
+look dead.
+
+So the rule is: **a channel earns its place by having something posted in it
+this week.** Start with five. Add the sixth when a real conversation in
+`#general` keeps happening and wants its own room, and it will be obvious when
+that is.
+
+---
+
+## The five channels to launch with
+
+### START HERE
+
+**`#welcome`** — read only, nobody can post.
+What SendOff is, what beta means, the links, and how to get in. One message,
+pinned, edited rather than added to. Copy is below.
+
+**`#announcements`** — read only, Jason and the webhook only.
+Releases, changes, anything down. Low volume on purpose: a person who muted
+this because it was chatty will not unmute it for the one message that
+mattered.
+
+### TALK
+
+**`#general`**
+Everything that is not a support question. Deliberately one room. This is where
+the community either happens or does not, so it gets the widest remit.
+
+**`#help`**
+"How do I", "is it meant to do this", "I cannot sign in". Separate from
+`#general` for one reason: an unanswered question is visible here, and visible
+means it gets answered. Buried in `#general`, it does not.
+
+### RACES
+
+**`#race-feed`** — read only, webhook only.
+Automatic posts when a public race starts, when a racer finishes, and links to
+follow along. Nobody types in here. It is the channel that gives people a
+reason to come back on a weekend, and it is the one that will make the server
+feel alive before there are enough members to do that on their own.
+
+---
+
+## What to add second, and when
+
+**`#crewing`**, for crewing talk that is not about SendOff at all: what to pack,
+how to work a hand off, what went wrong last time. It is what turns a support
+server into a community, and it is also the one most likely to sit empty on day
+one.
+
+**The trigger for adding it**: when crewing talk in `#general` has happened
+three or four times and somebody has had to scroll to find it. Not before.
+
+---
+
+## Roles
+
+Two, and resist a third.
+
+- **`@Beta`** — has a SendOff account. The gate already exists (creating a race
+  is invite only), so this role mirrors something real rather than inventing a
+  hierarchy. Useful for one thing: pinging the people who can actually test a
+  change.
+- **`@Jason`** — admin. Named rather than "Staff", because there is one person
+  and pretending otherwise is worse than owning it.
+
+**Skip self-assign role menus for now.** Racer / crew / spectator sounds tidy
+and buys nothing at this size: there is nobody to ping selectively, and a
+reaction-role menu in an empty server is a machine with no work to do. Add it
+when a ping would go to more people than would read the channel anyway.
+
+---
+
+## Moderation, with one person
+
+The honest position is that nobody is watching this server most of the time.
+Set it up so that is survivable rather than pretending otherwise.
+
+- Turn on **Community features**, which gets you the rules screen and
+  onboarding.
+- **Rules screening on**: members must accept before they can post. It is the
+  cheapest filter there is.
+- **Verification level: Medium** (verified email, registered more than five
+  minutes). High (phone) is too much friction for a running club.
+- **AutoMod on** for spam, mention spam and invite links. Discord's built in
+  rules are enough; a moderation bot is another dependency to keep alive.
+- **Slow mode off** everywhere. It solves a problem this server does not have.
+- Nothing that pings `@everyone` except Jason.
+
+---
+
+## The one that is easy to get wrong: bugs
+
+**Bug reports should keep going through the in-app feedback button, not
+Discord.** This is worth being firm about because the instinct is the other
+way.
+
+The in-app button already captures the page, the race, the app version, whether
+the device was offline, how many writes were queued, and the browser, and it
+lands in the admin panel with a count. A Discord message captures a person's
+memory of what happened. On the offline path especially, that difference is the
+difference between fixing something and guessing at it.
+
+So `#help` is for questions, and its pinned message points at the in-app button
+for anything broken. When somebody reports a bug in Discord anyway, which they
+will, the useful reply is a thank you and a nudge to press the button from the
+page it happened on, so the context comes with it.
+
+---
+
+## The thing to say about unlisted races
+
+Somebody will paste a race link. If that race is unlisted, pasting it in a
+public Discord is what un-unlists it: the address is the only thing keeping it
+off the public list, and now the address is in a searchable channel.
+
+That belongs in `#welcome` rather than in a rule nobody reads, and it is in the
+copy below.
+
+---
+
+## Copy
+
+### `#welcome`
+
+> # SendOff
+>
+> Live crew tracking for ultras. Your crew works one board at the aid station,
+> and everyone back home watches the splits land live.
+>
+> **sendoff.run**
+>
+> **SendOff is in beta.** It has run real races and the crew work is solid, but
+> it moves week to week and you will find rough edges.
+>
+> **Watching a race needs nothing.** No account, no app. Anyone with the link
+> can follow along, and every public race stays readable forever.
+>
+> **Running a race of your own is invite only** while the beta lasts. Ask at
+> sendoff.run and you will get an answer.
+>
+> **Found something broken?** Use the feedback button inside the app rather
+> than posting here. It sends the page, the race and the version with your
+> message, which is usually what makes a bug fixable. `#help` is for questions.
+>
+> **One thing worth knowing before you paste a link.** A race marked unlisted
+> is kept off the public list, but its address is the only thing keeping it
+> there. Pasting that link in here makes it public in practice. Public races,
+> paste away.
+>
+> Terms: sendoff.run/terms.html · Privacy: sendoff.run/privacy.html
+
+### Rules screen
+
+Four, because nobody reads seven.
+
+> 1. **Be decent.** Crewing is a kind sport. Keep it that way.
+> 2. **No medical advice.** Share what worked for you, not what somebody else
+>    should do with their body. Nobody here is your doctor.
+> 3. **Do not post somebody else's race data or address** without asking them.
+>    That includes screenshots with names in.
+> 4. **No promotion** unless it is a race you are running, crewing or putting
+>    on.
+
+### First post in `#announcements`
+
+> This server is new, and so is SendOff.
+>
+> What is here: the app, at sendoff.run, and the people using it. Right now
+> that is a small number of us.
+>
+> What is coming: **Sangre de Cristo 100 on 26 September.** That is the race
+> this whole thing was built for, after a DNF there in 2025. It will be logged
+> live in SendOff, and `#race-feed` will post as it happens. If you want to see
+> what the app actually does under load, that weekend is the one to watch.
+
+---
+
+## Launch order
+
+1. Create the five channels and the two roles.
+2. Turn on Community, rules screening, verification Medium, AutoMod.
+3. Post `#welcome`, pin it, lock the channel.
+4. Post the `#announcements` message.
+5. Create the `#race-feed` webhook and put its URL in the Worker as a secret,
+   never in this repository. Discord resets tokens and webhooks it finds in
+   public repos, and this one is public.
+6. Invite ten people you know. Not more. A server that is quiet with ten feels
+   small; quiet with two hundred feels dead.
+
+The race on the 26th is the launch. Everything before it is setting the table.
