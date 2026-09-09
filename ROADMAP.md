@@ -46,8 +46,9 @@ After the race, in this order:
 3. **Goal-time planner.** Target finish in, per-aid target times out, live
    delta against them. Self-contained, needs no billing, and it is what makes a
    second race better than the first.
-4. **Printable crew sheet.** Checkpoints, cutoffs, racer details and room to
-   write, printed the night before. Every number on it already exists, so it
+4. **Printable crew sheet.** One sheet per crew member, two or three racers to
+   a sheet: checkpoints, which of them crew can reach, cutoffs as clock times,
+   racer details, and room to write. Printed the night before. Every number on it already exists, so it
    is mostly a second print template. It comes after the planner because
    target times are the one column that is not already computable, and it is
    the layer under the offline layer: paper has no battery and can be handed
@@ -530,16 +531,61 @@ numbers, fueling targets. No worker change, no schema change, and
 `print-report.html` already proves the print CSS. Mostly this is a second print
 template and a page that offers it.
 
-Two decisions to make when building it, both about paper rather than code:
+**One sheet per crew member, decided 2026-09-09**, holding two or three racers
+where there are that many. That choice is what sets the layout, because it makes
+the course shared and only the blanks multiply: racers in the same race run the
+same checkpoints at the same distances against the same cutoffs, so those three
+columns are printed once and each racer gets a column group of their own beside
+them.
 
-1. **One sheet per racer, or one per crew member?** They differ when a crew
-   works two racers, and the answer is probably per racer with the crew's
-   contacts repeated on each, because the sheet lives in a pocket next to the
-   racer it is about.
-2. **How much fits.** One page per racer is the target, and it is the
-   constraint that decides everything above. A course with 20 aid stations and
-   a full fueling plan will not fit, so the template needs an honest rule for
-   what is dropped first. Blank writing space is the last thing to go.
+So the sheet is a header strip per racer (name, bib, phone, anything the crew
+needs at a glance) over one table:
+
+    | checkpoint | mi | crew? | cutoff | racer A: in / out / note | racer B: ... |
+
+The crew's own contact block appears once, at the top, which is the saving that
+one-per-crew buys over one-per-racer.
+
+**The `crew?` column is the one that was missed first time round**, and it may be
+the most useful thing on the page. Segment courses already store `crewAccess`,
+`crewNote`, `dropBag` and `pacerEligible` per segment, and a crew member's first
+question is not what the cutoff is, it is *which aid stations am I allowed to be
+at*. That belongs on paper more than anything else here, because getting it wrong
+means driving to the wrong place. Same for drop bags and where a pacer can join.
+
+Two things checked in the config rather than assumed, both of which shape it:
+
+- **Per-aid cutoffs exist, but only on segment courses.** They are stored as
+  `arriveCutoffHours`, elapsed, so the clock time the sheet wants is computed
+  from `startTime` rather than read. Loop courses (`courseType: "loops"`) carry
+  only `cutoffs.totalHours`, so on those the cutoff column is one number at the
+  bottom and the checkpoint rows repeat per lap. Two layouts, not one.
+- **Per-racer fueling targets already exist** as `targets` and `phaseTargets` on
+  each runner, along with `crewNotes`. That is the header strip, already stored,
+  no new fields.
+
+**How many fit is a question about handwriting, not about data.** Rough
+arithmetic on US Letter landscape: about 255mm of usable width, of which the
+shared columns want 85mm, leaving 170mm to divide. Two racers get a comfortable
+85mm each. Three get 56mm, which is 15mm for in, 15mm for out and 26mm for a
+note. A note column much under 25mm cannot be written in with a cold hand, so
+three is the ceiling and four is a second sheet. None of that is measured, it is
+arithmetic, and the real test is printing one and filling it in with gloves on.
+
+Two consequences worth deciding before the template is written:
+
+1. **Portrait for one racer, landscape for two or three.** One racer does not
+   need the width and reads better tall, in a pocket.
+2. **Target times do not fit in the grid** once the goal-time planner lands,
+   because they are per racer rather than shared, and three more columns is
+   what breaks it. They belong in each racer's header strip as a single goal
+   finish, with the per-aid targets on the one-racer portrait version where
+   there is room.
+
+The rule for what gets dropped when a course with twenty aid stations still will
+not fit: fueling targets first, then the elevation column, then the header strip
+narrows. Blank writing space is the last thing to go, because a sheet nobody can
+write on is a worse version of the phone they already have.
 
 Best built after the goal-time planner, since target times are the one column
 that is not already computable, and before the race archive, since a crew sheet
