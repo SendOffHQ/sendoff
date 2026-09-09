@@ -24,19 +24,21 @@ Both are quantised to a 256 colour palette afterwards, which costs nothing
 visible on a flat dark interface and saves about two thirds of the bytes.
 Resizing them instead makes them *larger*, because resampling adds noise.
 
-## `founder.jpg` is missing on purpose
+## `founder.jpg`
 
-The landing page wants a photograph of Jason at
-`brand/marketing/founder.jpg`. There is no placeholder committed, because a
-stand-in photograph of a real person is worse than none: until the real file is
-dropped in, the page falls back to a monogram, which looks intentional rather
-than broken.
+Jason on a trail, 751 x 751. Re-encoded on the way in, which strips every
+metadata block: a trail selfie is exactly the kind of photograph that carries
+GPS, and this one is in a public repository. The source had no GPS block and
+the committed file has no EXIF at all. Check that again for any replacement.
 
-Square, and 600px on a side is plenty: it renders at 300px, capped to 72vw
-so it never outgrows a narrow phone. That size is set for a photograph with a scene in it
-rather than a headshot, so a trail selfie with the mountains still in frame
-lands correctly with no cropping. A square source fills the circle exactly and
-only the corners are clipped, so anything at the centre is safe.
+It renders at 300px, capped to 72vw so it never outgrows a narrow phone, which
+is about 2.5x density on this file. Square is the shape to use: it fills the
+circle exactly and only the corners are clipped, so anything near the centre is
+safe, and a photograph with a scene in it survives at that size in a way a
+headshot does not need to.
 
-If the file is not square, `object-position: center 38%` biases the crop
+If a replacement is not square, `object-position: center 38%` biases the crop
 upward, toward a face rather than a chest.
+
+If the file is ever missing, the page falls back to a monogram rather than a
+broken image, so it degrades to something that looks intentional.
