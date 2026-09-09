@@ -1,4 +1,10 @@
-// The offline path, in a real browser with a real service worker.
+// Two promises that only a real browser can check, in one run to save a launch.
+//
+// First: a stranger with no account can see every public race and open any of
+// them. That is a commitment now (ROADMAP, "Every race, forever"), so it is
+// held by a test rather than by whoever remembers it.
+//
+// Then: the offline path.
 //
 // The unit tests cover the logic. This covers what actually went wrong on a
 // phone, which was an interaction between three pieces that each looked right
@@ -70,6 +76,32 @@ const page = await ctx.newPage();
 const navLinks = () => page.evaluate(() =>
   [...document.querySelectorAll('a')].map(a => a.textContent.trim())
     .filter(t => /Pit Board|Racer|Settings|Charts|Print/i.test(t)));
+
+// Before signing in, because signed out is the state being tested.
+console.log('\na stranger with no account');
+await page.goto(BASE + '/index.html');
+await page.waitForTimeout(2200);
+await page.evaluate(() => { const o = document.querySelector('.intro-overlay'); if (o) o.remove(); });
+const publicRaces = await page.evaluate(() =>
+  [...document.querySelectorAll('a.card')].map(a => new URL(a.href).searchParams.get('id')));
+ok('sees the public races on the hub', publicRaces.length >= 3, true);
+ok('and is not shown an empty hub',
+  await page.evaluate(() => !!document.querySelector('.empty')), false);
+// Finished races included: a cap on history would show up here first.
+ok('including ones that already finished', await page.evaluate(() =>
+  [...document.querySelectorAll('a.card .card-status')].some(e => /finished/i.test(e.textContent))), true);
+
+await page.goto(`${BASE}/race.html?id=${publicRaces[0]}`);
+await page.waitForTimeout(2800);
+ok('can open one of them', await page.evaluate(() => {
+  const t = document.getElementById('race-title');
+  return !!t && t.textContent.trim().length > 0 && !/loading/i.test(t.textContent);
+}), true);
+ok('with no error shown', await page.evaluate(() => {
+  const e = document.getElementById('error');
+  return !e || getComputedStyle(e).display === 'none';
+}), true);
+ok('and the charts and printout are offered', await navLinks(), ['Charts', 'Print']);
 
 await page.goto(BASE + '/index.html');
 await page.evaluate(([me, base]) => {
