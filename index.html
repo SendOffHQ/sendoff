@@ -146,6 +146,11 @@
   }
   .portrait img { width: 100%; height: 100%; object-fit: cover;
                   object-position: center 38%; display: block; }
+  /* On a phone the portrait is a 300px circle in a single column, and left
+     against the edge it reads as though it slipped. Centred it reads as a
+     portrait. The wide layout puts it in its own column beside the text,
+     where the left edge is the alignment, so this stops at 720px. */
+  @media (max-width: 719px) { .portrait { margin-left: auto; margin-right: auto; } }
   /* Shown only when the photograph is not there, so the page never renders a
      broken image while the real one is still to be dropped in. */
   .portrait .monogram {
@@ -202,37 +207,6 @@
   .foot-links { font-size: 13px; color: var(--text-muted); }
   .foot-links a { color: var(--text-dim); text-decoration: none; }
   .foot-links a:hover { color: var(--accent); }
-
-  /* ---------- centred on a phone ---------- */
-  /* Scoped to the narrow layout rather than set and then undone, so the wide
-     layout below is untouched and there is only one place that decides. The
-     blocks with a max-width need the auto margins too, or they stay pinned
-     left inside a centred column and only their text moves. */
-  @media (max-width: 719px) {
-    .hero, .eyebrow, h1, h2, .lede, .body-copy, .hero-note,
-    figcaption, ol.steps li, .founder, form.beta, #beta-status,
-    .form-foot, .beta-note, footer.lp { text-align: center; }
-    .lede, .body-copy, figcaption, form.beta { margin-left: auto; margin-right: auto; }
-    /* Stacked and centred, two buttons of different widths read as ragged
-       rather than as a pair, so they share one. */
-    .cta { justify-content: center; }
-    .cta .btn-lp { min-width: 230px; }
-    .shot { margin-left: auto; margin-right: auto; }
-
-    /* The step number moves from beside the text to above it. */
-    ol.steps li { padding-left: 0; }
-    ol.steps li::before { position: static; margin: 0 auto 12px; }
-
-    .founder { justify-items: center; }
-
-    /* A left edge accent under centred text reads as a mistake, so on a phone
-       the same stripe runs along the top instead. */
-    .beta-note { border-left-width: 1px; border-top: 2px solid var(--accent); }
-
-    .field label, .field .hint { text-align: center; }
-    footer.lp { justify-content: center; }
-    footer.lp .brand-row { justify-content: center; }
-  }
 
   @media (min-width: 720px) {
     .wrap { padding: 0 32px; }
