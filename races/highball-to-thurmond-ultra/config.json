@@ -10,17 +10,17 @@
   "course": {
     "segments": [
       {
-        "name": "Start \u2192 Deepwater \u2013 Loop Creek area",
+        "name": "Start → Deepwater – Loop Creek area",
         "fromAid": "Start",
-        "toAid": "Deepwater \u2013 Loop Creek area",
+        "toAid": "Deepwater – Loop Creek area",
         "distanceMi": 5.9,
         "elevationGainFt": 286,
         "elevationLossFt": 344,
         "arriveCutoffHours": null
       },
       {
-        "name": "Deepwater \u2013 Loop Creek area \u2192 Kanawha Falls Overlook",
-        "fromAid": "Deepwater \u2013 Loop Creek area",
+        "name": "Deepwater – Loop Creek area → Kanawha Falls Overlook",
+        "fromAid": "Deepwater – Loop Creek area",
         "toAid": "Kanawha Falls Overlook",
         "distanceMi": 3.8,
         "elevationGainFt": 357,
@@ -28,7 +28,7 @@
         "arriveCutoffHours": null
       },
       {
-        "name": "Kanawha Falls Overlook \u2192 Top of Cotton Hill",
+        "name": "Kanawha Falls Overlook → Top of Cotton Hill",
         "fromAid": "Kanawha Falls Overlook",
         "toAid": "Top of Cotton Hill",
         "distanceMi": 4.2,
@@ -37,7 +37,7 @@
         "arriveCutoffHours": null
       },
       {
-        "name": "Top of Cotton Hill \u2192 Cotton Hill Damn Access",
+        "name": "Top of Cotton Hill → Cotton Hill Damn Access",
         "fromAid": "Top of Cotton Hill",
         "toAid": "Cotton Hill Damn Access",
         "distanceMi": 4,
@@ -46,7 +46,7 @@
         "arriveCutoffHours": null
       },
       {
-        "name": "Cotton Hill Damn Access \u2192 Hawks Nest State Park",
+        "name": "Cotton Hill Damn Access → Hawks Nest State Park",
         "fromAid": "Cotton Hill Damn Access",
         "toAid": "Hawks Nest State Park",
         "distanceMi": 2.1,
@@ -55,7 +55,7 @@
         "arriveCutoffHours": null
       },
       {
-        "name": "Hawks Nest State Park \u2192 Fayette Station Rd",
+        "name": "Hawks Nest State Park → Fayette Station Rd",
         "fromAid": "Hawks Nest State Park",
         "toAid": "Fayette Station Rd",
         "distanceMi": 5.7,
@@ -64,7 +64,7 @@
         "arriveCutoffHours": null
       },
       {
-        "name": "Fayette Station Rd \u2192 Kaymoor Miners Trail Mountain Bike Parking Lot",
+        "name": "Fayette Station Rd → Kaymoor Miners Trail Mountain Bike Parking Lot",
         "fromAid": "Fayette Station Rd",
         "toAid": "Kaymoor Miners Trail Mountain Bike Parking Lot",
         "distanceMi": 5.9,
@@ -73,7 +73,7 @@
         "arriveCutoffHours": null
       },
       {
-        "name": "Kaymoor Miners Trail Mountain Bike Parking Lot \u2192 Kaymoor Trailhead ",
+        "name": "Kaymoor Miners Trail Mountain Bike Parking Lot → Kaymoor Trailhead ",
         "fromAid": "Kaymoor Miners Trail Mountain Bike Parking Lot",
         "toAid": "Kaymoor Trailhead ",
         "distanceMi": 7.8,
@@ -82,7 +82,7 @@
         "arriveCutoffHours": null
       },
       {
-        "name": "Kaymoor Trailhead  \u2192 Cunard River Access",
+        "name": "Kaymoor Trailhead  → Cunard River Access",
         "fromAid": "Kaymoor Trailhead ",
         "toAid": "Cunard River Access",
         "distanceMi": 1.8,
@@ -91,7 +91,7 @@
         "arriveCutoffHours": null
       },
       {
-        "name": "Cunard River Access \u2192 Southside Junction Trail",
+        "name": "Cunard River Access → Southside Junction Trail",
         "fromAid": "Cunard River Access",
         "toAid": "Southside Junction Trail",
         "distanceMi": 5,
@@ -100,7 +100,7 @@
         "arriveCutoffHours": null
       },
       {
-        "name": "Southside Junction Trail \u2192 Finish",
+        "name": "Southside Junction Trail → Finish",
         "fromAid": "Southside Junction Trail",
         "toAid": "Finish",
         "distanceMi": 3.8,
@@ -126,5 +126,6 @@
   "units": {
     "distance": "mi",
     "elevation": "ft"
-  }
+  },
+  "activity": "trail-run"
 }
