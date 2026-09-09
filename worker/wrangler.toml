@@ -39,6 +39,16 @@ INFO_FROM = "info@sendoff.run"
 #                  secret rather than a var so a personal inbox stays out of
 #                  git. Must be a verified Email Routing destination, which is
 #                  the free path; without it the worker simply does not notify.
+#   DISCORD_WEBHOOK  optional. A channel webhook URL, from Discord's Server
+#                  Settings, Integrations, Webhooks. When set, the worker
+#                  announces a public race being created and a racer finishing
+#                  one. Unset, none of that code runs at all.
+#                  It is a secret and not a var for a blunt reason: this
+#                  repository is public, and anyone holding a webhook URL can
+#                  post to that channel as SendOff. Discord also resets
+#                  webhooks it finds in public repositories, so committing it
+#                  would break it as well as leak it.
+#                  Only races explicitly marked public are ever announced.
 
 # Lets the worker send the notification above. Sending to a verified
 # destination address is free on all plans with Email Routing configured.

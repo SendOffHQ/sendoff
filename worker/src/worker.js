@@ -1494,7 +1494,7 @@ async function handleAccountRaces(req, env) {
   return json({ email, races }, {}, env, req);
 }
 
-async function handleCommit(req, env) {
+async function handleCommit(req, env, ctx) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
 
@@ -1529,6 +1529,10 @@ async function handleCommit(req, env) {
   let creationAcl = null;
   // An access list lifted off an ordinary config write, stored once it lands.
   let aclUpdate = null;
+  // The race as it stands, lifted out of the ACL check below. The Discord
+  // announcement needs the visibility and the course shape, and a data.json
+  // write carries neither.
+  let liveCfg = null;
 
   // Path allowlist + ACL check.
   if (path === 'races/index.json') {
@@ -1539,6 +1543,7 @@ async function handleCommit(req, env) {
     const slug = racePathSlug(path);
     creationSlug = slug;
     const raceCfg = await loadRaceConfig(env, slug);
+    liveCfg = raceCfg;
     if (!raceCfg) {
       // Brand-new race: only allow writes to files under this slug if the body
       // looks like a self-creation. The wizard writes config.json first, then
@@ -1675,6 +1680,13 @@ async function handleCommit(req, env) {
   // The cached copy is now wrong. Dropping it means a press is visible on the
   // next poll rather than up to CACHE_TTL_S later, at least in this colo.
   if (res.ok) await purgeReadCache(env, path);
+  // After everything, and outside the response. waitUntil keeps the worker
+  // alive for it without the caller waiting on it, so a slow or down Discord
+  // costs a crew member nothing. Without a ctx (the tests call fetch directly)
+  // it is simply skipped.
+  if (res.ok && ctx && ctx.waitUntil) {
+    ctx.waitUntil(announceCommit(env, path, content, liveCfg, isCreation));
+  }
   return new Response(text, {
     status: res.status,
     headers: { 'Content-Type': 'application/json', ...corsHeaders(env, req) }
@@ -1949,6 +1961,161 @@ function resetMail(env, url, days) {
           `The link expires in ${days} days. If this was not you, ignore it and your password ` +
           `stays as it is.\n\nSendOff, live crew tracking for ultras. ${mailBase(env)}\n`
   };
+}
+
+// ---------- Discord ----------
+// Posts to a channel webhook when a public race is created and when somebody
+// finishes one. Off unless DISCORD_WEBHOOK is set as a secret, so a worker
+// that has not opted in runs exactly the code it ran before.
+//
+// Three rules, and the first is the one that matters:
+//
+// 1. Only races explicitly marked public are ever announced. An unlisted
+//    race's address is the only thing keeping it off the public list, so
+//    posting that address into a chat channel is precisely what un-unlists
+//    it. The test is `visibility === 'public'` rather than "not private":
+//    a config with the field missing is not announced, because a missing
+//    field is not consent.
+// 2. Nothing here can affect a commit. It runs after the response has been
+//    sent, through ctx.waitUntil, and every failure is swallowed. A crew
+//    member pressing "check in" at an aid station must never wait on a chat
+//    service, and must never be failed by one.
+// 3. No mentions, ever. A race name is typed by a user, and a race called
+//    "@everyone" would otherwise ping the whole server from inside a message
+//    the server trusts.
+const DISCORD_SEEN_TTL_DAYS = 365;
+
+function discordEnabled(env) {
+  return !!(env && env.DISCORD_WEBHOOK);
+}
+
+// Explicit opt-in. See rule 1 above.
+function isPublicRace(cfg) {
+  return !!(cfg && cfg.visibility === 'public');
+}
+
+// How many legs a finished racer has behind them, for either course shape.
+// Loops multiply out; segments are counted as written. Zero means the shape
+// is unrecognised, and an unrecognised shape announces nothing.
+function totalLegs(cfg) {
+  const c = (cfg && cfg.course) || {};
+  if (cfg && cfg.courseType === 'loops') {
+    return (c.loopCount || 0) * ((c.loopSegments || []).length);
+  }
+  return (c.segments || []).length;
+}
+
+function completedLegs(runner) {
+  return ((runner && runner.legs) || []).filter(l => l && l.endTime).length;
+}
+
+// Anything a user typed, made safe to put in a message: no mentions, no
+// newlines to fake structure with, and short enough not to fill a channel.
+function forDiscord(v, n) {
+  return String(v == null ? '' : v)
+    .replace(/[@`*_~|\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, n || 120);
+}
+
+function elapsedHms(fromIso, toIso) {
+  const a = Date.parse(fromIso), b = Date.parse(toIso);
+  if (!isFinite(a) || !isFinite(b) || b <= a) return null;
+  const s = Math.floor((b - a) / 1000);
+  const p = n => String(n).padStart(2, '0');
+  return `${p(Math.floor(s / 3600))}:${p(Math.floor(s / 60) % 60)}:${p(s % 60)}`;
+}
+
+// Never throws, never retries. A dropped announcement is a dropped
+// announcement; the race is unaffected and the data is already safe.
+async function postToDiscord(env, content) {
+  if (!discordEnabled(env) || !content) return false;
+  try {
+    const res = await fetch(env.DISCORD_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: content.slice(0, 1900),
+        // Rule 3. Belt and braces: the text is already stripped of @.
+        allowed_mentions: { parse: [] }
+      })
+    });
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+function raceUrl(env, slug) {
+  return `${mailBase(env)}/race.html?id=${encodeURIComponent(slug)}`;
+}
+
+async function announceNewRace(env, slug, cfg) {
+  if (!isPublicRace(cfg)) return;
+  const name = forDiscord(cfg.name) || 'A race';
+  const where = forDiscord(cfg.location, 80);
+  const when = cfg.startTime ? new Date(cfg.startTime) : null;
+  const day = when && isFinite(when.getTime())
+    ? when.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+    : null;
+  const bits = [where, day].filter(Boolean).join(', ');
+  await postToDiscord(env,
+    `**${name}** is on the board${bits ? ` (${bits})` : ''}.\n${raceUrl(env, slug)}`);
+}
+
+// Announces each racer once. The set of who has already been announced lives
+// in KV rather than being derived from the previous data.json, because a crew
+// correcting a typo after the finish writes data.json again and nobody wants
+// the finish posted twice.
+async function announceFinishes(env, slug, cfg, data) {
+  if (!isPublicRace(cfg) || !env.AUTH_KV) return;
+  const total = totalLegs(cfg);
+  if (!total) return;
+
+  const done = ((data && data.runners) || []).filter(r => completedLegs(r) >= total);
+  if (!done.length) return;
+
+  const key = 'dsc:fin:' + slug;
+  let seen;
+  try { seen = new Set(JSON.parse((await env.AUTH_KV.get(key)) || '[]')); }
+  catch (e) { seen = new Set(); }
+
+  const fresh = done.filter(r => r && r.id && !seen.has(r.id));
+  if (!fresh.length) return;
+
+  const byId = new Map(((cfg.runners) || []).map(r => [r.id, r]));
+  for (const r of fresh) {
+    const who = forDiscord((byId.get(r.id) || {}).name || r.id, 60);
+    const last = r.legs[r.legs.length - 1];
+    const time = cfg.startTime && last ? elapsedHms(cfg.startTime, last.endTime) : null;
+    await postToDiscord(env,
+      `**${who}** finished ${forDiscord(cfg.name) || 'the race'}${time ? ` in ${time}` : ''}.\n` +
+      raceUrl(env, slug));
+    seen.add(r.id);
+  }
+  await env.AUTH_KV.put(key, JSON.stringify([...seen]),
+    { expirationTtl: DISCORD_SEEN_TTL_DAYS * 24 * 3600 });
+}
+
+// The single entry point a commit calls, so handleCommit carries one line of
+// this rather than a branch of it.
+async function announceCommit(env, path, content, cfg, isCreation) {
+  if (!discordEnabled(env)) return;
+  try {
+    const slug = racePathSlug(path);
+    if (!slug) return;
+    let doc;
+    try { doc = JSON.parse(content); } catch (e) { return; }
+    if (path.endsWith('/config.json')) {
+      if (isCreation) await announceNewRace(env, slug, doc);
+    } else if (path.endsWith('/data.json')) {
+      await announceFinishes(env, slug, cfg, doc);
+    }
+  } catch (e) {
+    // Rule 2. A chat post is never worth failing a write over, and by the
+    // time this runs the response has already gone.
+  }
 }
 
 // ---------- access requests ----------
@@ -2955,7 +3122,7 @@ async function handleRaceDelete(req, env) {
 
 // ---------- router ----------
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders(env, request) });
     }
@@ -2980,7 +3147,7 @@ export default {
     if (request.method === 'GET'  && path === '/reset-info')      return handleResetInfo(request, env);
     if (request.method === 'POST' && path === '/reset-password')  return handleResetPassword(request, env);
     if (request.method === 'GET'  && path === '/invite-info')     return handleInviteInfo(request, env);
-    if (request.method === 'POST' && path === '/commit')          return handleCommit(request, env);
+    if (request.method === 'POST' && path === '/commit')          return handleCommit(request, env, ctx);
     if (request.method === 'GET'  && path === '/get')             return handleGet(request, env);
     if (request.method === 'POST' && path === '/invite')          return handleInvite(request, env);
     if (request.method === 'POST' && path === '/share-link')      return handleShareLink(request, env);
