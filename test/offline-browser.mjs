@@ -175,9 +175,9 @@ ok('and still offers the race and racer pages', await navLinks(), ['Racer', 'Set
 console.log('\nthe hub, with no signal');
 await page.goto(BASE + '/app/').catch(() => {});
 await page.waitForTimeout(3000);
-// A private race is not in the published manifest at all, so without the saved
+// An unlisted race is not in the published manifest at all, so without the saved
 // list the hub silently drops the one race the crew member is here for.
-ok('the private race is still listed', await page.evaluate((s) =>
+ok('the unlisted race is still listed', await page.evaluate((s) =>
   [...document.querySelectorAll('a[href*="race.html"]')].some(a => a.href.includes(s)), SLUG), true);
 
 await browser.close();

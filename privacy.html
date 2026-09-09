@@ -154,8 +154,8 @@
   <p>SendOff's race data is currently kept in a public GitHub repository, which is also what serves
     the pages people watch. That has consequences which are not obvious from using the app:</p>
   <ul>
-    <li>A race marked <strong>private</strong> is unlisted, not sealed. The box below says
-      exactly what that means.</li>
+    <li>A race marked <strong>unlisted</strong> is not sealed. The box below says exactly
+      what that means.</li>
     <li>Every change made through SendOff creates a public commit. Commit messages made before
       9 September 2026 contain the email address of whoever made the change, and they remain in
       the repository's history. Messages made after that date carry no address: what was done is
@@ -164,10 +164,12 @@
       September 2026. They remain in the repository's history.</li>
   </ul>
   <div class="conspicuous">
-    <p>The word private in SendOff means unlisted. It does not mean sealed, encrypted or access
-      controlled. A private race is kept off the public list and out of search engines, but the
-      file behind it sits on a public host and can be read by anybody who knows or guesses its
-      address. Do not put anything in a race that you would mind a stranger reading.</p>
+    <p>Unlisted does not mean sealed, encrypted or access controlled. An unlisted race is kept
+      off the public list and out of search engines, and its address carries a random suffix so it
+      cannot be guessed, but the file behind it sits on a public host and can be read by anybody
+      who has that address. Do not put anything in a race that you would mind a stranger reading.
+      SendOff called this setting private until 9 September 2026, and stopped because unlisted is
+      what it actually does.</p>
   </div>
   <p>Moving off this is in progress and is the next piece of work after the September 2026 race.
     Until it is finished, treat a race page as something a stranger could read.</p>

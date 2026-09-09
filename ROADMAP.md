@@ -346,8 +346,21 @@ before promising an event in another hemisphere.
    `worker/wrangler.toml`, which is on. A race the mirror has not seen still
    falls back to git, so setting it back to `"false"` is the whole rollback.
 3. New races stop writing to GitHub except the archive commit at finish.
-   **Not done.** This is the one that makes private mean private, because it is
-   what stops the files existing.
+   **Not done.** This is the one that makes the word private true again,
+   because it is what stops the files existing.
+
+   Until it lands, the setting is called **unlisted** rather than private
+   everywhere a person can read it: the setup picker, the hub card badge, the
+   share panel, the admin list, the intro, the landing page and both legal
+   pages. Changed 2026-09-09, after a review pointed out that calling a
+   guessable public file "private" is the kind of claim the Texas DTPA is
+   about. Nothing under the hood moved: the stored value is still
+   `visibility: "private"` and every comparison against it is untouched, so
+   this is a text change and reverting it is another one. When step 3 lands
+   and the files stop existing, the honest word becomes private again: change
+   the labels back, and update the box in `privacy.html` that explains what
+   unlisted means, which is the only place that also needs its argument
+   rewritten rather than its noun swapped.
 4. ~~Backfill the existing races~~ **done 2026-09-08**, and delete the
    dual-write. **Not done**, and it waits for 3.
 
