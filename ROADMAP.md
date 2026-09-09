@@ -251,6 +251,13 @@ to the published copy. Privacy lands at the second of those, not the first: a
 file deleted from `main` is still readable in the history of a public
 repository.
 
+The purge has to take the commit **messages** with it, not just the file
+contents. Until 2026-09-09 every message carried the address of whoever made
+the change, and four people's addresses are in 191 of them. Dropping the
+`races/**` paths leaves those commits empty and they go with it, which is the
+right outcome, but a purge written to preserve history while rewriting only the
+blobs would keep the exact thing worth removing.
+
 ### The published copy, and why it is a separate job
 
 Moving writes to a database fixes correctness and the build limit. It does not

@@ -629,10 +629,30 @@ async function githubGetJson(env, path) {
   return { sha: j.sha, data: JSON.parse(text), text, missing: false };
 }
 
+// Every commit this worker makes lands in a public repository, so the message
+// is published. It used to carry the address of whoever made the change, which
+// meant a crew logging splits wrote their address into a public commit for
+// every press. Four people's addresses ended up in 191 of them before anyone
+// noticed, because the addresses had been taken out of the race files and
+// nobody thought to look at the messages that changed them.
+//
+// So no message goes out with an address in it, and the check lives here
+// rather than at each call site: a caller composing "accept invite for
+// someone@example.com" should not be able to publish it by accident, and the
+// next call site somebody adds should not have to remember this.
+//
+// Who did what is recorded in the database instead, which is where an audit
+// trail belongs and where it is not world readable.
+const EMAILISH = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+function commitMessage(raw) {
+  return String(raw == null ? '' : raw).replace(EMAILISH, '[redacted]');
+}
+
 async function githubPutJson(env, path, data, sha, message, actor) {
   const url = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURI(path)}`;
   const body = {
-    message: actor ? `${message} (via ${actor})` : message,
+    // `actor` is no longer written into the message; see commitMessage above.
+    message: commitMessage(message),
     branch: env.GITHUB_BRANCH || 'main',
     content: utf8ToBase64(JSON.stringify(data, null, 2) + '\n')
   };
@@ -1614,7 +1634,7 @@ async function handleCommit(req, env) {
 
   const ghUrl = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURI(path)}`;
   const ghBody = {
-    message: `${message} (via ${session.email})`,
+    message: commitMessage(message),
     branch: env.GITHUB_BRANCH || 'main',
     content: utf8ToBase64(content)
   };
@@ -2615,7 +2635,7 @@ async function handleAcceptInvite(req, env) {
       people.push({ email, role: RACE_ROLES.includes(role) ? role : 'viewer' });
       setRacePeople(cfg, people);
       return cfg;
-    }, `hub: accept invite for ${inv.email} on ${inv.slug}`, inv.email);
+    }, `hub: accept invite on ${inv.slug}`, inv.email);
   } catch (err) {
     return json({ error: err.message || 'Could not update race ACL' }, { status: 500 }, env, req);
   }
@@ -2895,7 +2915,7 @@ async function handleRaceDelete(req, env) {
           'User-Agent': 'race-dashboard-proxy'
         },
         body: JSON.stringify({
-          message: `hub: delete race ${slug} (${f.path.slice(prefix.length)}) (via ${session.email})`,
+          message: commitMessage(`hub: delete race ${slug} (${f.path.slice(prefix.length)})`),
           sha: f.sha,
           branch: env.GITHUB_BRANCH || 'main'
         })
