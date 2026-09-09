@@ -233,6 +233,34 @@ ok('and the others made room for it',
    !!ctx.localStorage.getItem('so:seen:other-race:config.json'), false);
 ok('the session survived the clear-out', !!ctx.localStorage.getItem('race-hub-session-v1'), true);
 
+console.log('\nwhat kind of race this is');
+// These become stored values, so the list is a contract: a key that changes
+// leaves races filed under something the reader no longer knows.
+ok('every entry has a key, a label and a family',
+   Race.activities.all.every(a => a.key && a.label && a.family), true);
+ok('the keys are unique',
+   new Set(Race.activities.all.map(a => a.key)).size, Race.activities.all.length);
+ok('the ones people measure in distance per hour',
+   Race.activities.all.filter(a => a.speed).map(a => a.key),
+   ['mtb', 'gravel-bike', 'road-bike', 'paddle']);
+ok('a bike race reads as speed', Race.activities.isSpeed({ activity: 'road-bike' }), true);
+ok('a trail race does not', Race.activities.isSpeed({ activity: 'trail-run' }), false);
+ok('running distances are their own family',
+   Race.activities.family({ activity: 'hike' }), 'foot');
+// The archive compares like with like, and a race with no answer is not the
+// same as a race whose answer is "other".
+ok('a race made before the field has no label', Race.activities.label({}), null);
+ok('nor a family', Race.activities.family({}), null);
+ok('and a key this list has dropped reads as absent too',
+   Race.activities.label({ activity: 'unicycle' }), null);
+ok('the long name shortens for a card',
+   [Race.activities.label({ activity: 'mixed' }), Race.activities.short({ activity: 'mixed' })],
+   ['Mixed discipline', 'Mixed']);
+ok('and one without a short form uses its label',
+   Race.activities.short({ activity: 'paddle' }), 'Paddle');
+ok('the picker default is one of the keys',
+   !!Race.activities.find(Race.activities.DEFAULT), true);
+
 console.log('\nsigning out takes the race data with it');
 ok('there is something to clear', Object.keys(ctx.localStorage).some(k => k.startsWith('so:seen:')), true);
 Race.auth.clearSession();

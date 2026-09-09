@@ -342,6 +342,11 @@
       <span class="lbl">Location</span>
       <input type="text" id="race-location" placeholder="Westcliffe, CO" />
     </label>
+    <label class="field">
+      <span class="lbl">Activity</span>
+      <select id="race-activity"></select>
+      <span class="hint">What the race is. Changeable later from the settings page.</span>
+    </label>
     <div class="field">
       <span class="lbl">Start date / time (local)</span>
       <div class="datetime-row">
@@ -605,13 +610,14 @@
 
 </div>
 
-<script src="lib/race-core.js?v=69"></script>
+<script src="lib/race-core.js?v=70"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
   // ---------- state ----------
   const state = {
     courseType: 'segments',
+    activity: 'trail-run',
     visibility: 'public',
     units: { distance: 'mi', elevation: 'ft' },
     aidStations: [
@@ -1148,6 +1154,7 @@
     const cfg = {
       name, location, startTime,
       courseType: state.courseType,
+      activity: state.activity,
       units: { distance: state.units.distance, elevation: state.units.elevation },
       visibility: proxy ? state.visibility : 'public',
       createdBy: me || null,
@@ -1234,6 +1241,7 @@
       startTime: cfg.startTime,
       courseType: cfg.courseType,
       units: cfg.units,
+      activity: cfg.activity,
       totalDistanceMi: +Race.course.totalDistanceMi(cfg).toFixed(2),
       runnerNames: cfg.runners.map(r => r.name),
       cutoffHours: cfg.cutoffs.totalHours
@@ -1617,6 +1625,15 @@
     renderPresetRows();
     renderSeedPicker();
     setCourseType(state.courseType);
+    // Built from the one list rather than typed into the markup, so a picker
+    // can never offer something the reader does not know.
+    const act = document.getElementById('race-activity');
+    if (act && !act.options.length) {
+      act.innerHTML = Race.activities.all
+        .map(a => `<option value="${a.key}">${a.label}</option>`).join('');
+      act.value = state.activity || Race.activities.DEFAULT;
+      act.addEventListener('change', () => { state.activity = act.value; });
+    }
     updateSlug();
   })();
 </script>

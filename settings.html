@@ -272,6 +272,27 @@
 
 <div id="error" class="error-banner" style="display:none;"></div>
 
+<!-- Race details. One field today, but it needs somewhere to live: an activity
+     that could only be chosen in the wizard could never be corrected, and the
+     races made before the field existed could never have one at all. -->
+<section class="editor collapsed" id="race-editor">
+  <div class="editor-head" id="race-editor-head">
+    <div class="editor-title">Race details</div>
+    <span class="editor-toggle">Edit</span>
+  </div>
+  <div class="editor-body">
+    <div class="row">
+      <label for="race-activity">Activity</label>
+      <select id="race-activity"></select>
+    </div>
+    <p class="hint" style="margin-top:8px">What this race is. It decides how a
+      pace reads and, later, what a result is comparable to.</p>
+    <div style="margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;">
+      <button class="btn primary" id="race-save">Save changes</button>
+    </div>
+  </div>
+</section>
+
 <!-- Aid station editor (segments mode) -->
 <section class="editor collapsed" id="aid-editor" style="display:none;">
   <div class="editor-head" id="aid-editor-head">
@@ -404,7 +425,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=69"></script>
+<script src="lib/race-core.js?v=70"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -629,6 +650,7 @@
 
   function render() {
     if (!cfg || !data) return;
+    fillActivity();
     document.getElementById('aid-editor').style.display = cfg.courseType === 'segments' ? '' : 'none';
     if (cfg.courseType === 'segments' && !editingAid) {
       // Initialize the editor with current aid stations
@@ -1174,6 +1196,54 @@
     }
   }
 
+  // Empty is a real answer: a race can go back to having no activity set,
+  // which is not the same as being "other".
+  function fillActivity() {
+    const el = document.getElementById('race-activity');
+    if (!el) return;
+    el.innerHTML = '<option value="">Not set</option>' +
+      Race.activities.all.map(a => `<option value="${a.key}">${a.label}</option>`).join('');
+    el.value = (cfg && cfg.activity) || '';
+  }
+
+  async function saveRaceDetails() {
+    const el = document.getElementById('race-activity');
+    const chosen = el ? el.value : '';
+    const btn = document.getElementById('race-save');
+    btn.disabled = true;
+    try {
+      await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
+        if (chosen) remote.activity = chosen; else delete remote.activity;
+        return remote;
+      }, `settings: set activity for ${slug}`);
+      // The hub draws its cards from the manifest, not from the config, so a
+      // change that stopped here would show on the race page and nowhere else.
+      // A public race only; a private one is not in the manifest at all.
+      if (cfg.visibility !== 'private') {
+        try {
+          await Race.gh.mutateJson(Race.auth.cfg(), 'races/index.json', (m) => {
+            const e = (m.races || []).find(r => r.slug === slug);
+            if (e) {
+              if (chosen) e.activity = chosen; else delete e.activity;
+              m.lastUpdated = new Date().toISOString();
+            }
+            return m;
+          }, `settings: refresh index activity for ${slug}`);
+        } catch (e) {
+          // The race itself is saved. The card catches up on the next write
+          // that touches the manifest, so this is not worth failing over.
+          toast('Saved, but the hub card may lag.', 'error');
+        }
+      }
+      cfg.activity = chosen || undefined;
+      toast('Race details saved.', 'ok');
+    } catch (e) {
+      toast(e.message || 'Could not save.', 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   async function saveAidStations() {
     const aids = editingAid
       .map(a => ({
@@ -1316,6 +1386,11 @@
     editingAid = null; render();
   });
   document.getElementById('aid-save').addEventListener('click', saveAidStations);
+
+  document.getElementById('race-editor-head').addEventListener('click', () => {
+    document.getElementById('race-editor').classList.toggle('collapsed');
+  });
+  document.getElementById('race-save').addEventListener('click', saveRaceDetails);
 
   document.getElementById('runner-editor-head').addEventListener('click', () => {
     document.getElementById('runner-editor').classList.toggle('collapsed');

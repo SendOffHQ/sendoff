@@ -512,7 +512,7 @@
      Esri's and will be missing offline; the map is useful without them. -->
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8"></script>
-<script src="lib/race-core.js?v=69"></script>
+<script src="lib/race-core.js?v=70"></script>
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
@@ -965,8 +965,13 @@
       document.title = `${cfg.name} · SendOff`;
       document.getElementById('race-title').innerHTML =
         cfg.name.replace(/(\w+)$/, '<em>$1</em>');
-      document.getElementById('brand-subtitle').textContent =
-        cfg.location || (cfg.courseType === 'loops' ? 'Loops' : 'Point-to-point');
+      // Place and discipline read as one line: where it is and what it is.
+      const actLabel = Race.activities.label(cfg);
+      document.getElementById('brand-subtitle').textContent = [
+        cfg.location || (cfg.courseType === 'loops' ? 'Loops' : 'Point-to-point'),
+        actLabel
+      ].filter(Boolean).join(' · ');
+
 
       renderCutoffs();
 

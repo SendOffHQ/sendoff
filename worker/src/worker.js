@@ -2791,6 +2791,7 @@ async function handleMyRaces(req, env) {
       location: cfg.location,
       startTime: cfg.startTime,
       courseType: cfg.courseType,
+      activity: cfg.activity,
       totalDistanceMi: cfg.course
         ? (cfg.courseType === 'loops'
             ? +((cfg.course.loopCount || 0) * (cfg.course.loopDistanceMi || 0)).toFixed(2)
