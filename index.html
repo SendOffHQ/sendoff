@@ -60,7 +60,7 @@
   .lp-mark img { width: min(300px, 74vw); height: auto; display: block; }
 
   /* ---------- hero ---------- */
-  .hero { padding: 26px 0 8px; }
+  .hero { padding: 26px 0 8px; text-align: center; }
   .kicker {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
@@ -74,10 +74,13 @@
   h1 em { font-style: italic; color: var(--accent); }
   .lede {
     font-size: 17px; line-height: 1.55; color: var(--text-dim);
-    max-width: 46ch; margin-top: 20px;
+    max-width: 46ch; margin: 20px auto 0;
   }
   .lede b { color: var(--text); font-weight: 600; }
-  .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+  .cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 28px; }
+  /* Side by side or stacked, two buttons of different widths read as ragged
+     under centred text rather than as a pair, so they share one. */
+  .cta .btn-lp { min-width: 230px; }
   .btn-lp {
     display: inline-block; text-decoration: none; text-align: center;
     font-family: 'JetBrains Mono', ui-monospace, monospace;
@@ -91,7 +94,7 @@
   }
   .btn-lp.primary:hover { background: var(--accent-hot); }
   .btn-lp:not(.primary):hover { border-color: var(--accent); color: var(--accent); }
-  .hero-note { margin-top: 18px; font-size: 13px; color: var(--text-muted); }
+  .hero-note { margin: 18px auto 0; max-width: 56ch; font-size: 13px; color: var(--text-muted); }
 
   /* ---------- section furniture ---------- */
   section { padding: 56px 0; border-top: 1px solid var(--border); margin-top: 48px; }
