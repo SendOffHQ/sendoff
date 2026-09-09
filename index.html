@@ -43,8 +43,6 @@
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
     padding: 18px 0 14px; border-bottom: 1px solid var(--border);
   }
-  .lp-head .wordmark { --wm-size: 26px; }
-  .lp-head .brand-row { display: flex; align-items: center; gap: 14px; }
   .lp-open {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
@@ -53,8 +51,16 @@
   }
   .lp-open:hover { border-color: var(--accent); color: var(--accent-hot); }
 
+  /* ---------- the wordmark ----------
+     On a landing page the wordmark is the first thing rather than chrome, so
+     it comes out of the bar and gets its own band and its own space. Width
+     rather than height sets the size, because the mark is nearly three times
+     as wide as it is tall and width is the dimension that runs out first. */
+  .lp-mark { display: flex; justify-content: center; padding: 40px 0 4px; }
+  .lp-mark img { width: min(300px, 74vw); height: auto; display: block; }
+
   /* ---------- hero ---------- */
-  .hero { padding: 44px 0 8px; }
+  .hero { padding: 26px 0 8px; }
   .kicker {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
@@ -210,7 +216,9 @@
 
   @media (min-width: 720px) {
     .wrap { padding: 0 32px; }
-    .hero { padding: 72px 0 16px; }
+    .lp-mark { padding: 64px 0 8px; }
+    .lp-mark img { width: 380px; }
+    .hero { padding: 40px 0 16px; }
     .lede { font-size: 19px; }
     .screens { grid-template-columns: 1fr 1fr; gap: 44px; }
     ol.steps { grid-template-columns: repeat(3, 1fr); gap: 30px; }
@@ -219,7 +227,9 @@
     section { padding: 76px 0; }
   }
   @media (min-width: 1000px) {
-    .hero { padding: 96px 0 24px; }
+    .lp-mark { padding: 76px 0 10px; }
+    .lp-mark img { width: 440px; }
+    .hero { padding: 48px 0 24px; }
     .shot { max-width: 340px; }
   }
   @media (prefers-reduced-motion: no-preference) {
@@ -232,12 +242,13 @@
 <div class="wrap">
 
   <header class="lp-head">
-    <div class="brand-row">
-      <span class="wordmark"><img src="/brand/sendoffprimaryonDark.svg" alt="SendOff" style="height:26px;width:auto;display:block"></span>
-      <span class="beta-badge">Beta</span>
-    </div>
+    <span class="beta-badge">Beta</span>
     <a class="lp-open" href="/app/">Open the app &rarr;</a>
   </header>
+
+  <div class="lp-mark">
+    <img src="/brand/sendoffprimaryonDark.svg" alt="SendOff" width="3059" height="1066">
+  </div>
 
   <div class="hero">
     <p class="kicker">Live crew tracking for ultras</p>
