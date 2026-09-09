@@ -66,8 +66,15 @@
     {
       "id": "jason",
       "name": "Jason Dupree",
-      "bib": "Jason",
-      "color": "#1bc318"
+      "bib": "128",
+      "color": "#1bc318",
+      "targets": {
+        "caloriesPerHour": 275,
+        "fluidOzPerHour": 32,
+        "sodiumMgPerHour": 1200
+      },
+      "phaseTargets": [],
+      "crewNotes": ""
     }
   ],
   "targets": {
@@ -101,5 +108,6 @@
       "step": 50
     }
   ],
-  "activity": "trail-run"
+  "activity": "trail-run",
+  "fuelPresets": []
 }
