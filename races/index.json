@@ -25,7 +25,8 @@
       "runnerNames": [
         "Jason Dupree"
       ],
-      "cutoffHours": 8.5
+      "cutoffHours": 8.5,
+      "activity": "trail-run"
     },
     {
       "slug": "000001-sangre-de-cristo-100",
@@ -45,5 +46,5 @@
       "activity": "trail-run"
     }
   ],
-  "lastUpdated": "2026-09-09T00:31:13.031Z"
+  "lastUpdated": "2026-09-09T00:31:32.991Z"
 }
