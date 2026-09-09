@@ -91,8 +91,13 @@ const server = http.createServer((req, res) => {
   if (url.pathname.startsWith('/api/')) return send(200, '{}', 'application/json');
 
   // --- the site ---
-  let file = url.pathname === '/' ? '/index.html' : url.pathname;
-  const full = path.join(ROOT, decodeURIComponent(file));
+  // Pages serves a directory as its index.html. The hub lives at /app/ now, so
+  // resolving directories here is what keeps this harness the same shape as
+  // production rather than a simpler one that happens to pass.
+  let full = path.join(ROOT, decodeURIComponent(url.pathname));
+  if (full.startsWith(ROOT) && fs.existsSync(full) && fs.statSync(full).isDirectory()) {
+    full = path.join(full, 'index.html');
+  }
   if (!full.startsWith(ROOT) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) {
     return send(404, 'not found');
   }

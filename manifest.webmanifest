@@ -3,7 +3,7 @@
   "short_name": "SendOff",
   "description": "Follow a runner live through an ultra. Crew log legs and pits from the aid station; anyone with the link watches without an account.",
   "id": "/",
-  "start_url": "/",
+  "start_url": "/app/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0A0F14",
@@ -17,6 +17,6 @@
   ],
   "shortcuts": [
     { "name": "Pit board", "short_name": "Pit", "url": "/pit.html" },
-    { "name": "Race hub", "short_name": "Hub", "url": "/" }
+    { "name": "Race hub", "short_name": "Hub", "url": "/app/" }
   ]
 }
