@@ -57,6 +57,21 @@
     background: rgba(255, 176, 122, 0.05);
   }
   .legal .callout p:last-child { margin-bottom: 0; }
+  /* Texas fair notice: a disclaimer or a liability limit only works if a
+     reasonable person ought to have noticed it (Tex. Bus. & Com. Code
+     1.201(b)(10), and Dresser v. Page Petroleum on conspicuousness). Larger,
+     bolder, upper case, in a contrasting box, is the shape that satisfies it.
+     It is uglier than the rest of the page on purpose. */
+  .legal .conspicuous {
+    border: 2px solid var(--yellow); border-radius: 4px;
+    background: rgba(255, 176, 122, 0.07);
+    padding: 16px 18px; margin: 14px 0 18px;
+  }
+  .legal .conspicuous p {
+    text-transform: uppercase; font-weight: 700; color: var(--text);
+    font-size: 14px; line-height: 1.7; letter-spacing: 0.02em;
+  }
+  .legal .conspicuous p:last-child { margin-bottom: 0; }
   .legal .placeholder {
     background: rgba(255, 176, 122, 0.14); color: var(--yellow);
     padding: 1px 5px; border-radius: 3px; font-family: 'JetBrains Mono', monospace;
@@ -89,7 +104,10 @@
   Jason Dupree, and these terms are the agreement between you and
   them for using sendoff.run.</p>
 
-<p>Section 3 is the one that matters. If you read nothing else, read that.</p>
+<p>Section 3 is the one that matters. If you read nothing else, read that.
+  Sections 11, 12 and 13 are the legal limits on what SendOff promises and what
+  it is answerable for. They are set in boxes and in capitals so that nobody can
+  say later that they did not see them.</p>
 
 <h2>1. What SendOff does</h2>
 <p>SendOff lets a crew record a racer's progress through a race: arrivals and departures at aid
@@ -111,9 +129,11 @@
     <li>a safety or emergency system. It cannot tell that a racer is in trouble, and it will not
       tell anybody if they are.</li>
   </ul>
-  <p>Do not use SendOff to decide whether somebody is safe, whether they should continue, or
-    whether they have made a cutoff. Those decisions belong to the racer, their crew, and the
-    race organisation, using the race's own information.</p>
+  <div class="conspicuous">
+    <p>Do not use SendOff to decide whether somebody is safe, whether they should continue,
+      or whether they have made a cutoff. Those decisions belong to the racer, their crew and
+      the race organisation, using the race's own information.</p>
+  </div>
 </div>
 <p>Everything SendOff shows is arithmetic on what was typed in. If a split was logged late, or the
   phone had no signal, or somebody pressed the wrong button, the numbers will be wrong, and they
@@ -162,28 +182,61 @@
   be given reasonable notice and a way to get your data out.</p>
 
 <h2>11. No warranty</h2>
-<p>SendOff is provided as it is, without warranty of any kind, express or implied, including any
-  implied warranty of merchantability or fitness for a particular purpose. You use it at your own
-  risk.</p>
+<div class="conspicuous">
+  <p>SendOff is provided "as is" and "as available", without warranty of any kind, whether
+    express, implied or statutory. Jason Dupree disclaims all implied warranties, including
+    the implied warranties of merchantability, of fitness for a particular purpose, of title
+    and of non-infringement. No warranty is made that SendOff will be uninterrupted, timely,
+    secure, error free, or that any information it shows is accurate. You use it at your own
+    risk.</p>
+</div>
 
 <h2>12. Limit of liability</h2>
-<p>To the fullest extent the law allows, Jason Dupree is not liable
-  for any indirect, incidental, special or consequential loss arising out of your use of SendOff,
-  including any injury, loss or missed result connected with a race. Total liability for any claim
-  is limited to what you paid for SendOff in the twelve months before the claim, which today is
-  nothing.</p>
-<p>Nothing here limits any liability that cannot be limited by law.</p>
+<div class="conspicuous">
+  <p>To the fullest extent the law allows, Jason Dupree is not liable for any indirect,
+    incidental, special, consequential, exemplary or punitive loss arising out of or related
+    to your use of SendOff, including any personal injury, death, property damage, lost data,
+    lost profit, or missed or incorrect race result.</p>
+  <p>This limit applies even where the claim is based on the sole or partial negligence of
+    Jason Dupree, and it applies whether the claim is brought in contract, in tort, under a
+    statute or on any other basis.</p>
+  <p>Jason Dupree's total liability for all claims taken together is limited to the greater of
+    what you paid for SendOff in the twelve months before the claim, which today is nothing,
+    or one hundred United States dollars.</p>
+</div>
+<p>Nothing here limits any liability that cannot be limited by law, and some states do not allow
+  some of these exclusions, in which case they apply to you only as far as that state allows.</p>
 
-<h2>13. Which law applies</h2>
-<p>These terms are governed by the laws of Texas, United States,
-  without regard to its conflict of law rules.</p>
+<h2>13. If somebody sues over what you did with it</h2>
+<div class="conspicuous">
+  <p>You agree to defend, indemnify and hold Jason Dupree harmless from any claim, demand,
+    loss, liability, damage, cost or expense, including reasonable legal fees, brought by
+    anyone else and arising out of the content you put into SendOff, your use of SendOff, your
+    breach of these terms, or your violation of anyone's rights.</p>
+  <p>This obligation applies even where the claim is based in part on the negligence of Jason
+    Dupree, except to the extent the claim is caused by his gross negligence or wilful
+    misconduct.</p>
+</div>
+<p>In plain terms: if somebody comes after SendOff because of a race you ran, roster you
+  entered or link you shared, that is yours to answer for rather than the tool's.</p>
 
-<h2>14. Changes to these terms</h2>
+<h2>14. Which law applies, and where</h2>
+<p>These terms are governed by the laws of the State of Texas, United States, without regard to
+  its conflict of law rules.</p>
+<p>Any suit, action or proceeding arising out of or related to these terms or to SendOff must be
+  brought only in the state or federal courts located in the State of Texas. You and Jason Dupree
+  each consent to the personal jurisdiction of those courts and waive any objection that they are
+  an inconvenient forum.</p>
+
+<h2>15. Changes to these terms</h2>
 <p>These terms will change. The date at the top says when they last did. Continuing to use SendOff
-  after a change means you accept it. If a change matters, you will be told rather than left to
-  find it.</p>
+  after a change means you accept it.</p>
+<p>If a change materially reduces your rights or materially increases your obligations, you will be
+  told at least fourteen days before it takes effect, by an email to the address on your account or
+  by a notice shown in SendOff. Changes that do not do either of those, such as a corrected typo or
+  a clearer wording, take effect when they are published.</p>
 
-<h2>15. Getting in touch</h2>
+<h2>16. Getting in touch</h2>
 <p><a href="mailto:info@sendoff.run">info@sendoff.run</a></p>
 
 </main>
