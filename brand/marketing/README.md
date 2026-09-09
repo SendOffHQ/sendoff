@@ -32,4 +32,11 @@ stand-in photograph of a real person is worse than none: until the real file is
 dropped in, the page falls back to a monogram, which looks intentional rather
 than broken.
 
-Square, and 240px on a side is enough (it renders at 120px).
+Square, and 400px on a side is plenty: it renders at 168px on a phone and
+200px from 720px up. Those sizes are set for a photograph with a scene in it
+rather than a headshot, so a trail selfie with the mountains still in frame
+lands correctly with no cropping. A square source fills the circle exactly and
+only the corners are clipped, so anything at the centre is safe.
+
+If the file is not square, `object-position: center 38%` biases the crop
+upward, toward a face rather than a chest.

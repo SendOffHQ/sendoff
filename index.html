@@ -135,16 +135,20 @@
   /* ---------- founder ---------- */
   .founder { display: grid; gap: 24px; align-items: start; }
   .portrait {
-    width: 120px; height: 120px; border-radius: 50%; overflow: hidden; flex: none;
+    /* Sized for the photograph that is actually going in it: a trail selfie
+       with the mountains still in frame. At 120px the scene collapsed into
+       mush, and the scene is half of why the picture belongs here. */
+    width: 168px; height: 168px; border-radius: 50%; overflow: hidden; flex: none;
     border: 1px solid var(--border-bright); background: var(--bg-card);
     display: grid; place-items: center; position: relative;
   }
-  .portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .portrait img { width: 100%; height: 100%; object-fit: cover;
+                  object-position: center 38%; display: block; }
   /* Shown only when the photograph is not there, so the page never renders a
      broken image while the real one is still to be dropped in. */
   .portrait .monogram {
     display: none; font-family: 'Barlow Condensed', sans-serif; font-weight: 800;
-    font-size: 46px; color: var(--accent); letter-spacing: 0.02em;
+    font-size: 64px; color: var(--accent); letter-spacing: 0.02em;
   }
   .portrait.no-photo img { display: none; }
   .portrait.no-photo .monogram { display: block; }
@@ -203,7 +207,8 @@
     .lede { font-size: 19px; }
     .screens { grid-template-columns: 1fr 1fr; gap: 44px; }
     ol.steps { grid-template-columns: repeat(3, 1fr); gap: 30px; }
-    .founder { grid-template-columns: 120px 1fr; gap: 34px; }
+    .founder { grid-template-columns: 200px 1fr; gap: 36px; }
+    .portrait { width: 200px; height: 200px; }
     section { padding: 76px 0; }
   }
   @media (min-width: 1000px) {
