@@ -57,6 +57,17 @@
     background: rgba(255, 176, 122, 0.05);
   }
   .legal .callout p:last-child { margin-bottom: 0; }
+  /* The one statement in this document that has to be impossible to miss,
+     because the word "private" appears in the app and does not mean sealed. */
+  .legal .conspicuous {
+    border: 2px solid var(--yellow); border-radius: 4px;
+    background: rgba(255, 176, 122, 0.07); padding: 16px 18px; margin: 14px 0 18px;
+  }
+  .legal .conspicuous p {
+    text-transform: uppercase; font-weight: 700; color: var(--text);
+    font-size: 14px; line-height: 1.7; letter-spacing: 0.02em;
+  }
+  .legal .conspicuous p:last-child { margin-bottom: 0; }
   .legal .placeholder {
     background: rgba(255, 176, 122, 0.14); color: var(--yellow);
     padding: 1px 5px; border-radius: 3px; font-family: 'JetBrains Mono', monospace;
@@ -107,7 +118,11 @@
 
 <h3>What the crew logs</h3>
 <p>Arrival and departure times at each aid station, calories, fluid, sodium, whether those were
-  measured or estimated, notes, and any issues recorded. Also which account logged each one.</p>
+  measured or estimated, gear taken or dropped, free text notes, and anything typed into the
+  issues and meds fields. Those last two are worth calling out on their own: a crew uses them for
+  how a racer is doing and what they have taken, so they can hold health information about a named
+  person. They are stored exactly like the rest of the race, which on a public race means
+  publicly. Also which account logged each one.</p>
 
 <h3>Access</h3>
 <p>Which email addresses may see or edit each race, and which account each racer is linked to.</p>
@@ -139,9 +154,8 @@
   <p>SendOff's race data is currently kept in a public GitHub repository, which is also what serves
     the pages people watch. That has consequences which are not obvious from using the app:</p>
   <ul>
-    <li>A race marked <strong>private</strong> is unlisted, not sealed. It is kept out of the
-      public list and out of search engines, but the file behind it can be read by anybody who
-      knows or guesses its address.</li>
+    <li>A race marked <strong>private</strong> is unlisted, not sealed. The box below says
+      exactly what that means.</li>
     <li>Every change made through SendOff creates a public commit. Commit messages made before
       9 September 2026 contain the email address of whoever made the change, and they remain in
       the repository's history. Messages made after that date carry no address: what was done is
@@ -149,6 +163,12 @@
     <li>Email addresses that were once stored inside the race files themselves were removed in
       September 2026. They remain in the repository's history.</li>
   </ul>
+  <div class="conspicuous">
+    <p>The word private in SendOff means unlisted. It does not mean sealed, encrypted or access
+      controlled. A private race is kept off the public list and out of search engines, but the
+      file behind it sits on a public host and can be read by anybody who knows or guesses its
+      address. Do not put anything in a race that you would mind a stranger reading.</p>
+  </div>
   <p>Moving off this is in progress and is the next piece of work after the September 2026 race.
     Until it is finished, treat a race page as something a stranger could read.</p>
 </div>
@@ -175,6 +195,23 @@
   cookie, which is why there is no cookie banner: there is nothing to consent to. Nothing is sold,
   rented, or shared for advertising. There is no profiling and no automated decision-making.</p>
 
+<h2>Sensitive information</h2>
+<p><strong>No location is ever taken from your device.</strong> SendOff never asks your browser
+  for your position and never reads it. Nothing in the app calls the browser's location interface
+  at all.</p>
+<p>The only coordinates in SendOff are in a course file that whoever set the race up chose to
+  upload, and that file describes a route rather than a person. It is worth understanding what
+  that still implies: a course, a start time and a logged arrival together say roughly where a
+  named racer was, and on a public race that is readable by anybody.</p>
+<p>The other sensitive thing SendOff can hold is health information, and only because a crew
+  typed it. The notes, issues and meds fields are free text, and crews use them for how a racer is
+  doing and what they have taken. SendOff does not require any of it, does not ask for it, and
+  cannot tell whether a note is about a shoe or a stomach. It is stored like the rest of the race
+  and it is readable by everyone the race is readable by.</p>
+<p>None of it is sold, shared for advertising, or used to build a profile of anybody. If you would
+  rather it were not in a public file, keep it out of the fields, or wait for the storage move
+  described above.</p>
+
 <h2>On your device</h2>
 <p>Signing in stores a session that lasts seven days. Opening a race stores a copy of it so the
   page still works when the signal goes, which for a crew at an aid station is the point. Feedback
@@ -193,20 +230,48 @@
   <tr><td>Races and logged data</td><td>until deleted</td></tr>
 </table>
 
-<h2>Getting a copy, or getting it deleted</h2>
+<h2>Your rights: getting a copy, a correction, or a deletion</h2>
 <p>Write to <a href="mailto:info@sendoff.run">info@sendoff.run</a>. Your account, your profile and
   your races can be deleted on request.</p>
+<p>You can ask to see what is held about you, to get a copy of it in a portable form, to have it
+  corrected, or to have it deleted. Ask at <a href="mailto:info@sendoff.run">info@sendoff.run</a>
+  from the address on the account, or say which account you mean. Every request is answered within
+  45 days. If it needs longer you will be told why inside those 45 days, and the extension will not
+  be more than a further 45.</p>
+<p>If a request is refused you will be told why, and you can appeal by replying to that answer. An
+  appeal is decided within 60 days. If the appeal is refused as well, you will be told how to
+  complain to the Texas Attorney General.</p>
 <p>Anything already published to the public repository is harder, and it is worth being straight
-  about that. Removing it from the current files is quick. Removing it from the repository's
-  history requires rewriting that history, which is done in batches rather than on demand. You
-  will be told which applies to your request and when the second one is expected.</p>
+  about that. Removing it from the <strong>current files</strong> is done within 30 days of the
+  request. Removing it from the <strong>repository's history</strong> means rewriting that history,
+  which cannot be done for one person on demand because it rewrites the whole repository. Within
+  the same 45 days you will be told which of the two your request needs and, where it needs the
+  second, the date it is expected by. It will not be left at "eventually".</p>
 
 <h2>Children</h2>
-<p>SendOff is not aimed at children, and accounts are not knowingly given to anybody under 13.</p>
+<p>SendOff is not aimed at children and accounts are not knowingly given to anybody under 13. No
+  age is asked for at sign up, because sign up is invite only and every invite is sent by hand.</p>
+<p>A racer in a race can be a child, because a child can run a race and a crew logs for them. What
+  is held then is a name, a bib number and the splits, entered by an adult on the crew rather than
+  by the child, and there is no account for that child.</p>
+<p>If you believe a child under 13 has an account, or that something about a child is in a race and
+  should not be, write to <a href="mailto:info@sendoff.run">info@sendoff.run</a> and it will be
+  removed. A parent or guardian can ask for that without having the account.</p>
 
-<h2>Where it is processed</h2>
-<p>Cloudflare and GitHub are United States companies operating globally. Your data may be stored
-  or processed outside the country you are in.</p>
+<h2>Where it is processed, and by whom</h2>
+<p>SendOff itself is run from the United States, in Texas. Two companies process data on its
+  behalf, and no others:</p>
+<table>
+  <tr><td>Cloudflare, Inc. (US)</td><td>runs the worker that answers requests, and holds accounts,
+    profiles, access lists, tokens, share links and feedback. Also serves traffic from whichever
+    of its locations is nearest the person asking, worldwide.</td></tr>
+  <tr><td>GitHub, Inc. (US, a Microsoft company)</td><td>holds races and logged splits as files in
+    a public repository, and serves the pages people watch.</td></tr>
+</table>
+<p>Both are United States companies operating globally, so your data is stored in the United States
+  and may pass through or be cached in other countries as it is served. Nobody else is given it.
+  There is no advertising network, no analytics provider and no data broker in this list because
+  there are none.</p>
 
 <h2>Changes</h2>
 <p>This will change, and most of all when the storage move above is finished. The date at the top
