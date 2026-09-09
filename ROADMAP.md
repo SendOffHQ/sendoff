@@ -40,8 +40,7 @@ After the race, in this order:
    already ships: `Race.archive` in `lib/race-core.js` has the distance
    buckets, `resultFor`, `records` and `sort`, and no page uses any of it. It
    needs a page and a hub link. It also lands at the first moment there is a
-   finished race to show, and it gives the free tier's "last 3" cap something
-   to cap, which billing later depends on.
+   finished race to show.
 3. **Goal-time planner.** Target finish in, per-aid target times out, live
    delta against them. Self-contained, needs no billing, and it is what makes a
    second race better than the first.
@@ -58,6 +57,44 @@ Two held back on purpose:
   wrong thing to start next. The free caps, one runner and two crew, are
   enforceable in the worker today. Until something worth paying for is not
   grandfathered, a checkout flow gates nothing.
+
+---
+
+## Every race, forever
+
+Decided 2026-09-09, and it replaces the pricing draft's cap of three historical
+races on the free tier.
+
+> Every public race stays readable, forever, by anyone. No account, no app, no
+> plan. The hub lists them all, each one opens, and the splits, the course, the
+> charts and the printout are all there years later.
+
+This was already how it worked. What was missing was saying so, and a line in
+the pricing draft that quietly said otherwise.
+
+Why it is worth writing down rather than leaving as an accident of the build:
+
+- A cap on history is the one paywall that bites hardest exactly when somebody
+  cares most, which is when they go back to look at a race they ran. That is
+  the moment a person decides whether their own data is theirs, and the answer
+  has to be yes.
+- It contradicts the promise above it. Nothing is taken away from anyone is not
+  compatible with hiding a race somebody already ran.
+- Every other free-tier limit is a cap on **scale**, one racer and two crew.
+  None of them withholds something already made. A history cap would have been
+  the only one, and the odd one out is usually the wrong one.
+
+If the archive is ever sold, what is sold is the **analysis**: records, distance
+buckets, comparison across races, trends. Never the history itself. A race page
+is not a feature, it is the thing the person made.
+
+One consequence to be deliberate about rather than surprised by: `races/index.json`
+is a single public manifest, so the hub is already a public directory of every
+public race anybody has run here. At four races that is a list. At four thousand
+it is a product decision, and "public" may read to a creator as "anyone with the
+link" rather than "listed on the front page". Worth a separate look before there
+are enough races for it to matter, and it does not change the commitment above:
+listed or not, a public race stays readable by anyone forever.
 
 ---
 
@@ -421,8 +458,12 @@ Per-runner goals, hour bands and crew notes exist and travel via profiles.
 A named, reusable playbook that is not tied to one person does not.
 
 ### Race archive + PR tracking — *logic built, no page*
-The hub lists races. Nothing tracks a personal record across them, and the
-free tier's "last 3" cap has nothing to cap.
+The hub lists races. Nothing tracks a personal record across them yet.
+
+The pricing draft capped the free tier at the last three races. **That is
+withdrawn**; see "Every race, forever" below. The archive is a view over all of
+them for everybody, and if any part of it is ever sold, it is the analysis and
+never the history.
 
 The arithmetic is already written and already shipping: `Race.archive` in
 `lib/race-core.js` carries the distance buckets a race is filed under, along
