@@ -168,9 +168,21 @@
   }
   .portrait.no-photo img { display: none; }
   .portrait.no-photo .monogram { display: block; }
-  .founder blockquote { margin: 0; }
+  /* His words, not the site's. The rule down the left and the lighter,
+     slightly larger setting are what say so at a glance; the signature under
+     it says who. Both belong to the quote, so if the text is ever rewritten
+     they come off with it. */
+  .founder-note {
+    margin: 16px 0 0; padding-left: 18px; border-left: 2px solid var(--accent);
+  }
+  .founder-note p {
+    font-size: 15.5px; line-height: 1.68; color: var(--text-dim); max-width: 62ch;
+  }
+  .founder-note p + p { margin-top: 13px; }
+  .founder-note p:first-child::first-line { color: var(--text); }
   .founder .sig {
-    margin-top: 16px; font-family: 'JetBrains Mono', ui-monospace, monospace;
+    margin-top: 14px; padding-left: 20px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted);
   }
 
@@ -330,18 +342,45 @@
         <span class="monogram" aria-hidden="true">J</span>
       </div>
       <div>
-        <h2>Built by a runner, at mile seventy</h2>
-        <!-- Third person on purpose, and short on purpose. This is a stand-in
-             until Jason writes the note in his own words, at which point it
-             becomes a first person block with his name under it. Nothing here
-             is in his voice, and nothing here is a detail he did not give. -->
-        <p class="body-copy">SendOff is built by Jason Dupree, a hundred mile
-          runner. It exists because spreadsheets and texts were not cutting it at
-          mile seventy: between them they still could not answer the only question
-          that mattered at that aid station, which is whether the racer is ahead of
-          the cutoff or behind it.</p>
-        <p class="body-copy">It has run real races since, and it is still being
-          built between them.</p>
+        <h2>It started on a plane to Vermont</h2>
+        <!-- Jason's words, sent 9 September 2026. Edited only for typos: Excel
+             and GitHub capitalised, "project location" to "projected location",
+             "build" to "built", "access too" to "access to". Nothing added,
+             nothing rephrased. If this is ever rewritten, it stops being a
+             quote and the attribution below has to come off with it. -->
+        <blockquote class="founder-note">
+          <p>I was on a plane headed to the Blood Root Ultra in Vermont to crew
+            for two buddies of mine and wanted to keep track of their lap times
+            and projected finish. I started with the idea of doing so in Excel.
+            The idea snowballed into creating an app with not only a projected
+            finish, but a map showing their projected location, a place for me to
+            log their intake after every lap, and visible to the public so their
+            family and friends could follow along at home. By the time the race
+            started, I had a fully functional app built in GitHub. When they
+            arrived, I checked them in. When they left, I checked them out. During
+            the down time I continued to develop and add new features to the app.
+            By the time they finished, I had charts and graphs and a full
+            breakdown of their race to export for them.</p>
+          <p>As a crew member, the tracking of their location and fueling took out
+            all of the guess work and let me focus on what really mattered in the
+            moment, when they were in the pit. I knew I wanted the same tool for
+            my own upcoming 100 miler. I DNF'd Sangre de Cristo 100 in 2025 when I
+            ran without a crew and relied on my own judgment. I gave up when I
+            didn't think I had time to hit a cutoff, when truthfully, I probably
+            had the time. I wanted the competitive edge coming back in 2026 to
+            finish that race strong, leaving bad decisions out of the equation.</p>
+          <p>I also thought, how many other people could use this tool for the
+            same reason, or simply to help their friends and family follow along
+            with their race? So I developed the app into a platform where anyone
+            could set up their own race and pass out the link. They can invite
+            their crew to check in and out and keep up with fueling and notes, or
+            they can use the simpler racer page to run it themselves if they
+            either don't have a crew or they're at an aid station that crew
+            doesn't have access to.</p>
+          <p>My hope is that this tool helps people reach their goals and easily
+            be able to share that journey with those they love and care about.</p>
+        </blockquote>
+        <p class="sig">Jason Dupree &middot; September 2026</p>
       </div>
     </div>
   </section>
