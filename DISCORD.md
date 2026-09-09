@@ -95,16 +95,43 @@ when a ping would go to more people than would read the channel anyway.
 The honest position is that nobody is watching this server most of the time.
 Set it up so that is survivable rather than pretending otherwise.
 
-- Turn on **Community features**, which gets you the rules screen and
-  onboarding.
-- **Rules screening on**: members must accept before they can post. It is the
-  cheapest filter there is.
-- **Verification level: Medium** (verified email, registered more than five
-  minutes). High (phone) is too much friction for a running club.
+**Community has to be on**, because rules screening is a Community only
+feature. On a plain server the setting is not merely off, it is not in the menu
+at all. Checked 2026-09-09 against Discord's own documentation.
+
+Turning it on is not free, and these are the conditions rather than
+suggestions:
+
+- **A verified email is required** to post, at minimum. Medium (account older
+  than five minutes as well) is the setting to pick: it costs a new member
+  nothing and stops the throwaway accounts. High, which wants a phone number,
+  is too much friction for a running club.
+- **The explicit media filter is forced to scan everything**, from every
+  member. No say in it.
+- **Moderators must have two factor authentication** to take moderation
+  actions. With one admin that means Jason's own account, and it should have
+  had 2FA anyway.
+- **Two channels are mandated**: a rules channel, and a Community Updates
+  channel that only moderators can see, where Discord posts admin notices. So
+  the server has seven channels, five of which a member can see. The five
+  above are still the five that matter.
+
+Community is **not** the same as Discovery. Turning it on does not list the
+server in Discord's public directory; that is a separate opt in with its own
+requirements. The server stays invite only.
+
+The rest:
+
 - **AutoMod on** for spam, mention spam and invite links. Discord's built in
   rules are enough; a moderation bot is another dependency to keep alive.
 - **Slow mode off** everywhere. It solves a problem this server does not have.
 - Nothing that pings `@everyone` except Jason.
+
+**If Community is not turned on**, the fallback is a plain `#rules` channel
+with a pinned message. It is worth having either way, but be clear about what
+it is not: nobody has to read it, nobody has to accept it, and a new account
+can post the moment it joins. The gate is the whole value, and the gate needs
+Community.
 
 ---
 
@@ -197,8 +224,10 @@ Four, because nobody reads seven.
 
 ## Launch order
 
-1. Create the five channels and the two roles.
-2. Turn on Community, rules screening, verification Medium, AutoMod.
+1. Turn on Community first. It mandates a rules channel and a Community
+   Updates channel, so doing it before you build anything saves rearranging.
+2. Create the five member facing channels and the two roles. Set rules
+   screening, verification Medium, AutoMod.
 3. Post `#welcome`, pin it, lock the channel.
 4. Post the `#announcements` message.
 5. Create the `#race-feed` webhook and put its URL in the Worker as a secret,
