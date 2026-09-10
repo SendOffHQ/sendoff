@@ -354,8 +354,35 @@ before promising an event in another hemisphere.
    `worker/wrangler.toml`, which is on. A race the mirror has not seen still
    falls back to git, so setting it back to `"false"` is the whole rollback.
 3. New races stop writing to GitHub except the archive commit at finish.
-   **Not done.** This is the one that makes the word private true again,
-   because it is what stops the files existing.
+   **Half done, 2026-09-10.** The write path exists and is off:
+   `WRITE_TO_GIT="false"` in `worker/wrangler.toml` makes D1 the authority for
+   `races/<slug>/config.json` and `data.json`. This is the one that makes the
+   word private true again, because it is what stops the files existing.
+
+   **What building it turned up.** Concurrency was git's, not ours. Two crew
+   members cannot clobber each other today only because GitHub refuses a write
+   whose blob sha has moved, and `config_sha`/`data_sha` were mirrors of that
+   sha rather than a version of our own. Taking git out of the write path
+   takes the guard with it, and the failure it prevents, two people at one aid
+   station overwriting each other's splits, is silent.
+
+   So those columns became the version token. A read hands one out, a write
+   sends it back, and a guarded `UPDATE ... WHERE slug = ? AND data_sha IS ?`
+   decides who wins. Same contract, different authority, and the client needed
+   no change at all: `mutateJson` already re-reads and retries on a 409.
+   `worker/test/d1-writes.mjs` holds the property directly, two writers off one
+   version, first lands, second refused, first survives, loser retries and gets
+   through.
+
+   **What is still missing before the flag can be flipped:** the finish-time
+   archive commit. With git out of the per-press path and no archive being
+   written, there is no archive for GitHub to be "only for", and a day's splits
+   would exist in exactly one place. That is the next piece, and it is the one
+   that makes the phrase true rather than half true.
+
+   `course.gpx` and `races/index.json` keep going to git under either setting:
+   one is written once at setup, the other is the public manifest the
+   signed-out hub reads.
 
    Until it lands, the setting is called **unlisted** rather than private
    everywhere a person can read it: the setup picker, the hub card badge, the

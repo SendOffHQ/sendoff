@@ -13,6 +13,24 @@ GITHUB_BRANCH = "main"
 # either way, so flipping this on cannot make a race unreadable; flipping it
 # back is a one-line change and a deploy, with no data to undo.
 READ_FROM_D1 = "true"
+# Race writes go to git, and D1 follows. "false" makes D1 the authority for
+# races/<slug>/config.json and data.json, and leaves git for the archive.
+#
+# Do not flip this yet. It is the write half of storage steps 5 and 6 and it is
+# complete on its own terms, but one piece is still missing: with git out of
+# the per-press path, nothing writes the race to git at all, so there is no
+# archive to be "only for archive". The finish-time archive commit has to land
+# first, or a day's splits exist in exactly one place.
+#
+# What it does change when it is on, and what to check if it misbehaves: the
+# concurrency guard stops being GitHub's blob sha and becomes the config_sha /
+# data_sha columns, which a read hands out and a write sends back. A stale one
+# is a 409, which is what stops two crew members at the same aid station
+# overwriting each other. worker/test/d1-writes.mjs holds that.
+#
+# course.gpx and races/index.json still go to git either way: one is written
+# once at setup, the other is the public manifest the signed-out hub reads.
+WRITE_TO_GIT = "true"
 # If you mount the worker at a subpath (e.g. on a route like
 # api.example.com/race-dashboard/*), set MOUNT_PATH to that prefix.
 # Leave empty if the worker is at the root of its hostname.
