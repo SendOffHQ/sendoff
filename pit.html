@@ -271,7 +271,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=74"></script>
+<script src="lib/race-core.js?v=75"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -980,9 +980,21 @@
     await load();
     // Never forced: see render(). Adaptive, and stopped while the tab is
     // hidden, which is most of the time a phone spends in a vest pocket.
-    Race.poll(() => load(), { interval: () => Race.POLL_MS[Race.raceState(cfg, data)] });
+    const poller = Race.poll(() => load(), { interval: () => Race.POLL_MS[Race.raceState(cfg, data)] });
     setInterval(tick, 1000);
     setInterval(updateLastUpdatedLabel, 1000);
+    // The push, on top of the poll rather than instead of it. The race page
+    // drops to a 60s poll once its socket is up, because a spectator seeing a
+    // stale split is a disappointment. Crew acting on one is a different
+    // thing, so the interval here does not change at all: this only makes the
+    // board faster than 5s, never slower, and a socket that dies quietly costs
+    // nothing. Spectators are where the request budget is; crew is where being
+    // right is.
+    //
+    // Last in this block on purpose. Everything above is what the board needs
+    // in order to work; this only makes it quicker, and a fault in here should
+    // cost the push rather than the clock.
+    Race.live(slug, () => poller.now());
   })();
 </script>
 
