@@ -259,6 +259,44 @@ station inside ten minutes goes well past ten. Throttled builds do not fail
 loudly: the Pages copy of the data simply stops updating, which is exactly what
 a spectator without an account is reading.
 
+### What the limits actually are, 2026-09-10
+
+Recomputed after the day's changes, because most of the old numbers were about
+a system that no longer exists.
+
+**Spectators: about 1,600 watcher-hours a day.** The worker's free plan is
+100,000 requests a day, and a spectator on a live socket polls at 60s rather
+than 5s, so a watcher-hour costs about 60 requests instead of 720. Dropping the
+poll entirely would be roughly 33,000 watchers, and is not worth it: that
+interval is the only thing that makes a silently dead socket a slower page
+instead of a wrong one.
+
+**The build limit is gone.** It was the thing the "When" section below says
+fires on race one, and it fired because every press was a commit. Presses are
+not commits any more. Cloudflare Pages Direct Upload also publishes no
+deployment quota at all, only file count and size.
+
+**Roster size is the new ceiling, and it is the one to watch.** D1's free plan
+allows **50 queries per Worker invocation**. A `data.json` write issues one
+statement for the race row, one per leg across every runner, and one to delete
+dropped legs. So the whole roster costs `legs + 2` statements *on every press*,
+plus whatever else the request does:
+
+| | |
+|---|---|
+| Sangre de Cristo, 16 legs, 1 runner | 18 |
+| the same course, 3 runners | 50, at the edge |
+| the same course, 4 runners | 66, over |
+
+Call it **about 45 leg-rows total** to be safe, which is three runners on a
+sixteen-leg course or two on a twenty-four.
+
+This limit is not new. What is new is that it matters: while git held the write
+a mirror failure was harmless, and now it is a 503 the crew have to retry. Two
+ways out when a roster needs to be bigger, neither done: write only the legs
+that changed rather than the whole roster, which is the right fix and turns
+this into a per-press constant; or the $5 plan, which raises it.
+
 ### Three shapes of load, and only one scales badly
 
 Worth separating before choosing anything, because they have nothing in common
@@ -428,7 +466,7 @@ the change, and four people's addresses are in 191 of them. Dropping the
 right outcome, but a purge written to preserve history while rewriting only the
 blobs would keep the exact thing worth removing.
 
-### The published copy — *shipped 2026-09-10, in part*
+### The published copy — *shipped 2026-09-10*
 
 `GET /public?path=races/<slug>/<file>` on the worker. What it does and why it
 is shaped the way it is:
@@ -752,7 +790,7 @@ bought about 139 tab-hours a day, and a 30 hour hundred miler with twenty
 watchers is 300 tab-hours. The interval alone never fixed that. Not asking when
 nobody is looking does.
 
-### Move the site to Cloudflare Pages — *staged 2026-09-10, off*
+### Move the site to Cloudflare Pages — *done 2026-09-10*
 `HOSTING.md` has the runbook. Staged and inert: a second deploy workflow and a
 `_headers` file that GitHub Pages ignores, so pushing it changes nothing until
 a Pages project exists and DNS is pointed at it.
@@ -813,7 +851,7 @@ commit. A share link and a crew board are on the same footing.
 wait and leaves the commit round trip. Genuinely under a second needs the write
 to stop being a git commit, which is the storage move, not this.
 
-### Live push over a websocket — *prototype, off*
+### Live push over a websocket — *on 2026-09-10*
 Written 2026-09-10. Code is in the repo and nothing is running it: the Durable
 Object binding is commented out in `worker/wrangler.toml` and `hub.json` says
 `live: false`. Two switches away from doing anything.
