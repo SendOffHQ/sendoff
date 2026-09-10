@@ -120,6 +120,28 @@ missing if you ask for it by name.
 **`worker/`, `test/` and `tools/`** are served by GitHub Pages and are not
 uploaded here. Nothing references them; the smaller surface is deliberate.
 
+**The `.html` redirect, which turned out not to be a decision.** Cloudflare
+Pages 308s `/race.html` to `/race`. This sat on the list as "disable it in the
+Pages settings or repoint the app's links", and the first half of that was
+simply wrong: `html_handling` is a Workers static-assets option and Pages
+projects have no equivalent, in the dashboard or anywhere else.
+
+It does not matter, for two reasons, both measured 2026-09-10:
+
+    /race.html?id=six-0&t=abc  →  308  /race?id=six-0&t=abc     query kept, token and all
+    sendoff.run/race           →  200  the race page            GitHub Pages resolves it too
+
+So the query string survives, which is what would have broken share links, and
+the extensionless form works on *both* hosts, so repointing the links was never
+blocked by the trial the way it looked. The cost as it stands is one extra
+round trip on the first hit of an `.html` address. It is per navigation, not
+per poll, and no data read goes near it: `/races/<slug>/data.json` and the
+worker's `/public` are not `.html` and are not redirected.
+
+Left alone deliberately. Repointing thirteen pages' links and the service
+worker's precache list to save one redirect per navigation is a change with
+more ways to go wrong than the thing it fixes.
+
 **`_headers` only works on one of them.** It is a Cloudflare Pages feature, and
 GitHub Pages has no way to set custom headers at all. Measured 2026-09-10:
 
