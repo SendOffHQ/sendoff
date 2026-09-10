@@ -2938,7 +2938,13 @@ async function handleAccessList(req, env) {
   try { raceCfg = await requireRaceWriter(env, slug, session.email); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
 
+  // Share links and pending invites are best-effort, and the roster is not.
+  // Both of these scan KV, which has a daily allowance; when it runs out the
+  // whole panel used to fail, so an operator lost the list of who is on their
+  // race over a list of outstanding invitations. What matters here is the
+  // roster, and it comes from somewhere else.
   let shareLinks = [];
+  try {
   if (env.AUTH_KV) {
     const list = await env.AUTH_KV.list({ prefix: 'share:' });
     for (const k of list.keys) {
@@ -2959,7 +2965,9 @@ async function handleAccessList(req, env) {
       } catch (e) {}
     }
   }
+  } catch (e) { shareLinks = null; }
   let pendingInvites = [];
+  try {
   if (env.AUTH_KV) {
     const list = await env.AUTH_KV.list({ prefix: 'invite:' });
     for (const k of list.keys) {
@@ -2979,6 +2987,7 @@ async function handleAccessList(req, env) {
       } catch (e) {}
     }
   }
+  } catch (e) { pendingInvites = null; }
   // Display names, so the roster and the runner picker can say "Jason Dupree"
   // rather than an email address. Only for people already on this race, and
   // only to someone who can write it, which is the same bar a caller already
