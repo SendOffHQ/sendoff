@@ -1626,6 +1626,120 @@ async function commitToD1(env, path, content, actor, expected) {
   return null;
 }
 
+// ---------- the archive ----------
+// Is this race finished, in the sense that its data is worth committing?
+//
+// Two ways, and the second matters more than it looks. Every runner having
+// logged every leg is the happy one. But a race where somebody drops never
+// satisfies it, and a DNF is exactly the race whose data you most want kept,
+// so the clock running past the cutoff counts too.
+function raceIsDone(cfg, data) {
+  const total = totalLegs(cfg);
+  const runners = (cfg && cfg.runners) || [];
+  if (total && runners.length) {
+    const every = runners.every(r => {
+      const d = ((data && data.runners) || []).find(x => x && x.id === r.id);
+      return d && completedLegs(d) >= total;
+    });
+    if (every) return true;
+  }
+  const start = cfg && cfg.startTime ? Date.parse(cfg.startTime) : NaN;
+  const hours = (cfg && cfg.cutoffs && cfg.cutoffs.totalHours) || 36;
+  return isFinite(start) && Date.now() > start + hours * 3600000;
+}
+
+async function gitPut(env, path, content, sha, message) {
+  const body = {
+    message: commitMessage(message),
+    branch: env.GITHUB_BRANCH || 'main',
+    content: utf8ToBase64(content)
+  };
+  if (sha) body.sha = sha;
+  return fetch(`https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURI(path)}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `token ${env.GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+      'User-Agent': 'race-dashboard-proxy'
+    },
+    body: JSON.stringify(body)
+  });
+}
+
+// Put the race into git, once it is over. This is the half that makes
+// "GitHub only for archive" true rather than half true: with WRITE_TO_GIT off
+// nothing else commits race data at all, so without this a day's splits would
+// live in exactly one place.
+//
+// Idempotent by comparing bytes rather than by a marker. A marker would have
+// to be cleared for every correction filed after the finish, and forgetting to
+// is how an archive silently stops matching the race. Comparing means a
+// correction makes one commit and a re-run with nothing changed makes none.
+async function archiveRace(env, slug) {
+  if (!env.DB) return { skipped: 'no DB binding' };
+  const out = [];
+  for (const file of ['config.json', 'data.json']) {
+    const path = `races/${slug}/${file}`;
+    const mirrored = await readFromD1(env, path);
+    if (!mirrored) { out.push({ file, skipped: 'not in the mirror' }); continue; }
+    let content = null;
+    try { content = base64ToUtf8(JSON.parse(mirrored).content); } catch (e) {}
+    if (content == null) { out.push({ file, skipped: 'unreadable' }); continue; }
+
+    let sha = null, same = false;
+    const cur = await githubGet(env, path);
+    if (cur.status === 200) {
+      try {
+        const j = JSON.parse(await cur.text());
+        sha = j.sha || null;
+        same = base64ToUtf8(j.content || '') === content;
+      } catch (e) { /* treat as absent */ }
+    }
+    if (same) { out.push({ file, skipped: 'already archived' }); continue; }
+
+    const res = await gitPut(env, path, content, sha, `archive: ${slug} ${file}`);
+    out.push({ file, ok: res.ok, status: res.status });
+  }
+  return { slug, files: out };
+}
+
+// Called after a write has landed, from where nothing can make a crew member
+// wait for it. Reads both files back out of the mirror, which by now holds the
+// write that triggered this.
+async function archiveIfDone(env, slug) {
+  try {
+    if (!slug || gitWrites(env)) return;
+    const cfgRaw = await readFromD1(env, `races/${slug}/config.json`);
+    const dataRaw = await readFromD1(env, `races/${slug}/data.json`);
+    if (!cfgRaw || !dataRaw) return;
+    const cfg = JSON.parse(base64ToUtf8(JSON.parse(cfgRaw).content));
+    const data = JSON.parse(base64ToUtf8(JSON.parse(dataRaw).content));
+    if (!raceIsDone(cfg, data)) return;
+    await archiveRace(env, slug);
+  } catch (e) {
+    // Never worth failing a write over, and never worth failing loudly: the
+    // next write on this race tries again, and the manual endpoint is there
+    // for a race that has stopped getting writes.
+  }
+}
+
+// The escape hatch. A race that ended in a way the rules above do not catch,
+// or one that needs archiving now rather than on the next press.
+async function handleArchive(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  let body; try { body = await req.json(); } catch (e) { body = {}; }
+  const slug = (body && body.slug) || '';
+  if (!slug || slug.includes('/')) return json({ error: 'Missing slug' }, { status: 400 }, env, req);
+  const cfg = await loadRaceConfig(env, slug);
+  if (!cfg) return json({ error: 'Not found' }, { status: 404 }, env, req);
+  if (session.role !== 'admin' && !WRITING_ROLES.has(roleForRace(cfg, session.email))) {
+    return json({ error: 'Only somebody who works this race can archive it' }, { status: 403 }, env, req);
+  }
+  return json(await archiveRace(env, slug), {}, env, req);
+}
+
 async function handleCommit(req, env, ctx) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -1790,6 +1904,7 @@ async function handleCommit(req, env, ctx) {
       if (ctx && ctx.waitUntil) {
         ctx.waitUntil(announceCommit(env, path, content, liveCfg, isCreation));
         ctx.waitUntil(publishChange(env, path));
+        ctx.waitUntil(archiveIfDone(env, creationSlug || racePathSlug(path)));
       }
       // The shape the client already knows. It reads the status and nothing
       // else: mutateJson returns the document it wrote, because reading a file
@@ -3412,6 +3527,7 @@ export default {
     if (request.method === 'POST' && path === '/commit')          return handleCommit(request, env, ctx);
     if (request.method === 'GET'  && path === '/get')             return handleGet(request, env);
     if (request.method === 'GET'  && path === '/public')          return handlePublicRead(request, env);
+    if (request.method === 'POST' && path === '/archive')         return handleArchive(request, env);
     if (request.method === 'POST' && path === '/invite')          return handleInvite(request, env);
     if (request.method === 'POST' && path === '/share-link')      return handleShareLink(request, env);
     if (request.method === 'POST' && path === '/share/revoke')    return handleShareRevoke(request, env);

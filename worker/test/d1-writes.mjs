@@ -22,12 +22,22 @@ globalThis.caches = { default: { async match(){}, async put(){}, async delete(){
 // git must not be touched at all for a race file. Anything that reaches here
 // with a PUT is a bug this test is meant to catch.
 let gitPuts = [];
+let archived = false;          // whether the git stub should admit to holding files
+const gitFiles = new Map();
 globalThis.fetch = async (url, opts = {}) => {
   const u = String(url);
   const m = u.match(/contents\/(.+?)(\?|$)/);
   const path = m ? decodeURIComponent(m[1]) : '';
-  if ((opts.method || 'GET') === 'PUT') { gitPuts.push(path); 
-    return new Response(JSON.stringify({ content: { path, sha: 'git-' + path } }), { status: 200 }); }
+  if ((opts.method || 'GET') === 'PUT') {
+    gitPuts.push(path);
+    const body = JSON.parse(opts.body);
+    gitFiles.set(path, Buffer.from(body.content, 'base64').toString('utf8'));
+    return new Response(JSON.stringify({ content: { path, sha: 'git-' + path } }), { status: 200 });
+  }
+  if (archived && gitFiles.has(path)) {
+    return new Response(JSON.stringify({ sha: 'git-' + path,
+      content: Buffer.from(gitFiles.get(path), 'utf8').toString('base64') }), { status: 200 });
+  }
   return new Response('{"message":"Not Found"}', { status: 404 });
 };
 
@@ -163,6 +173,56 @@ await worker.fetch(new Request('https://w/commit', {
   body: JSON.stringify({ path: 'races/index.json', content: '{"races":[]}\n', message: 'manifest' })
 }), env, { waitUntil: () => {} });
 ok('the hub manifest still goes to git', gitPuts, ['races/index.json']);
+
+// ---------- the archive ----------
+// The half that makes "git only for archive" true rather than half true.
+// Nothing else commits race data with WRITE_TO_GIT off, so if this never
+// fires the day's splits live in one place only.
+const waits = [];
+const wctx = { waitUntil: (p) => waits.push(p) };
+const settle = async () => { await Promise.all(waits.splice(0)); };
+const putW = (path, doc, sha) => worker.fetch(new Request('https://w/commit', {
+  method:'POST', headers:{ 'Content-Type':'application/json', Authorization: 'Bearer ' + token },
+  body: JSON.stringify({ path, content: JSON.stringify(doc, null, 2) + '\n', message: 'test', sha })
+}), env, wctx);
+
+console.log('\nan unfinished race is not archived');
+gitPuts = [];
+cur = await read('races/cas/data.json');
+// Out on the leg, not through it. This course has one segment, so a leg with
+// an endTime would already be a finish.
+await putW('races/cas/data.json', { runners: [{ id:'jd', legs: [
+  { index:1, startTime:'2026-10-03T13:00:00Z' } ] }] }, cur.sha);
+await settle();
+ok('git is left alone while the race is running', gitPuts, []);
+
+console.log('\nand the finishing press puts it in the archive');
+gitPuts = [];
+cur = await read('races/cas/data.json');
+// One segment on this course, so one completed leg is a finish.
+await putW('races/cas/data.json', { runners: [{ id:'jd', legs: [
+  { index:1, startTime:'2026-10-03T13:00:00Z', endTime:'2026-10-03T14:00:00Z' } ] }] }, cur.sha);
+await settle();
+ok('both files are committed', gitPuts.sort(), ['races/cas/config.json','races/cas/data.json']);
+
+console.log('\nand archiving again with nothing changed commits nothing');
+// Idempotent by comparing bytes, not by a marker: a marker has to be cleared
+// for every correction filed after the finish, and forgetting is how an
+// archive quietly stops matching the race.
+gitPuts = [];
+archived = true;
+cur = await read('races/cas/data.json');
+await putW('races/cas/data.json', JSON.parse(JSON.stringify(cur.doc)), cur.sha);
+await settle();
+ok('no second commit for the same bytes', gitPuts, []);
+
+console.log('\na correction after the finish still gets through');
+gitPuts = [];
+cur = await read('races/cas/data.json');
+await putW('races/cas/data.json', { runners: [{ id:'jd', legs: [
+  { index:1, startTime:'2026-10-03T13:00:00Z', endTime:'2026-10-03T14:05:00Z' } ] }] }, cur.sha);
+await settle();
+ok('the corrected data is archived', gitPuts.includes('races/cas/data.json'), true);
 
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);
