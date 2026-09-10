@@ -292,6 +292,18 @@ c2 = await read('races/big/data.json');
 await put('races/big/data.json', JSON.parse(JSON.stringify(c2.doc)), c2.sha);
 ok('nothing but the race row and the delete', batchSizes, [2]);
 
+console.log('\nan unlisted race is never archived');
+// The archive is a public git repository. Publishing an unlisted race when it
+// finishes is the exact thing storage step 3 exists to stop, and it would have
+// undone the whole point of taking git out of the write path.
+gitPuts = [];
+await put('races/quiet/config.json', { ...race, name: 'Quiet', visibility: 'private' });
+cur = await read('races/quiet/data.json').catch(() => ({ sha: undefined }));
+await putW('races/quiet/data.json', { runners: [{ id:'jd', legs: [
+  { index:1, startTime:'2026-10-03T13:00:00Z', endTime:'2026-10-03T14:00:00Z' } ] }] }, cur.sha);
+await settle();
+ok('a finished unlisted race commits nothing', gitPuts, []);
+
 console.log('\na press the database cannot store is not reported as landed');
 // The worst failure available now that git is not written. mirrorToD1 stands
 // down when it cannot keep up, dropping the sha so reads fall through to git,
