@@ -19,7 +19,12 @@ READ_FROM_D1 = "true"
 MOUNT_PATH = ""
 # Comma-separated origins allowed by CORS. "*" allows any caller.
 # A CORS origin is scheme + host only, never a path.
-ALLOWED_ORIGINS = "https://sendoff.run"
+# The second origin is the Cloudflare Pages trial host and is temporary:
+# take it out at the cutover, or if the trial is abandoned. Without it a
+# browser refuses every signed-in call from the trial site, and the trial
+# would only be testing the signed-out half. Named exactly, never a
+# wildcard over pages.dev, which anybody can get a subdomain of.
+ALLOWED_ORIGINS = "https://sendoff.run,https://sendoff-abi.pages.dev"
 # Public URL of the hub frontend, used when building invite & share URLs.
 # The site is served from the root of its domain. If empty, the worker
 # falls back to the request's Origin header.
