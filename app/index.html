@@ -423,7 +423,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
       badge = `<span class="card-badge">${roleName}</span>`;
     }
     return `
-      <a class="card status-${status}" href="race.html?id=${encodeURIComponent(r.slug)}">
+      <a class="card status-${status}" href="${Race.raceHref(r.slug, r.visibility !== 'private')}">
         ${badge}
         <div class="card-head">
           <div class="card-status status-${status}">${status === 'live' ? '<span class="live-dot"></span>' : ''}${statusText}</div>

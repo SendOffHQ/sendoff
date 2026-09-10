@@ -142,6 +142,41 @@ def split_accent(name):
     parts = str(name).split()
     return (' '.join(parts[:-1]), parts[-1]) if len(parts) > 1 else (name, '')
 
+def race_stats(slug):
+    """Distance, climb and cutoff, read from the race's own config.
+
+    The card had the name and a line of small type and a great deal of dark
+    gradient. These are the three numbers somebody wants when they are deciding
+    whether to click, and they cost nothing: every race stores per segment
+    elevation, and loops multiply out.
+
+    Returns a list of (value, label) or [] when the config cannot be read, in
+    which case the card lays out without them.
+    """
+    try:
+        cfg = json.loads((ROOT / 'races' / slug / 'config.json').read_text())
+    except Exception:
+        return []
+    co = cfg.get('course') or {}
+    segs = co.get('segments') or co.get('loopSegments') or []
+    loops = co.get('loopCount', 1) if cfg.get('courseType') == 'loops' else 1
+    out = []
+
+    dist = cfg.get('totalDistanceMi') or (co.get('loopDistanceMi', 0) * loops) or \
+           sum(x.get('distanceMi') or 0 for x in segs) * loops
+    if dist:
+        out.append((f'{dist:g}', 'miles'))
+
+    gain = sum(x.get('elevationGainFt') or 0 for x in segs) * loops
+    if gain:
+        out.append((f'+{gain:,.0f}', 'ft of climb'))
+
+    cut = (cfg.get('cutoffs') or {}).get('totalHours')
+    if cut:
+        out.append((f'{cut:g}h', 'cutoff'))
+    return out
+
+
 def elevation_path(slug, width, height, samples=280):
     """The course, as an SVG area path, from that race's own GPX.
 
@@ -195,7 +230,7 @@ def elevation_path(slug, width, height, samples=280):
             f'stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/></svg>')
 
 
-def card_html(title_main, title_accent, meta_line, kicker, profile=None):
+def card_html(title_main, title_accent, meta_line, kicker, profile=None, stats=None):
     faces = "\n".join([
       f"@font-face{{font-family:'BC';font-weight:600;src:url(data:font/woff2;base64,{b64('bc-600.woff2')}) format('woff2')}}",
       f"@font-face{{font-family:'BC';font-weight:700;src:url(data:font/woff2;base64,{b64('bc-700.woff2')}) format('woff2')}}",
@@ -205,6 +240,10 @@ def card_html(title_main, title_accent, meta_line, kicker, profile=None):
     ])
     accent = f' <em>{esc(title_accent)}</em>' if title_accent else ''
     profile_html = f'<div class="profile">{profile}</div>' if profile else ''
+    stats_html = ''
+    if stats:
+        cells = ''.join(f'<div class="stat"><b>{esc(v)}</b><span>{esc(l)}</span></div>' for v, l in stats)
+        stats_html = f'<div class="stats">{cells}</div>'
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><style>
 {faces}
 *{{margin:0;padding:0;box-sizing:border-box}}
@@ -231,7 +270,14 @@ h1{{font-family:'BC',sans-serif;font-weight:700;font-size:112px;line-height:.96;
 h1 em{{font-style:italic;font-weight:600;color:#0FB8BF}}
 .meta{{font-family:'JB',monospace;font-size:26px;letter-spacing:.05em;color:#9DB0BC}}
 .rule{{height:5px;width:132px;background:#0FB8BF;margin-bottom:30px}}
-.mid{{display:flex;flex-direction:column;justify-content:center;flex:1;padding:26px 0}}
+.mid{{display:flex;flex-direction:column;justify-content:center;flex:1;padding:18px 0}}
+/* The three numbers somebody wants before clicking. Mono, because they are
+   figures, and sized so the eye lands on them after the name. */
+.stats{{display:flex;gap:54px;margin-top:30px}}
+.stat b{{display:block;font-family:'JB',monospace;font-size:44px;font-weight:500;
+        letter-spacing:-.01em;color:#F0ECE3;line-height:1}}
+.stat span{{display:block;margin-top:9px;font-family:'JB',monospace;font-size:17px;
+           letter-spacing:.17em;text-transform:uppercase;color:#0FB8BF}}
 /* The course runs the full width along the bottom, behind the meta line and
    under the title. Bled to the edges on purpose: it is the ground the card
    sits on rather than a chart somebody is meant to read values off. */
@@ -242,7 +288,7 @@ h1 em{{font-style:italic;font-weight:600;color:#0FB8BF}}
 </style></head><body>
   {profile_html}
   <div class="top"><span class="wm">{wordmark()}</span><span class="kicker">{esc(kicker)}</span></div>
-  <div class="mid"><div class="rule"></div><h1>{esc(title_main)}{accent}</h1></div>
+  <div class="mid"><div class="rule"></div><h1>{esc(title_main)}{accent}</h1>{stats_html}</div>
   <div class="meta">{esc(meta_line)}</div>
 </body></html>"""
 
@@ -277,16 +323,14 @@ def main():
     for race in index.get('races', []):
         slug = race['slug']
         bits = [pretty_date(race.get('startTime')), race.get('location') or '']
-        if race.get('totalDistanceMi'):
-            d = race['totalDistanceMi']
-            bits.append(f"{d:g} mi")
         runners = race.get('runnerNames') or []
         if runners:
             bits.append(' · '.join(runners))
         meta_line = ' · '.join(b for b in bits if b)
         main_t, accent = split_accent(race.get('name', slug))
         render(card_html(main_t, accent, meta_line, 'Follow live',
-                         profile=elevation_path(slug, W, 210)),
+                         profile=elevation_path(slug, W, 210),
+                         stats=race_stats(slug)),
                ROOT / 'races' / slug / 'og.png')
 
         name = race.get('name', slug)

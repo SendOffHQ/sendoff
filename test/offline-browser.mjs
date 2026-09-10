@@ -90,7 +90,7 @@ await page.goto(BASE + '/app/');
 await page.waitForTimeout(2200);
 await page.evaluate(() => { const o = document.querySelector('.intro-overlay'); if (o) o.remove(); });
 const publicRaces = await page.evaluate(() =>
-  [...document.querySelectorAll('a.card')].map(a => new URL(a.href).searchParams.get('id')));
+  [...document.querySelectorAll('a.card')].map(a => new URL(a.href).pathname));
 ok('sees the public races on the hub', publicRaces.length >= 3, true);
 ok('and is not shown an empty hub',
   await page.evaluate(() => !!document.querySelector('.empty')), false);
@@ -98,8 +98,24 @@ ok('and is not shown an empty hub',
 ok('including ones that already finished', await page.evaluate(() =>
   [...document.querySelectorAll('a.card .card-status')].some(e => /finished/i.test(e.textContent))), true);
 
-await page.goto(`${BASE}/race.html?id=${publicRaces[0]}`);
+// The address worth sharing. /races/<slug>/ carries that race's own social
+// card, so it is what the hub links to and what the race page leaves in the
+// bar; race.html?id= still works and is what an unlisted race keeps.
+ok('the hub links to the shareable page', publicRaces[0].startsWith('/races/'), true);
+
+await page.goto(BASE + publicRaces[0]);
 await page.waitForTimeout(2800);
+ok('which opens the race', await page.evaluate(() => {
+  const t = document.getElementById('race-title');
+  return !!t && t.textContent.trim().length > 0 && !/loading/i.test(t.textContent);
+}), true);
+ok('and leaves that address in the bar to be copied',
+  await page.evaluate(() => location.pathname), publicRaces[0]);
+
+await page.goto(`${BASE}/race.html?id=${publicRaces[0].split('/')[2]}`);
+await page.waitForTimeout(2800);
+ok('arriving by the app URL tidies it to the shareable one',
+  await page.evaluate(() => location.pathname), publicRaces[0]);
 ok('can open one of them', await page.evaluate(() => {
   const t = document.getElementById('race-title');
   return !!t && t.textContent.trim().length > 0 && !/loading/i.test(t.textContent);
@@ -186,6 +202,22 @@ ok('the course drew', await page.evaluate(() => {
 // reach the pages they log from.
 ok('and the pit and racer pages are still reachable',
   await navLinks(), ['Pit Board', 'Racer', 'Settings', 'Charts', 'Print']);
+// The address bar now leaves /races/<slug>/ behind, so that is the address a
+// crew member reloads at an aid station. It is not precached and never can be
+// (there is one per race), so the worker serves the precached race page for it
+// and race.html reads the slug out of the path. Without that this whole change
+// would have traded a better shared link for a worse offline reload.
+await page.goto(`${BASE}/races/${SLUG}/`).catch(() => {});
+await page.waitForTimeout(3500);
+ok('the shareable address still opens the race offline', await page.evaluate(() => {
+  const t = document.getElementById('race-title');
+  return !!t && t.textContent.trim().length > 0 && !/loading/i.test(t.textContent);
+}), true);
+ok('and it is the right race', await page.evaluate(() =>
+  document.getElementById('race-title').textContent.toLowerCase().includes('sangre')), true);
+
+await page.goto(`${BASE}/race.html?id=${SLUG}`).catch(() => {});
+await page.waitForTimeout(3500);
 ok('the page says it is showing saved data', await page.evaluate(() => {
   const b = document.getElementById('so-offline-bar');
   return !!b && /saved|No signal|network/i.test(b.textContent);
