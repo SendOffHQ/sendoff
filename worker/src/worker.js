@@ -3548,7 +3548,43 @@ async function handleRaceDelete(req, env) {
       { status: 503 }, env, req);
   }
 
-  // The manifest goes first. If a file delete then fails we are left with
+  // The keys that carry the slug in their name, so they go directly and cost
+  // no list. acl: is the one that matters: it is the roster, which is a list
+  // of people's addresses, and it used to outlive the race it belonged to
+  // forever. dsc:fin: is who has already been announced as finishing, which
+  // would otherwise silence the announcements if the slug were ever reused.
+  if (env.AUTH_KV) {
+    for (const key of [ACL_KEY(slug), 'dsc:fin:' + slug, 'created:' + slug]) {
+      try { await env.AUTH_KV.delete(key); } catch (e) { /* best effort */ }
+    }
+  }
+  if (env.AUTH_KV) {
+    for (const prefix of ['share:', 'invite:']) {
+      try {
+        let cursor;
+        do {
+          const list = await env.AUTH_KV.list({ prefix, cursor });
+          for (const k of (list.keys || [])) {
+            const raw = await env.AUTH_KV.get(k.name);
+            if (!raw) continue;
+            try {
+              if (JSON.parse(raw).slug === slug) await env.AUTH_KV.delete(k.name);
+            } catch (e) { /* not JSON we wrote; leave it alone */ }
+          }
+          cursor = list.list_complete ? null : list.cursor;
+        } while (cursor);
+      } catch (e) { /* tokens for a deleted race fail their slug check anyway */ }
+    }
+  }
+
+  // Both of the above run before anything touches git, which is a change of
+  // order and not just of place. They used to sit at the end, after the tree
+  // listing, so a git call failing left the roster behind with the race that
+  // owned it already gone from the database: addresses stranded in KV with
+  // nothing left pointing at them. Git is the archive now. The stores that
+  // answer a read, and the ones holding people's addresses, go first.
+
+  // Then the manifest. If a file delete then fails we are left with
   // orphaned files, which are invisible and harmless; the other order leaves a
   // listed race whose config 404s, which is the failure we are here to fix.
   let manifestErr = null;
@@ -3604,24 +3640,6 @@ async function handleRaceDelete(req, env) {
   // weight, and an invite accepted afterwards would fail on the missing config
   // with an error nobody can act on. Both key spaces are paginated: a listing
   // that stops at the first page would leave tokens behind on a busy account.
-  if (env.AUTH_KV) {
-    for (const prefix of ['share:', 'invite:']) {
-      try {
-        let cursor;
-        do {
-          const list = await env.AUTH_KV.list({ prefix, cursor });
-          for (const k of (list.keys || [])) {
-            const raw = await env.AUTH_KV.get(k.name);
-            if (!raw) continue;
-            try {
-              if (JSON.parse(raw).slug === slug) await env.AUTH_KV.delete(k.name);
-            } catch (e) { /* not JSON we wrote; leave it alone */ }
-          }
-          cursor = list.list_complete ? null : list.cursor;
-        } while (cursor);
-      } catch (e) { /* tokens for a deleted race fail their slug check anyway */ }
-    }
-  }
 
   if (failed.length || manifestErr) {
     return json({ ok: false, deleted, failed, manifestErr }, { status: 207 }, env, req);

@@ -333,11 +333,18 @@ console.log('\ndeleting a race takes it out of the database too');
 // anybody holding its slug.
 await put('races/goner/config.json', { ...race, name: 'Goner', createdBy: ME });
 await put('races/goner/data.json', { runners: [{ id:'jd', legs: [] }] });
+kvStore.set('acl:goner', JSON.stringify({ createdBy: ME, people: [{ email: 'crew@example.com', role: 'crew' }] }));
+kvStore.set('dsc:fin:goner', JSON.stringify(['jd']));
 ok('it exists first', !!rows.get('goner'), true);
+ok('with a roster in KV', kvStore.has('acl:goner'), true);
 await worker.fetch(new Request('https://w/race/delete', {
   method:'POST', headers:{ 'Content-Type':'application/json', Authorization: 'Bearer ' + token },
   body: JSON.stringify({ slug: 'goner' }) }), env, { waitUntil: () => {} });
 ok('the row is gone', !!rows.get('goner'), false);
+// The roster is a list of people's addresses and used to outlive the race
+// it belonged to, with no way to reach it once the race was gone.
+ok('the roster went with it', kvStore.has('acl:goner'), false);
+ok('and so did the Discord state', kvStore.has('dsc:fin:goner'), false);
 ok('and a read finds nothing',
   (await worker.fetch(new Request('https://w/public?path=' +
     encodeURIComponent('races/goner/data.json')), env, { waitUntil: () => {} })).status, 404);
