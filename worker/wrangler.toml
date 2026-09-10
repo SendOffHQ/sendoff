@@ -16,11 +16,12 @@ READ_FROM_D1 = "true"
 # Race writes go to git, and D1 follows. "false" makes D1 the authority for
 # races/<slug>/config.json and data.json, and leaves git for the archive.
 #
-# Do not flip this yet. It is the write half of storage steps 5 and 6 and it is
-# complete on its own terms, but one piece is still missing: with git out of
-# the per-press path, nothing writes the race to git at all, so there is no
-# archive to be "only for archive". The finish-time archive commit has to land
-# first, or a day's splits exist in exactly one place.
+# The archive commit that this depends on is in: once a race is finished, the
+# worker commits its config and data to git, and again on any correction filed
+# afterwards. Finished means every runner through every leg, or the clock past
+# the cutoff, because a race somebody dropped out of never satisfies the first
+# and is exactly the race whose data you want kept. POST /archive forces it for
+# anything the rules miss.
 #
 # What it does change when it is on, and what to check if it misbehaves: the
 # concurrency guard stops being GitHub's blob sha and becomes the config_sha /

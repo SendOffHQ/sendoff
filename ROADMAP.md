@@ -374,11 +374,24 @@ before promising an event in another hemisphere.
    version, first lands, second refused, first survives, loser retries and gets
    through.
 
-   **What is still missing before the flag can be flipped:** the finish-time
-   archive commit. With git out of the per-press path and no archive being
-   written, there is no archive for GitHub to be "only for", and a day's splits
-   would exist in exactly one place. That is the next piece, and it is the one
-   that makes the phrase true rather than half true.
+   **The archive commit is in too.** Once a race is finished the worker
+   commits its config and data to git, and again on any correction filed after
+   the finish. Two things about it are deliberate:
+
+   *Finished* means every runner through every leg **or** the clock past the
+   cutoff. The second half carries more weight than it looks: a race somebody
+   dropped out of never satisfies the first, and a DNF is exactly the race
+   whose data you most want kept. `POST /archive` forces it for anything the
+   rules miss.
+
+   *Idempotent by comparing bytes*, not by a marker. A marker would have to be
+   cleared for every correction filed after the finish, and forgetting to is
+   how an archive quietly stops matching the race. Comparing means a correction
+   makes one commit and a re-run with nothing changed makes none.
+
+   So the flag is now flippable on its own terms. What is left before flipping
+   it is a decision rather than code: after it, live race data has one home
+   until the finish, and the next race is on 26 September.
 
    `course.gpx` and `races/index.json` keep going to git under either setting:
    one is written once at setup, the other is the public manifest the
