@@ -90,38 +90,46 @@ at sendoff.social. Cloudflare hands out `<project>.pages.dev` globally, and that
 name was taken, so this project got **`sendoff-abi.pages.dev`**. The deploy log
 prints the real address every run; read it rather than assuming it.
 
-## A deleted page can outlive its deployment, in one region
+## Telling a stale cache from a stale deployment
 
-Observed 2026-09-10, deleting a test race. Both races were gone from the
-database, from git and from the manifest, and `/races/<slug>/data.json`
-answered 404 — but `/races/<slug>/` answered **200 from some requests and 404
-from others**, for over an hour.
+Observed 2026-09-10, deleting a test race, and worth writing down mostly for
+the diagnostic at the end.
 
-It is not the propagation lag described below. That settles in a minute and
-this did not. Splitting the responses by `cf-ray` shows why:
+Both races were gone from the database, from git and from the manifest, and
+`/races/<slug>/data.json` answered 404 — but `/races/<slug>/` answered **200
+from some requests and 404 from others**, for over an hour. Splitting by
+`cf-ray` showed it was regional: IAD answered 404, EWR served a three-hour-old
+copy with the `age` header climbing in real time. A fresh deployment did not
+change it. Neither did a Purge Everything on the zone, at first glance.
 
-    ray=…-IAD   404                                  correct
-    ray=…-EWR   200   age=10807, cf-cache-status: DYNAMIC
+At which point the shape of the evidence looked like a bad deployment, and it
+was not. **Ask for a URL nothing has ever requested, and the answer is
+unambiguous:**
 
-One region holding a three-hour-old copy. `DYNAMIC` says Cloudflare's CDN is
-not the thing caching it, and `age` climbing in real time across checks
-(10807, 10925, 10926) says it is one object getting older rather than being
-refetched. **A fresh deployment did not clear it**, which is the part worth
-knowing: shipping another commit is the reflex and it does not work.
+    curl -o /dev/null -w '%{http_code}' \
+      "https://sendoff.run/races/<slug>/?cb=$RANDOM"
 
-The remedy is a cache purge from the Cloudflare dashboard, Caching,
-Configuration, Purge Everything or the single URL.
+404, from every host, every time. No cache anywhere can hold a URL that has
+never been asked for, so this separates what is deployed from what is
+remembered in one request. Everything above was cache.
 
-**How much it matters: not much, and it is worth being precise about why.** The
-page that survives is an empty shell. It forwards into `race.html`, which asks
-the worker for the race and is told 404, so no race data is reachable through
-it. The cost is a stale link that loads before saying the race is gone.
+Two things that made it confusing, both worth knowing:
 
-Two things follow. When checking that a delete worked, `/public` on the worker
-is the answer, because it is the read path; the share address is a static file
-and can lie. And the mixed 200/404 that this produces is indistinguishable at a
-glance from a delete that half-worked, which is one of the arguments for the
-single-commit delete in `ROADMAP.md`.
+- **Purging the zone does not touch `sendoff-abi.pages.dev`.** That name is not
+  on the `sendoff.run` zone, so it kept serving its own stale copies while the
+  apex was mostly clean. Comparing the two hosts looked like evidence of a
+  broken deployment and was evidence of two caches.
+- **Individual files expire independently**, so a race directory can answer 404
+  for its config and 200 for its data at the same moment. That looks like a
+  half-finished delete and is not.
+
+The delete itself was complete throughout. What survives is an empty shell that
+forwards into `race.html`, which asks the worker and is told the race is gone,
+so no race data is reachable through it.
+
+**The rule that follows:** the worker's `/public` is what says whether a delete
+worked, because it is the read path. A static file is a copy, and copies lie
+for as long as their cache says they may.
 
 ## Give a deploy a minute before judging it
 
