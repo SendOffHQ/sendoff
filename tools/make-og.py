@@ -142,7 +142,60 @@ def split_accent(name):
     parts = str(name).split()
     return (' '.join(parts[:-1]), parts[-1]) if len(parts) > 1 else (name, '')
 
-def card_html(title_main, title_accent, meta_line, kicker):
+def elevation_path(slug, width, height, samples=280):
+    """The course, as an SVG area path, from that race's own GPX.
+
+    lib/finish-card.js puts it plainly: "The elevation profile is the hero
+    rather than a logo, because the shape of the course is the part that says
+    which race this was." The same is true of a link preview. Without it every
+    race's card is the same picture with a different name on it.
+
+    Drawn from the elevation series alone, evenly spaced, rather than against
+    real distance. At 1200px wide across a whole hundred miler the difference
+    is invisible, and it keeps this to one regular expression.
+
+    Returns None when there is no GPX or nothing usable in it, and the card
+    falls back to the plain layout. A missing course file is not a reason to
+    fail a build.
+    """
+    gpx = ROOT / 'races' / slug / 'course.gpx'
+    if not gpx.exists():
+        return None
+    try:
+        eles = [float(m) for m in re.findall(r'<ele>\s*(-?[\d.]+)\s*</ele>', gpx.read_text(errors='ignore'))]
+    except Exception:
+        return None
+    if len(eles) < 8:
+        return None
+
+    # Down to a drawable number of points, by taking the max of each bucket so
+    # summits survive: averaging a hundred miler into 280 points flattens the
+    # climbs that are the whole character of the course.
+    step = len(eles) / samples
+    pts = [max(eles[int(i * step):max(int((i + 1) * step), int(i * step) + 1)])
+           for i in range(samples)]
+    lo, hi = min(pts), max(pts)
+    if hi - lo < 1:
+        return None
+
+    def xy(i, e):
+        x = i * width / (len(pts) - 1)
+        y = height - (e - lo) / (hi - lo) * height
+        return f'{x:.1f},{y:.1f}'
+
+    line = ' '.join(xy(i, e) for i, e in enumerate(pts))
+    return (f'<svg viewBox="0 0 {width} {height}" preserveAspectRatio="none" '
+            f'width="{width}" height="{height}">'
+            f'<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">'
+            f'<stop offset="0%" stop-color="#0FB8BF" stop-opacity=".05"/>'
+            f'<stop offset="100%" stop-color="#0FB8BF" stop-opacity=".26"/>'
+            f'</linearGradient></defs>'
+            f'<polygon points="0,{height} {line} {width},{height}" fill="url(#g)"/>'
+            f'<polyline points="{line}" fill="none" stroke="#0FB8BF" stroke-opacity=".42" '
+            f'stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/></svg>')
+
+
+def card_html(title_main, title_accent, meta_line, kicker, profile=None):
     faces = "\n".join([
       f"@font-face{{font-family:'BC';font-weight:600;src:url(data:font/woff2;base64,{b64('bc-600.woff2')}) format('woff2')}}",
       f"@font-face{{font-family:'BC';font-weight:700;src:url(data:font/woff2;base64,{b64('bc-700.woff2')}) format('woff2')}}",
@@ -151,6 +204,7 @@ def card_html(title_main, title_accent, meta_line, kicker):
       f"@font-face{{font-family:'JB';src:url(data:font/woff2;base64,{b64('jb-500.woff2')}) format('woff2')}}",
     ])
     accent = f' <em>{esc(title_accent)}</em>' if title_accent else ''
+    profile_html = f'<div class="profile">{profile}</div>' if profile else ''
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><style>
 {faces}
 *{{margin:0;padding:0;box-sizing:border-box}}
@@ -162,6 +216,12 @@ body{{
     linear-gradient(165deg,#0C141B 0%,#0A0F14 62%);
   color:#F0ECE3; font-family:'Plex',sans-serif;
   padding:66px 72px; display:flex; flex-direction:column; justify-content:space-between;
+  /* The profile is positioned against the card. Without this it resolves
+     against the viewport, which render() deliberately makes 220px taller than
+     the card before cropping, so the course ended up below the crop. Body is
+     border-box at exactly {W}x{H} with no border, so its padding box is the
+     card edge to edge, which is what the profile wants to bleed to. */
+  position:relative;
   --wm-signal:#0FB8BF; --wm-letter:#F0ECE3;
 }}
 .top{{display:flex;align-items:center;justify-content:space-between;gap:30px}}
@@ -172,7 +232,15 @@ h1 em{{font-style:italic;font-weight:600;color:#0FB8BF}}
 .meta{{font-family:'JB',monospace;font-size:26px;letter-spacing:.05em;color:#9DB0BC}}
 .rule{{height:5px;width:132px;background:#0FB8BF;margin-bottom:30px}}
 .mid{{display:flex;flex-direction:column;justify-content:center;flex:1;padding:26px 0}}
+/* The course runs the full width along the bottom, behind the meta line and
+   under the title. Bled to the edges on purpose: it is the ground the card
+   sits on rather than a chart somebody is meant to read values off. */
+.profile{{position:absolute;left:0;right:0;bottom:0;height:210px;z-index:0;pointer-events:none}}
+.profile svg{{display:block;width:100%;height:100%}}
+.top,.mid,.meta{{position:relative;z-index:1}}
+.meta{{text-shadow:0 2px 14px rgba(10,15,20,.85)}}
 </style></head><body>
+  {profile_html}
   <div class="top"><span class="wm">{wordmark()}</span><span class="kicker">{esc(kicker)}</span></div>
   <div class="mid"><div class="rule"></div><h1>{esc(title_main)}{accent}</h1></div>
   <div class="meta">{esc(meta_line)}</div>
@@ -217,7 +285,8 @@ def main():
             bits.append(' · '.join(runners))
         meta_line = ' · '.join(b for b in bits if b)
         main_t, accent = split_accent(race.get('name', slug))
-        render(card_html(main_t, accent, meta_line, 'Follow live'),
+        render(card_html(main_t, accent, meta_line, 'Follow live',
+                         profile=elevation_path(slug, W, 210)),
                ROOT / 'races' / slug / 'og.png')
 
         name = race.get('name', slug)
