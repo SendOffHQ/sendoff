@@ -626,6 +626,33 @@ bought about 139 tab-hours a day, and a 30 hour hundred miler with twenty
 watchers is 300 tab-hours. The interval alone never fixed that. Not asking when
 nobody is looking does.
 
+### Move the site to Cloudflare Pages — *staged 2026-09-10, off*
+`HOSTING.md` has the runbook. Staged and inert: a second deploy workflow and a
+`_headers` file that GitHub Pages ignores, so pushing it changes nothing until
+a Pages project exists and DNS is pointed at it.
+
+**Why it turned out to matter more than the push prototype.** A signed-out
+spectator polls the static host directly, not the worker: `readRaceFile` only
+uses the proxy when there is a session. So the one unbounded axis lands on
+GitHub Pages, whose bandwidth limits are soft and whose terms discourage
+high-traffic use. Cloudflare Pages documents no free-plan bandwidth limit; its
+constraints are 500 builds a month, 20,000 files and 25 MiB an asset, against
+this site's 134 files and 1.2 MB largest.
+
+It also unlocks conditional requests, which this document has called "most of
+the win for the least effort" since it was written and which have never been
+possible on GitHub Pages.
+
+**Both hosts run at once during the trial, and DNS is the switch.** GitHub
+Pages keeps deploying, so a revert is a DNS change against a copy that is
+current rather than stale.
+
+**One thing found while writing it, worth doing separately:** every published
+read appends `?_=` + `Date.now()`, which makes each poll a unique URL and
+defeats ETag revalidation completely. Dropping that in favour of `no-cache`
+plus an ETag is where the 304s actually come from. Kept out of the move so the
+move stays like-for-like and a regression has one possible cause.
+
 ### Live push over a websocket — *prototype, off*
 Written 2026-09-10. Code is in the repo and nothing is running it: the Durable
 Object binding is commented out in `worker/wrangler.toml` and `hub.json` says

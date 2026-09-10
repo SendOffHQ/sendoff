@@ -1,0 +1,42 @@
+# Cloudflare Pages reads this file and turns it into response headers. GitHub
+# Pages ignores it, so it is safe to have here during the trial: it changes
+# nothing until the site is served from Cloudflare.
+#
+# The shape of the problem: a spectator's browser asks for the same handful of
+# files over and over. Assets almost never change and should be held. Race data
+# changes constantly and must never be held, but should be revalidated rather
+# than re-downloaded, which is what an ETag and a 304 are for.
+
+# Race data. no-cache does not mean "do not store", it means "ask before
+# reusing". Paired with the ETag Pages sets automatically, an unchanged
+# data.json comes back as a 304 with no body.
+/races/*
+  Cache-Control: no-cache
+
+/hub.json
+  Cache-Control: no-cache
+
+# The service worker. A stale one can keep a broken version of the app alive,
+# which is the one thing worth never caching.
+/sw.js
+  Cache-Control: no-cache
+
+# The app itself. Short, because a fix should reach people the same day, and
+# the service worker is what makes this fast in practice anyway.
+/*.html
+  Cache-Control: public, max-age=300, must-revalidate
+
+/app/*
+  Cache-Control: public, max-age=300, must-revalidate
+
+# Shared code and styles, which carry ?v= when they change.
+/lib/*
+  Cache-Control: public, max-age=3600
+
+# Third party, pinned by version in its path, so it can be held indefinitely.
+/vendor/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Brand artwork and social cards. Change rarely; a day is plenty.
+/brand/*
+  Cache-Control: public, max-age=86400
