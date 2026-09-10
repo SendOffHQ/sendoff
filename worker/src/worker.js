@@ -2047,8 +2047,31 @@ async function postToDiscord(env, content) {
   }
 }
 
-function raceUrl(env, slug) {
-  return `${mailBase(env)}/race.html?id=${encodeURIComponent(slug)}`;
+// Two addresses point at the same race, and which one is posted decides what
+// the chat preview looks like.
+//
+//   /races/<slug>/      a real page per race, made by tools/make-og.py, whose
+//                       social tags name that race and whose image is that
+//                       race's card. It forwards into the app.
+//   /race.html?id=      the app itself. One static file serving every race, so
+//                       it can only ever carry one set of preview tags, and
+//                       they are the generic ones.
+//
+// So the share page is posted when it exists. It does not always: make-og.py
+// is run by hand, and a race created five minutes ago has never been through
+// it. Rather than post a link that 404s, this asks, and falls back.
+//
+// The check is a HEAD against a static file on a CDN, it runs after the
+// response like everything else here, and a failure falls back rather than
+// throwing.
+async function shareUrl(env, slug) {
+  const base = mailBase(env);
+  const pretty = `${base}/races/${encodeURIComponent(slug)}/`;
+  try {
+    const res = await fetch(pretty, { method: 'HEAD' });
+    if (res.ok) return pretty;
+  } catch (e) { /* fall through */ }
+  return `${base}/race.html?id=${encodeURIComponent(slug)}`;
 }
 
 async function announceNewRace(env, slug, cfg) {
@@ -2061,7 +2084,7 @@ async function announceNewRace(env, slug, cfg) {
     : null;
   const bits = [where, day].filter(Boolean).join(', ');
   await postToDiscord(env,
-    `**${name}** is on the board${bits ? ` (${bits})` : ''}.\n${raceUrl(env, slug)}`);
+    `**${name}** is on the board${bits ? ` (${bits})` : ''}.\n${await shareUrl(env, slug)}`);
 }
 
 // Announces each racer once. The set of who has already been announced lives
@@ -2085,13 +2108,14 @@ async function announceFinishes(env, slug, cfg, data) {
   if (!fresh.length) return;
 
   const byId = new Map(((cfg.runners) || []).map(r => [r.id, r]));
+  // Asked once for the whole batch rather than per racer.
+  const url = await shareUrl(env, slug);
   for (const r of fresh) {
     const who = forDiscord((byId.get(r.id) || {}).name || r.id, 60);
     const last = r.legs[r.legs.length - 1];
     const time = cfg.startTime && last ? elapsedHms(cfg.startTime, last.endTime) : null;
     await postToDiscord(env,
-      `**${who}** finished ${forDiscord(cfg.name) || 'the race'}${time ? ` in ${time}` : ''}.\n` +
-      raceUrl(env, slug));
+      `**${who}** finished ${forDiscord(cfg.name) || 'the race'}${time ? ` in ${time}` : ''}.\n` + url);
     seen.add(r.id);
   }
   await env.AUTH_KV.put(key, JSON.stringify([...seen]),

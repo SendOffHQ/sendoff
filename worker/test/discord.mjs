@@ -22,8 +22,16 @@ globalThis.caches = { default: { async match(){}, async put(){}, async delete(){
 // Everything the worker sends to Discord, in order.
 let posts = [];
 
+// Which races have been through tools/make-og.py, and so have a share page.
+let sharePages = new Set();
+
 globalThis.fetch = async (url, opts = {}) => {
   const u = String(url);
+  // The HEAD that decides whether to post the pretty URL or the app one.
+  const share = u.match(/^https:\/\/sendoff\.run\/races\/([^/]+)\/$/);
+  if (share) {
+    return new Response('', { status: sharePages.has(share[1]) ? 200 : 404 });
+  }
   if (u.startsWith('https://discord.test/')) {
     posts.push(JSON.parse(opts.body));
     return new Response('', { status: 204 });
@@ -123,6 +131,31 @@ ok('with its name', /Blood Root Ultra/.test(posts[0].content), true);
 ok('where and when', /Vermont/.test(posts[0].content) && /October 3, 2026/.test(posts[0].content), true);
 ok('and a link somebody can follow',
   /https:\/\/sendoff\.run\/race\.html\?id=902-open/.test(posts[0].content), true);
+
+console.log('\nwhen the race has a share page of its own');
+// tools/make-og.py has been run for this one, so /races/<slug>/ exists and
+// carries that race's name and card rather than the generic ones.
+sharePages.add('905-pretty');
+posts = [];
+await commit('races/905-pretty/config.json',
+  { ...course, name: 'Sangre de Cristo 100', location: 'Westcliffe, CO',
+    visibility: 'public', createdBy: ME });
+ok('that page is what gets posted',
+  /https:\/\/sendoff\.run\/races\/905-pretty\/$/m.test(posts[0].content.trim()), true);
+ok('and not the generic app URL', /race\.html\?id=/.test(posts[0].content), false);
+
+posts = [];
+await commit('races/905-pretty/data.json', legs(4));
+ok('a finish uses it too',
+  /https:\/\/sendoff\.run\/races\/905-pretty\/$/m.test(posts[0].content.trim()), true);
+
+console.log('\nand when it does not have one yet');
+posts = [];
+await commit('races/906-fresh/config.json',
+  { ...course, name: 'Made Five Minutes Ago', location: 'Texas',
+    visibility: 'public', createdBy: ME });
+ok('it falls back rather than posting a 404',
+  /race\.html\?id=906-fresh/.test(posts[0].content), true);
 
 console.log('\nfinishing it');
 posts = [];
