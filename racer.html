@@ -604,9 +604,6 @@
   (async () => {
     await Race.hub.load();
     await load();
-    // The clock and the undo countdown are the only things that move on their
-    // own; a full poll is slower here than on the crew board because a runner
-    // is the one making the changes.
     // Only the two numbers that move are touched each second. Redrawing the
     // whole readout would take a chip out from under a thumb already on it.
     setInterval(() => {
@@ -615,7 +612,17 @@
       else if (undoUntil) renderAct();
       tickClocks();
     }, 1000);
-    setInterval(() => { if (!undoUntil) load(); }, 30000);
+    // This used to be a flat 30 seconds, on the reasoning that a runner is the
+    // one making the changes so their own page has less to learn. That is only
+    // half true: the plan, the notes and the station edits all come from the
+    // crew, and a runner standing in an aid station waiting for one of them
+    // was waiting half a minute for a page that had it. Same adaptive interval
+    // as the crew board now, which also means the poll stops while the phone
+    // is in a pocket with the screen off and refreshes the moment it comes
+    // back out. setInterval kept firing either way.
+    Race.poll(() => { if (!undoUntil) load(); }, {
+      interval: () => Race.POLL_MS[Race.raceState(cfg, data)]
+    });
   })();
 </script>
 
