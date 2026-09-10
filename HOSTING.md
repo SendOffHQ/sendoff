@@ -120,6 +120,24 @@ missing if you ask for it by name.
 **`worker/`, `test/` and `tools/`** are served by GitHub Pages and are not
 uploaded here. Nothing references them; the smaller surface is deliberate.
 
+**`_headers` only works on one of them.** It is a Cloudflare Pages feature, and
+GitHub Pages has no way to set custom headers at all. Measured 2026-09-10:
+
+    sendoff.run            cache-control: max-age=600
+    sendoff-abi.pages.dev  cache-control: no-cache
+
+So on GitHub Pages a published race file is cached by the browser for ten
+minutes. The reason that has never been a bug is the `?_=` + `Date.now()` on
+every published read, which makes each poll a unique URL the cache has never
+seen. That cache-buster is not a leftover: on GitHub Pages it is load-bearing,
+and it is the only thing standing between an unlisted share link and a
+ten-minute-old race.
+
+Which reverses what the roadmap says about dropping it. It can only go after
+the cutover, because only Cloudflare Pages honours the `no-cache` and the ETag
+that would replace it. Worth counting as an argument for the move: it is the
+difference between correct cache headers on race data and none.
+
 ## What to check on sendoff-abi.pages.dev before touching DNS
 
 The offline path is the part most likely to differ, and it is the part this
@@ -133,7 +151,20 @@ app has been bitten by most.
 - Reload `/races/<slug>/` offline. This one exercises the service worker
   fallback added in v6.
 - Check response headers: `curl -I https://sendoff-abi.pages.dev/races/<slug>/data.json`
-  should show `cache-control: no-cache` and an `etag`.
+  should show `cache-control: no-cache` and an `etag`. Confirmed 2026-09-10.
+
+Two things worth checking that did not exist when this list was written:
+
+- **The live push on a phone that goes to sleep.** A websocket can be killed by
+  a captive portal or a locked phone without saying so, which is the failure
+  the poll underneath exists to cover. Open a race page, lock the phone for a
+  few minutes, unlock it, and confirm the page catches up rather than sitting
+  on a stale split. This is the one worth doing on a real phone on cell data,
+  because it cannot be reproduced on a desk.
+- **A spectator with no account.** Open a public race in a private window,
+  signed out, and confirm it still updates within a few seconds. That reads
+  `/public` on the worker rather than the published file, so it is the path a
+  share link actually takes now.
 
 `npm run test:browser` can be pointed at the trial host by changing `BASE` in
 `test/offline-browser.mjs`, which is the fastest way to do most of the above.
