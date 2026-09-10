@@ -71,6 +71,64 @@ const INVITE_TTL_DAYS = 14;
 const SHARE_TTL_DAYS_DEFAULT = 30;
 const RESET_TTL_DAYS = 2;
 
+// The Durable Object class, re-exported because Cloudflare looks for it on the
+// worker's entry module. Inert unless wrangler.toml declares the binding, which
+// it does not by default: see the commented block there.
+export { RaceHub } from './race-hub.js';
+import { RaceHub as _RaceHub } from './race-hub.js';
+
+// ---------- live push ----------
+// Off unless the RACE_HUB binding exists. A worker without it runs exactly the
+// code it ran before, and every call below is a no-op.
+function liveEnabled(env) {
+  return !!(env && env.RACE_HUB);
+}
+
+// The object for one race, addressed by slug so every socket for that race
+// meets in the same place wherever it connects from.
+function raceHub(env, slug) {
+  return env.RACE_HUB.get(env.RACE_HUB.idFromName(slug));
+}
+
+// A watcher asking to be told about a race.
+//
+// Public races only, for now. A private race's watchers are the people on its
+// access list, and checking that on a socket upgrade is a separate piece of
+// work; until it is done, an unlisted race keeps polling, which already works.
+async function handleLive(req, env) {
+  if (!liveEnabled(env)) return new Response('Live push is not enabled', { status: 501 });
+  const slug = new URL(req.url).searchParams.get('race') || '';
+  if (!slug || slug.includes('/')) return new Response('Missing race', { status: 400 });
+
+  const cfg = await loadRaceConfig(env, slug);
+  if (!cfg) return new Response('Race not found', { status: 404 });
+  if (cfg.visibility !== 'public') {
+    return new Response('Live push is public races only for now', { status: 403 });
+  }
+  return raceHub(env, slug).fetch(req);
+}
+
+// Told after a write has landed, from the same place the Discord announcement
+// goes: after the response, where it cannot cost a crew member anything.
+async function publishChange(env, path) {
+  if (!liveEnabled(env)) return;
+  try {
+    const slug = racePathSlug(path);
+    if (!slug || !path.endsWith('/data.json')) return;
+    const cfg = await loadRaceConfig(env, slug);
+    if (!cfg || cfg.visibility !== 'public') return;
+    // Deliberately says nothing about what changed. The page already knows how
+    // to read a race; this only tells it that reading again is worth doing.
+    await raceHub(env, slug).fetch('https://race-hub/publish', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'changed', slug, at: new Date().toISOString() })
+    });
+  } catch (e) {
+    // A watcher who misses a nudge falls back to the poll that is still
+    // running underneath. Never worth failing a write over.
+  }
+}
+
 // ---------- CORS ----------
 function corsHeaders(env, req) {
   const allowed = (env.ALLOWED_ORIGINS || '*').split(',').map(s => s.trim()).filter(Boolean);
@@ -1686,6 +1744,7 @@ async function handleCommit(req, env, ctx) {
   // it is simply skipped.
   if (res.ok && ctx && ctx.waitUntil) {
     ctx.waitUntil(announceCommit(env, path, content, liveCfg, isCreation));
+    ctx.waitUntil(publishChange(env, path));
   }
   return new Response(text, {
     status: res.status,
@@ -3156,6 +3215,7 @@ export default {
     if (mount && path.startsWith(mount)) path = path.slice(mount.length) || '/';
     path = path.replace(/\/+$/, '') || '/';
 
+    if (request.method === 'GET'  && path === '/live')            return handleLive(request, env);
     if (request.method === 'GET'  && path === '/health')          return json({ ok: true, kv: !!env.AUTH_KV }, {}, env, request);
     if (request.method === 'POST' && path === '/feedback')         return handleFeedback(request, env);
     if (request.method === 'GET'  && path === '/feedback-list')    return handleFeedbackList(request, env);
