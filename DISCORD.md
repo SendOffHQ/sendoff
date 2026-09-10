@@ -62,8 +62,15 @@ Built and shipped 2026-09-09. The Worker posts two things:
 - **a public race is created**, with its name, where and when, and a link
 - **a racer finishes one**, with their name and elapsed time, and a link
 
-Discord unfurls the link into a preview using the race page's own social tags,
-so each post carries the race's card without any of that being built twice.
+The link is the race's own share page, `/races/<slug>/`, when one exists, so
+the preview names that race and shows that race's card rather than the generic
+SendOff one. Those pages are made by `tools/make-og.py`, which is run by hand,
+so a race created five minutes ago has not been through it: the worker asks
+first and falls back to `/race.html?id=` rather than posting a link that 404s.
+
+Run `python3 tools/make-og.py` after adding a race if you want its card in the
+feed. It reads `races/index.json`, which unlisted races are never in, so it
+cannot accidentally build a share page for one.
 
 Three things it deliberately does not post: **anything about an unlisted race**,
 feedback, and access requests. The last two are full of names and email
