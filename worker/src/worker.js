@@ -892,14 +892,35 @@ async function loadRaceConfig(env, slug) {
 // The stored config, parsed, or null to mean "ask git". Shares its rules with
 // readFromD1 below: off unless READ_FROM_D1 says true, and a row that cannot
 // stand behind its own answer is not an answer.
-async function mirroredConfig(env, slug) {
-  if (!d1Enabled(env) || !env.DB || !slug) return null;
+async function mirroredConfig(env, slug, force) {
+  if ((!d1Enabled(env) && !force) || !env.DB || !slug) return null;
   try {
     const r = (await env.DB.prepare(
       'SELECT config, config_sha FROM races WHERE slug = ?').bind(slug).all()).results[0];
     if (!r || !r.config || r.config === '{}' || !r.config_sha) return null;
     return JSON.parse(r.config);
   } catch (e) { return null; }
+}
+
+// The config as it stands, for a write's ACL check. Deliberately uncached: it
+// carries the ACL fields across a write, and acting on a roster three seconds
+// out of date is not a trade worth making to save one API call.
+//
+// The mirror comes first once git stops being written, and getting this
+// backwards is not a small bug. A race created after the flip has no config in
+// git at all, so a git-only lookup finds nothing, and every write to it by
+// anyone but the session that made it is answered "Race not found". That is a
+// race the crew cannot work.
+//
+// Forced past d1Enabled on purpose. WRITE_TO_GIT="false" with READ_FROM_D1
+// unset is an incoherent pair, but the failure it would cause here is bad
+// enough to be worth not depending on somebody setting both.
+async function loadRaceConfigForWrite(env, slug) {
+  if (!gitWrites(env)) {
+    const m = await mirroredConfig(env, slug, true);
+    if (m) return attachAcl(env, slug, m);
+  }
+  return loadRaceConfig(env, slug);
 }
 
 async function loadRaceConfigShared(env, slug) {
@@ -1614,10 +1635,17 @@ async function commitToD1(env, path, content, actor, expected) {
     return null;
   }
   // `IS` rather than `=`, because a column that has never been written is
-  // NULL and NULL = NULL is not true in SQL. A first write to an existing row
-  // sends no sha and has to match that NULL.
+  // NULL and NULL = NULL is not true in SQL.
+  //
+  // The OR is the migration case, and without it the first write to some rows
+  // would never land. A row whose version column is NULL is one readFromD1
+  // refuses to serve, so the client's read fell through to git and it is
+  // holding a git blob sha. That can never match, and mutateJson would retry
+  // its four times against the same answer and give up. A NULL column means no
+  // version was ever handed out for this file, so there is nothing to protect
+  // and the write is safe to take.
   const guard = await env.DB.prepare(
-    `UPDATE races SET ${col} = ? WHERE slug = ? AND ${col} IS ?`
+    `UPDATE races SET ${col} = ? WHERE slug = ? AND (${col} IS ? OR ${col} IS NULL)`
   ).bind(token, slug, expected || null).run();
   if (!guard.meta || guard.meta.changes !== 1) {
     return { status: 409, error: 'Someone else changed this first: re-read and try again' };
@@ -1732,7 +1760,7 @@ async function handleArchive(req, env) {
   let body; try { body = await req.json(); } catch (e) { body = {}; }
   const slug = (body && body.slug) || '';
   if (!slug || slug.includes('/')) return json({ error: 'Missing slug' }, { status: 400 }, env, req);
-  const cfg = await loadRaceConfig(env, slug);
+  const cfg = await loadRaceConfigForWrite(env, slug);
   if (!cfg) return json({ error: 'Not found' }, { status: 404 }, env, req);
   if (session.role !== 'admin' && !WRITING_ROLES.has(roleForRace(cfg, session.email))) {
     return json({ error: 'Only somebody who works this race can archive it' }, { status: 403 }, env, req);
@@ -1788,7 +1816,7 @@ async function handleCommit(req, env, ctx) {
   } else if (isRacePath(path)) {
     const slug = racePathSlug(path);
     creationSlug = slug;
-    const raceCfg = await loadRaceConfig(env, slug);
+    const raceCfg = await loadRaceConfigForWrite(env, slug);
     liveCfg = raceCfg;
     if (!raceCfg) {
       // Brand-new race: only allow writes to files under this slug if the body
