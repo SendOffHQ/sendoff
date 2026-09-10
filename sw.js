@@ -18,7 +18,7 @@
 // claims clients immediately so a fixed worker takes over on the next load
 // rather than waiting for every tab to close.
 
-const VERSION = 'v5';
+const VERSION = 'v6';
 const SHELL = `sendoff-shell-${VERSION}`;
 const DATA = `sendoff-data-${VERSION}`;
 const OURS = [SHELL, DATA];
@@ -200,7 +200,18 @@ self.addEventListener('fetch', (event) => {
         throw new Error('no response');
       } catch (e) {
         const cache = await caches.open(SHELL);
+        // A race now lives at two addresses, and only one of them is
+        // precached. /races/<slug>/ is a share page that forwards into the
+        // app, and race.html reads the slug out of that path just as happily
+        // as out of ?id=, so serving the precached app shell for it is not a
+        // fallback, it is the same race. Without this, reloading a race with
+        // no signal after the address bar had been tidied would land on the
+        // hub, which is a worse offline story than the one being improved.
+        const forRace = /^\/races\/[^/]+\/?$/.test(url.pathname)
+          ? await cache.match('/race.html')
+          : null;
         const hit = await cache.match(req, { ignoreSearch: true })
+                 || forRace
                  || await cache.match('/app/index.html')
                  || await cache.match('/index.html');
         if (hit) return fromCache(hit);

@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- This page answers to two addresses: race.html?id=<slug>, and
+     /races/<slug>/ when the service worker serves it there with no signal.
+     Every script, style and asset below is written relative, which is right
+     at the root and resolves to /races/<slug>/lib/... at the other. One base
+     tag keeps them all pointing at the same place from either address. -->
+<base href="/">
 <title>SendOff</title>
 <link rel="icon" href="brand/sendoff-favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0a0f14" />
@@ -516,6 +522,25 @@
 <script>
   const REFRESH_MS = 10000;
   const slug = Race.qs('id');
+
+  // What somebody copies out of the address bar should be the address worth
+  // sharing. Arriving at /races/<slug>/ forwards here, which put the app URL
+  // back in the bar and undid the whole point of that page existing; most
+  // people share by copying the bar rather than by finding a share panel.
+  //
+  // Only for a public race, because only a public race has a page. Only when
+  // there is no token in the query, because a share link's token is the one
+  // thing that must survive a copy. And guarded, because a browser that
+  // dislikes this should not take the race page down with it.
+  function useShareableAddress(cfg) {
+    try {
+      if (!cfg || cfg.visibility !== 'public') return;
+      if (Race.qs('t') || Race.qs('new')) return;
+      const want = new URL(Race.raceHref(slug, true), location.origin).pathname;
+      if (location.pathname === want) return;
+      history.replaceState(history.state, '', want + location.hash);
+    } catch (e) { /* the address bar is cosmetic; the page is not */ }
+  }
   if (!slug) { window.location = 'index.html'; }
 
   // Update nav links to carry the slug
@@ -961,6 +986,8 @@
       data = Race.queue.applyTo(`races/${slug}/data.json`,
         await Race.gh.readRaceJson(slug, 'data.json', true));
       lastFetchAt = new Date();
+
+      useShareableAddress(cfg);
 
       document.title = `${cfg.name} · SendOff`;
       document.getElementById('race-title').innerHTML =
