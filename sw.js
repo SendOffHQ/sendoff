@@ -18,7 +18,7 @@
 // claims clients immediately so a fixed worker takes over on the next load
 // rather than waiting for every tab to close.
 
-const VERSION = 'v6';
+const VERSION = 'v7';
 const SHELL = `sendoff-shell-${VERSION}`;
 const DATA = `sendoff-data-${VERSION}`;
 const OURS = [SHELL, DATA];
@@ -211,7 +211,20 @@ self.addEventListener('fetch', (event) => {
         const forRace = /^\/races\/[^/]+\/?$/.test(url.pathname)
           ? await cache.match('/race.html')
           : null;
+        // Every page in the precache list above is a .html file, and on
+        // Cloudflare Pages nothing lands on one. /race.html 308s to /race, so
+        // a navigation arrives here as /race, misses the cache entirely, and
+        // falls through to the app shell: you click a race with no signal and
+        // land on the hub, or on the marketing page. The addresses differ by a
+        // file extension the host removes on the way past.
+        //
+        // GitHub Pages served both forms with no redirect, so nothing about
+        // this was visible until the cutover.
+        const asHtml = /^\/[^./]+\/?$/.test(url.pathname)
+          ? await cache.match('/' + url.pathname.replace(/^\/|\/$/g, '') + '.html')
+          : null;
         const hit = await cache.match(req, { ignoreSearch: true })
+                 || asHtml
                  || forRace
                  || await cache.match('/app/index.html')
                  || await cache.match('/index.html');
