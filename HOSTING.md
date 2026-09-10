@@ -76,9 +76,16 @@ if the Cloudflare copy misbehaves, it misbehaves on a URL nobody is using.
    only tells you about signed-out reading. Take the second origin back out
    after the cutover.
 
+   Done, and verified: a preflight from the trial origin comes back
+   `access-control-allow-origin: https://sendoff-abi.pages.dev`.
+
+   There is no separate trial account. Both hosts talk to the same worker and
+   accounts live in its `USERS` secret, so sign in with the normal address and
+   password.
+
 ## The trial URL is not the one you would guess
 
-`sendoff-abi.pages.dev` belongs to somebody else: a social media scheduling product
+`sendoff.pages.dev` belongs to somebody else: a social media scheduling product
 at sendoff.social. Cloudflare hands out `<project>.pages.dev` globally, and that
 name was taken, so this project got **`sendoff-abi.pages.dev`**. The deploy log
 prints the real address every run; read it rather than assuming it.
