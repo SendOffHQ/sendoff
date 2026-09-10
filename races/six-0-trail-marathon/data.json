@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-09-10T02:59:20.815Z",
+  "lastUpdated": "2026-09-10T03:17:53.625Z",
   "runners": [
     {
       "id": "jason",
@@ -99,7 +99,8 @@
           "calories": 100,
           "sodiumMg": 295,
           "fluidOz": 20.3,
-          "intakeEstimated": true
+          "intakeEstimated": true,
+          "notes": "Test note"
         }
       ]
     }
