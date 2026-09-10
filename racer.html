@@ -181,7 +181,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=74"></script>
+<script src="lib/race-core.js?v=75"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -620,9 +620,13 @@
     // as the crew board now, which also means the poll stops while the phone
     // is in a pocket with the screen off and refreshes the moment it comes
     // back out. setInterval kept firing either way.
-    Race.poll(() => { if (!undoUntil) load(); }, {
+    const poller = Race.poll(() => { if (!undoUntil) load(); }, {
       interval: () => Race.POLL_MS[Race.raceState(cfg, data)]
     });
+    // Same as the crew board: on top of the poll, not instead of it, and the
+    // interval is unchanged. The undo window is still respected, because that
+    // is the poll's own callback being asked to run now.
+    Race.live(slug, () => poller.now());
   })();
 </script>
 
