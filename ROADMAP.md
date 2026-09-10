@@ -449,16 +449,30 @@ by the published copy and not by any hosting decision. The published copy fixed
 *latency* for signed-out readers, which is a different problem that was also
 real.
 
-**And the gap that matters for storage steps 5 and 6:** `/public` serves public
-races only. A signed-out visitor holding a share link to an *unlisted* race
-still reads the file the site publishes, because the share token lives in
-`sessionStorage` and is never sent to the worker: `getFile` builds
-`/get?path=…` with no `t`, though `handleGet` would honour one. So that reader
-is still half a minute behind, and more to the point **`races/**` cannot stop
-being written to git until they have a read path that does not need it.**
-Closing it means sending the token on the read and letting `/public` or `/get`
-accept it without a session. That is the real gate on the repository becoming
-an archive, not the published copy that is now done.
+**The share-link gap, closed 2026-09-10.** `/public` serves public races only,
+so a signed-out visitor holding a link to an *unlisted* race was still reading
+the file the site publishes. The worker had always been ready for them:
+`handleGet` accepts `?t=` and checks it against KV with no session needed. The
+client simply never sent it, because the token sat in `sessionStorage` and
+`getFile` built `/get?path=…` without it.
+
+So the fix was two small things: send the token on every proxy read, and let a
+signed-out reader use the worker when they hold one. Signed out, the order is
+now token first (it covers unlisted and public alike), then `/public`, then the
+published file.
+
+Sending it alongside a session is additive rather than a second opinion. The
+worker ORs the token into `allowed` and still takes the role from the session,
+so a token grants reading and never a role. `worker/test/share-token-read.mjs`
+pins the refusals, which are the interesting half: a token for one race is
+refused by another, an expired one is refused, a revoked one is refused, and
+`/public` ignores tokens entirely because a body that varied by credential is
+exactly what must never be cached.
+
+**Which clears the gate on storage steps 5 and 6.** Every way of reading a race
+now has a path that does not go through the published file: a session, a share
+token, or the race being public. `races/**` can stop being written to git
+without breaking a reader.
 
 ### Why it was a separate job
 
