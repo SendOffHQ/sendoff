@@ -978,7 +978,9 @@
     if (!Race.auth.has()) openConnForm();
     renderConnStatus();
     await load();
-    setInterval(() => load(), 10000);   // never forced: see render()
+    // Never forced: see render(). Adaptive, and stopped while the tab is
+    // hidden, which is most of the time a phone spends in a vest pocket.
+    Race.poll(() => load(), { interval: () => Race.POLL_MS[Race.raceState(cfg, data)] });
     setInterval(tick, 1000);
     setInterval(updateLastUpdatedLabel, 1000);
   })();
