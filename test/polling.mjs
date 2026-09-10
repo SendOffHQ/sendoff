@@ -1,6 +1,10 @@
 // Counts what the race page actually asks for. Adaptive polling is a claim
 // about a number of requests, and nothing but counting them is evidence.
 //
+// Takes about 100 seconds: it measures three sixteen second windows and lets
+// each page settle first. Slow because counting requests over time is the only
+// honest way to check this. Not hung.
+//
 // No race in the repo is live today, so the "in progress" runs happen in a
 // context whose clock is pinned inside the dry run's window. The finished run
 // uses the real clock, because six-0 really is finished.

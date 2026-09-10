@@ -626,6 +626,54 @@ bought about 139 tab-hours a day, and a 30 hour hundred miler with twenty
 watchers is 300 tab-hours. The interval alone never fixed that. Not asking when
 nobody is looking does.
 
+### Live push over a websocket — *prototype, off*
+Written 2026-09-10. Code is in the repo and nothing is running it: the Durable
+Object binding is commented out in `worker/wrangler.toml` and `hub.json` says
+`live: false`. Two switches away from doing anything.
+
+**The shape.** A Worker is stateless, so forty people watching one race hold
+forty sockets on forty machines and the Worker handling the crew's press cannot
+reach any of them. A Durable Object is the exception: one named instance,
+unique worldwide. Named after the race, so every socket for that race meets in
+the same place. `worker/src/race-hub.js`.
+
+**Why it is nearly free**, from Cloudflare's own billing rules rather than a
+guess: outgoing websocket messages are not charged, so the fan-out, which is
+the entire point, costs nothing. Incoming are charged at 20:1 and a watcher
+sends nothing at all. Hibernation lets the object be evicted while its sockets
+stay open, and a race is quiet for forty minutes between aid stations. What is
+billed is one request per connection and one per crew press.
+
+**What it affords, on the free plan** (100,000 Worker requests/day, 100,000
+Durable Object requests/day):
+
+| | |
+|---|---|
+| polling today, 5s, paused when hidden | 69 watcher-hours a day. **Five people** through a 12 hour race, **two** through a hundred miler |
+| push, at 3 reconnects per watcher per day | **~33,000 watchers a day**, whatever length they watch |
+
+The number to notice is not the size, it is the shape: polling costs time
+watched, push costs people. A hundred miler is thirty hours long, which is
+what makes the first one hopeless.
+
+An individual object has a soft limit of 1,000 requests per second, and the
+docs put no cap on sockets per object. Instances per account are unlimited.
+
+**What is still to do before it could ship:**
+
+- **Private races.** The prototype is public only. A private race's watchers
+  are its access list and checking that on a socket upgrade is its own piece
+  of work. Until then unlisted races poll, which works.
+- **A test against the real thing.** `worker/test/race-hub.mjs` drives the
+  class with stand-ins for `WebSocketPair` and the hibernation API, which
+  holds the fan-out properties but proves nothing about Cloudflare.
+- **Whether the reconnect estimate survives a real race.** Three per watcher
+  per day is a guess, and it is the only number the affordance above rests on.
+
+**The poll stays underneath, always.** A socket can be killed by a captive
+portal or a sleeping phone without saying so, and a spectator receiving nothing
+cannot tell. Connected, the race page drops to a 60s poll rather than none.
+
 ### Spectator push / SMS alerts — *not built*
 Notify on each aid arrival. Needs a delivery path (web push, or a provider
 for SMS) and a subscription model for people without accounts.

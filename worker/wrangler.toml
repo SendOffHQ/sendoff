@@ -55,6 +55,30 @@ INFO_FROM = "info@sendoff.run"
 [[send_email]]
 name = "EMAIL"
 
+# ---------------------------------------------------------------------------
+# Live push, prototype. Commented out on purpose: uncommenting it creates the
+# Durable Object class on the next deploy, and nothing about a race weekend is
+# improved by doing that in a hurry. The worker is a no-op without the binding.
+#
+# To try it:
+#   1. uncomment both blocks below
+#   2. npx wrangler deploy          (the migration creates the class)
+#   3. set "live": true in hub.json (the client only connects when told to)
+#
+# Cost, from Cloudflare's own billing rules: outgoing WebSocket messages are
+# free, so the fan-out is free; incoming are billed at 20:1 and watchers send
+# nothing; hibernation means the object sleeps between aid stations. What is
+# billed is one request per connection and one per crew press.
+#
+# [[durable_objects.bindings]]
+# name = "RACE_HUB"
+# class_name = "RaceHub"
+#
+# [[migrations]]
+# tag = "v1"
+# new_sqlite_classes = ["RaceHub"]
+# ---------------------------------------------------------------------------
+
 # KV namespace for invite tokens, share-link tokens, and dynamically
 # created (invite-accepted) users. Created with:
 #   npx wrangler kv namespace create AUTH_KV
