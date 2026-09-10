@@ -421,7 +421,11 @@
       const runner = merged();
       const next = Race.compute.nextActionFor(runner, cfg);
       const c = Race.compute.runner(runner, cfg);
-      const since = (next.state !== 'idle' && next.lastTs)
+      // Nothing is still running once they are done. lastTs is the finish, so
+      // adding time since it made the race clock keep climbing for days after
+      // the race was over.
+      const running = next.state !== 'idle' && next.state !== 'finished' && next.lastTs;
+      const since = running
         ? Math.max(0, (Date.now() - new Date(next.lastTs).getTime()) / 1000) : 0;
       clock.textContent = Race.fmt.duration(next.state === 'idle' ? 0 : (c.completedRaceSec || 0) + since);
     }
