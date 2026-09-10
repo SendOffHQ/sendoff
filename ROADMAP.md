@@ -592,6 +592,40 @@ that is not already computable, and before the race archive, since a crew sheet
 is useful the first time somebody sets up a race and an archive needs a history
 to be worth opening.
 
+### How often the pages ask — *done 2026-09-10*
+Every watching page ran `setInterval(load, 10000)` forever, whatever was
+happening. Three costs, in order of size:
+
+- **A hidden tab polled as hard as one somebody was looking at.** A phone in a
+  vest pocket with the race page open asked twice every ten seconds all night.
+  Spectator reads are the one axis that grows without bound, and most of them
+  were nobody watching.
+- **A finished race was polled at the same rate, forever**, with nothing left
+  to say.
+- **`setInterval` stacks.** A load slower than the interval, which is what a bad
+  signal produces, starts the next before the last has finished.
+
+Now `Race.poll` chains a timeout off the end of each run, stops entirely while
+`document.hidden`, and refreshes at once on return. The interval comes from
+`Race.raceState`: **5s live, 30s upcoming, 120s finished**. Live is faster than
+the ten seconds it replaces; the hidden-tab saving is what pays for that.
+
+Measured in a real browser, counting requests that leave the page
+(`test/polling.mjs`), against Six-0 with its clock pinned mid-race and its legs
+truncated to match:
+
+| | data reads in 16s |
+|---|---|
+| live, tab visible | 3 |
+| live, tab hidden | 0 |
+| finished | 0 |
+| returning to the tab | immediate |
+
+Against the 100,000 requests/day free plan, at two requests a poll: 10s polling
+bought about 139 tab-hours a day, and a 30 hour hundred miler with twenty
+watchers is 300 tab-hours. The interval alone never fixed that. Not asking when
+nobody is looking does.
+
 ### Spectator push / SMS alerts — *not built*
 Notify on each aid arrival. Needs a delivery path (web push, or a provider
 for SMS) and a subscription model for people without accounts.

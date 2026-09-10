@@ -520,7 +520,6 @@
 <script src="lib/finish-card.js?v=8"></script>
 <script src="lib/race-core.js?v=73"></script>
 <script>
-  const REFRESH_MS = 10000;
   const slug = Race.qs('id');
 
   // What somebody copies out of the address bar should be the address worth
@@ -1429,7 +1428,10 @@
   });
   setInterval(tick, 1000);
   setInterval(updateLastUpdated, 1000);
-  setInterval(load, REFRESH_MS);
+  // Adaptive: fast while the race is running and somebody is looking, slow
+  // once it is over, and nothing at all while the tab is hidden. See
+  // Race.poll. Coming back to the tab refreshes at once.
+  Race.poll(load, { interval: () => Race.POLL_MS[Race.raceState(cfg, data)] });
 </script>
 
 </body>
