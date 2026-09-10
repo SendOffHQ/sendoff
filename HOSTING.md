@@ -32,7 +32,7 @@ publishing to GitHub Pages and `deploy-cf-pages.yml` publishes the same files
 to Cloudflare Pages. **DNS is the switch, and DNS is the revert.**
 
     sendoff.run          GitHub Pages       (live, unchanged)
-    sendoff.pages.dev    Cloudflare Pages   (identical, for comparison)
+    sendoff-abi.pages.dev  Cloudflare Pages (identical, for comparison)
 
 Nothing about the app changes while both are up. The comparison is the point:
 if the Cloudflare copy misbehaves, it misbehaves on a URL nobody is using.
@@ -70,13 +70,36 @@ if the Cloudflare copy misbehaves, it misbehaves on a URL nobody is using.
    hosts publishing the same commit through the same pipeline.
 3. **Let the worker answer the trial origin.** In `worker/wrangler.toml`:
 
-       ALLOWED_ORIGINS = "https://sendoff.run,https://sendoff.pages.dev"
+       ALLOWED_ORIGINS = "https://sendoff.run,https://sendoff-abi.pages.dev"
 
    Without it, anything signed in fails CORS on the trial URL and the trial
    only tells you about signed-out reading. Take the second origin back out
    after the cutover.
 
-## What to check on sendoff.pages.dev before touching DNS
+## The trial URL is not the one you would guess
+
+`sendoff-abi.pages.dev` belongs to somebody else: a social media scheduling product
+at sendoff.social. Cloudflare hands out `<project>.pages.dev` globally, and that
+name was taken, so this project got **`sendoff-abi.pages.dev`**. The deploy log
+prints the real address every run; read it rather than assuming it.
+
+## Two differences from GitHub Pages, both found by running both
+
+**Unknown paths.** Cloudflare Pages answers a path it does not have with the
+project's fallback HTML and a **200**, where GitHub Pages returns 404. That is
+not cosmetic: `readRaceFile` checks `res.ok`, so a missing race file would come
+back as a page of markup, be treated as the file, and be written into
+`lastSeen` as that race's data. A poisoned copy in storage outlives the
+mistake, because it is what gets handed back with no signal.
+
+Fixed at both ends: `404.html` at the root, which is what makes Pages return a
+real 404, and a content-type check in `readRaceFile` so no host can hand the
+app markup where it asked for JSON.
+
+**`worker/`, `test/` and `tools/`** are served by GitHub Pages and are not
+uploaded here. Nothing references them; the smaller surface is deliberate.
+
+## What to check on sendoff-abi.pages.dev before touching DNS
 
 The offline path is the part most likely to differ, and it is the part this
 app has been bitten by most.
@@ -88,7 +111,7 @@ app has been bitten by most.
   the pit and racer links are all still there.
 - Reload `/races/<slug>/` offline. This one exercises the service worker
   fallback added in v6.
-- Check response headers: `curl -I https://sendoff.pages.dev/races/<slug>/data.json`
+- Check response headers: `curl -I https://sendoff-abi.pages.dev/races/<slug>/data.json`
   should show `cache-control: no-cache` and an `etag`.
 
 `npm run test:browser` can be pointed at the trial host by changing `BASE` in
