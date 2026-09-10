@@ -1561,6 +1561,71 @@ async function handleAccountRaces(req, env) {
   return json({ email, races }, {}, env, req);
 }
 
+// ---------- writing without git ----------
+// Off by default, and the default is the behaviour that shipped: every race
+// write goes to GitHub and D1 follows it. WRITE_TO_GIT="false" makes D1 the
+// authority for races/<slug>/* and leaves git for the archive.
+//
+// The reason this is not just "skip the PUT" is concurrency. Today two crew
+// members cannot clobber each other because GitHub refuses a write whose sha
+// has moved: the client reads a file, gets a sha, and sends it back. The
+// config_sha and data_sha columns only mirror git's blob sha, so taking git
+// out of the write path takes the guard with it, and the failure it prevents
+// is two people at the same aid station overwriting each other's splits.
+//
+// So those columns become the version token instead of a copy of git's. A read
+// hands one out, a write sends it back, and the write only lands if it still
+// matches. Same contract, different authority, and the client needs no change
+// at all: mutateJson already re-reads and retries on a 409.
+function gitWrites(env) {
+  return String(env && env.WRITE_TO_GIT !== undefined ? env.WRITE_TO_GIT : 'true')
+    .toLowerCase() !== 'false';
+}
+
+// A token that is not a git sha and cannot be mistaken for one, so a row can
+// always say which regime wrote it.
+function d1Token() {
+  return 'd1-' + crypto.randomUUID();
+}
+
+// Compare-and-swap on the version column, then the content. Returns null when
+// it took, or a reason when it did not.
+//
+// The guard is its own statement and runs first, so the thing that decides
+// whether this write wins is a single atomic UPDATE rather than a read
+// followed by a hopeful write. Content goes in after, under the token this
+// write just claimed.
+async function commitToD1(env, path, content, actor, expected) {
+  if (!env.DB) return { status: 503, error: 'No DB bound' };
+  const slug = racePathSlug(path);
+  if (!slug) return { status: 403, error: 'Forbidden path' };
+  const col = path.endsWith('/config.json') ? 'config_sha'
+            : path.endsWith('/data.json')   ? 'data_sha'
+            : null;
+  // course.gpx and anything else has no column to guard. Those still go to
+  // git: they are written once at setup, not pressed at an aid station.
+  if (!col) return { status: 0, passthrough: true };
+
+  const token = d1Token();
+  const row = (await env.DB.prepare('SELECT slug FROM races WHERE slug = ?').bind(slug).all()).results[0];
+  if (!row) {
+    // No row yet. mirrorToD1 inserts one, and there is nothing to race with.
+    await mirrorToD1(env, path, content, actor, token);
+    return null;
+  }
+  // `IS` rather than `=`, because a column that has never been written is
+  // NULL and NULL = NULL is not true in SQL. A first write to an existing row
+  // sends no sha and has to match that NULL.
+  const guard = await env.DB.prepare(
+    `UPDATE races SET ${col} = ? WHERE slug = ? AND ${col} IS ?`
+  ).bind(token, slug, expected || null).run();
+  if (!guard.meta || guard.meta.changes !== 1) {
+    return { status: 409, error: 'Someone else changed this first: re-read and try again' };
+  }
+  await mirrorToD1(env, path, content, actor, token);
+  return null;
+}
+
 async function handleCommit(req, env, ctx) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -1702,6 +1767,36 @@ async function handleCommit(req, env, ctx) {
     }
   } else {
     return json({ error: 'Forbidden path' }, { status: 403 }, env, req);
+  }
+
+  // D1 as the authority, when the flag says so and this is a race file with a
+  // version column to guard. Everything after this point that matters, the
+  // creation grant, the access list, the Discord post and the live push, runs
+  // exactly the same way: only where the bytes landed has changed.
+  if (!gitWrites(env) && isRacePath(path)) {
+    const failed = await commitToD1(env, path, content, session.email, sha);
+    if (failed && !failed.passthrough) {
+      return json({ error: failed.error }, { status: failed.status }, env, req);
+    }
+    if (!failed) {
+      if (isCreation) await noteRaceCreated(env, creationSlug, session.email);
+      if (isCreation && creationAcl) {
+        try { await writeAcl(env, creationSlug, creationAcl); } catch (e) { /* falls back to the file */ }
+      }
+      if (aclUpdate && creationSlug) {
+        try { await writeAcl(env, creationSlug, aclUpdate); } catch (e) { /* falls back to the file */ }
+      }
+      await purgeReadCache(env, path);
+      if (ctx && ctx.waitUntil) {
+        ctx.waitUntil(announceCommit(env, path, content, liveCfg, isCreation));
+        ctx.waitUntil(publishChange(env, path));
+      }
+      // The shape the client already knows. It reads the status and nothing
+      // else: mutateJson returns the document it wrote, because reading a file
+      // back straight after writing it was never reliable anyway.
+      return json({ content: { path } }, { status: 200 }, env, req);
+    }
+    // passthrough: course.gpx and friends still go to git below.
   }
 
   const ghUrl = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURI(path)}`;
