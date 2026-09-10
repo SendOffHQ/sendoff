@@ -468,6 +468,34 @@ the change, and four people's addresses are in 191 of them. Dropping the
 right outcome, but a purge written to preserve history while rewriting only the
 blobs would keep the exact thing worth removing.
 
+### Deleting a race should be one commit — *not built*
+
+`handleRaceDelete` walks the repository tree and issues a separate Contents API
+DELETE per file, so removing one race made **ten commits**: the manifest, then
+config, data, course.gpx, index.html and og.png for each of two races. Each one
+is a push, and each push starts a site deploy.
+
+The concurrency group in the workflow does its job — nine of the ten runs were
+cancelled and only the last one published — so the cost today is close to
+nothing. This is on the list for two other reasons.
+
+**It made verifying a delete confusing.** Ten deploys racing meant the share
+address answered 200 from some edge nodes and 404 from others for several
+minutes, which is indistinguishable from a delete that half-worked. The thing
+that tells you a race is really gone should not look like a bug.
+
+**And ten commits for one intent is a bad shape in the history**, which matters
+more once `races/**` is purged and the repository becomes an archive that
+somebody might actually read.
+
+The fix is the Git Data API rather than the Contents API: read the current
+tree, post a new tree with those paths removed, create one commit pointing at
+it, and move the branch. One commit, one deploy, and the delete is atomic
+rather than a sequence that can stop halfway. `mutateJsonAt` on the manifest
+can go into the same commit.
+
+Worth doing before the purge, not before the next race.
+
 ### The published copy — *shipped 2026-09-10*
 
 `GET /public?path=races/<slug>/<file>` on the worker. What it does and why it
