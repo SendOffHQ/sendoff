@@ -3586,6 +3586,26 @@ async function handleRaceDelete(req, env) {
 // ---------- router ----------
 export default {
   async fetch(request, env, ctx) {
+    try {
+      return await route(request, env, ctx);
+    } catch (err) {
+      // Without this, a throw anywhere below reaches the Workers runtime and
+      // comes back as a bare 500 with no CORS headers on it. To a page on
+      // another origin that is indistinguishable from the network being down:
+      // the browser reports "Failed to fetch" and the message, which is the
+      // one useful thing, never arrives. Every uncaught bug in here looked
+      // like an outage.
+      //
+      // The message is safe to hand back. Nothing in this worker puts a secret
+      // in one, and the alternative is a person staring at "Failed to fetch"
+      // with nothing to tell anybody.
+      const msg = (err && err.message) ? err.message : String(err);
+      return json({ error: msg, unhandled: true }, { status: 500 }, env, request);
+    }
+  }
+};
+
+async function route(request, env, ctx) {
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders(env, request) });
     }
@@ -3640,5 +3660,4 @@ export default {
     if (request.method === 'GET'  && path === '/account-races')   return handleAccountRaces(request, env);
 
     return json({ error: 'Not found', path }, { status: 404 }, env, request);
-  }
-};
+}

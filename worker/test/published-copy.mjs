@@ -17,6 +17,7 @@ const KV = {
   async get(k) { const v = kvStore.get(k); return v === undefined ? null : v; },
   async put(k, v) { kvStore.set(k, v); },
   async delete(k) { kvStore.delete(k); },
+  async list() { return { keys: [] }; },
 };
 globalThis.caches = { default: { async match(){}, async put(){}, async delete(){ return true; } } };
 
@@ -157,6 +158,21 @@ ok('ETag is readable cross-origin', (r.headers.get('Access-Control-Expose-Header
 ok('If-None-Match is an allowed header',
   (r.headers.get('Access-Control-Allow-Headers') || '').includes('If-None-Match'), true);
 ok('and the cache is told the origin matters', (r.headers.get('Vary') || ''), 'Origin');
+
+console.log('\nan unhandled fault still answers with CORS on it');
+// Without a top-level catch a throw reaches the Workers runtime and comes back
+// as a bare 500 with no CORS headers. To a page on another origin that is
+// indistinguishable from the network being down: the browser says "Failed to
+// fetch" and the message, the one useful thing, never arrives.
+const boom = new Error('kaboom');
+const realList = KV.list;
+KV.list = async () => { throw boom; };
+r = await worker.fetch(new Request('https://w/access?slug=open-race', {
+  headers: { Origin: 'https://sendoff.run', Authorization: 'Bearer nope' } }), env, ctx);
+KV.list = realList;
+ok('the browser is told the origin is allowed',
+  !!r.headers.get('Access-Control-Allow-Origin'), true);
+ok('rather than getting an opaque network failure', r.status < 600, true);
 
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);
