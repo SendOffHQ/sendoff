@@ -226,6 +226,48 @@ run**: a route needs the hostname proxied. Anything that wants the worker on
 
 Keep both for at least one full race weekend before turning either off.
 
+## After the cutover, 2026-09-10
+
+`sendoff.run` and `www.sendoff.run` both answer `server: cloudflare` on the
+zone's proxy addresses. Verified straight after:
+
+- `_headers` applies, which is the thing GitHub Pages could never do:
+  `/races/*` and `/hub.json` come back `no-cache` with an ETag, `/brand/*`
+  at a day.
+- `/definitely-not-real`, `/worker/src/worker.js`, `/races/no-such-race/data.json`
+  and `/races/no-such-race/` all 404. `/`, `/app/`, `/races/<slug>/` and
+  `/hub.json` all 200.
+- The worker still answers a preflight from `https://sendoff.run`, `/public`
+  serves the published copy, and `/live` reaches the Durable Object.
+
+**One thing to fix, and it is a zone setting rather than anything in the repo.**
+`_headers` is not authoritative for `.js` and `.css`:
+
+    /lib/race-core.js   _headers says 3600      served max-age=14400
+    /sw.js              _headers says no-cache  served max-age=14400
+    /brand/*.png        _headers says 86400     served max-age=86400   correct
+    /*.html, /*.json    _headers                served as written      correct
+
+That is the zone's **Browser Cache TTL**, set to 4 hours, which applies to
+responses Cloudflare caches by default and raises anything with a lower TTL.
+HTML and JSON are not default-cached, so they pass through untouched; the PNG
+already asked for longer than four hours, so it kept it.
+
+Fix: Caching, Configuration, **Browser Cache TTL, "Respect Existing Headers"**.
+
+Neither symptom is currently doing harm, which is worth saying so the fix is
+not mistaken for an emergency. `/lib/*` carries `?v=` and is busted by version
+rather than by time. And `sw.js` is registered without `updateViaCache`, whose
+default of `'imports'` means the browser bypasses its HTTP cache for the
+service worker script itself. Worth fixing anyway: a header file that is
+advisory rather than authoritative is a trap for whoever reads it next.
+
+**Also true now and not before:** the zone is proxied, so Worker routes on
+`sendoff.run` would run for the first time. The reason to want one is
+same-origin (no CORS, no preflight) and latency. It is *not* headroom, per the
+correction in `ROADMAP.md`: a cache hit in front of a Worker is still a billed
+request.
+
 ## What is NOT moving yet, and why the order matters
 
 **Race data stays in git for now.** "The GitHub repo as archive" is storage
