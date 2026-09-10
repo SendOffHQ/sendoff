@@ -675,10 +675,17 @@
         : `Send Off · Start ${def ? def.name : 'Lap 1'}`;
     }
 
-    const since = next.lastTs || '';
+    // lastTs is the moment the current state began, which for a finished racer
+    // is the moment they finished. Counting from it gave "Total since start"
+    // ticking up forever: on Six-0 it read 89 hours, which was the time since
+    // the finish rather than the time it took. A finished race has a total, and
+    // a total does not move, so it is rendered once and left alone.
+    const done = next.state === 'finished';
+    const finishedSec = done ? Race.compute.runner(runner, cfg).completedRaceSec : null;
+    const since = done ? '' : (next.lastTs || '');
     const timerLabel = next.state === 'on-course' ? 'On course for'
                      : next.state === 'in-pit'    ? 'In pit for'
-                     : next.state === 'finished'  ? 'Total since start' : 'Awaiting start';
+                     : done                       ? 'Total race time' : 'Awaiting start';
 
     // Intake panel: every leg that has been started, finished or not. A leg in
     // progress belongs here because the send-off that began it is the thing
@@ -762,7 +769,7 @@
           <div class="state-badge state-${stateClass}">${stateLabel}</div>
         </div>
         <div class="where">${whereLine(runner, next)}</div>
-        <div class="state-timer" data-since="${since}">
+        <div class="state-timer" data-since="${since}"${done ? ` data-elapsed="${finishedSec}"` : ''}>
           <span class="label">${timerLabel}</span>
           <span class="value runner-timer">–</span>
         </div>
@@ -873,7 +880,13 @@
       const timerEl = card.querySelector('.state-timer');
       const valueEl = card.querySelector('.runner-timer');
       const since = timerEl?.dataset.since;
-      if (!since) { if (valueEl) valueEl.textContent = '–'; return; }
+      // A fixed total, for a race that is over. Set instead of data-since, so
+      // there is nothing here that could start counting again.
+      const fixed = timerEl?.dataset.elapsed;
+      if (!since) {
+        if (valueEl) valueEl.textContent = fixed ? Race.fmt.duration(+fixed) : '–';
+        return;
+      }
       const seconds = (Date.now() - new Date(since).getTime()) / 1000;
       if (valueEl) valueEl.textContent = Race.fmt.duration(seconds);
     });
