@@ -107,7 +107,7 @@
   <span>Charts auto-refresh every 30s</span>
 </footer>
 
-<script src="lib/race-core.js?v=77"></script>
+<script src="lib/race-core.js?v=78"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -119,17 +119,25 @@
 
   async function load() {
     try {
-      const [cfgRes, dataRes] = await Promise.all([
-        fetch(`races/${encodeURIComponent(slug)}/config.json`, { cache: 'no-cache' }),
-        fetch(`races/${encodeURIComponent(slug)}/data.json`, { cache: 'no-cache' })
+      // hub.json first. It carries the worker address, and without it
+      // readRaceJson has nowhere to ask and falls all the way back to the
+      // published file. Every other page already did this; this one did not,
+      // which is exactly what the charts case in test/spectator.mjs caught.
+      await Race.hub.load();
+      // Through readRaceJson rather than straight at the published file, which
+      // is what every other page does and what this one has to do before race
+      // data can stop being written to git. It tries the worker first for
+      // anyone entitled to it (a session, a share token, or the race being
+      // public) and keeps the published file as the fallback it always was.
+      const [c, d] = await Promise.all([
+        Race.gh.readRaceJson(slug, 'config.json', true),
+        Race.gh.readRaceJson(slug, 'data.json', true)
       ]);
-      if (!cfgRes.ok) throw new Error('config.json not found');
-      if (!dataRes.ok) throw new Error('data.json not found');
-      cfg = await cfgRes.json();
+      cfg = c;
       // Now that the roster is known, the pit board can appear for whoever is
       // allowed to work it.
       Race.nav.setRace(slug, 'charts', () => Race.roles.canEdit(cfg, Race.auth.email()));
-      data = await dataRes.json();
+      data = d;
       document.title = `${cfg.name} · Charts · SendOff`;
       document.getElementById('race-title').textContent = cfg.name;
       document.getElementById('error').style.display = 'none';
