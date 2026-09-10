@@ -1765,6 +1765,18 @@ async function gitPut(env, path, content, sha, message) {
 // correction makes one commit and a re-run with nothing changed makes none.
 async function archiveRace(env, slug) {
   if (!env.DB) return { skipped: 'no DB binding' };
+  // Public races only. The archive is a public git repository, so archiving an
+  // unlisted race publishes it, which is the exact thing storage step 3 exists
+  // to stop: with git out of the write path an unlisted race lives only in the
+  // database, and this would have put it back on the internet the moment it
+  // finished. Caught by an unlisted dry run archiving itself on 2026-09-10.
+  //
+  // So an unlisted race has no archive, and D1 is its store. If it ever needs
+  // one it has to be somewhere that is not a public repository.
+  const cfg = await loadRaceConfigForWrite(env, slug);
+  if (!cfg || cfg.visibility !== 'public') {
+    return { slug, skipped: 'not a public race' };
+  }
   const out = [];
   for (const file of ['config.json', 'data.json']) {
     const path = `races/${slug}/${file}`;
