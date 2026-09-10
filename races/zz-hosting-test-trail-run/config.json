@@ -1,0 +1,82 @@
+{
+  "name": "Hosting Test Trail Run",
+  "location": "Nowhere in particular",
+  "startTime": "2026-09-10T09:43:33.939207Z",
+  "courseType": "segments",
+  "visibility": "public",
+  "createdBy": "thebillyman@gmail.com",
+  "cutoffs": {
+    "totalHours": 12
+  },
+  "course": {
+    "segments": [
+      {
+        "name": "Start \u2192 Ridge Gate",
+        "fromAid": "Start",
+        "toAid": "Ridge Gate",
+        "distanceMi": 4.8,
+        "elevationGainFt": 920,
+        "elevationLossFt": 240,
+        "arriveCutoffHours": 1.55
+      },
+      {
+        "name": "Ridge Gate \u2192 Cold Spring",
+        "fromAid": "Ridge Gate",
+        "toAid": "Cold Spring",
+        "distanceMi": 6.1,
+        "elevationGainFt": 1180,
+        "elevationLossFt": 760,
+        "arriveCutoffHours": 3.52
+      },
+      {
+        "name": "Cold Spring \u2192 The Notch",
+        "fromAid": "Cold Spring",
+        "toAid": "The Notch",
+        "distanceMi": 5.4,
+        "elevationGainFt": 640,
+        "elevationLossFt": 1090,
+        "arriveCutoffHours": 5.26
+      },
+      {
+        "name": "The Notch \u2192 Mill Creek",
+        "fromAid": "The Notch",
+        "toAid": "Mill Creek",
+        "distanceMi": 7.2,
+        "elevationGainFt": 310,
+        "elevationLossFt": 880,
+        "arriveCutoffHours": 7.58
+      },
+      {
+        "name": "Mill Creek \u2192 Ridge Gate",
+        "fromAid": "Mill Creek",
+        "toAid": "Ridge Gate",
+        "distanceMi": 6.6,
+        "elevationGainFt": 1240,
+        "elevationLossFt": 300,
+        "arriveCutoffHours": 9.71
+      },
+      {
+        "name": "Ridge Gate \u2192 Finish",
+        "fromAid": "Ridge Gate",
+        "toAid": "Finish",
+        "distanceMi": 4.9,
+        "elevationGainFt": 120,
+        "elevationLossFt": 1140,
+        "arriveCutoffHours": 11.29
+      }
+    ]
+  },
+  "runners": [
+    {
+      "id": "tester",
+      "name": "Test Racer",
+      "bib": "001",
+      "color": "#0fb8bf"
+    }
+  ],
+  "units": {
+    "distance": "mi",
+    "elevation": "ft"
+  },
+  "activity": "trail-run"
+}

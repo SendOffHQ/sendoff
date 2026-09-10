@@ -32,7 +32,7 @@
     {
       "slug": "000001-sangre-de-cristo-100",
       "name": "Sangre de Cristo 100",
-      "location": "Music Meadows Ranch · Westcliffe, CO",
+      "location": "Music Meadows Ranch \u00b7 Westcliffe, CO",
       "startTime": "2026-09-26T04:00:00-06:00",
       "courseType": "segments",
       "units": {
@@ -45,7 +45,20 @@
       ],
       "cutoffHours": 38,
       "activity": "trail-run"
+    },
+    {
+      "slug": "zz-hosting-test-trail-run",
+      "name": "Hosting Test Trail Run",
+      "location": "Nowhere in particular",
+      "startTime": "2026-09-10T09:43:33.939207Z",
+      "courseType": "segments",
+      "totalDistanceMi": 35.0,
+      "runnerNames": [
+        "Test Racer"
+      ],
+      "cutoffHours": 12,
+      "activity": "trail-run"
     }
   ],
-  "lastUpdated": "2026-09-10T02:59:22.110Z"
+  "lastUpdated": "2026-09-10T12:17:33.942540Z"
 }
