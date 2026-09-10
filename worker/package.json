@@ -7,7 +7,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
-    "test": "node test/creation-grant.mjs && node test/read-cache.mjs && node test/entitlements.mjs && node test/my-role.mjs && node test/acl-store.mjs && node test/d1-mirror.mjs && node test/d1-reads.mjs && node test/feedback.mjs && node test/commit-message.mjs && node test/discord.mjs && node test/race-hub.mjs && node test/published-copy.mjs"
+    "test": "node test/creation-grant.mjs && node test/read-cache.mjs && node test/entitlements.mjs && node test/my-role.mjs && node test/acl-store.mjs && node test/d1-mirror.mjs && node test/d1-reads.mjs && node test/feedback.mjs && node test/commit-message.mjs && node test/discord.mjs && node test/race-hub.mjs && node test/published-copy.mjs && node test/share-token-read.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.129.0"

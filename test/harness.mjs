@@ -41,14 +41,23 @@ const server = http.createServer((req, res) => {
     const p = url.searchParams.get('path') || '';
     const m = p.match(/^races\/([^/]+)\/(.+)$/);
     if (!m) return send(400, '{}', 'application/json');
+    // Who is asking. A session, or a share token that names this race, or
+    // nobody, which the real worker answers with a 401. A stub token is
+    // "stub-<slug>", so a token for the wrong race fails the way a real one
+    // would.
+    const signedIn = !!req.headers.authorization;
+    const tok = url.searchParams.get('t');
+    const tokenOk = tok === 'stub-' + m[1];
+    if (!signedIn && !tokenOk) return send(401, '{"error":"Unauthorized"}', 'application/json');
     let text = raceFile(m[1], m[2]);
     if (text == null) return send(404, '{"message":"Not Found"}', 'application/json');
     // What the real worker does: injects the caller's role, and the published
-    // file names nobody.
+    // file names nobody. A token holder is nobody: it grants reading, not a
+    // role.
     if (m[2] === 'config.json') {
       const cfg = JSON.parse(text);
       delete cfg.people; delete cfg.createdBy;
-      cfg.myRole = 'crew';
+      cfg.myRole = signedIn ? 'crew' : null;
       // The dry run predates the activity field; give it one here so the
       // browser check can see the label render.
       if (!cfg.activity) cfg.activity = 'trail-run';
