@@ -3,6 +3,6 @@
     "proxyUrl": "https://race-dashboard-proxy.thebillyman.workers.dev",
     "_comment": "When proxyUrl is set, the hub uses worker-mediated email/password sign-in. Set it to null to fall back to direct PAT mode."
   },
-  "live": false,
-  "_live": "Live push over a websocket, prototype. false means every page polls, which is what shipped. Turning it on only makes pages try to connect; the worker still refuses unless its RACE_HUB binding exists, and a refused connection leaves the poll running."
+  "live": true,
+  "_live": "Live push over a websocket, on since 2026-09-10. Pages connect to the worker's /live and refresh when told, with the poll still running underneath at a slower interval so a socket that dies quietly makes the page slower rather than wrong. Set this to false to put every page back on polling alone; the worker's RACE_HUB binding is the other switch and either one off is enough."
 }
