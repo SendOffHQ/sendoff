@@ -90,6 +90,11 @@ const DB = {
           const r = rows.get(this.args[0]); if (r) r[nulled[1]] = null;
           return { meta: { changes: r ? 1 : 0 } };
         }
+        const del = this.sql.match(/DELETE FROM (races|legs|race_people) WHERE slug = \?$/);
+        if (del) {
+          if (del[1] === 'races') rows.delete(this.args[0]);
+          return { meta: { changes: 1 } };
+        }
         if (/INSERT INTO races/.test(this.sql)) { applyInsert(this.sql, this.args); return { meta: { changes: 1 } }; }
         return { meta: { changes: 1 } };
       }
@@ -320,6 +325,22 @@ DB.batch = realBatch;
 // that retry meets a NULL and is taken.
 ok('and the retry afterwards is accepted',
   (await put('races/cas/data.json', { runners: [{ id:'jd', legs: [{ index:1 }] }] }, cur.sha)).status, 200);
+
+console.log('\ndeleting a race takes it out of the database too');
+// Delete used to remove the manifest entry, the git files and the KV keys and
+// leave the row alone. Both /get and /public read the mirror, so a "deleted"
+// race dropped off the hub, left the repository, and stayed readable to
+// anybody holding its slug.
+await put('races/goner/config.json', { ...race, name: 'Goner', createdBy: ME });
+await put('races/goner/data.json', { runners: [{ id:'jd', legs: [] }] });
+ok('it exists first', !!rows.get('goner'), true);
+await worker.fetch(new Request('https://w/race/delete', {
+  method:'POST', headers:{ 'Content-Type':'application/json', Authorization: 'Bearer ' + token },
+  body: JSON.stringify({ slug: 'goner' }) }), env, { waitUntil: () => {} });
+ok('the row is gone', !!rows.get('goner'), false);
+ok('and a read finds nothing',
+  (await worker.fetch(new Request('https://w/public?path=' +
+    encodeURIComponent('races/goner/data.json')), env, { waitUntil: () => {} })).status, 404);
 
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

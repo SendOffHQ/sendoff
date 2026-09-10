@@ -3515,12 +3515,37 @@ async function handleRaceDelete(req, env) {
     return json({ error: 'Missing or invalid slug' }, { status: 400 }, env, req);
   }
 
-  const raceCfg = await loadRaceConfig(env, slug);
+  // Through the mirror when the mirror is the authority, or a race created
+  // after WRITE_TO_GIT went false has no config in git and cannot be deleted
+  // at all: the lookup 404s at its own creator.
+  const raceCfg = await loadRaceConfigForWrite(env, slug);
   if (!raceCfg) return json({ error: 'Race not found' }, { status: 404 }, env, req);
 
   const me = normalizeEmail(session.email);
   if (!raceCfg.createdBy || normalizeEmail(raceCfg.createdBy) !== me) {
     return json({ error: 'Only the race creator can delete it' }, { status: 403 }, env, req);
+  }
+
+  // The database first, because it is what answers a read. Deleting the git
+  // files and the manifest entry took the race off the hub and out of the
+  // repository and left it being served: /get and /public both read the
+  // mirror, so a "deleted" race stayed readable by anyone holding its slug.
+  // Children before parents, in one batch so a half-delete is not possible.
+  let dbErr = null;
+  if (env.DB) {
+    try {
+      await env.DB.batch([
+        env.DB.prepare('DELETE FROM legs WHERE slug = ?').bind(slug),
+        env.DB.prepare('DELETE FROM race_people WHERE slug = ?').bind(slug),
+        env.DB.prepare('DELETE FROM races WHERE slug = ?').bind(slug)
+      ]);
+    } catch (e) { dbErr = (e && e.message) ? e.message : String(e); }
+  }
+  if (dbErr) {
+    // Stop. Carrying on would strip the race from git and the hub and leave
+    // the copy that actually gets served sitting there.
+    return json({ error: `Could not remove the race from the database: ${dbErr}` },
+      { status: 503 }, env, req);
   }
 
   // The manifest goes first. If a file delete then fails we are left with
