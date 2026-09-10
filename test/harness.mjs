@@ -134,10 +134,20 @@ const server = http.createServer((req, res) => {
   if (url.pathname.startsWith('/api/')) return send(200, '{}', 'application/json');
 
   // --- the site ---
-  // Pages serves a directory as its index.html. The hub lives at /app/ now, so
-  // resolving directories here is what keeps this harness the same shape as
-  // production rather than a simpler one that happens to pass.
+  // Cloudflare Pages redirects a .html address to its extensionless form, and
+  // serves the extensionless one. Modelled here because not modelling it hid a
+  // real bug: every URL in the service worker's precache list ends in .html,
+  // nothing in production lands on one, and a navigation that missed the cache
+  // fell through to the app shell. The harness served both forms happily, so
+  // every test passed while the live site sent people to the marketing page.
+  //
+  // A harness that is easier to satisfy than the host is not a test.
+  if (/\.html$/.test(url.pathname)) {
+    res.writeHead(308, { Location: url.pathname.replace(/\.html$/, '') + (url.search || '') });
+    return res.end();
+  }
   let full = path.join(ROOT, decodeURIComponent(url.pathname));
+  if (!fs.existsSync(full) && fs.existsSync(full + '.html')) full += '.html';
   if (full.startsWith(ROOT) && fs.existsSync(full) && fs.statSync(full).isDirectory()) {
     full = path.join(full, 'index.html');
   }
