@@ -315,7 +315,7 @@
   <div>Auto-generated · race-dashboard hub</div>
 </footer>
 
-<script src="lib/race-core.js?v=76"></script>
+<script src="lib/race-core.js?v=77"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -477,8 +477,8 @@
   async function load() {
     try {
       const [cfgRes, dataRes] = await Promise.all([
-        fetch(`races/${encodeURIComponent(slug)}/config.json?_=${Date.now()}`, { cache: 'no-store' }),
-        fetch(`races/${encodeURIComponent(slug)}/data.json?_=${Date.now()}`,   { cache: 'no-store' })
+        fetch(`races/${encodeURIComponent(slug)}/config.json`, { cache: 'no-cache' }),
+        fetch(`races/${encodeURIComponent(slug)}/data.json`,   { cache: 'no-cache' })
       ]);
       if (!cfgRes.ok) throw new Error('config.json not found');
       if (!dataRes.ok) throw new Error('data.json not found');

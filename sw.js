@@ -94,11 +94,12 @@ const isStaticAsset = (url) =>
   /\.(css|js|png|jpg|jpeg|svg|webp|woff2?|ico)$/i.test(url.pathname) ||
   url.pathname === '/manifest.webmanifest';
 
-// Race JSON is fetched with a ?_=<now> buster, so every request is a distinct
-// URL. Storing them as they arrive means a new entry per poll, and race.html
-// polls every ten seconds: an afternoon of that is thousands of copies of the
-// same file. Race data is therefore keyed on the path alone, so each file has
-// exactly one entry that the next poll overwrites.
+// Race data is keyed on the path alone, so each file has exactly one entry
+// that the next poll overwrites. This mattered more when every read carried a
+// ?_=<now> buster and each poll was a distinct URL: storing them as they
+// arrived meant thousands of copies of the same file over an afternoon. The
+// buster is gone, but keying on the path is still what keeps a token or any
+// other query parameter from splitting one file into several entries.
 // Pages get the same treatment. race.html?id=A and race.html?id=B are the same
 // file with the race chosen by script, so keying on the path stores one copy
 // instead of one per race, and each visit refreshes the copy a later offline
