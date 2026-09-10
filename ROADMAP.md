@@ -425,6 +425,17 @@ project. Until then the read is cheap and fast but still counts.
 row reads a day is the second limit after the worker's 100,000 requests. The
 worker limit binds first, at roughly 139 watcher-hours a day at a 5s poll.
 
+**And the gap that matters for storage steps 5 and 6:** `/public` serves public
+races only. A signed-out visitor holding a share link to an *unlisted* race
+still reads the file the site publishes, because the share token lives in
+`sessionStorage` and is never sent to the worker: `getFile` builds
+`/get?path=…` with no `t`, though `handleGet` would honour one. So that reader
+is still half a minute behind, and more to the point **`races/**` cannot stop
+being written to git until they have a read path that does not need it.**
+Closing it means sending the token on the read and letting `/public` or `/get`
+accept it without a session. That is the real gate on the repository becoming
+an archive, not the published copy that is now done.
+
 ### Why it was a separate job
 
 Moving writes to a database fixes correctness and the build limit. It does not
@@ -701,11 +712,13 @@ A crew press reaching another **signed-in** page adds up like this:
 | | |
 |---|---|
 | the write: worker to the GitHub contents API | roughly half a second to a second |
-| the worker's shared read cache, `CACHE_TTL_S` | 0 to 3s, purged on write but only in the colo that took it |
+| the worker's shared read cache, `CACHE_TTL_S` | 0 to 3s, but only when the D1 mirror misses: `handleGet` goes to the mirror first and the cache sits on the git path behind it, so for a mirrored race this term is zero |
 | the other page's next poll | 0 to 5s while the race is live |
 
-which lands around three seconds on average, and that is what a crew board and
-a racer page see of each other. It is the poll interval that dominates, which
+which lands around three seconds on average, and that is what a crew board, a
+racer page and a race page see of each other. Confirmed on the live site
+2026-09-10: with the mirror answering, it is the commit round trip plus half a
+poll interval and nothing else. It is the poll interval that dominates, which
 is what the live push is for.
 
 A **signed-out** page used to be a different chain and a much longer one. It
