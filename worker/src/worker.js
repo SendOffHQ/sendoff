@@ -404,11 +404,40 @@ async function mirrorToD1(env, path, content, actor, sha) {
          ON CONFLICT(slug) DO UPDATE SET
            data=excluded.data, data_sha=excluded.data_sha, updated_at=excluded.updated_at`
       ).bind(slug, content, sha || null)];
+
+      // Only the legs that actually moved. This used to write one statement
+      // per leg on the roster, on every press, which put a hard ceiling on
+      // roster size: D1's free plan allows fifty queries per invocation, so
+      // three runners on a sixteen-leg course was the edge and four was over.
+      // A press changes one leg, so comparing against what is already stored
+      // turns that into a constant.
+      //
+      // The previous document is the right thing to compare against because it
+      // is what the legs table was written from, and both go in the same
+      // atomic batch, so they cannot have drifted apart. If it will not parse,
+      // prev stays empty and every leg is written, which is what this did
+      // before: slower, and never wrong.
+      let prev = {};
+      try {
+        const before = (await env.DB.prepare('SELECT data FROM races WHERE slug = ?')
+          .bind(slug).all()).results[0];
+        for (const runner of (JSON.parse((before && before.data) || '{}').runners || [])) {
+          for (const leg of ((runner && runner.legs) || [])) {
+            if (runner.id && leg && leg.index != null) {
+              prev[`${runner.id}\u0000${leg.index}`] = JSON.stringify(leg);
+            }
+          }
+        }
+      } catch (e) { prev = {}; }
+
       let n = 0;
       for (const runner of (data.runners || [])) {
         if (!runner || !runner.id) continue;
         for (const leg of (runner.legs || [])) {
           if (!leg || leg.index == null) continue;
+          // Unchanged since the last write, so there is nothing to say about
+          // it. The row it would have written is the row already there.
+          if (prev[`${runner.id}\u0000${leg.index}`] === JSON.stringify(leg)) continue;
           n++;
           stmts.push(env.DB.prepare(
             `INSERT INTO legs (slug, runner_id, idx, start_time, end_time, calories,

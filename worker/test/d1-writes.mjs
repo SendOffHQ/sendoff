@@ -44,6 +44,7 @@ globalThis.fetch = async (url, opts = {}) => {
 // A very small stand-in for D1: enough of prepare/bind/all/run/batch for the
 // statements the worker actually issues against `races`.
 const rows = new Map();
+let batchSizes = [];
 const DB = {
   prepare(sql) {
     return {
@@ -53,6 +54,10 @@ const DB = {
         if (/SELECT slug FROM races WHERE slug/.test(this.sql)) {
           const r = rows.get(this.args[0]);
           return { results: r ? [{ slug: r.slug }] : [] };
+        }
+        if (/SELECT data FROM races WHERE slug/.test(this.sql)) {
+          const r = rows.get(this.args[0]);
+          return { results: r ? [{ data: r.data }] : [] };
         }
         if (/SELECT config, config_sha, data, data_sha FROM races/.test(this.sql)) {
           const r = rows.get(this.args[0]);
@@ -90,7 +95,7 @@ const DB = {
       }
     };
   },
-  async batch(stmts) { for (const st of stmts) await st.run(); return []; }
+  async batch(stmts) { batchSizes.push(stmts.length); for (const st of stmts) await st.run(); return []; }
 };
 function applyInsert(sql, args) {
   if (/config, config_sha, updated_at/.test(sql)) {
@@ -255,6 +260,37 @@ ok('a git sha against a NULL column is taken, not refused',
 ok('and the row now carries a version of ours', /^d1-/.test(rows.get('legacy').data_sha), true);
 ok('after which a stale sha is refused again',
   (await put('races/legacy/data.json', { runners: [] }, 'git-blob-sha')).status, 409);
+
+console.log('\na press costs the same whatever the roster looks like');
+// The ceiling this removes: D1's free plan allows fifty queries per Worker
+// invocation, and this used to write one statement per leg on the whole
+// roster on every press. Three runners on a sixteen-leg course was the edge
+// and four was over, which is a limit on how many people a crew can follow.
+const bigRoster = { name: 'Big', visibility: 'public', courseType: 'segments',
+  course: { segments: Array.from({ length: 16 }, (_, i) => ({ name: 'S' + i, distanceMi: 3 })) },
+  startTime: '2026-10-03T13:00:00.000Z',
+  runners: ['a','b','c','d','e'].map(id => ({ id, name: id, bib: id })) };
+const fullDoc = (extra) => ({ runners: ['a','b','c','d','e'].map(id => ({ id,
+  legs: Array.from({ length: 16 }, (_, i) => ({ index: i + 1,
+    startTime: '2026-10-03T13:00:00Z',
+    endTime: (id === 'a' && i === 0 && extra) ? extra : '2026-10-03T14:00:00Z' })) })) });
+
+await put('races/big/config.json', bigRoster);
+let c2 = await read('races/big/config.json');
+// First data write: eighty legs, nothing stored yet, so all of them go.
+await put('races/big/data.json', fullDoc());
+batchSizes = [];
+c2 = await read('races/big/data.json');
+// One runner's one leg corrected. Everything else is byte-identical.
+await put('races/big/data.json', fullDoc('2026-10-03T14:07:00Z'), c2.sha);
+ok('eighty legs on the roster, one changed', batchSizes, [3]);
+ok('which is well under the fifty-query ceiling', Math.max(...batchSizes) < 50, true);
+
+console.log('\nand a leg that did not change is not rewritten');
+batchSizes = [];
+c2 = await read('races/big/data.json');
+await put('races/big/data.json', JSON.parse(JSON.stringify(c2.doc)), c2.sha);
+ok('nothing but the race row and the delete', batchSizes, [2]);
 
 console.log('\na press the database cannot store is not reported as landed');
 // The worst failure available now that git is not written. mirrorToD1 stands
