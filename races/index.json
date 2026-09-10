@@ -45,20 +45,7 @@
       ],
       "cutoffHours": 38,
       "activity": "trail-run"
-    },
-    {
-      "slug": "zz-hosting-test-trail-run",
-      "name": "Hosting Test Trail Run",
-      "location": "Nowhere in particular",
-      "startTime": "2026-09-10T09:43:33.939207Z",
-      "courseType": "segments",
-      "totalDistanceMi": 35,
-      "runnerNames": [
-        "Test Racer"
-      ],
-      "cutoffHours": 12,
-      "activity": "trail-run"
     }
   ],
-  "lastUpdated": "2026-09-10T20:28:08.486Z"
+  "lastUpdated": "2026-09-10T20:28:44.008Z"
 }
