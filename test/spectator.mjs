@@ -29,7 +29,7 @@ const ok=(l,g,w)=>{const q=JSON.stringify(g)===JSON.stringify(w); if(!q)bad++;
 
 // The service worker would answer some of these from its own cache and hide
 // which one the page chose. The question is what leaves the page.
-async function watch(slug, extra = '') {
+async function watch(slug, extra = '', page_ = '/race.html') {
   const ctx = await b.newContext({ viewport:{width:390,height:844}, serviceWorkers:'block' });
   const page = await ctx.newPage();
   const asked = { published: 0, worker: 0, get: 0 };
@@ -40,7 +40,7 @@ async function watch(slug, extra = '') {
     else if (new RegExp(`/races/${slug}/(data|config)\\.json`).test(u)) asked.published++;
   });
   // No session is set. This is a stranger with a link.
-  await page.goto(`${BASE}/race.html?id=${slug}${extra}`);
+  await page.goto(`${BASE}${page_}?id=${slug}${extra}`);
   await page.waitForTimeout(4000);
   return { page, asked };
 }
@@ -76,6 +76,26 @@ ok('the race rendered', await page.evaluate(() =>
 ok('with no crew pages offered', await page.evaluate(() =>
   [...document.querySelectorAll('nav a, .nav a')].map(a => a.textContent.trim())
     .filter(t => t === 'Pit Board' || t === 'Settings')), []);
+await page.context().close();
+
+// charts and print-report read their own race files. They used to fetch the
+// published copy directly, with no worker path at all, which meant they would
+// have been the two pages that broke the moment races/** stopped being
+// written. Signed out on a public race is the case with no session to lean on.
+console.log('\nthe charts page, signed out on a public race');
+({ page, asked } = await watch(PUBLIC_SLUG, '', '/charts.html'));
+ok('reads through the worker', asked.worker >= 1, true);
+ok('and not the published file', asked.published, 0);
+ok('and it drew something', await page.evaluate(() =>
+  document.querySelectorAll('svg, canvas').length > 0), true);
+await page.context().close();
+
+console.log('\nthe printable report, same');
+({ page, asked } = await watch(PUBLIC_SLUG, '', '/print-report.html'));
+ok('reads through the worker', asked.worker >= 1, true);
+ok('and not the published file', asked.published, 0);
+ok('the race name made it onto the page', await page.evaluate(() =>
+  /Six-0/.test(document.body.textContent || '')), true);
 await page.context().close();
 
 console.log('\nand a link for the wrong race gets nothing from the worker');

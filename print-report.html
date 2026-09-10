@@ -315,7 +315,7 @@
   <div>Auto-generated · race-dashboard hub</div>
 </footer>
 
-<script src="lib/race-core.js?v=77"></script>
+<script src="lib/race-core.js?v=78"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = 'index.html'; }
@@ -476,17 +476,18 @@
 
   async function load() {
     try {
-      const [cfgRes, dataRes] = await Promise.all([
-        fetch(`races/${encodeURIComponent(slug)}/config.json`, { cache: 'no-cache' }),
-        fetch(`races/${encodeURIComponent(slug)}/data.json`,   { cache: 'no-cache' })
+      // Same as charts: through readRaceJson, so this page has a way to read a
+      // race that does not depend on the file being published. The GPX below
+      // already went this way.
+      const [c, d] = await Promise.all([
+        Race.gh.readRaceJson(slug, 'config.json', true),
+        Race.gh.readRaceJson(slug, 'data.json', true)
       ]);
-      if (!cfgRes.ok) throw new Error('config.json not found');
-      if (!dataRes.ok) throw new Error('data.json not found');
-      cfg  = await cfgRes.json();
+      cfg = c;
       // Now that the roster is known, the pit board can appear for whoever is
       // allowed to work it.
       Race.nav.setRace(slug, 'print', () => Race.roles.canEdit(cfg, Race.auth.email()));
-      data = await dataRes.json();
+      data = d;
       gpxPts = await loadGpx();
 
       document.title = `${cfg.name} · Report · SendOff`;
