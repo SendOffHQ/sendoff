@@ -74,6 +74,17 @@ const DB = {
           r[cas[1]] = token;
           return { meta: { changes: 1 } };
         }
+        const set = this.sql.match(/^UPDATE races SET (config_sha|data_sha) = \? WHERE slug = \?$/);
+        if (set) {
+          const [val, slug] = this.args;
+          const r = rows.get(slug); if (r) r[set[1]] = val ?? null;
+          return { meta: { changes: r ? 1 : 0 } };
+        }
+        const nulled = this.sql.match(/UPDATE races SET (config_sha|data_sha) = NULL WHERE slug = \?/);
+        if (nulled) {
+          const r = rows.get(this.args[0]); if (r) r[nulled[1]] = null;
+          return { meta: { changes: r ? 1 : 0 } };
+        }
         if (/INSERT INTO races/.test(this.sql)) { applyInsert(this.sql, this.args); return { meta: { changes: 1 } }; }
         return { meta: { changes: 1 } };
       }
@@ -244,6 +255,23 @@ ok('a git sha against a NULL column is taken, not refused',
 ok('and the row now carries a version of ours', /^d1-/.test(rows.get('legacy').data_sha), true);
 ok('after which a stale sha is refused again',
   (await put('races/legacy/data.json', { runners: [] }, 'git-blob-sha')).status, 409);
+
+console.log('\na press the database cannot store is not reported as landed');
+// The worst failure available now that git is not written. mirrorToD1 stands
+// down when it cannot keep up, dropping the sha so reads fall through to git,
+// which was right while git held the write. It no longer does, so a swallowed
+// failure would tell a crew member their split landed when it is nowhere.
+const realBatch = DB.batch;
+DB.batch = async () => { throw new Error('D1_ERROR: too many SQL variables'); };
+cur = await read('races/cas/data.json');
+const broke = await put('races/cas/data.json', { runners: [{ id:'jd', legs: [{ index:1 }] }] }, cur.sha);
+ok('the crew are told it did not land', broke.status, 503);
+DB.batch = realBatch;
+// 503 is what the client's queue treats as transient, so the press is held on
+// the phone and retried rather than lost. The stand-down nulls the version, so
+// that retry meets a NULL and is taken.
+ok('and the retry afterwards is accepted',
+  (await put('races/cas/data.json', { runners: [{ id:'jd', legs: [{ index:1 }] }] }, cur.sha)).status, 200);
 
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

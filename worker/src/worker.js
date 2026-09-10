@@ -1627,12 +1627,43 @@ async function commitToD1(env, path, content, actor, expected) {
   // git: they are written once at setup, not pressed at an aid station.
   if (!col) return { status: 0, passthrough: true };
 
+  // A failed mirror write is no longer survivable, and the difference is the
+  // whole of this flag. mirrorToD1 stands down when it cannot keep up: it drops
+  // the sha so reads fall through to git, because git was right. With git out
+  // of the write path git is not right, it is stale or absent, and reporting
+  // success would tell a crew member their split landed when it is nowhere.
+  //
+  // 503 rather than 500 on purpose. The client's queue treats it as transient,
+  // so the press is held on the phone and retried, which is what it already
+  // does for a lost signal. The stand-down nulls the version column, so that
+  // retry meets a NULL and is taken.
+  const stored = async (tok, previous) => {
+    const r = await mirrorToD1(env, path, content, actor, tok);
+    const why = r && (r.error || r.skipped);
+    if (!why) return null;
+    // Put the version back where it was. The guard above already claimed the
+    // new one, so leaving it would mean the row advertises a version that
+    // describes content nobody stored, and the retry carrying the old one
+    // would be refused as stale.
+    //
+    // Restoring rather than leaving mirrorToD1's stand-down NULL, which drops
+    // the row out of service so reads fall through to git. That was right when
+    // git held the write. Here git is stale or absent, and the row still holds
+    // the last content that did land, which is the best answer available.
+    if (col) {
+      try {
+        await env.DB.prepare(`UPDATE races SET ${col} = ? WHERE slug = ?`)
+          .bind(previous || null, slug).run();
+      } catch (e) { /* nothing better to try */ }
+    }
+    return { status: 503, error: `Could not store that press: ${why}` };
+  };
+
   const token = d1Token();
   const row = (await env.DB.prepare('SELECT slug FROM races WHERE slug = ?').bind(slug).all()).results[0];
   if (!row) {
     // No row yet. mirrorToD1 inserts one, and there is nothing to race with.
-    await mirrorToD1(env, path, content, actor, token);
-    return null;
+    return await stored(token, null);
   }
   // `IS` rather than `=`, because a column that has never been written is
   // NULL and NULL = NULL is not true in SQL.
@@ -1650,8 +1681,7 @@ async function commitToD1(env, path, content, actor, expected) {
   if (!guard.meta || guard.meta.changes !== 1) {
     return { status: 409, error: 'Someone else changed this first: re-read and try again' };
   }
-  await mirrorToD1(env, path, content, actor, token);
-  return null;
+  return await stored(token, expected || null);
 }
 
 // ---------- the archive ----------
