@@ -594,7 +594,9 @@
       toast(r.queued
         ? `No signal · intake for leg ${legIndex} saved on this phone`
         : `Intake saved · leg ${legIndex}`, 'ok');
-      await load();
+      // Forced: the boxes still hold what was just sent, so they read as
+      // unsaved until this redraw replaces them with what landed.
+      await load(true);
     } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
   }
 
@@ -773,14 +775,38 @@
     `;
   }
 
-  function render() {
+  // True when anything in an intake panel has been typed into and not yet
+  // saved. Worked out from the DOM rather than tracked with a flag, so it
+  // clears itself the moment the text goes back to what was rendered, and
+  // there is no state to get stuck on.
+  function intakeDirty() {
+    return [...document.querySelectorAll('#runners [data-intake]')]
+      .some(el => el.value !== (el.dataset.rendered ?? ''));
+  }
+
+  // The ten second poll rebuilds every card's innerHTML, which used to throw
+  // away whatever a crew member was in the middle of typing. Worse than losing
+  // it: an emptied box means "clear this field", so saving after a wipe
+  // deleted the note that was already there.
+  //
+  // So a poll-driven render stands down while there are unsaved edits. Anything
+  // the person actually asked for (switching legs, saving) passes force and
+  // redraws regardless. The cost is that the whole board pauses while somebody
+  // types, rather than just their card; with a full field of racers that is
+  // worth splitting, but not days before a race.
+  function render(force) {
     if (!cfg || !data) return;
+    if (!force && intakeDirty()) return;
     const runnersById = new Map((cfg.runners || []).map(r => [r.id, r]));
     const merged = (cfg.runners || []).map(r => {
       const dr = (data.runners || []).find(d => d.id === r.id) || { id: r.id, legs: [] };
       return { ...r, ...dr };
     });
     document.getElementById('runners').innerHTML = merged.map(renderRunner).join('');
+    // What each field was drawn with. Anything different later is a person's
+    // unsaved typing.
+    document.querySelectorAll('#runners [data-intake]')
+      .forEach(el => { el.dataset.rendered = el.value; });
     tick();
     updateLastUpdatedLabel();
   }
@@ -861,7 +887,7 @@
     document.getElementById('last-updated').textContent = lu;
   }
 
-  async function load() {
+  async function load(force) {
     try {
       // data.json reads through the worker when signed in (GitHub API, no
       // Pages rebuild lag) so a pit press shows on other devices within a poll.
@@ -892,7 +918,7 @@
       document.getElementById('race-title').textContent = cfg.name;
       document.getElementById('error').style.display = 'none';
       maybeOfferRacerMode();
-      render();
+      render(force);
     } catch (err) {
       const e = document.getElementById('error');
       e.style.display = 'block';
@@ -927,7 +953,9 @@
   document.getElementById('runners').addEventListener('change', (e) => {
     if (e.target.matches('[data-intake-leg]')) {
       stickyIntakeLegByRunner[e.target.dataset.runner] = +e.target.value;
-      render();
+      // Asked for by hand, so it redraws even over an unsaved edit: choosing
+      // another leg is choosing to look at another leg.
+      render(true);
     }
   });
 
@@ -937,7 +965,7 @@
     if (!Race.auth.has()) openConnForm();
     renderConnStatus();
     await load();
-    setInterval(load, 10000);
+    setInterval(() => load(), 10000);   // never forced: see render()
     setInterval(tick, 1000);
     setInterval(updateLastUpdatedLabel, 1000);
   })();
