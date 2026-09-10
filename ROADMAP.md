@@ -653,6 +653,37 @@ defeats ETag revalidation completely. Dropping that in favour of `no-cache`
 plus an ETag is where the 304s actually come from. Kept out of the move so the
 move stays like-for-like and a regression has one possible cause.
 
+### Where the delay actually comes from today
+
+Measured 2026-09-10, against a live test race, because "it feels slow" and "it
+is slow for this reason" are different claims and only one of them can be
+fixed.
+
+A crew press reaching another **signed-in** page adds up like this:
+
+| | |
+|---|---|
+| the write: worker to the GitHub contents API | roughly half a second to a second |
+| the worker's shared read cache, `CACHE_TTL_S` | 0 to 3s, purged on write but only in the colo that took it |
+| the other page's next poll | 0 to 5s while the race is live |
+
+which lands around three seconds on average, and that is what a crew board and
+a racer page see of each other. It is the poll interval that dominates, which
+is what the live push is for.
+
+A **signed-out** page is a different chain and a much longer one. It has no
+worker session, so it reads the published file from the site, and that file
+only changes when the site rebuilds. The deploys for this repo take **20 to 30
+seconds** on GitHub Pages and 30 to 50 on Cloudflare Pages, on their own
+timings. So a spectator on a share link is half a minute behind at best, and no
+poll interval touches it. This is the thing the published copy above fixes, and
+it is a better reason to do that work than the cost argument.
+
+**The push does not make the first chain sub-second on its own.** It fires from
+`publishChange` only after the commit comes back `ok`, so it removes the poll
+wait and leaves the commit round trip. Genuinely under a second needs the write
+to stop being a git commit, which is the storage move, not this.
+
 ### Live push over a websocket — *prototype, off*
 Written 2026-09-10. Code is in the repo and nothing is running it: the Durable
 Object binding is commented out in `worker/wrangler.toml` and `hub.json` says

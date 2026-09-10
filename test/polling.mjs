@@ -1,8 +1,8 @@
-// Counts what the race page actually asks for. Adaptive polling is a claim
+// Counts what the race and racer pages actually ask for. Adaptive polling is a claim
 // about a number of requests, and nothing but counting them is evidence.
 //
-// Takes about 100 seconds: it measures three sixteen second windows and lets
-// each page settle first. Slow because counting requests over time is the only
+// Takes about two and a half minutes: it measures five sixteen second windows
+// and lets each page settle first. Slow because counting requests over time is the only
 // honest way to check this. Not hung.
 //
 // No race in the repo is live today, so the "in progress" runs happen in a
@@ -118,6 +118,27 @@ await setHidden(page, false);
 await page.waitForTimeout(1500);
 page.off('request', onWake);
 ok('refreshes at once rather than waiting an interval', woke >= 1, true);
+await page.context().close();
+
+// The runner's own page. It polled on a flat thirty second setInterval, which
+// meant a crew edit could sit unseen for half a minute and the poll went on
+// firing with the phone face down in a vest pocket. Both are request counts,
+// so both are countable.
+console.log('\nthe racer page, same race in progress');
+page = await fresh(true);
+await page.goto(`${BASE}/racer.html?id=${SLUG}`);
+await page.waitForTimeout(5000);
+const racer = await count(page, 16);
+console.log(`     ${racer} data reads in 16s`);
+// At the old flat thirty seconds a sixteen second window could see nothing at
+// all, so anything here is the adaptive interval and not the old one.
+ok('keeps up with the crew board', racer >= 2, true);
+
+console.log('\nthe racer page, phone in a pocket');
+await setHidden(page, true);
+const racerHidden = await count(page, 16);
+console.log(`     ${racerHidden} data reads in 16s`);
+ok('stops asking entirely', racerHidden, 0);
 await page.context().close();
 
 console.log('\na race that finished days ago');
