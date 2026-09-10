@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<base href="/">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Not found · SendOff</title>
+<link rel="icon" href="brand/sendoff-favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0a0f14" />
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lib/race-theme.css?v=29">
+<style>
+  /* This file exists for two reasons, and only one of them is the message.
+     Cloudflare Pages serves a project's fallback HTML with a 200 for any path
+     it does not have, unless there is a 404.html, in which case it serves this
+     with a real 404. Without it a missing race file answers 200 with a page of
+     markup, and the app writes that down as the race. */
+  body { display: grid; place-items: center; min-height: 100vh; padding: 24px; text-align: center; }
+  .box { max-width: 44ch; }
+  .code { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.22em;
+          text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+  h1 { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; text-transform: uppercase;
+       font-size: clamp(34px, 9vw, 54px); line-height: 1; margin-bottom: 16px; }
+  p { color: var(--text-dim); line-height: 1.6; font-size: 15.5px; }
+  .links { margin-top: 26px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .links a { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.14em;
+             text-transform: uppercase; text-decoration: none; padding: 13px 18px; border-radius: 8px;
+             border: 1px solid var(--border-bright); color: var(--text); }
+  .links a.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <p class="code">404</p>
+    <h1>Nothing here</h1>
+    <p>That address does not point at a race. It may have been mistyped, or the
+      race may have been deleted by whoever made it.</p>
+    <p>If somebody sent you a link to an unlisted race, it only opens for people
+      on its access list, and you may need to sign in first.</p>
+    <div class="links">
+      <a class="primary" href="/app/">Every race</a>
+      <a href="/">What SendOff is</a>
+    </div>
+  </div>
+</body>
+</html>
