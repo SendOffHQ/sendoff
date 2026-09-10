@@ -109,5 +109,13 @@
     }
   ],
   "activity": "trail-run",
-  "fuelPresets": []
+  "fuelPresets": [
+    {
+      "name": "LMNT Flask",
+      "values": {
+        "sodiumMg": 1000,
+        "fluidOz": 17
+      }
+    }
+  ]
 }
