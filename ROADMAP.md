@@ -388,7 +388,44 @@ the change, and four people's addresses are in 191 of them. Dropping the
 right outcome, but a purge written to preserve history while rewriting only the
 blobs would keep the exact thing worth removing.
 
-### The published copy, and why it is a separate job
+### The published copy — *shipped 2026-09-10, in part*
+
+`GET /public?path=races/<slug>/<file>` on the worker. What it does and why it
+is shaped the way it is:
+
+- **A separate route, not a flag on `/get`.** `/get` personalises a config with
+  the caller's role, so its answer can never be shared between two callers and
+  nothing in front of the worker can cache it. `/public` is byte-identical for
+  everyone reading the same race. "The same answer for everyone" has to be a
+  property of the address, because the address is what a shared cache keys on;
+  a parameter that quietly changed the body for a signed-in caller would be a
+  cache poisoning bug rather than a feature. `worker/test/published-copy.mjs`
+  holds that line: the same request carrying a valid owner session still comes
+  back with `myRole: null`.
+- **Not public is answered as not found.** An unlisted race's only protection
+  is that its address is not known, and "forbidden" confirms a guess.
+- **An ETag from the git blob sha**, so a poll that finds nothing new is a 304
+  with no body. The client asks with `cache: 'no-cache'` and no cache-buster:
+  the browser adds `If-None-Match` itself, which is why this does not become a
+  preflighted request on every poll.
+- **Two CORS details that would have broken it silently.** `ETag` is not a
+  safelisted response header, so it reads as null cross-origin without
+  `Access-Control-Expose-Headers`. And `If-None-Match` had to join
+  `Access-Control-Allow-Headers` for any caller doing its own revalidation.
+
+**What it does not yet do: stop invoking the worker.** Requests to a Worker
+route are billed whether or not the answer came from a cache inside it, so the
+`max-age=3` above helps a browser and helps any cache in front, but there is no
+cache in front yet. Getting spectator reads to be served without waking the
+worker needs it on a route on the `sendoff.run` zone with a Cache Rule, which
+is a natural step to fold into the Cloudflare move rather than a separate
+project. Until then the read is cheap and fast but still counts.
+
+**Still to do:** the D1 row is the mirror behind this, so the free tier's 5M
+row reads a day is the second limit after the worker's 100,000 requests. The
+worker limit binds first, at roughly 139 watcher-hours a day at a 5s poll.
+
+### Why it was a separate job
 
 Moving writes to a database fixes correctness and the build limit. It does not
 by itself fix spectators, because a thousand people watching would then be a
@@ -671,13 +708,14 @@ which lands around three seconds on average, and that is what a crew board and
 a racer page see of each other. It is the poll interval that dominates, which
 is what the live push is for.
 
-A **signed-out** page is a different chain and a much longer one. It has no
-worker session, so it reads the published file from the site, and that file
-only changes when the site rebuilds. The deploys for this repo take **20 to 30
-seconds** on GitHub Pages and 30 to 50 on Cloudflare Pages, on their own
-timings. So a spectator on a share link is half a minute behind at best, and no
-poll interval touches it. This is the thing the published copy above fixes, and
-it is a better reason to do that work than the cost argument.
+A **signed-out** page used to be a different chain and a much longer one. It
+has no worker session, so it read the published file from the site, and that
+file only changes when the site rebuilds. The deploys for this repo take **20
+to 30 seconds** on GitHub Pages and 30 to 50 on Cloudflare Pages, on their own
+timings. So a spectator on a share link was half a minute behind at best, and
+no poll interval touched it. **Fixed 2026-09-10** by `/public`, below: a
+spectator now reads the same mirror a signed-in reader does, written during the
+commit. A share link and a crew board are on the same footing.
 
 **The push does not make the first chain sub-second on its own.** It fires from
 `publishChange` only after the commit comes back `ok`, so it removes the poll

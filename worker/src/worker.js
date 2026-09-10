@@ -140,7 +140,16 @@ function corsHeaders(env, req) {
   return {
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    // If-None-Match is here for callers that do their own revalidation, which
+    // in a browser is a preflighted request without it. A browser revalidating
+    // out of its own HTTP cache does not need it: that header is added by the
+    // browser, not the page, and is not subject to this list.
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, If-None-Match',
+    // ETag is not a CORS-safelisted response header, so without this a page on
+    // another origin reads null off a response that plainly has one. Nothing
+    // in the app depends on reading it, but measuring whether the published
+    // copy is working does.
+    'Access-Control-Expose-Headers': 'ETag',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin'
   };
@@ -1801,6 +1810,80 @@ async function readFromD1(env, path) {
   }
 }
 
+// ---------- the published copy ----------
+// A public race, served to anybody, with nothing in the answer that depends on
+// who asked. That last part is the whole point rather than a detail: /get
+// personalises a config with the caller's role, so its answer can never be
+// shared between two callers and nothing in front of the worker can ever cache
+// it. This one is byte-identical for every reader of the same race, which is
+// what makes an ETag safe to hand out and a cache safe to put in front of it.
+//
+// Deliberately a separate route and not a flag on /get. "Same answer for
+// everyone" has to be a property of the address, because the address is what a
+// shared cache keys on. A query parameter that quietly changed the answer for
+// a signed-in caller would be a cache poisoning bug, not a feature.
+//
+// What this replaces: a signed-out spectator read the file the site publishes,
+// which only changes when the site rebuilds, measured at 20 to 30 seconds. The
+// mirror behind this endpoint is written during the commit itself.
+async function handlePublicRead(req, env) {
+  const url = new URL(req.url);
+  const path = url.searchParams.get('path') || '';
+  if (!path || !isRacePath(path)) {
+    return json({ error: 'Not found' }, { status: 404 }, env, req);
+  }
+  const slug = racePathSlug(path);
+  const cfg = await loadRaceConfigShared(env, slug);
+  // A race that is not public is answered exactly as one that does not exist.
+  // "Forbidden" would confirm the slug to anybody who guessed it, and an
+  // unlisted race's whole protection is that its address is not known.
+  if (!cfg || cfg.visibility !== 'public') {
+    return json({ error: 'Not found' }, { status: 404 }, env, req);
+  }
+
+  const mirrored = await readFromD1(env, path);
+  const res = mirrored ? new Response(mirrored, { status: 200 }) : await githubGetShared(env, path);
+  if (res.status !== 200) return json({ error: 'Not found' }, { status: 404 }, env, req);
+  let text = mirrored || await res.text();
+
+  // The anonymous view of a config, which is the one /get already hands a
+  // reader who is nobody: a null role, and the roster left exactly as stored.
+  // Kept in step with that branch on purpose. If the two ever disagree, this
+  // is the one that is wrong, because /get is what a signed-in reader sees.
+  if (path.endsWith('/config.json')) {
+    try {
+      const env0 = JSON.parse(text);
+      const c = JSON.parse(base64ToUtf8(env0.content));
+      c.myRole = null;
+      env0.content = utf8ToBase64(JSON.stringify(c, null, 2) + '\n');
+      text = JSON.stringify(env0);
+    } catch (e) { /* hand back what the store gave us */ }
+  }
+
+  // The git blob sha changes exactly when the content does, which is what an
+  // ETag has to promise. Weak, because the body above is re-serialised rather
+  // than passed through byte for byte.
+  let sha = null;
+  try { sha = (JSON.parse(text) || {}).sha || null; } catch (e) {}
+  const etag = sha ? `W/"pub-${sha}"` : null;
+  const headers = {
+    'Content-Type': 'application/json',
+    // Short and shared. One spectator polling every five seconds mostly gets a
+    // 304 with no body; a second spectator on the same race inside the window
+    // does not reach the store at all. Long enough to be worth having, short
+    // enough that nobody watching a race is looking at a stale split.
+    'Cache-Control': 'public, max-age=3',
+    ...corsHeaders(env, req)
+  };
+  if (etag) headers.ETag = etag;
+
+  const seen = req.headers.get('If-None-Match');
+  if (etag && seen && seen.split(',').some(v => v.trim() === etag)) {
+    return new Response(null, { status: 304, headers });
+  }
+  return new Response(text, { status: 200, headers });
+}
+
 async function handleGet(req, env) {
   const url = new URL(req.url);
   const path = url.searchParams.get('path');
@@ -3233,6 +3316,7 @@ export default {
     if (request.method === 'GET'  && path === '/invite-info')     return handleInviteInfo(request, env);
     if (request.method === 'POST' && path === '/commit')          return handleCommit(request, env, ctx);
     if (request.method === 'GET'  && path === '/get')             return handleGet(request, env);
+    if (request.method === 'GET'  && path === '/public')          return handlePublicRead(request, env);
     if (request.method === 'POST' && path === '/invite')          return handleInvite(request, env);
     if (request.method === 'POST' && path === '/share-link')      return handleShareLink(request, env);
     if (request.method === 'POST' && path === '/share/revoke')    return handleShareRevoke(request, env);

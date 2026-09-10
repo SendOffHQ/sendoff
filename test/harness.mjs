@@ -3,6 +3,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const PORT = 8787;
@@ -56,6 +57,39 @@ const server = http.createServer((req, res) => {
     return send(200, JSON.stringify({ sha: 'stub-sha', path: p,
       content: Buffer.from(text, 'utf8').toString('base64'), encoding: 'base64' }),
       'application/json');
+  }
+  // The published copy. Public races only, no session read at all, and an
+  // ETag so a poll that finds nothing new is a 304. Mirrors the real worker's
+  // /public closely enough that the client cannot tell the difference.
+  if (url.pathname === '/api/public') {
+    const p = url.searchParams.get('path') || '';
+    const m = p.match(/^races\/([^/]+)\/([^/]+)$/);
+    if (!m) return send(404, '{"error":"Not found"}', 'application/json');
+    const cfgText = raceFile(m[1], 'config.json');
+    let visibility = null;
+    try { visibility = JSON.parse(cfgText || 'null').visibility; } catch (e) {}
+    // Not public is answered exactly as not found, same as the worker.
+    if (visibility !== 'public') return send(404, '{"error":"Not found"}', 'application/json');
+    let text = raceFile(m[1], m[2]);
+    if (text == null) return send(404, '{"error":"Not found"}', 'application/json');
+    if (m[2] === 'config.json') {
+      const cfg = JSON.parse(text);
+      delete cfg.people; delete cfg.createdBy;
+      cfg.myRole = null;
+      if (!cfg.activity) cfg.activity = 'trail-run';
+      text = JSON.stringify(cfg, null, 2) + '\n';
+    }
+    const etag = 'W/"pub-' + createHash('sha1').update(text).digest('hex').slice(0, 12) + '"';
+    if ((req.headers['if-none-match'] || '').split(',').some(v => v.trim() === etag)) {
+      res.writeHead(304, { ETag: etag, 'Cache-Control': 'public, max-age=3',
+        'Access-Control-Allow-Origin': '*', 'Access-Control-Expose-Headers': 'ETag' });
+      return res.end();
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', ETag: etag,
+      'Cache-Control': 'public, max-age=3', 'Access-Control-Allow-Origin': '*',
+      'Access-Control-Expose-Headers': 'ETag' });
+    return res.end(JSON.stringify({ sha: 'stub-sha', path: p,
+      content: Buffer.from(text, 'utf8').toString('base64'), encoding: 'base64' }));
   }
   if (url.pathname === '/api/my-races') {
     const cfg = JSON.parse(raceFile(SLUG, 'config.json') || '{}');
