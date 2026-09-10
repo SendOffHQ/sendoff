@@ -308,7 +308,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=76"></script>
+<script src="lib/race-core.js?v=77"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
@@ -469,7 +469,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
       // works without a worker. Treats 404 as "no manifest yet" (empty hub).
       let publicRaces = [];
       try {
-        const res = await fetch('races/index.json?_=' + Date.now(), { cache: 'no-store' });
+        const res = await fetch('races/index.json', { cache: 'no-cache' });
         if (res.ok) {
           const manifest = await res.json();
           publicRaces = manifest.races || [];
