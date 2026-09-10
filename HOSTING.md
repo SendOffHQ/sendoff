@@ -193,13 +193,36 @@ Two things worth checking that did not exist when this list was written:
 
 ## The cutover, and the revert
 
-**Cutover.** Add `sendoff.run` as a custom domain on the Pages project, then
-point the DNS record at Pages. Remove the custom domain from the GitHub Pages
-settings so the two do not fight over it.
+**Cutover.** Cloudflare dashboard, Workers & Pages, the `sendoff` project,
+Custom domains, Set up a custom domain, `sendoff.run`. The zone is already in
+the same account, so Cloudflare offers to change the DNS itself: accept, and it
+replaces the four A records below with a proxied CNAME to the project. Repeat
+for `www.sendoff.run` if you want it to follow. Then wait for the certificate,
+usually a minute or two.
+
+**Do not remove the custom domain from the GitHub Pages settings**, which this
+file used to tell you to do. Leaving both configured is what keeps the revert
+to a single DNS change: GitHub Pages will only serve `sendoff.run` while it is
+still configured to, and re-adding it later means waiting on certificate
+issuance at the moment you least want to. They do not fight, because DNS
+decides which one gets asked. The `CNAME` file in the repository root is what
+holds that configuration, so leave that alone too.
 
 **Revert.** Point DNS back at GitHub Pages. `deploy-pages.yml` never stopped
 running, so the GitHub copy is current, not stale. That is the whole reason
 both deploys stay on during the trial.
+
+**The records as they stood before the cutover**, captured 2026-09-10 so the
+revert does not depend on remembering them:
+
+    sendoff.run        A      185.199.108.153  185.199.109.153
+                              185.199.110.153  185.199.111.153   (DNS only)
+    www.sendoff.run    CNAME  sendoffhq.github.io
+
+`sendoff.run` was grey-clouded, which is why it answered `server: GitHub.com`
+rather than Cloudflare. That also means **Worker routes on this zone have never
+run**: a route needs the hostname proxied. Anything that wants the worker on
+`sendoff.run/...` depends on this cutover having happened.
 
 Keep both for at least one full race weekend before turning either off.
 
