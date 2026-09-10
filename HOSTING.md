@@ -39,16 +39,18 @@ if the Cloudflare copy misbehaves, it misbehaves on a URL nobody is using.
 
 ## What only you can do
 
-1. **Create the Pages project.** Cloudflare dashboard, Workers & Pages, Create,
-   Pages, "Direct Upload", name it `sendoff`. Do not connect it to the git
-   repository: the workflow uploads, so that both hosts publish the same
-   commit through the same pipeline.
-2. **Two repository secrets** in GitHub, Settings, Secrets and variables,
-   Actions:
-   - `CLOUDFLARE_API_TOKEN`, scoped to *Cloudflare Pages: Edit*
-   - `CLOUDFLARE_ACCOUNT_ID`
-   The deploy job skips itself until the token is there, so nothing breaks in
-   the meantime.
+1. **Widen the API token.** Both secrets already exist, because the worker
+   deploy uses them, and the first run of this workflow proved the token
+   authenticates. What it does not have is Pages permission: the run failed
+   with *The Pages project "sendoff" does not exist*, and creating it needs
+   **Cloudflare Pages: Edit** added to `CLOUDFLARE_API_TOKEN` in the
+   Cloudflare dashboard under My Profile, API Tokens.
+
+   The workflow creates the project itself once the token can, so this is the
+   only thing to get right. If you would rather make it by hand: Workers &
+   Pages, Create, Pages, Direct Upload, named `sendoff`. Do not connect it to
+   the git repository, because the workflow uploads, which is what keeps both
+   hosts publishing the same commit through the same pipeline.
 3. **Let the worker answer the trial origin.** In `worker/wrangler.toml`:
 
        ALLOWED_ORIGINS = "https://sendoff.run,https://sendoff.pages.dev"

@@ -55,7 +55,28 @@ jobs:
         if: ${{ env.CLOUDFLARE_API_TOKEN == '' }}
         run: echo "No CLOUDFLARE_API_TOKEN set, so nothing was published. See HOSTING.md."
 
-      # Deliberately not guarded beyond the token check: once the secrets are
+      # Made here rather than by hand, so starting the trial is one thing to
+      # get right (the token's scope) instead of three. Creating it twice is
+      # not an error; the list is checked first.
+      - name: Make sure the Pages project exists
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: |
+          if npx --yes wrangler@4 pages project list 2>/dev/null | grep -qE '(^|[[:space:]])sendoff([[:space:]]|$)'; then
+            echo "Pages project 'sendoff' is already there."
+          else
+            echo "Creating the Pages project 'sendoff'."
+            npx --yes wrangler@4 pages project create sendoff --production-branch=main || {
+              echo
+              echo "Could not create it. The usual cause is the API token: the one"
+              echo "this repository already has is scoped for Workers, and Pages"
+              echo "needs its own permission. Add 'Cloudflare Pages: Edit' to"
+              echo "CLOUDFLARE_API_TOKEN, or create the project by hand in the"
+              echo "dashboard and re-run. See HOSTING.md."
+              exit 1
+            }
+          fi
+
+      # Deliberately not guarded beyond the token check: once the project is
       # there, a failed deploy should be loud.
       - name: Deploy
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
