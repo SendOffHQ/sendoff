@@ -138,6 +138,33 @@ ok('and the saved config still knows the role', await page.evaluate((s) => {
   return r && JSON.parse(r.text).myRole;
 }, SLUG), 'crew');
 
+// The pit board polls every ten seconds and rebuilds every card's innerHTML.
+// That used to throw away whatever was half typed, and because an empty box
+// means "clear this field", saving afterwards deleted the note that was
+// already there. A crew member types slower than ten seconds, so this was
+// every note, every time.
+console.log('\ntyping a note through a poll');
+await page.goto(`${BASE}/pit.html?id=${SLUG}`);
+await page.waitForTimeout(2500);
+const box = await page.$('#runners textarea[data-intake="notes"]');
+ok('there is a notes box to type in', !!box, true);
+if (box) {
+  await box.fill('Half a PB and J, ice in the kerchief');
+  // Long enough for the poll to fire at least once.
+  await page.waitForTimeout(12000);
+  ok('the note survives the poll', await page.evaluate(() =>
+    document.querySelector('#runners textarea[data-intake="notes"]').value),
+    'Half a PB and J, ice in the kerchief');
+  // And the board comes back to life once the draft is gone.
+  await page.evaluate(() => {
+    const t = document.querySelector('#runners textarea[data-intake="notes"]');
+    t.value = t.dataset.rendered; t.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  ok('and clearing it lets the board update again', await page.evaluate(() =>
+    [...document.querySelectorAll('#runners [data-intake]')]
+      .every(el => el.value === (el.dataset.rendered ?? ''))), true);
+}
+
 console.log('\nthe server is gone');
 server.kill('SIGKILL');
 await waitFor(false, 'The server is still answering on 8787 after being killed, so nothing ' +
