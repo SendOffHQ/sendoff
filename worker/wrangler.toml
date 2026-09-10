@@ -61,27 +61,27 @@ INFO_FROM = "info@sendoff.run"
 name = "EMAIL"
 
 # ---------------------------------------------------------------------------
-# Live push, prototype. Commented out on purpose: uncommenting it creates the
-# Durable Object class on the next deploy, and nothing about a race weekend is
-# improved by doing that in a hurry. The worker is a no-op without the binding.
+# Live push. On since 2026-09-10. The binding is the switch: liveEnabled() is
+# just !!env.RACE_HUB, so removing these two blocks turns both /live and the
+# publish-after-commit back off, and the worker runs exactly the code it ran
+# before. hub.json's "live" is the second switch, on the client side, and
+# either one alone is enough to stop it.
 #
-# To try it:
-#   1. uncomment both blocks below
-#   2. npx wrangler deploy          (the migration creates the class)
-#   3. set "live": true in hub.json (the client only connects when told to)
+# Turning it off again is those two blocks and a deploy. The class itself can
+# stay: an object with nobody connected to it costs nothing and is not billed.
 #
 # Cost, from Cloudflare's own billing rules: outgoing WebSocket messages are
 # free, so the fan-out is free; incoming are billed at 20:1 and watchers send
 # nothing; hibernation means the object sleeps between aid stations. What is
 # billed is one request per connection and one per crew press.
 #
-# [[durable_objects.bindings]]
-# name = "RACE_HUB"
-# class_name = "RaceHub"
-#
-# [[migrations]]
-# tag = "v1"
-# new_sqlite_classes = ["RaceHub"]
+[[durable_objects.bindings]]
+name = "RACE_HUB"
+class_name = "RaceHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RaceHub"]
 # ---------------------------------------------------------------------------
 
 # KV namespace for invite tokens, share-link tokens, and dynamically
