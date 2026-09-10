@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-09-10T03:17:53.625Z",
+  "lastUpdated": "2026-09-10T03:18:33.295Z",
   "runners": [
     {
       "id": "jason",
@@ -100,7 +100,7 @@
           "sodiumMg": 295,
           "fluidOz": 20.3,
           "intakeEstimated": true,
-          "notes": "Test note"
+          "notes": "Test note 2"
         }
       ]
     }
