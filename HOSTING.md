@@ -83,6 +83,14 @@ at sendoff.social. Cloudflare hands out `<project>.pages.dev` globally, and that
 name was taken, so this project got **`sendoff-abi.pages.dev`**. The deploy log
 prints the real address every run; read it rather than assuming it.
 
+## Give a deploy a minute before judging it
+
+Checking straight after the workflow goes green gives mixed answers: some
+paths behave, some do not, and it looks like a partial failure. It is
+propagation. The same checks a minute later were uniform. Worth knowing before
+somebody concludes something from a half-settled deploy, which nearly happened
+here.
+
 ## Two differences from GitHub Pages, both found by running both
 
 **Unknown paths.** Cloudflare Pages answers a path it does not have with the
@@ -95,6 +103,12 @@ mistake, because it is what gets handed back with no signal.
 Fixed at both ends: `404.html` at the root, which is what makes Pages return a
 real 404, and a content-type check in `readRaceFile` so no host can hand the
 app markup where it asked for JSON.
+
+Verified after the fix: `/definitely-not-real`, `/worker/src/worker.js`,
+`/races/no-such-race/data.json` and `/races/no-such-race/` all answer **404**
+with the not-found page, while every real path still answers 200. Note that
+Pages redirects `/404.html` to `/404`, which is why the file appears to be
+missing if you ask for it by name.
 
 **`worker/`, `test/` and `tools/`** are served by GitHub Pages and are not
 uploaded here. Nothing references them; the smaller surface is deliberate.
