@@ -42,9 +42,26 @@ if the Cloudflare copy misbehaves, it misbehaves on a URL nobody is using.
 1. **Widen the API token.** Both secrets already exist, because the worker
    deploy uses them, and the first run of this workflow proved the token
    authenticates. What it does not have is Pages permission: the run failed
-   with *The Pages project "sendoff" does not exist*, and creating it needs
-   **Cloudflare Pages: Edit** added to `CLOUDFLARE_API_TOKEN` in the
-   Cloudflare dashboard under My Profile, API Tokens.
+   with *The Pages project "sendoff" does not exist*.
+
+   Cloudflare dashboard, **My Profile, API Tokens**. On that page there are two
+   lists and only one of them is right:
+
+   - **API Tokens** is the one. Find the token the worker deploy uses, Edit,
+     and add **Account, Cloudflare Pages, Edit** to the permissions it already
+     has. Editing permissions does not change the token's value, so the GitHub
+     secret does not need touching.
+   - **API Keys**, the Global API Key, is not. It grants everything on the
+     account, cannot be scoped, and cannot be revoked without breaking every
+     other thing that uses it. It does not belong in CI.
+
+   If it is not obvious which token is in the secret, make a new one instead:
+   Create Token, Custom token, with Workers Scripts Edit, Workers KV Storage
+   Edit, D1 Edit and Cloudflare Pages Edit, then replace
+   `CLOUDFLARE_API_TOKEN` in the repository secrets and delete the old token.
+
+   Pages Edit is needed either way. Creating the project by hand in the
+   dashboard does not avoid it, because publishing needs the same permission.
 
    The workflow creates the project itself once the token can, so this is the
    only thing to get right. If you would rather make it by hand: Workers &
