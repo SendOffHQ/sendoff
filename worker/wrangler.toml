@@ -15,6 +15,9 @@ GITHUB_BRANCH = "main"
 READ_FROM_D1 = "true"
 # Race writes go to git, and D1 follows. "false" makes D1 the authority for
 # races/<slug>/config.json and data.json, and leaves git for the archive.
+# Flipped to "false" on 2026-09-10. Setting it back to "true" and deploying is
+# the whole rollback: every race is in the mirror, and a race the mirror has
+# not seen still falls back to git on the read side either way.
 #
 # The archive commit that this depends on is in: once a race is finished, the
 # worker commits its config and data to git, and again on any correction filed
@@ -31,7 +34,7 @@ READ_FROM_D1 = "true"
 #
 # course.gpx and races/index.json still go to git either way: one is written
 # once at setup, the other is the public manifest the signed-out hub reads.
-WRITE_TO_GIT = "true"
+WRITE_TO_GIT = "false"
 # If you mount the worker at a subpath (e.g. on a route like
 # api.example.com/race-dashboard/*), set MOUNT_PATH to that prefix.
 # Leave empty if the worker is at the root of its hostname.

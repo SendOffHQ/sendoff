@@ -65,12 +65,12 @@ const DB = {
         return { results: [] };
       },
       async run() {
-        const cas = this.sql.match(/UPDATE races SET (config_sha|data_sha) = \? WHERE slug = \? AND \1 IS \?/);
+        const cas = this.sql.match(/UPDATE races SET (config_sha|data_sha) = \? WHERE slug = \? AND \((config_sha|data_sha) IS \? OR \2 IS NULL\)/);
         if (cas) {
           const [token, slug, expected] = this.args;
           const r = rows.get(slug);
           const cur = r ? (r[cas[1]] ?? null) : null;
-          if (!r || cur !== (expected ?? null)) return { meta: { changes: 0 } };
+          if (!r || (cur !== null && cur !== (expected ?? null))) return { meta: { changes: 0 } };
           r[cas[1]] = token;
           return { meta: { changes: 1 } };
         }
@@ -223,6 +223,27 @@ await putW('races/cas/data.json', { runners: [{ id:'jd', legs: [
   { index:1, startTime:'2026-10-03T13:00:00Z', endTime:'2026-10-03T14:05:00Z' } ] }] }, cur.sha);
 await settle();
 ok('the corrected data is archived', gitPuts.includes('races/cas/data.json'), true);
+
+console.log('\na race that exists only in the mirror is still writable');
+// Two bugs meet here. handleCommit resolved the race config with a git-only
+// lookup, so a race created after the flip, which has no config in git at all,
+// answered "Race not found" to every write by anyone but the session that made
+// it: a race the crew cannot work. And readFromD1 refuses a row whose version
+// column is NULL, so that read fell through to git and the client came back
+// holding a git blob sha that could never match the guard, which mutateJson
+// would retry four times and give up on.
+// readFromD1 refuses to serve a row whose version column is NULL, so that
+// read fell through to git and the client is holding a git blob sha. Without
+// the OR in the guard it could never match, and mutateJson would retry four
+// times against the same answer and give up: a race nobody could write to.
+rows.set('legacy', { slug: 'legacy', config: JSON.stringify({ ...race, createdBy: ME }),
+                     config_sha: 'gitsha', data: '{"runners":[]}', data_sha: null });
+ok('git has no config for it at all', gitFiles.has('races/legacy/config.json'), false);
+ok('a git sha against a NULL column is taken, not refused',
+  (await put('races/legacy/data.json', { runners: [{ id:'jd', legs: [] }] }, 'git-blob-sha')).status, 200);
+ok('and the row now carries a version of ours', /^d1-/.test(rows.get('legacy').data_sha), true);
+ok('after which a stale sha is refused again',
+  (await put('races/legacy/data.json', { runners: [] }, 'git-blob-sha')).status, 409);
 
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);
