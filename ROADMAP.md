@@ -276,26 +276,28 @@ fires on race one, and it fired because every press was a commit. Presses are
 not commits any more. Cloudflare Pages Direct Upload also publishes no
 deployment quota at all, only file count and size.
 
-**Roster size is the new ceiling, and it is the one to watch.** D1's free plan
-allows **50 queries per Worker invocation**. A `data.json` write issues one
-statement for the race row, one per leg across every runner, and one to delete
-dropped legs. So the whole roster costs `legs + 2` statements *on every press*,
-plus whatever else the request does:
+**Roster size was the new ceiling. It is gone, same day.** D1's free plan
+allows **50 queries per Worker invocation**, and a `data.json` write used to
+issue one statement per leg across every runner, on every press. Three runners
+on a sixteen-leg course was the edge and four was over, which is a limit on how
+many people one crew can follow.
+
+A press changes one leg, so the write now compares against the document already
+stored and sends only what moved:
 
 | | |
 |---|---|
-| Sangre de Cristo, 16 legs, 1 runner | 18 |
-| the same course, 3 runners | 50, at the edge |
-| the same course, 4 runners | 66, over |
+| five runners, sixteen legs each, one press | **3 statements** |
+| the same press before | 82 |
+| a press that changed nothing at all | 2 |
 
-Call it **about 45 leg-rows total** to be safe, which is three runners on a
-sixteen-leg course or two on a twenty-four.
+The previous document is the right thing to compare against because it is what
+the legs table was written from, and both go into the same atomic batch, so
+they cannot have drifted apart. If it will not parse, every leg is written,
+which is what this did before: slower, and never wrong.
 
-This limit is not new. What is new is that it matters: while git held the write
-a mirror failure was harmless, and now it is a 503 the crew have to retry. Two
-ways out when a roster needs to be bigger, neither done: write only the legs
-that changed rather than the whole roster, which is the right fix and turns
-this into a per-press constant; or the $5 plan, which raises it.
+So there is no roster ceiling left to speak of. The limit that remains is the
+worker's 100,000 requests a day, which is spectators rather than crew.
 
 ### Three shapes of load, and only one scales badly
 
