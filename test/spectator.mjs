@@ -29,17 +29,18 @@ const ok=(l,g,w)=>{const q=JSON.stringify(g)===JSON.stringify(w); if(!q)bad++;
 
 // The service worker would answer some of these from its own cache and hide
 // which one the page chose. The question is what leaves the page.
-async function watch(slug) {
+async function watch(slug, extra = '') {
   const ctx = await b.newContext({ viewport:{width:390,height:844}, serviceWorkers:'block' });
   const page = await ctx.newPage();
-  const asked = { published: 0, worker: 0 };
+  const asked = { published: 0, worker: 0, get: 0 };
   page.on('request', r => {
     const u = r.url();
     if (/\/api\/public\?/.test(u)) asked.worker++;
+    else if (/\/api\/get\?/.test(u)) asked.get++;
     else if (new RegExp(`/races/${slug}/(data|config)\\.json`).test(u)) asked.published++;
   });
   // No session is set. This is a stranger with a link.
-  await page.goto(`${BASE}/race.html?id=${slug}`);
+  await page.goto(`${BASE}/race.html?id=${slug}${extra}`);
   await page.waitForTimeout(4000);
   return { page, asked };
 }
@@ -54,12 +55,33 @@ ok('with splits on it', await page.evaluate(() =>
   document.querySelectorAll('#runners tr, .runner, [data-runner]').length > 0), true);
 await page.context().close();
 
-console.log('\nand an unlisted race still comes off the published file');
+console.log('\nand an unlisted race with no link still comes off the published file');
 ({ page, asked } = await watch(UNLISTED_SLUG));
 ok('the published file answered it', asked.published >= 1, true);
 // publicMiss: the worker is asked once, told no, and not asked again. Without
 // that memo every poll would pay for a 404 it already knows about.
 ok('the worker was asked once and not again', asked.worker, 1);
+await page.context().close();
+
+// The share link. This is what lets races/** stop being written to git: before
+// it, a stranger holding a link to an unlisted race read the published file,
+// so that file had to keep existing.
+console.log('\na stranger with a share link to an unlisted race');
+({ page, asked } = await watch(UNLISTED_SLUG, `&t=stub-${UNLISTED_SLUG}`));
+ok('reads it through the worker', asked.get >= 1, true);
+ok('and never touches the published file', asked.published, 0);
+ok('the race rendered', await page.evaluate(() =>
+  ((document.getElementById('race-title')||{}).textContent || '').length > 0), true);
+// A token grants reading, not a role: no pit board, no settings.
+ok('with no crew pages offered', await page.evaluate(() =>
+  [...document.querySelectorAll('nav a, .nav a')].map(a => a.textContent.trim())
+    .filter(t => t === 'Pit Board' || t === 'Settings')), []);
+await page.context().close();
+
+console.log('\nand a link for the wrong race gets nothing from the worker');
+({ page, asked } = await watch(UNLISTED_SLUG, '&t=stub-some-other-race'));
+ok('the worker refused it', asked.get >= 1, true);
+ok('so the published file had to answer', asked.published >= 1, true);
 await page.context().close();
 
 await b.close(); srv.kill('SIGKILL');

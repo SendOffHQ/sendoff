@@ -120,6 +120,46 @@ missing if you ask for it by name.
 **`worker/`, `test/` and `tools/`** are served by GitHub Pages and are not
 uploaded here. Nothing references them; the smaller surface is deliberate.
 
+**The `.html` redirect, which turned out not to be a decision.** Cloudflare
+Pages 308s `/race.html` to `/race`. This sat on the list as "disable it in the
+Pages settings or repoint the app's links", and the first half of that was
+simply wrong: `html_handling` is a Workers static-assets option and Pages
+projects have no equivalent, in the dashboard or anywhere else.
+
+It does not matter, for two reasons, both measured 2026-09-10:
+
+    /race.html?id=six-0&t=abc  →  308  /race?id=six-0&t=abc     query kept, token and all
+    sendoff.run/race           →  200  the race page            GitHub Pages resolves it too
+
+So the query string survives, which is what would have broken share links, and
+the extensionless form works on *both* hosts, so repointing the links was never
+blocked by the trial the way it looked. The cost as it stands is one extra
+round trip on the first hit of an `.html` address. It is per navigation, not
+per poll, and no data read goes near it: `/races/<slug>/data.json` and the
+worker's `/public` are not `.html` and are not redirected.
+
+Left alone deliberately. Repointing thirteen pages' links and the service
+worker's precache list to save one redirect per navigation is a change with
+more ways to go wrong than the thing it fixes.
+
+**`_headers` only works on one of them.** It is a Cloudflare Pages feature, and
+GitHub Pages has no way to set custom headers at all. Measured 2026-09-10:
+
+    sendoff.run            cache-control: max-age=600
+    sendoff-abi.pages.dev  cache-control: no-cache
+
+So on GitHub Pages a published race file is cached by the browser for ten
+minutes. The reason that has never been a bug is the `?_=` + `Date.now()` on
+every published read, which makes each poll a unique URL the cache has never
+seen. That cache-buster is not a leftover: on GitHub Pages it is load-bearing,
+and it is the only thing standing between an unlisted share link and a
+ten-minute-old race.
+
+Which reverses what the roadmap says about dropping it. It can only go after
+the cutover, because only Cloudflare Pages honours the `no-cache` and the ETag
+that would replace it. Worth counting as an argument for the move: it is the
+difference between correct cache headers on race data and none.
+
 ## What to check on sendoff-abi.pages.dev before touching DNS
 
 The offline path is the part most likely to differ, and it is the part this
@@ -133,22 +173,100 @@ app has been bitten by most.
 - Reload `/races/<slug>/` offline. This one exercises the service worker
   fallback added in v6.
 - Check response headers: `curl -I https://sendoff-abi.pages.dev/races/<slug>/data.json`
-  should show `cache-control: no-cache` and an `etag`.
+  should show `cache-control: no-cache` and an `etag`. Confirmed 2026-09-10.
+
+Two things worth checking that did not exist when this list was written:
+
+- **The live push on a phone that goes to sleep.** A websocket can be killed by
+  a captive portal or a locked phone without saying so, which is the failure
+  the poll underneath exists to cover. Open a race page, lock the phone for a
+  few minutes, unlock it, and confirm the page catches up rather than sitting
+  on a stale split. This is the one worth doing on a real phone on cell data,
+  because it cannot be reproduced on a desk.
+- **A spectator with no account.** Open a public race in a private window,
+  signed out, and confirm it still updates within a few seconds. That reads
+  `/public` on the worker rather than the published file, so it is the path a
+  share link actually takes now.
 
 `npm run test:browser` can be pointed at the trial host by changing `BASE` in
 `test/offline-browser.mjs`, which is the fastest way to do most of the above.
 
 ## The cutover, and the revert
 
-**Cutover.** Add `sendoff.run` as a custom domain on the Pages project, then
-point the DNS record at Pages. Remove the custom domain from the GitHub Pages
-settings so the two do not fight over it.
+**Cutover.** Cloudflare dashboard, Workers & Pages, the `sendoff` project,
+Custom domains, Set up a custom domain, `sendoff.run`. The zone is already in
+the same account, so Cloudflare offers to change the DNS itself: accept, and it
+replaces the four A records below with a proxied CNAME to the project. Repeat
+for `www.sendoff.run` if you want it to follow. Then wait for the certificate,
+usually a minute or two.
+
+**Do not remove the custom domain from the GitHub Pages settings**, which this
+file used to tell you to do. Leaving both configured is what keeps the revert
+to a single DNS change: GitHub Pages will only serve `sendoff.run` while it is
+still configured to, and re-adding it later means waiting on certificate
+issuance at the moment you least want to. They do not fight, because DNS
+decides which one gets asked. The `CNAME` file in the repository root is what
+holds that configuration, so leave that alone too.
 
 **Revert.** Point DNS back at GitHub Pages. `deploy-pages.yml` never stopped
 running, so the GitHub copy is current, not stale. That is the whole reason
 both deploys stay on during the trial.
 
+**The records as they stood before the cutover**, captured 2026-09-10 so the
+revert does not depend on remembering them:
+
+    sendoff.run        A      185.199.108.153  185.199.109.153
+                              185.199.110.153  185.199.111.153   (DNS only)
+    www.sendoff.run    CNAME  sendoffhq.github.io
+
+`sendoff.run` was grey-clouded, which is why it answered `server: GitHub.com`
+rather than Cloudflare. That also means **Worker routes on this zone have never
+run**: a route needs the hostname proxied. Anything that wants the worker on
+`sendoff.run/...` depends on this cutover having happened.
+
 Keep both for at least one full race weekend before turning either off.
+
+## After the cutover, 2026-09-10
+
+`sendoff.run` and `www.sendoff.run` both answer `server: cloudflare` on the
+zone's proxy addresses. Verified straight after:
+
+- `_headers` applies, which is the thing GitHub Pages could never do:
+  `/races/*` and `/hub.json` come back `no-cache` with an ETag, `/brand/*`
+  at a day.
+- `/definitely-not-real`, `/worker/src/worker.js`, `/races/no-such-race/data.json`
+  and `/races/no-such-race/` all 404. `/`, `/app/`, `/races/<slug>/` and
+  `/hub.json` all 200.
+- The worker still answers a preflight from `https://sendoff.run`, `/public`
+  serves the published copy, and `/live` reaches the Durable Object.
+
+**One thing to fix, and it is a zone setting rather than anything in the repo.**
+`_headers` is not authoritative for `.js` and `.css`:
+
+    /lib/race-core.js   _headers says 3600      served max-age=14400
+    /sw.js              _headers says no-cache  served max-age=14400
+    /brand/*.png        _headers says 86400     served max-age=86400   correct
+    /*.html, /*.json    _headers                served as written      correct
+
+That is the zone's **Browser Cache TTL**, set to 4 hours, which applies to
+responses Cloudflare caches by default and raises anything with a lower TTL.
+HTML and JSON are not default-cached, so they pass through untouched; the PNG
+already asked for longer than four hours, so it kept it.
+
+Fix: Caching, Configuration, **Browser Cache TTL, "Respect Existing Headers"**.
+
+Neither symptom is currently doing harm, which is worth saying so the fix is
+not mistaken for an emergency. `/lib/*` carries `?v=` and is busted by version
+rather than by time. And `sw.js` is registered without `updateViaCache`, whose
+default of `'imports'` means the browser bypasses its HTTP cache for the
+service worker script itself. Worth fixing anyway: a header file that is
+advisory rather than authoritative is a trap for whoever reads it next.
+
+**Also true now and not before:** the zone is proxied, so Worker routes on
+`sendoff.run` would run for the first time. The reason to want one is
+same-origin (no CORS, no preflight) and latency. It is *not* headroom, per the
+correction in `ROADMAP.md`: a cache hit in front of a Worker is still a billed
+request.
 
 ## What is NOT moving yet, and why the order matters
 
