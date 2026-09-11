@@ -127,6 +127,21 @@
     font-size: 15px; line-height: 1;
   }
   table.list .row-del:hover { color: var(--red); border-color: var(--red); }
+  /* Same box as the delete button, so a row's controls read as one set. Up and
+     down are ordinary actions and delete is the one that destroys something,
+     which is the whole of the colour difference on hover. */
+  table.list .row-move {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text-muted); cursor: pointer;
+    width: 30px; height: 30px; border-radius: 3px;
+    font-size: 13px; line-height: 1;
+  }
+  table.list .row-move:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+  /* Kept in the layout rather than removed: the top and bottom rows would
+     otherwise have their remaining buttons slide sideways, and the column
+     would not line up. */
+  table.list .row-move:disabled { opacity: 0.25; cursor: default; }
+  .row-acts { display: flex; gap: 4px; justify-content: flex-end; }
   .add-row {
     background: transparent; border: 1px dashed var(--border-bright);
     color: var(--text-dim); padding: 10px 14px; border-radius: 4px;
@@ -810,6 +825,48 @@
       <input type="checkbox" data-aid="${i}" data-k="${key}" ${on ? 'checked' : ''} />${label}</label>`;
   }
 
+  // Reordering a list of aid stations.
+  //
+  // The order is the course: segmentsFromAidStations reads the list in order
+  // and the mileages have to climb through it, so typing one in the wrong
+  // place used to mean retyping everything after it. The whole station moves,
+  // mileage and options with it, because a station entered out of order was
+  // entered with its own mileage and that is what is being put right.
+  //
+  // Index 0 never moves and nothing moves above it. It is the start: its
+  // mileage is fixed at zero and startAidFrom reads it by position.
+  function moveRow(list, from, dir) {
+    const to = from + dir;
+    if (from < 1 || to < 1 || to >= list.length) return null;
+    const [item] = list.splice(from, 1);
+    list.splice(to, 0, item);
+    return to;
+  }
+
+  // Re-rendering replaces the button that was just clicked, so the focus goes
+  // with it. Putting it back on the same control in its new row is what makes
+  // moving something three places a matter of pressing up three times.
+  function refocus(sel) {
+    const el = document.querySelector(sel);
+    if (el && !el.disabled) el.focus();
+  }
+
+  // Up and down for one row. Absent on the start row, and disabled rather than
+  // dropped at the ends so the column stays lined up.
+  function moveBtns(attr, i, n) {
+    if (i === 0) return '';
+    const b = (dir, label, on) =>
+      `<button type="button" class="row-move" data-${attr}-move="${i}" data-dir="${dir}" ` +
+      `aria-label="Move ${label}"${on ? '' : ' disabled'}>${dir < 0 ? '\u2191' : '\u2193'}</button>`;
+    return b(-1, 'up', i > 1) + b(1, 'down', i < n - 1);
+  }
+
+  // Any row but the start, as long as two are left: two is the fewest that
+  // makes a segment. It used to be "any row after the first two", which with
+  // nothing able to move was the same thing; with rows able to move it would
+  // have meant moving a station down one place to be allowed to delete it.
+  function canDelete(i, n) { return i > 0 && n > 2; }
+
   function renderAidRows() {
     const tbody = document.getElementById('aid-rows');
     tbody.innerHTML = state.aidStations.map((a, i) => `
@@ -818,7 +875,10 @@
         <td><input type="text" data-aid="${i}" data-k="name" value="${escapeAttr(a.name)}" placeholder="Aid name" /></td>
         <td><input type="number" data-aid="${i}" data-k="mileage" value="${a.mileage === '' || a.mileage == null ? '' : a.mileage}" step="0.1" min="0" placeholder="0.0" ${i === 0 ? 'readonly style="opacity:0.6"' : ''} /></td>
         <td><input type="number" data-aid="${i}" data-k="arriveCutoffHours" value="${a.arriveCutoffHours === '' || a.arriveCutoffHours == null ? '' : a.arriveCutoffHours}" step="0.25" min="0" placeholder="–" ${i === 0 ? 'readonly style="opacity:0.6"' : ''} /></td>
-        <td>${i > 1 ? `<button type="button" class="row-del" data-del-aid="${i}" aria-label="Delete">×</button>` : ''}</td>
+        <td><div class="row-acts">${moveBtns('aid', i, state.aidStations.length)}${
+          canDelete(i, state.aidStations.length)
+            ? `<button type="button" class="row-del" data-del-aid="${i}" aria-label="Delete">×</button>` : ''
+        }</div></td>
       </tr>
       <tr class="aid-opts-row">
         <td></td>
@@ -862,7 +922,10 @@
         <td style="font-family: 'JetBrains Mono', monospace; color: var(--text-muted); width: 30px;">${i+1}</td>
         <td><input type="text" data-loopaid="${i}" data-k="name" value="${escapeAttr(a.name)}" placeholder="Aid name" /></td>
         <td><input type="number" data-loopaid="${i}" data-k="mileage" value="${a.mileage === '' || a.mileage == null ? '' : a.mileage}" step="0.1" min="0" placeholder="0.0" ${i === 0 ? 'readonly style="opacity:0.6"' : ''} /></td>
-        <td>${i > 1 ? `<button type="button" class="row-del" data-del-loopaid="${i}" aria-label="Delete">×</button>` : ''}</td>
+        <td><div class="row-acts">${moveBtns('loopaid', i, state.loopAidStations.length)}${
+          canDelete(i, state.loopAidStations.length)
+            ? `<button type="button" class="row-del" data-del-loopaid="${i}" aria-label="Delete">×</button>` : ''
+        }</div></td>
       </tr>
     `).join('');
     renderLoopAidSummary();
@@ -1461,7 +1524,16 @@
     renderAidSummary();
   });
   document.getElementById('aid-rows').addEventListener('click', (e) => {
-    const del = e.target.dataset.delAid;
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.dataset.aidMove != null) {
+      const to = moveRow(state.aidStations, +btn.dataset.aidMove, +btn.dataset.dir);
+      if (to == null) return;
+      renderAidRows();
+      refocus(`[data-aid-move="${to}"][data-dir="${btn.dataset.dir}"]`);
+      return;
+    }
+    const del = btn.dataset.delAid;
     if (del == null) return;
     state.aidStations.splice(+del, 1);
     renderAidRows();
@@ -1483,7 +1555,16 @@
     renderLoopAidSummary();
   });
   document.getElementById('loop-aid-rows').addEventListener('click', (e) => {
-    const del = e.target.dataset.delLoopaid;
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.dataset.loopaidMove != null) {
+      const to = moveRow(state.loopAidStations, +btn.dataset.loopaidMove, +btn.dataset.dir);
+      if (to == null) return;
+      renderLoopAidRows();
+      refocus(`[data-loopaid-move="${to}"][data-dir="${btn.dataset.dir}"]`);
+      return;
+    }
+    const del = btn.dataset.delLoopaid;
     if (del == null) return;
     state.loopAidStations.splice(+del, 1);
     renderLoopAidRows();
