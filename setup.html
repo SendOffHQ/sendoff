@@ -649,8 +649,17 @@
   // ---------- auth UI ----------
   function isProxyMode() { return Race.auth.mode() === 'proxy'; }
 
+  // Hides the whole section, heading and status line included, rather than
+  // just its body: a bare "Sign in / signed in as ..." head with nothing under
+  // it reads as a panel that failed to load.
+  function showAuthSection(show) {
+    const sec = document.getElementById('sec-github');
+    if (sec) sec.style.display = show ? '' : 'none';
+  }
+
   function applyAuthMode() {
     const proxy = isProxyMode();
+    showAuthSection(true);
     document.getElementById('auth-login').style.display = proxy ? '' : 'none';
     document.getElementById('auth-pat').style.display = proxy ? 'none' : '';
     document.getElementById('auth-section-title').textContent = proxy ? 'Sign in' : 'GitHub connection';
@@ -669,6 +678,14 @@
     if (isProxyMode()) {
       const s = Race.auth.loadSession();
       const logout = document.getElementById('btn-logout');
+      // Somebody already signed in does not need a sign-in form at the top of
+      // the page they came to fill in, and the account bar in the header
+      // already says who they are and offers a way out. It stays for anybody
+      // who is not signed in, because they cannot create a race without an
+      // account and the form here signs them in without a reload: the modal
+      // the other pages use reloads on success, which on a wizard would throw
+      // away whatever had been typed into it.
+      showAuthSection(!(s && s.session && (!s.expiresAt || s.expiresAt > Date.now())));
       if (s && s.session && (!s.expiresAt || s.expiresAt > Date.now())) {
         const expIn = s.expiresAt ? Math.max(0, Math.floor((s.expiresAt - Date.now()) / 60000)) : null;
         dot.className = 'status-dot connected';
@@ -1294,7 +1311,14 @@
 
     const cfg = Race.auth.cfg();
     if (!cfg) {
+      // The panel is hidden while the session is good, so a session that ran
+      // out while the form was being filled in would otherwise leave "Sign in
+      // first." pointing at nothing. Put it back and send them to it.
+      renderGhStatus();
+      showAuthSection(true);
       showError(isProxyMode() ? 'Sign in first.' : 'Connect to GitHub first.');
+      const sec = document.getElementById('sec-github');
+      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
