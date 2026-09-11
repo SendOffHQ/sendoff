@@ -468,6 +468,41 @@ the change, and four people's addresses are in 191 of them. Dropping the
 right outcome, but a purge written to preserve history while rewriting only the
 blobs would keep the exact thing worth removing.
 
+### Is a private race private yet? Not quite — *two gaps*
+
+Checked 2026-09-11, after the write path moved off git. Most of the way, and
+worth being exact about the rest rather than rounding up.
+
+**What a new private race now keeps to itself.** `config.json` and `data.json`
+go to D1 and never reach git, because `handleCommit` routes any race path
+through `commitToD1` while `WRITE_TO_GIT` is false. The hub manifest skips it
+(`setup.html`: "Unlisted race: skipping public manifest"). No share page and no
+`og.png` are generated for it, which `test/share-pages.mjs` holds. The roster
+and the addresses on it live in KV, never in a file. The archive no longer
+publishes it at the finish, fixed the same day.
+
+**Gap one: `course.gpx` still goes to the public repository.** `commitToD1`
+guards the two files that have a version column and passes everything else
+through to git, and `setup.html` writes the GPX through the same endpoint. So a
+private race's route file, and the path naming its slug, are readable by
+anybody. Splits, names, notes and the roster are not — but the race's
+*existence* is, which is the thing an unlisted race is trying to keep.
+
+Fixing it means somewhere for the GPX to live that is not git: a column on
+`races` and a branch in `readFromD1`, which is a migration plus both sides of
+the read. Not a patch, and worth doing deliberately.
+
+**Gap two: history.** Every private race that has ever existed is still in this
+public repository's history — 45 commits for the dry run alone, and it was
+deleted from the working tree today. Deleting a file from `main` does nothing
+about that. This is what the purge is for, and it is why the purge, not the
+write path, is where privacy actually lands.
+
+**So the honest statement today** is that a new private race keeps its data
+private and leaks its existence, and an old one is fully readable to anybody
+who clones. Until both are closed the labels stay "unlisted" everywhere a
+person can read them, which is the point of that word.
+
 ### Deleting a race should be one commit — *not built*
 
 `handleRaceDelete` walks the repository tree and issues a separate Contents API
