@@ -8,7 +8,9 @@ import { createHash } from 'node:crypto';
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const PORT = 8787;
 const ME = 'crew@example.com';
-const SLUG = '000003-dry-run-sangre';
+// The fixture the browser tests use, not a race anybody might delete. This
+// named a real unlisted race until that race was tidied away.
+const SLUG = 'zz-fixture-unlisted';
 
 const TYPES = { '.html':'text/html', '.js':'application/javascript', '.css':'text/css',
   '.json':'application/json', '.svg':'image/svg+xml', '.gpx':'application/gpx+xml',
