@@ -12,7 +12,8 @@ import { spawn } from 'node:child_process';
 import net from 'node:net'; import fs from 'node:fs';
 const BASE = 'http://localhost:8787';
 const PUBLIC_SLUG = 'six-0-trail-marathon';
-const UNLISTED_SLUG = '000003-dry-run-sangre';
+// The fixture, not a race somebody might delete. See test/fixtures/races.
+const UNLISTED_SLUG = 'zz-fixture-unlisted';
 const PIN = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 const listening = () => new Promise(r => { const s = net.connect(8787,'127.0.0.1');
