@@ -40,29 +40,12 @@
   .wrap { max-width: 860px; margin: 0 auto; }
 
   /* connection bar */
-  .conn {
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: 6px; padding: 14px 18px; margin-bottom: 18px;
-  }
-  .conn-status { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .status-dot {
     width: 8px; height: 8px; border-radius: 50%;
     background: var(--text-muted); flex: none;
   }
   .status-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); }
   .status-dot.error { background: var(--red); box-shadow: 0 0 8px var(--red); }
-  .conn-text { flex: 1 1 auto; min-width: 200px;
-    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim);
-  }
-  .conn-text strong { color: var(--text); font-weight: 600; }
-  .conn-form { margin-top: 14px; display: grid; gap: 10px; }
-  .conn-form[hidden] { display: none; }
-  .conn-form .row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: center; }
-  @media (max-width: 480px) { .conn-form .row { grid-template-columns: 1fr; gap: 4px; } }
-  .conn-form label {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
-    letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted);
-  }
 
   /* runner cards */
   /* aid station editor */
@@ -246,36 +229,6 @@
   </div>
 </header>
 
-<section class="conn" id="conn">
-  <div class="conn-status">
-    <span class="status-dot" id="conn-dot"></span>
-    <span class="conn-text" id="conn-text">Not connected · button presses will fail until you connect.</span>
-    <button class="btn" id="conn-toggle">Setup</button>
-  </div>
-
-  <!-- Login form (proxy mode) -->
-  <div class="conn-form" id="login-form" hidden>
-    <div class="row"><label>Email</label><input type="email" id="login-username" autocomplete="username" spellcheck="false" /></div>
-    <div class="row"><label>Password</label><input type="password" id="login-password" autocomplete="current-password" /></div>
-    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-      <button class="btn primary" id="login-submit">Sign in</button>
-      <button class="btn" id="login-logout">Sign out</button>
-    </div>
-  </div>
-
-  <!-- PAT form (direct mode) -->
-  <div class="conn-form" id="conn-form" hidden>
-    <div class="row"><label>Token</label><input type="password" id="cfg-token" placeholder="github_pat_..." autocomplete="off" /></div>
-    <div class="row"><label>Owner</label><input type="text" id="cfg-owner" autocomplete="off" /></div>
-    <div class="row"><label>Repo</label><input type="text" id="cfg-repo" autocomplete="off" /></div>
-    <div class="row"><label>Branch</label><input type="text" id="cfg-branch" value="main" autocomplete="off" /></div>
-    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-      <button class="btn primary" id="cfg-save">Connect</button>
-      <button class="btn" id="cfg-disconnect">Disconnect</button>
-    </div>
-  </div>
-</section>
-
 <div id="error" class="error-banner" style="display:none;"></div>
 
 <!-- Race details. One field today, but it needs somewhere to live: an activity
@@ -431,7 +384,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=82"></script>
+<script src="lib/race-core.js?v=83"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -521,127 +474,6 @@
   }
 
   // ---------- connection ----------
-  function isProxyMode() { return Race.auth.mode() === 'proxy'; }
-
-  function renderConnStatus() {
-    const dot = document.getElementById('conn-dot');
-    const txt = document.getElementById('conn-text');
-    const toggle = document.getElementById('conn-toggle');
-    if (isProxyMode()) {
-      const s = Race.auth.loadSession();
-      const signedIn = !!(s && s.session && (!s.expiresAt || s.expiresAt > Date.now()));
-      if (signedIn) {
-        const expIn = s.expiresAt ? Math.max(0, Math.floor((s.expiresAt - Date.now()) / 60000)) : null;
-        dot.className = 'status-dot connected';
-        txt.innerHTML = `Signed in as <strong>${s.email || s.username || '?'}</strong>${expIn != null ? ` · session ${expIn}m left` : ''}`;
-      } else {
-        dot.className = 'status-dot';
-        txt.textContent = 'Not signed in · button presses will fail until you sign in.';
-      }
-      toggle.textContent = signedIn ? 'Account' : 'Sign in';
-    } else {
-      const c = Race.config.load();
-      if (c && c.token) {
-        const masked = c.token.length > 8 ? c.token.slice(0, 4) + '…' + c.token.slice(-4) : '••••';
-        dot.className = 'status-dot connected';
-        txt.innerHTML = `Connected · <strong>${c.owner}/${c.repo}</strong> @ <strong>${c.branch}</strong> · ${masked}`;
-      } else {
-        dot.className = 'status-dot';
-        txt.textContent = 'Not connected · button presses will fail until you connect.';
-      }
-      toggle.textContent = 'Setup';
-    }
-  }
-
-  function fillConnForm() {
-    if (isProxyMode()) {
-      const s = Race.auth.loadSession();
-      document.getElementById('login-username').value = s?.email || s?.username || '';
-      document.getElementById('login-password').value = '';
-    } else {
-      const c = Race.config.load() || Race.config.detectDefaults();
-      document.getElementById('cfg-token').value = c.token || '';
-      document.getElementById('cfg-owner').value = c.owner || '';
-      document.getElementById('cfg-repo').value  = c.repo || '';
-      document.getElementById('cfg-branch').value = c.branch || 'main';
-    }
-  }
-
-  function showConnForm() {
-    const proxy = isProxyMode();
-    document.getElementById('login-form').hidden = !proxy;
-    document.getElementById('conn-form').hidden = proxy;
-    fillConnForm();
-  }
-
-  function hideConnForm() {
-    document.getElementById('login-form').hidden = true;
-    document.getElementById('conn-form').hidden = true;
-  }
-
-  function isConnFormOpen() {
-    return !document.getElementById('login-form').hidden ||
-           !document.getElementById('conn-form').hidden;
-  }
-
-  async function saveConfigFromForm() {
-    const c = {
-      token: document.getElementById('cfg-token').value.trim(),
-      owner: document.getElementById('cfg-owner').value.trim(),
-      repo: document.getElementById('cfg-repo').value.trim(),
-      branch: document.getElementById('cfg-branch').value.trim() || 'main'
-    };
-    if (!c.token || !c.owner || !c.repo) { alert('Token, owner, and repo are required.'); return; }
-    const btn = document.getElementById('cfg-save');
-    const orig = btn.textContent;
-    btn.textContent = 'Testing…'; btn.disabled = true;
-    try {
-      await Race.gh.getFile({ mode: 'direct', ...c }, CONFIG_PATH);
-      Race.config.save({ ...(Race.config.load() || {}), ...c });
-      btn.textContent = 'Connected ✓';
-      hideConnForm();
-      renderConnStatus();
-      await load();
-    } catch (err) {
-      alert(`Could not connect:\n${err.message}`);
-    } finally {
-      btn.disabled = false;
-      setTimeout(() => { btn.textContent = orig; }, 1500);
-    }
-  }
-
-  async function doLogin() {
-    const email = document.getElementById('login-username').value.trim();
-    const password = document.getElementById('login-password').value;
-    if (!email || !password) { alert('Email and password required.'); return; }
-    const btn = document.getElementById('login-submit');
-    const orig = btn.textContent;
-    btn.textContent = 'Signing in…'; btn.disabled = true;
-    try {
-      await Race.auth.login(email, password);
-      btn.textContent = 'Signed in ✓';
-      document.getElementById('login-password').value = '';
-      hideConnForm();
-      renderConnStatus();
-      await load();
-    } catch (err) {
-      alert(`Could not sign in:\n${err.message}`);
-    } finally {
-      btn.disabled = false;
-      setTimeout(() => { btn.textContent = orig; }, 1500);
-    }
-  }
-
-  function disconnectConfig() {
-    if (isProxyMode()) {
-      if (!confirm('Sign out on this device?')) return;
-      Race.auth.logout();
-    } else {
-      if (!confirm('Disconnect and remove the stored token from this device?')) return;
-      Race.config.clear();
-    }
-    renderConnStatus();
-  }
 
   // ---------- render ----------
   function escapeHtml(s) {
@@ -1345,17 +1177,6 @@
   }
 
   // ---------- wire-up ----------
-  function openConnForm() { showConnForm(); }
-  document.getElementById('conn-toggle').addEventListener('click', () => {
-    if (isConnFormOpen()) hideConnForm(); else openConnForm();
-  });
-  document.getElementById('cfg-save').addEventListener('click', saveConfigFromForm);
-  document.getElementById('cfg-disconnect').addEventListener('click', disconnectConfig);
-  document.getElementById('login-submit').addEventListener('click', doLogin);
-  document.getElementById('login-logout').addEventListener('click', disconnectConfig);
-  document.getElementById('login-password').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') doLogin();
-  });
 
   document.getElementById('aid-editor-head').addEventListener('click', () => {
     document.getElementById('aid-editor').classList.toggle('collapsed');
@@ -1566,8 +1387,6 @@
   // Load hub.json first so we know whether to render proxy or PAT auth UI.
   (async () => {
     await Race.hub.load();
-    if (!Race.auth.has()) openConnForm();
-    renderConnStatus();
     await load();
     setInterval(load, 30000);
     setInterval(updateLastUpdatedLabel, 1000);
