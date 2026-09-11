@@ -8,6 +8,34 @@
 <link rel="icon" href="brand/sendoff-favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0a0f14" />
 <meta name="robots" content="noindex">
+<script>
+  // A race address that has no page of its own still opens the race.
+  //
+  // A public race is linked as /races/<slug>/, which is a real page in this
+  // repo: tools/make-og.py builds one per race so the link carries that race's
+  // own preview card. The page is built after the race exists, and for a while
+  // it was built by hand, so there is a window where the manifest lists a race
+  // whose address 404s. That happened: a race created on 2026-09-11 was live,
+  // listed on the hub, and every click on it landed here.
+  //
+  // The race itself is fine in all of those cases. Only the wrapper is
+  // missing, and the app can open the race without it, so it does rather than
+  // telling somebody their race does not exist. A slug that really is gone
+  // gets race.html's own "no such race", which is the more specific answer
+  // anyway.
+  //
+  // Before the stylesheet and before anything renders, so a working link does
+  // not flash the word "Nothing" at whoever followed it.
+  (function () {
+    // No dot in the class: a slug never has one, and without that
+    // /races/index.json, which 404s on a hub with no public races yet,
+    // would match with "index.json" as the slug.
+    var m = /^\/races\/([^/.]+)\/?$/.exec(location.pathname);
+    if (!m) return;
+    var q = location.search.replace(/^\?/, '');
+    location.replace('/race.html?id=' + m[1] + (q ? '&' + q : '') + location.hash);
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">

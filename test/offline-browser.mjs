@@ -27,6 +27,14 @@ const BASE = 'http://localhost:8787';
 // something the app was doing correctly.
 const SLUG = 'zz-fixture-unlisted';
 const NAME = 'Fixture Unlisted Race';
+// The public race these open. It used to be whichever card the hub listed
+// first, which is a different race whenever somebody creates one: a race
+// created on 2026-09-11 sorted to the top and took six assertions with it,
+// because its files live in the database now and this harness serves the
+// repository. The one named here is a race whose files are in the repository,
+// which is the property these assertions actually need.
+const PUBLIC_SLUG = 'six-0-trail-marathon';
+const PUBLIC_PATH = `/races/${PUBLIC_SLUG}/`;
 const ME = 'crew@example.com';
 const HARNESS = new URL('./harness.mjs', import.meta.url).pathname;
 // The sandbox's preinstalled Chromium when it is there, otherwise whichever
@@ -105,21 +113,22 @@ ok('including ones that already finished', await page.evaluate(() =>
 // The address worth sharing. /races/<slug>/ carries that race's own social
 // card, so it is what the hub links to and what the race page leaves in the
 // bar; race.html?id= still works and is what an unlisted race keeps.
-ok('the hub links to the shareable page', publicRaces[0].startsWith('/races/'), true);
+ok('the hub links to the shareable page', publicRaces.every(p => p.startsWith('/races/')), true);
+ok('including the one these open', publicRaces.includes(PUBLIC_PATH), true);
 
-await page.goto(BASE + publicRaces[0]);
+await page.goto(BASE + PUBLIC_PATH);
 await page.waitForTimeout(2800);
 ok('which opens the race', await page.evaluate(() => {
   const t = document.getElementById('race-title');
   return !!t && t.textContent.trim().length > 0 && !/loading/i.test(t.textContent);
 }), true);
 ok('and leaves that address in the bar to be copied',
-  await page.evaluate(() => location.pathname), publicRaces[0]);
+  await page.evaluate(() => location.pathname), PUBLIC_PATH);
 
-await page.goto(`${BASE}/race.html?id=${publicRaces[0].split('/')[2]}`);
+await page.goto(`${BASE}/race.html?id=${PUBLIC_SLUG}`);
 await page.waitForTimeout(2800);
 ok('arriving by the app URL tidies it to the shareable one',
-  await page.evaluate(() => location.pathname), publicRaces[0]);
+  await page.evaluate(() => location.pathname), PUBLIC_PATH);
 ok('can open one of them', await page.evaluate(() => {
   const t = document.getElementById('race-title');
   return !!t && t.textContent.trim().length > 0 && !/loading/i.test(t.textContent);
