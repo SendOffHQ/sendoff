@@ -246,6 +246,23 @@
     </div>
     <p class="hint" style="margin-top:8px">What this race is. It decides how a
       pace reads and, later, what a result is comparable to.</p>
+    <div class="row" style="margin-top:14px">
+      <label for="race-unit-distance">Distance</label>
+      <select id="race-unit-distance">
+        <option value="mi">Miles</option>
+        <option value="km">Kilometers</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="race-unit-elevation">Elevation</label>
+      <select id="race-unit-elevation">
+        <option value="ft">Feet</option>
+        <option value="m">Meters</option>
+      </select>
+    </div>
+    <p class="hint" style="margin-top:8px">How distance, elevation and pace
+      display for everyone watching this race. What is stored does not change,
+      so switching back shows the same numbers again.</p>
     <div style="margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;">
       <button class="btn primary" id="race-save">Save changes</button>
     </div>
@@ -382,9 +399,20 @@
 
 </div>
 
+<!-- On its own, and collapsed. Deleting is not an access control, and it is the
+     one thing on this page that cannot be undone, so it asks to be opened on
+     purpose rather than sitting at the bottom of a roster. -->
+<section class="editor collapsed" id="delete-editor" style="display:none;">
+  <div class="editor-head" id="delete-editor-head">
+    <div class="editor-title">Delete this race</div>
+    <span class="editor-toggle">Open</span>
+  </div>
+  <div class="editor-body" id="delete-editor-body"></div>
+</section>
+
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=83"></script>
+<script src="lib/race-core.js?v=84"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -548,10 +576,36 @@
         onRosterChanged: (panel) => {
           accountPeople = panel.racers();
           if (editingRunners) renderRunnerRows();
+          // The panel now knows who made the race, which is what decides
+          // whether the delete section exists at all.
+          maybeShowDeleteSection();
         }
       });
     } else {
       accessPanel.refresh();
+    }
+    maybeShowDeleteSection();
+  }
+
+  // Creator only, which is stricter than managing access and is the same bar
+  // the worker enforces on the endpoint: an editor was invited to help run the
+  // race, not to unmake it. Anybody else never sees the section rather than
+  // seeing a button that answers 403.
+  //
+  // The panel is asked because it knows: the config no longer names the
+  // creator, so this cannot be read off cfg. Called again from onRosterChanged
+  // because the panel only knows once its own fetch has landed.
+  let deleteMounted = false;
+  function maybeShowDeleteSection() {
+    const sec = document.getElementById('delete-editor');
+    if (!sec || !cfg) return;
+    const mine = accessPanel ? accessPanel.isCreator() : (cfg.myRole === 'owner');
+    sec.style.display = mine ? '' : 'none';
+    if (mine && !deleteMounted) {
+      Race.access.mountDelete(document.getElementById('delete-editor-body'), {
+        slug, cfg: () => cfg, data: () => data
+      });
+      deleteMounted = true;
     }
   }
 
@@ -1042,18 +1096,35 @@
     el.innerHTML = '<option value="">Not set</option>' +
       Race.activities.all.map(a => `<option value="${a.key}">${a.label}</option>`).join('');
     el.value = (cfg && cfg.activity) || '';
+    // Units live here now rather than in the access panel: they are a property
+    // of the race, not of who may see it.
+    const u = (cfg && cfg.units) || {};
+    const du = document.getElementById('race-unit-distance');
+    const eu = document.getElementById('race-unit-elevation');
+    if (du) du.value = u.distance === 'km' ? 'km' : 'mi';
+    if (eu) eu.value = u.elevation === 'm' ? 'm' : 'ft';
   }
 
   async function saveRaceDetails() {
     const el = document.getElementById('race-activity');
     const chosen = el ? el.value : '';
+    const dSel = document.getElementById('race-unit-distance');
+    const eSel = document.getElementById('race-unit-elevation');
+    const distance = dSel && dSel.value === 'km' ? 'km' : 'mi';
+    const elevation = eSel && eSel.value === 'm' ? 'm' : 'ft';
     const btn = document.getElementById('race-save');
     btn.disabled = true;
     try {
       await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
         if (chosen) remote.activity = chosen; else delete remote.activity;
+        remote.units = { distance, elevation };
         return remote;
-      }, `settings: set activity for ${slug}`);
+      }, `settings: set race details for ${slug}`);
+      // Applied in place rather than re-read. Reading the config back straight
+      // after writing it races GitHub's own consistency, and would briefly show
+      // the units from before the save.
+      if (cfg) cfg.units = { distance, elevation };
+      render();
       // The hub draws its cards from the manifest, not from the config, so a
       // change that stopped here would show on the race page and nowhere else.
       // A public race only; a private one is not in the manifest at all.
@@ -1214,6 +1285,9 @@
   });
   document.getElementById('aid-save').addEventListener('click', saveAidStations);
 
+  document.getElementById('delete-editor-head').addEventListener('click', () => {
+    document.getElementById('delete-editor').classList.toggle('collapsed');
+  });
   document.getElementById('race-editor-head').addEventListener('click', () => {
     document.getElementById('race-editor').classList.toggle('collapsed');
   });
