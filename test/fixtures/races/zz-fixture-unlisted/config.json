@@ -1,0 +1,373 @@
+{
+  "courseType": "segments",
+  "course": {
+    "segments": [
+      {
+        "name": "Music Meadows (Start) \u2192 Music Pass",
+        "fromAid": "Music Meadows (Start)",
+        "toAid": "Music Pass",
+        "distanceMi": 4.3,
+        "elevationGainFt": 2824,
+        "elevationLossFt": 13,
+        "arriveCutoffHours": null,
+        "crewAccess": false,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": true
+      },
+      {
+        "name": "Music Pass \u2192 Music Meadows 1",
+        "fromAid": "Music Pass",
+        "toAid": "Music Meadows 1",
+        "distanceMi": 4.3,
+        "elevationGainFt": 0,
+        "elevationLossFt": 2822,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Music Meadows 1 \u2192 Colony Creek 1",
+        "fromAid": "Music Meadows 1",
+        "toAid": "Colony Creek 1",
+        "distanceMi": 6.6,
+        "elevationGainFt": 1304,
+        "elevationLossFt": 414,
+        "arriveCutoffHours": null,
+        "crewAccess": false,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Colony Creek 1 \u2192 Horn Creek 1",
+        "fromAid": "Colony Creek 1",
+        "toAid": "Horn Creek 1",
+        "distanceMi": 8.8,
+        "elevationGainFt": 1029,
+        "elevationLossFt": 1981,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": "Crew lot C1",
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Horn Creek 1 \u2192 Venable",
+        "fromAid": "Horn Creek 1",
+        "toAid": "Venable",
+        "distanceMi": 5.6,
+        "elevationGainFt": 909,
+        "elevationLossFt": 982,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": "Crew lot C2",
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Venable \u2192 Horn Creek 2",
+        "fromAid": "Venable",
+        "toAid": "Horn Creek 2",
+        "distanceMi": 5.7,
+        "elevationGainFt": 996,
+        "elevationLossFt": 913,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": "Crew lot C1",
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Horn Creek 2 \u2192 Colony Creek 2",
+        "fromAid": "Horn Creek 2",
+        "toAid": "Colony Creek 2",
+        "distanceMi": 8.7,
+        "elevationGainFt": 1909,
+        "elevationLossFt": 1023,
+        "arriveCutoffHours": null,
+        "crewAccess": false,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Colony Creek 2 \u2192 Music Meadows 2",
+        "fromAid": "Colony Creek 2",
+        "toAid": "Music Meadows 2",
+        "distanceMi": 6.6,
+        "elevationGainFt": 505,
+        "elevationLossFt": 1326,
+        "arriveCutoffHours": 18.5,
+        "crewAccess": true,
+        "crewNote": null,
+        "pacerEligible": true,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Music Meadows 2 \u2192 Colony Creek 3",
+        "fromAid": "Music Meadows 2",
+        "toAid": "Colony Creek 3",
+        "distanceMi": 6.6,
+        "elevationGainFt": 1318,
+        "elevationLossFt": 418,
+        "arriveCutoffHours": null,
+        "crewAccess": false,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Colony Creek 3 \u2192 Horn Creek 3",
+        "fromAid": "Colony Creek 3",
+        "toAid": "Horn Creek 3",
+        "distanceMi": 8.9,
+        "elevationGainFt": 1014,
+        "elevationLossFt": 2001,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": "Crew lot C2",
+        "pacerEligible": true,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Horn Creek 3 \u2192 Venable 2",
+        "fromAid": "Horn Creek 3",
+        "toAid": "Venable 2",
+        "distanceMi": 5.5,
+        "elevationGainFt": 913,
+        "elevationLossFt": 944,
+        "arriveCutoffHours": 26.5,
+        "crewAccess": true,
+        "crewNote": "Crew lot C1",
+        "pacerEligible": true,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Venable 2 \u2192 Horn Creek 4",
+        "fromAid": "Venable 2",
+        "toAid": "Horn Creek 4",
+        "distanceMi": 5.7,
+        "elevationGainFt": 964,
+        "elevationLossFt": 932,
+        "arriveCutoffHours": 28.75,
+        "crewAccess": true,
+        "crewNote": "Crew lot C2",
+        "pacerEligible": true,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Horn Creek 4 \u2192 Colony Creek 4",
+        "fromAid": "Horn Creek 4",
+        "toAid": "Colony Creek 4",
+        "distanceMi": 8.7,
+        "elevationGainFt": 1870,
+        "elevationLossFt": 1000,
+        "arriveCutoffHours": null,
+        "crewAccess": false,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Colony Creek 4 \u2192 Music Meadows 3",
+        "fromAid": "Colony Creek 4",
+        "toAid": "Music Meadows 3",
+        "distanceMi": 6.6,
+        "elevationGainFt": 517,
+        "elevationLossFt": 1295,
+        "arriveCutoffHours": 34,
+        "crewAccess": true,
+        "crewNote": null,
+        "pacerEligible": true,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Music Meadows 3 \u2192 Music Pass 2",
+        "fromAid": "Music Meadows 3",
+        "toAid": "Music Pass 2",
+        "distanceMi": 4.3,
+        "elevationGainFt": 2825,
+        "elevationLossFt": 14,
+        "arriveCutoffHours": null,
+        "crewAccess": false,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": true
+      },
+      {
+        "name": "Music Pass 2 \u2192 Finish",
+        "fromAid": "Music Pass 2",
+        "toAid": "Finish",
+        "distanceMi": 4.4,
+        "elevationGainFt": 0,
+        "elevationLossFt": 2831,
+        "arriveCutoffHours": 38,
+        "crewAccess": true,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      }
+    ],
+    "startAid": {
+      "crewAccess": true,
+      "crewNote": null,
+      "pacerEligible": false,
+      "dropBag": true
+    }
+  },
+  "cutoffs": {
+    "totalHours": 38
+  },
+  "units": {
+    "distance": "mi",
+    "elevation": "ft"
+  },
+  "fuelMetrics": [
+    {
+      "key": "calories",
+      "label": "Calories",
+      "unit": "cal",
+      "short": "Cal",
+      "decimals": 0,
+      "step": 10
+    },
+    {
+      "key": "fluidOz",
+      "label": "Fluid",
+      "unit": "oz",
+      "short": "Fluid",
+      "decimals": 1,
+      "step": 1
+    },
+    {
+      "key": "sodiumMg",
+      "label": "Sodium",
+      "unit": "mg",
+      "short": "Na",
+      "decimals": 0,
+      "step": 50
+    }
+  ],
+  "fuelPresets": [
+    {
+      "name": "Flask of LMNT",
+      "values": {
+        "fluidOz": 17,
+        "sodiumMg": 1200
+      }
+    }
+  ],
+  "phaseTargets": [
+    {
+      "fromHour": 0,
+      "label": "Dark, cold (~35\u201345\u00b0F), pre-dawn",
+      "targets": {
+        "caloriesPerHour": 250,
+        "fluidOzPerHour": 16,
+        "sodiumMgPerHour": 500
+      }
+    },
+    {
+      "fromHour": 3,
+      "label": "Dawn, Warming",
+      "targets": {
+        "caloriesPerHour": 275,
+        "fluidOzPerHour": 20,
+        "sodiumMgPerHour": 700
+      }
+    },
+    {
+      "fromHour": 6,
+      "label": "Day, warm, high-altitude sun",
+      "targets": {
+        "caloriesPerHour": 275,
+        "fluidOzPerHour": 26,
+        "sodiumMgPerHour": 1200
+      }
+    },
+    {
+      "fromHour": 13,
+      "label": "Evening, cooling fast",
+      "targets": {
+        "caloriesPerHour": 250,
+        "fluidOzPerHour": 20,
+        "sodiumMgPerHour": 900
+      }
+    },
+    {
+      "fromHour": 16,
+      "label": "Night two, cold",
+      "targets": {
+        "caloriesPerHour": 250,
+        "fluidOzPerHour": 16,
+        "sodiumMgPerHour": 500
+      }
+    },
+    {
+      "fromHour": 27,
+      "label": "Day two, warming",
+      "targets": {
+        "caloriesPerHour": 225,
+        "fluidOzPerHour": 20,
+        "sodiumMgPerHour": 800
+      }
+    },
+    {
+      "fromHour": 31,
+      "label": "Warm, deep fatigue",
+      "targets": {
+        "caloriesPerHour": 200,
+        "fluidOzPerHour": 24,
+        "sodiumMgPerHour": 1000
+      }
+    },
+    {
+      "fromHour": 35,
+      "label": "Survival mode",
+      "targets": {
+        "caloriesPerHour": 200,
+        "fluidOzPerHour": 24,
+        "sodiumMgPerHour": 1000
+      }
+    }
+  ],
+  "targets": {
+    "caloriesPerHour": 275,
+    "fluidOzPerHour": 32,
+    "sodiumMgPerHour": 1000
+  },
+  "name": "Fixture Unlisted Race",
+  "location": "Music Meadows Ranch \u00b7 Westcliffe, CO",
+  "startTime": "2026-09-07T08:11:13.300565-06:00",
+  "visibility": "private",
+  "runners": [
+    {
+      "id": "jason",
+      "name": "Test Racer",
+      "bib": "147",
+      "color": "#1bc318"
+    }
+  ],
+  "crewNotes": "Dry run. Nothing here is real. See DRY-RUN.md in the repo for what to work through.",
+  "activity": "trail-run",
+  "createdBy": "crew@example.com"
+}

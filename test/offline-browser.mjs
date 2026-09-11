@@ -22,7 +22,10 @@ import net from 'node:net';
 import fs from 'node:fs';
 
 const BASE = 'http://localhost:8787';
-const SLUG = '000003-dry-run-sangre';
+// A fixture, not a race somebody might delete. This named a real unlisted race
+// until that race was tidied away and every assertion below started failing at
+// something the app was doing correctly.
+const SLUG = 'zz-fixture-unlisted';
 const ME = 'crew@example.com';
 const HARNESS = new URL('./harness.mjs', import.meta.url).pathname;
 // The sandbox's preinstalled Chromium when it is there, otherwise whichever

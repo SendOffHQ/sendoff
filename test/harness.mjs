@@ -14,9 +14,18 @@ const TYPES = { '.html':'text/html', '.js':'application/javascript', '.css':'tex
   '.json':'application/json', '.svg':'image/svg+xml', '.gpx':'application/gpx+xml',
   '.png':'image/png', '.webmanifest':'application/manifest+json', '.woff2':'font/woff2' };
 
+// Races from the repository, then the fixtures beside this file.
+//
+// The browser tests used to name a real unlisted race out of races/, because
+// they need one and the repository had one. Deleting that race broke them, and
+// the failure looked like a bug in the app: no crew pages, no role, and a hang.
+// A test that a person can break by tidying up is not testing what it says.
+const FIXTURES = path.join(ROOT, 'test', 'fixtures', 'races');
 const raceFile = (slug, file) => {
-  const p = path.join(ROOT, 'races', slug, file);
-  return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null;
+  for (const p of [path.join(ROOT, 'races', slug, file), path.join(FIXTURES, slug, file)]) {
+    if (fs.existsSync(p)) return fs.readFileSync(p, 'utf8');
+  }
+  return null;
 };
 
 const server = http.createServer((req, res) => {
@@ -147,6 +156,13 @@ const server = http.createServer((req, res) => {
     return res.end();
   }
   let full = path.join(ROOT, decodeURIComponent(url.pathname));
+  // A fixture race is served at the same address a real one would be, so the
+  // published-file path the app falls back to works for it as well.
+  const fx = /^\/races\/([^/]+)\/(.+)$/.exec(decodeURIComponent(url.pathname));
+  if (fx && !fs.existsSync(full)) {
+    const alt = path.join(FIXTURES, fx[1], fx[2]);
+    if (fs.existsSync(alt)) full = alt;
+  }
   if (!fs.existsSync(full) && fs.existsSync(full + '.html')) full += '.html';
   if (full.startsWith(ROOT) && fs.existsSync(full) && fs.statSync(full).isDirectory()) {
     full = path.join(full, 'index.html');
