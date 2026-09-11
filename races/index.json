@@ -45,7 +45,24 @@
       ],
       "cutoffHours": 38,
       "activity": "trail-run"
+    },
+    {
+      "slug": "000002-jr-texas-water-safari",
+      "name": "Jr Texas Water Safari",
+      "location": "San Marcos, TX",
+      "startTime": "2026-09-19T09:00:00-05:00",
+      "courseType": "segments",
+      "units": {
+        "distance": "mi",
+        "elevation": "ft"
+      },
+      "activity": "paddle",
+      "totalDistanceMi": 16,
+      "runnerNames": [
+        "Kristin Miller"
+      ],
+      "cutoffHours": 5
     }
   ],
-  "lastUpdated": "2026-09-10T20:28:44.008Z"
+  "lastUpdated": "2026-09-11T22:53:58.909Z"
 }
