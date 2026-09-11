@@ -170,6 +170,13 @@ const server = http.createServer((req, res) => {
     full = path.join(full, 'index.html');
   }
   if (!full.startsWith(ROOT) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) {
+    // What the host does, rather than a bare string. Cloudflare Pages answers
+    // any path it does not have with the project's 404.html, and that page is
+    // not only a message: it forwards /races/<slug>/ into the app for races
+    // whose own page has not been built yet. A harness that answers 'not
+    // found' cannot see whether that works.
+    const page = path.join(ROOT, '404.html');
+    if (fs.existsSync(page)) return send(404, fs.readFileSync(page), 'text/html; charset=utf-8');
     return send(404, 'not found');
   }
   send(200, fs.readFileSync(full), TYPES[path.extname(full)] || 'application/octet-stream');
