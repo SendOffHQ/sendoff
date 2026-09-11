@@ -205,6 +205,12 @@
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     margin: 0 0 12px;
   }
+  /* display:flex above wins against the [hidden] default, which is the same
+     trap race-theme.css guards the account menu against. Without this, a race
+     with one racer showed the label and an empty picker: renderPlanPicker sets
+     hidden and returns before filling the select, so the thing it thought it
+     had put away sat on screen with nothing in it. */
+  .plan-for[hidden] { display: none; }
   .plan-for label {
     font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim);
@@ -425,7 +431,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=80"></script>
+<script src="lib/race-core.js?v=81"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
