@@ -503,6 +503,12 @@ private and leaks its existence, and an old one is fully readable to anybody
 who clones. Until both are closed the labels stay "unlisted" everywhere a
 person can read them, which is the point of that word.
 
+**Decided 2026-09-11: both wait until after Sangre de Cristo**, which is on the
+26th and is public, so neither gap touches it. The one thing that would change
+that is creating a *private* race before the fix lands: its route file and its
+slug would go to the public repository the way they do today. If that comes up
+before then, the GPX column is the piece to pull forward.
+
 ### Deleting a race should be one commit — *not built*
 
 `handleRaceDelete` walks the repository tree and issues a separate Contents API
