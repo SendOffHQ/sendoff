@@ -392,16 +392,10 @@
   <div class="access-body" id="access-body"></div>
 </section>
 
-<footer class="site">
-  <span>Course, roster and access for this race</span>
-  <span id="last-updated">–</span>
-</footer>
-
-</div>
-
-<!-- On its own, and collapsed. Deleting is not an access control, and it is the
-     one thing on this page that cannot be undone, so it asks to be opened on
-     purpose rather than sitting at the bottom of a roster. -->
+<!-- Directly under Manage access, and inside the wrapper. Outside it, this ran
+     the full width of the window and sat below the footer. Collapsed, because
+     deleting is not an access control and it is the one thing on this page that
+     cannot be undone, so it asks to be opened on purpose. -->
 <section class="editor collapsed" id="delete-editor" style="display:none;">
   <div class="editor-head" id="delete-editor-head">
     <div class="editor-title">Delete this race</div>
@@ -410,9 +404,16 @@
   <div class="editor-body" id="delete-editor-body"></div>
 </section>
 
+<footer class="site">
+  <span>Course, roster and access for this race</span>
+  <span id="last-updated">–</span>
+</footer>
+
+</div>
+
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=84"></script>
+<script src="lib/race-core.js?v=85"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
