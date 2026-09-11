@@ -26,6 +26,7 @@ const BASE = 'http://localhost:8787';
 // until that race was tidied away and every assertion below started failing at
 // something the app was doing correctly.
 const SLUG = 'zz-fixture-unlisted';
+const NAME = 'Fixture Unlisted Race';
 const ME = 'crew@example.com';
 const HARNESS = new URL('./harness.mjs', import.meta.url).pathname;
 // The sandbox's preinstalled Chromium when it is there, otherwise whichever
@@ -216,8 +217,12 @@ ok('the shareable address still opens the race offline', await page.evaluate(() 
   const t = document.getElementById('race-title');
   return !!t && t.textContent.trim().length > 0 && !/loading/i.test(t.textContent);
 }), true);
-ok('and it is the right race', await page.evaluate(() =>
-  document.getElementById('race-title').textContent.toLowerCase().includes('sangre')), true);
+// Against the fixture's own name rather than a word from whichever race this
+// used to point at, which is how a renamed or deleted race breaks a test that
+// has nothing to do with it.
+ok('and it is the right race', await page.evaluate((n) =>
+  document.getElementById('race-title').textContent.toLowerCase().includes(n),
+  NAME.toLowerCase()), true);
 
 await page.goto(`${BASE}/race.html?id=${SLUG}`).catch(() => {});
 await page.waitForTimeout(3500);
