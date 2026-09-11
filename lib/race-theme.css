@@ -384,20 +384,27 @@ label.field > .hint {
    Mounted by Race.access on any page that can manage a race: the dashboard and
    the pit board both host it, from this one set of rules. */
 /* Manage access panel */
+/* The box matches .editor on the settings page, which is the only page this
+   panel appears on. The two sit one above the other with headings that now
+   look alike, so a 2px difference in the left padding shows up as a ragged
+   edge down the page. */
 .access {
   background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 6px; margin: 0 0 24px;
+  border-radius: 6px; margin: 0 0 22px;
 }
 .access-head {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 14px 22px; cursor: pointer; user-select: none;
+  padding: 18px 20px; cursor: pointer; user-select: none;
   border-bottom: 1px solid transparent;
 }
 .access.open .access-head { border-bottom-color: var(--border); }
 .access:not(.open) .access-body { display: none; }
+/* The same as .editor-title on the settings page. This was small, muted and
+   uppercase, which read as a label over a panel rather than as one of the
+   page's sections, and it is one of the page's sections. */
 .access-head-title {
-  font-family: 'JetBrains Mono', monospace; font-size: 11px;
-  letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted);
+  font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif;
+  font-size: 18px; font-weight: 600; color: var(--text);
 }
 .access-head-toggle {
   font-family: 'JetBrains Mono', monospace; font-size: 10px;
@@ -407,7 +414,7 @@ label.field > .hint {
 .access-head:hover .access-head-toggle { color: var(--accent); border-color: var(--accent); }
 .access:not(.open) .access-head-toggle::before { content: '▶ '; }
 .access.open .access-head-toggle::before { content: '▼ '; }
-.access-body { padding: 18px 22px 22px; }
+.access-body { padding: 16px 20px 18px; }
 .access-section { margin-bottom: 22px; }
 .access-section:last-child { margin-bottom: 0; }
 .access-section-title {
@@ -496,9 +503,17 @@ label.field > .hint {
 }
 .access-err { color: var(--red); margin-top: 8px; font-size: 11px; }
 /* Set apart from the rest of the panel: everything above it is reversible. */
+/* Red belongs to the doing, not to the existing. The section's own heading
+   stays like every other heading so the page reads as one calm list; the red
+   appears inside, once somebody has opened it on purpose, and on the button
+   that actually does it. A heading that shouts every time you visit settings
+   is a heading people stop reading. */
 .danger-zone { border-top: 1px solid var(--border); padding-top: 18px; }
 .danger-zone .access-section-title { color: var(--red); }
 .danger-zone .access-help { border-left-color: var(--red); }
+/* The body is the danger zone when the section is one of its own, so the rule
+   above needs no .access-section-title to hang on. */
+.editor-body.danger-zone { border-top: none; padding-top: 0; }
 
 .share-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 8px 12px;
   background: var(--bg-elevated); border-radius: 4px;
