@@ -38,7 +38,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=32">
+<link rel="stylesheet" href="lib/race-theme.css?v=33">
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css" />
 <style>
   .cutoffs {
@@ -490,6 +490,9 @@
 </header>
 
 <div id="error" class="error-banner" style="display:none;"></div>
+
+<!-- Where the first-visit tutorial goes. See Race.tutorial. -->
+<div id="tut-host"></div>
 <div id="share-banner" class="share-banner" style="display:none;"></div>
 <div id="cutoffs" class="cutoffs" style="display:none;"></div>
 <section id="runners" class="runners"></section>
@@ -518,7 +521,7 @@
      Esri's and will be missing offline; the map is useful without them. -->
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8"></script>
-<script src="lib/race-core.js?v=86"></script>
+<script src="lib/race-core.js?v=87"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -1423,7 +1426,31 @@
   // fetched asynchronously. Starting before it resolves meant the very first
   // load, the one whose wait anyone actually notices, always took the Pages
   // path and so waited on the rebuild no matter what the rest of this does.
+  // What this screen says the first time somebody lands on it.
+  //
+  // The lightest of any of them, on purpose. This is the page a stranger opens
+  // from a link somebody texted them, more people see it than all the other
+  // screens put together, and none of them asked to be taught anything.
+  function registerTutorial() {
+    Race.tutorial.register({
+      key: 'race',
+      version: 1,
+      where: '#tut-host',
+      title: 'Following the race',
+      points: [
+        'This updates itself while the race is on. Nothing to refresh, and no ' +
+          'account needed to watch.',
+        'Each row is a leg: when they left, when they arrived, and how long ' +
+          'they spent at the aid station.',
+        '<b>Green</b> is on pace for the cutoff and <b>red</b> is not. The ' +
+          'cutoffs themselves are at the top of the page.',
+        'Charts and a printable report are in the menu, top right.'
+      ]
+    });
+  }
+
   Race.hub.load().then(() => {
+    registerTutorial();
     if (Race.qs('new')) { noteSettling(); loadNewRace(); } else load();
   });
   setInterval(tick, 1000);

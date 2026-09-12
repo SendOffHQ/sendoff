@@ -33,7 +33,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=32">
+<link rel="stylesheet" href="lib/race-theme.css?v=33">
 <style>
   .chart-card {
     background: var(--bg-card); border: 1px solid var(--border);
@@ -100,6 +100,9 @@
 </header>
 
 <div id="error" class="error-banner" style="display:none;"></div>
+
+<!-- Where the first-visit tutorial goes. See Race.tutorial. -->
+<div id="tut-host"></div>
 <div id="body"></div>
 
 <footer class="site">
@@ -107,7 +110,7 @@
   <span>Charts auto-refresh every 30s</span>
 </footer>
 
-<script src="lib/race-core.js?v=86"></script>
+<script src="lib/race-core.js?v=87"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -117,6 +120,30 @@
 
   let cfg = null, data = null;
 
+  // What this screen says the first time somebody lands on it.
+  //
+  // Five charts is five questions, and which one somebody wants is not obvious
+  // from the titles. So this names the question each answers rather than
+  // describing the picture.
+  function registerTutorial() {
+    Race.tutorial.register({
+      key: 'charts',
+      version: 1,
+      where: '#tut-host',
+      title: 'Reading the charts',
+      points: [
+        '<b>Leg time</b> and <b>Leg pace</b> are the same race two ways: how ' +
+          'long each leg took, and how hard it was for its length.',
+        '<b>Aid station time</b> is the one nobody expects. It is usually where ' +
+          'a race is lost, and it is the part a crew can do something about.',
+        '<b>Cumulative progress</b> is the one to watch while a race is on: the ' +
+          'dashed line is the projected finish, with the cutoff drawn against it.',
+        'All of it comes from what the crew logged, so it fills in as the race ' +
+          'runs. Nothing to refresh.'
+      ]
+    });
+  }
+
   async function load() {
     try {
       // hub.json first. It carries the worker address, and without it
@@ -124,6 +151,7 @@
       // published file. Every other page already did this; this one did not,
       // which is exactly what the charts case in test/spectator.mjs caught.
       await Race.hub.load();
+      registerTutorial();
       // Through readRaceJson rather than straight at the published file, which
       // is what every other page does and what this one has to do before race
       // data can stop being written to git. It tries the worker first for

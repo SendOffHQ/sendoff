@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=32">
+<link rel="stylesheet" href="lib/race-theme.css?v=33">
 <style>
   body { padding: 20px 16px 32px; }
   .wrap { max-width: 860px; margin: 0 auto; }
@@ -213,6 +213,9 @@
 
 <div id="error" class="error-banner" style="display:none;"></div>
 
+<!-- Where the first-visit tutorial goes. See Race.tutorial. -->
+<div id="tut-host"></div>
+
 <section id="runners" class="runners"></section>
 
 <footer class="site">
@@ -224,7 +227,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=86"></script>
+<script src="lib/race-core.js?v=87"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -267,6 +270,8 @@
   // ---------- connection ----------
   // ---------- press button (sign in/out) ----------
   async function press(runnerId) {
+    // Working is the answer to "have you read this".
+    Race.tutorial.dismiss();
     // The shared modal, the same one the header offers. This page carried its
     // own sign-in form and its own copy of the account status, and both said
     // what the header already says.
@@ -796,8 +801,37 @@
 
   // hub.json first: it carries the worker address, and the account widget in
   // the header cannot say who you are until it has landed.
+  // What this screen says the first time somebody lands on it.
+  //
+  // The one screen where this had to not be a dialog. Somebody opening the pit
+  // board has a runner in front of them and both hands full, and a box between
+  // them and the button is worse than no teaching at all. So it sits above the
+  // cards, out of the way, and press() puts it away on the first press:
+  // whoever has started working has read it or decided not to.
+  function registerTutorial() {
+    Race.tutorial.register({
+      key: 'pit',
+      version: 1,
+      where: '#tut-host',
+      title: 'Working the pit board',
+      // Three short lines, not four longer ones. At four this pushed the first
+      // racer's button off the bottom of a phone, which on this screen is the
+      // failure: somebody has to scroll past the explanation to reach the
+      // thing it is explaining.
+      points: [
+        'One button per racer, and it alternates. <b>Send Off</b> when they ' +
+          'leave, <b>Check In</b> when they reach you.',
+        'Fluids, food and notes go in afterwards. None of it is needed to log ' +
+          'a split.',
+        '<b>Undo last</b> fixes a wrong press. No signal is fine: presses are ' +
+          'held on this phone until you have bars.'
+      ]
+    });
+  }
+
   (async () => {
     await Race.hub.load();
+    registerTutorial();
     await load();
     // Never forced: see render(). Adaptive, and stopped while the tab is
     // hidden, which is most of the time a phone spends in a vest pocket.

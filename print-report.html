@@ -33,7 +33,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=32">
+<link rel="stylesheet" href="lib/race-theme.css?v=33">
 <style>
   /* Screen styles (reuse dashboard) */
   .controls {
@@ -301,6 +301,9 @@
 </header>
 
 <div id="error" class="error-banner" style="display:none;"></div>
+
+<!-- Where the first-visit tutorial goes. See Race.tutorial. -->
+<div id="tut-host"></div>
 <div id="cutoffs" class="cutoffs" style="display:none;"></div>
 <div id="runners"></div>
 <div id="course-block" class="course-block" style="display:none;">
@@ -315,7 +318,7 @@
   <div>Auto-generated · race-dashboard hub</div>
 </footer>
 
-<script src="lib/race-core.js?v=86"></script>
+<script src="lib/race-core.js?v=87"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -513,9 +516,29 @@
     }
   }
 
+  // What this screen says the first time somebody lands on it.
+  //
+  // Two lines. This one is a printout, and the thing worth knowing about a
+  // printout is when to make it.
+  function registerTutorial() {
+    Race.tutorial.register({
+      key: 'print',
+      version: 1,
+      where: '#tut-host',
+      title: 'The printable report',
+      points: [
+        'Everything about the race on one page: course, cutoffs, every split ' +
+          'and the charts. <b>Print</b> at the top, or print to PDF and keep it.',
+        'Made after the finish it is the whole race. Made during one it is ' +
+          'whatever has been logged so far, which is what an aid station ' +
+          'captain with no signal actually wants.'
+      ]
+    });
+  }
+
   // Wait for hub.json, or the first read goes to Pages regardless of what
   // readRaceText prefers. See the same note in race.html.
-  Race.hub.load().then(load);
+  Race.hub.load().then(() => { registerTutorial(); return load(); });
 </script>
 
 </body>

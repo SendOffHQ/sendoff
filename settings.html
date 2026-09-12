@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=32">
+<link rel="stylesheet" href="lib/race-theme.css?v=33">
 <style>
   body { padding: 20px 16px 32px; }
   .wrap { max-width: 860px; margin: 0 auto; }
@@ -231,6 +231,9 @@
 
 <div id="error" class="error-banner" style="display:none;"></div>
 
+<!-- Where the first-visit tutorial goes. See Race.tutorial. -->
+<div id="tut-host"></div>
+
 <!-- Race details. One field today, but it needs somewhere to live: an activity
      that could only be chosen in the wizard could never be corrected, and the
      races made before the field existed could never have one at all. -->
@@ -413,7 +416,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=86"></script>
+<script src="lib/race-core.js?v=87"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -1459,9 +1462,34 @@
   });
   document.getElementById('runner-save').addEventListener('click', saveRunnerEditor);
 
+  // What this screen says the first time somebody lands on it.
+  //
+  // The section that needed explaining is the one people do not open, because
+  // "Manage access" sounds like permissions administration and is in fact how
+  // you get a link to your mother.
+  function registerTutorial() {
+    Race.tutorial.register({
+      key: 'settings',
+      version: 1,
+      where: '#tut-host',
+      title: 'Race settings',
+      points: [
+        'Every section here opens and closes, and saves on its own. You are ' +
+          'never made to fill in the rest to change one thing.',
+        '<b>Manage access</b> is where crew are added, and where you make a ' +
+          'share link for somebody who has no account and does not want one.',
+        'The course, the racers and the fuel plan can all be changed after the ' +
+          'race is made, so none of it had to be right in the wizard.',
+        '<b>Delete this race</b> is the last section, and it is the only thing ' +
+          'on this page that cannot be undone.'
+      ]
+    });
+  }
+
   // Load hub.json first so we know whether to render proxy or PAT auth UI.
   (async () => {
     await Race.hub.load();
+    registerTutorial();
     await load();
     setInterval(load, 30000);
     setInterval(updateLastUpdatedLabel, 1000);
