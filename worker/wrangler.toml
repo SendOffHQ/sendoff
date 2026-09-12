@@ -88,7 +88,7 @@ INFO_FROM = "info@sendoff.run"
 #
 # Fill it in from R2 -> sendoff-media -> Settings, either the r2.dev subdomain
 # or a custom domain such as media.sendoff.run. No trailing slash.
-MEDIA_BASE_URL = ""
+MEDIA_BASE_URL = "https://media.sendoff.run"
 
 # Secrets to set with `wrangler secret put`:
 #   GITHUB_TOKEN   PAT with Contents: Read and write
