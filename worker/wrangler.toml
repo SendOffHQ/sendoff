@@ -144,3 +144,20 @@ database_id = "e6086753-53c9-4db9-8571-2f8966804bc3"
 # [[routes]]
 # pattern = "api.sendoff.run/*"
 # zone_name = "sendoff.run"
+
+# Photos, attached to a leg of the course. See migrations/0004_media.sql.
+#
+# Without this binding the worker still runs and every photo endpoint answers
+# "not configured" rather than throwing: the rest of a race is unaffected by a
+# bucket that does not exist yet. Create it with
+#   npx wrangler r2 bucket create sendoff-media
+#
+# MEDIA_BASE_URL is the bucket's public hostname, and it is the difference
+# between a photo costing a worker request and costing none. R2 bills no egress
+# either way; what it saves is the 100,000 requests a day this account has for
+# everything. Leave it empty and reads fall back through /media-file, which
+# works and is the thing to move off. Set it in the dashboard once the bucket
+# has a custom domain or an r2.dev address.
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "sendoff-media"

@@ -47,6 +47,54 @@
   .status-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); }
   .status-dot.error { background: var(--red); box-shadow: 0 0 8px var(--red); }
 
+  /* Photos. A strip rather than a panel: it sits above the racer cards and
+     everything on this screen competes with the button somebody came to press. */
+  .photo-bar {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px 14px; margin-bottom: 16px;
+  }
+  .photo-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted);
+  }
+  .photo-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .photo-row select, .photo-row input[type="text"] {
+    background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text);
+    border-radius: 4px; padding: 9px 10px; font-size: 13px; font-family: inherit;
+  }
+  .photo-row select { flex: 1 1 190px; min-width: 0; }
+  .photo-row input[type="text"] { flex: 2 1 220px; min-width: 0; }
+  /* The file input itself is hidden behind a label: every browser styles it
+     differently and none of them the way the rest of this page is styled. */
+  .photo-pick {
+    flex: 1 1 130px; text-align: center; cursor: pointer;
+    background: transparent; border: 1px dashed var(--border-bright); color: var(--text-dim);
+    padding: 10px 14px; border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .photo-pick:hover { color: var(--accent); border-color: var(--accent); }
+  .photo-pick input { display: none; }
+  .photo-state { margin-top: 9px; font-size: 11.5px; color: var(--text-muted); }
+  .photo-state.warn { color: var(--yellow); }
+  .photo-state.err { color: var(--red); }
+  .photo-thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .photo-thumbs figure { margin: 0; position: relative; }
+  .photo-thumbs img {
+    width: 62px; height: 62px; object-fit: cover; border-radius: 4px;
+    border: 1px solid var(--border); display: block;
+  }
+  /* A photo still waiting for signal looks like one: dimmed, with the count in
+     the line above saying why. */
+  .photo-thumbs figure.queued img { opacity: 0.45; }
+  .photo-thumbs .kill {
+    position: absolute; top: -6px; right: -6px; width: 20px; height: 20px;
+    border-radius: 50%; border: 1px solid var(--border-bright); background: var(--bg);
+    color: var(--text-muted); font-size: 12px; line-height: 1; cursor: pointer; padding: 0;
+  }
+  .photo-thumbs .kill:hover { color: var(--red); border-color: var(--red); }
+
   /* runner cards */
   .runners { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 22px; }
   .runner {
@@ -216,6 +264,10 @@
 <!-- Where the first-visit tutorial goes. See Race.tutorial. -->
 <div id="tut-host"></div>
 
+<!-- Photos. Above the cards rather than inside one, because a photo belongs to
+     the leg and not to a racer: see migrations/0004_media.sql. -->
+<section id="photos" class="photo-bar" style="display:none;"></section>
+
 <section id="runners" class="runners"></section>
 
 <footer class="site">
@@ -227,7 +279,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=88"></script>
+<script src="lib/race-core.js?v=89"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -771,6 +823,7 @@
       document.getElementById('error').style.display = 'none';
       maybeOfferRacerMode();
       render(force);
+      renderPhotos();
     } catch (err) {
       const e = document.getElementById('error');
       e.style.display = 'block';
@@ -828,8 +881,137 @@
     });
   }
 
+  // ---------- photos ----------
+  // A photo belongs to a leg of the course, not to a racer: the aid station
+  // itself, or two of your runners standing together, is not any one person's.
+  // runnerId is there as an optional tag and the picker offers it second.
+  //
+  // The leg defaults to where the race actually is. A crew member at an aid
+  // station photographs what is in front of them, and making them find the
+  // right leg in a list of sixteen before they can take a picture is how the
+  // picture does not get taken.
+  let photoRows = [], photoQueued = [], photosWired = false;
+
+  function defaultLegIndex() {
+    if (!cfg || !data) return 1;
+    const merged = Race.queue.applyTo(DATA_PATH, JSON.parse(JSON.stringify(data))).runners || [];
+    for (const r of merged) {
+      const next = Race.compute.nextActionFor(r, cfg);
+      if (next.state === 'on-course' && next.currentLegIndex) return next.currentLegIndex;
+      if (next.nextLegIndex) return next.nextLegIndex;
+    }
+    return Race.course.legCount(cfg) || 1;
+  }
+
+  function canWorkPit() { return Race.roles.canEdit(cfg, Race.auth.email()); }
+
+  async function refreshPhotos() {
+    try { photoRows = await Race.media.list(slug); } catch (e) { photoRows = []; }
+    try { photoQueued = await Race.media.pending(slug); } catch (e) { photoQueued = []; }
+    renderPhotos();
+  }
+
+  function renderPhotos() {
+    const host = document.getElementById('photos');
+    if (!host || !cfg) return;
+    // Crew only. Everything the roadmap says about moderation starts the
+    // moment somebody not on the roster can put a picture on the page.
+    if (!canWorkPit()) { host.style.display = 'none'; return; }
+    host.style.display = '';
+
+    const legs = Race.course.legs(cfg) || [];
+    const chosen = host.querySelector('#photo-leg');
+    const keepLeg = chosen ? chosen.value : String(defaultLegIndex());
+    const keepRunner = (host.querySelector('#photo-runner') || {}).value || '';
+    const keepCaption = (host.querySelector('#photo-caption') || {}).value || '';
+
+    const legOpts = legs.map(l =>
+      `<option value="${l.index}"${String(l.index) === String(keepLeg) ? ' selected' : ''}>` +
+      `Leg ${l.index}${l.toAid ? ' · ' + escapeHtml(l.toAid) : ''}</option>`).join('');
+    const runners = (cfg.runners || []);
+    const runnerOpts = '<option value="">Nobody in particular</option>' +
+      runners.map(r =>
+        `<option value="${escapeHtml(r.id)}"${r.id === keepRunner ? ' selected' : ''}>` +
+        `${escapeHtml(r.name || r.id)}</option>`).join('');
+
+    const waiting = photoQueued.filter(q => !q.failed).length;
+    const stuck = photoQueued.filter(q => q.failed);
+    const thumbs = photoQueued.map(q =>
+        `<figure class="queued" data-queued="${escapeHtml(q.id)}">` +
+        `<img alt="Waiting to send" src="${URL.createObjectURL(q.blob)}">` +
+        `<button class="kill" type="button" data-drop="${escapeHtml(q.id)}" aria-label="Discard">×</button>` +
+        `</figure>`).join('') +
+      photoRows.slice().reverse().slice(0, 12).map(m =>
+        `<figure><img alt="${escapeHtml(m.caption || 'Race photo')}" src="${escapeHtml(m.url)}">` +
+        `<button class="kill" type="button" data-remove="${escapeHtml(m.id)}" aria-label="Delete">×</button>` +
+        `</figure>`).join('');
+
+    host.innerHTML =
+      `<div class="photo-head"><span>Photos</span>` +
+        `<span>${photoRows.length} on this race</span></div>` +
+      `<div class="photo-row">` +
+        `<select id="photo-leg" aria-label="Which leg">${legOpts}</select>` +
+        `<select id="photo-runner" aria-label="Who is in it">${runnerOpts}</select>` +
+      `</div>` +
+      `<div class="photo-row">` +
+        `<input type="text" id="photo-caption" maxlength="280" placeholder="A line about it (optional)" value="${escapeHtml(keepCaption)}">` +
+        `<label class="photo-pick">Add photo` +
+          `<input type="file" id="photo-file" accept="image/*" multiple></label>` +
+      `</div>` +
+      `<div class="photo-state${stuck.length ? ' err' : waiting ? ' warn' : ''}" id="photo-state">${
+        stuck.length ? `${stuck.length} could not be sent: ${escapeHtml(stuck[0].failed || '')}`
+        : waiting ? `${waiting} waiting for signal. They go out on their own.`
+        : 'Resized on this phone before sending, which takes the location off them too.'
+      }</div>` +
+      (thumbs ? `<div class="photo-thumbs">${thumbs}</div>` : '');
+
+    if (!photosWired) {
+      photosWired = true;
+      host.addEventListener('change', async (e) => {
+        if (e.target.id !== 'photo-file') return;
+        const files = [...(e.target.files || [])];
+        e.target.value = '';
+        if (!files.length) return;
+        const legIndex = parseInt(host.querySelector('#photo-leg').value, 10);
+        const runnerId = host.querySelector('#photo-runner').value || null;
+        const caption = host.querySelector('#photo-caption').value || '';
+        const state = host.querySelector('#photo-state');
+        state.className = 'photo-state';
+        state.textContent = files.length > 1 ? `Preparing ${files.length} photos…` : 'Preparing…';
+        for (const file of files) {
+          try {
+            await Race.media.enqueue(slug, { legIndex, runnerId, caption, file });
+          } catch (err) {
+            state.className = 'photo-state err';
+            state.textContent = err.message || 'Could not add that photo.';
+            break;
+          }
+        }
+        // The caption belonged to that batch, not to the next one.
+        const box = host.querySelector('#photo-caption');
+        if (box) box.value = '';
+        await refreshPhotos();
+      });
+      host.addEventListener('click', async (e) => {
+        const drop = e.target.closest('[data-drop]');
+        if (drop) { await Race.media.drop(drop.dataset.drop); return refreshPhotos(); }
+        const kill = e.target.closest('[data-remove]');
+        if (!kill) return;
+        if (!confirm('Delete this photo? It comes off the race page for everybody.')) return;
+        try { await Race.media.remove(kill.dataset.remove); } catch (err) {}
+        refreshPhotos();
+      });
+      // A photo that went out while the page was open should stop looking like
+      // one that is waiting.
+      Race.media.onChange(() => { Race.media.pending(slug).then(q => { photoQueued = q; }); });
+    }
+  }
+
   (async () => {
     await Race.hub.load();
+    // Anything taken with no signal last time goes out now, and the strip
+    // fills in once the config says which legs exist.
+    Race.media.flush().catch(() => {});
     // Not awaited. What the banner says about logging with no signal depends on
     // the plan, and asking costs a round trip; the board is what somebody came
     // for and it is not waiting on a sentence. Either way it registers: the
@@ -837,6 +1019,13 @@
     // way round for a screen somebody opens where the signal is worst.
     Race.plans.entitlements().then(registerTutorial, () => registerTutorial(null));
     await load();
+    // The list, once now and once a minute after. Not on the poll: the splits
+    // are what need to be fresh every five seconds, and another crew member's
+    // photograph arriving a minute late costs nobody anything. Uploads from
+    // this phone refresh it straight away, which is the case that is actually
+    // noticeable.
+    refreshPhotos();
+    setInterval(refreshPhotos, 60000);
     // Never forced: see render(). Adaptive, and stopped while the tab is
     // hidden, which is most of the time a phone spends in a vest pocket.
     const poller = Race.poll(() => load(), { interval: () => Race.POLL_MS[Race.raceState(cfg, data)] });
