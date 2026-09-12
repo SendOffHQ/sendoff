@@ -294,7 +294,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=91"></script>
+<script src="lib/race-core.js?v=92"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -905,7 +905,7 @@
   // station photographs what is in front of them, and making them find the
   // right leg in a list of sixteen before they can take a picture is how the
   // picture does not get taken.
-  let photoRows = [], photoQueued = [], photosWired = false;
+  let photoRows = [], photoQueued = [];
   // Shut on arrival. Everything on this screen competes with the button
   // somebody came to press, and the pit board is opened with a runner in front
   // of you far more often than it is opened to add a photograph.
@@ -934,6 +934,51 @@
     renderPhotos();
   }
 
+  // Built once, then updated in place. It used to rebuild its own innerHTML on
+  // every poll, which is five seconds, and that quietly broke the whole thing:
+  // tapping Add photo opens the operating system's picker, the picker stays up
+  // for longer than five seconds, a poll replaces the <input type="file"> while
+  // it is up, and the picker hands the photo back to an element that is no
+  // longer in the document. The change event fires on a detached node, never
+  // reaches the delegated listener on the section, and nothing happens at all:
+  // no thumbnail, no error, no queue entry. Airplane mode made it certain
+  // rather than occasional, because everything takes longer with no signal.
+  //
+  // render() above already carries the same lesson for the intake fields, in
+  // the comment about the poll throwing away what somebody was typing. The
+  // file input is worse than a text field: a text field loses its contents and
+  // the person sees it, and this lost the photograph and said nothing.
+  //
+  // So nothing in the body is ever replaced. The head, the state line and the
+  // thumbnails are updated; the selects are only rebuilt when the course or
+  // the roster actually changed, keeping the choice; the caption and the file
+  // input are never touched at all.
+  let photoSkeleton = false, photoLegSig = '', photoRunnerSig = '', photoThumbUrls = [];
+
+  function buildPhotoSkeleton(host) {
+    host.innerHTML =
+      `<button type="button" class="photo-head" id="photo-toggle" aria-expanded="false"` +
+        ` aria-controls="photo-body">` +
+        `<span>Photos</span>` +
+        `<span class="photo-head-right"><span id="photo-summary"></span>` +
+        `<span class="photo-head-caret"></span></span>` +
+      `</button>` +
+      `<div class="photo-body" id="photo-body" hidden>` +
+        `<div class="photo-row">` +
+          `<select id="photo-leg" aria-label="Which leg"></select>` +
+          `<select id="photo-runner" aria-label="Who is in it"></select>` +
+        `</div>` +
+        `<div class="photo-row">` +
+          `<input type="text" id="photo-caption" maxlength="280" placeholder="A line about it (optional)">` +
+          `<label class="photo-pick">Add photo` +
+            `<input type="file" id="photo-file" accept="image/*" multiple></label>` +
+        `</div>` +
+        `<div class="photo-state" id="photo-state"></div>` +
+        `<div class="photo-thumbs" id="photo-thumbs"></div>` +
+      `</div>`;
+    wirePhotos(host);
+  }
+
   function renderPhotos() {
     const host = document.getElementById('photos');
     if (!host || !cfg) return;
@@ -943,120 +988,153 @@
     // And only where photos can actually land. This shipped ahead of the
     // worker that takes them once, and the board offered a camera whose every
     // upload could only fail, on the one screen where a thing that does not
-    // work costs somebody a race. Null means the answer has not come back yet,
-    // which is also not a reason to offer it.
+    // work costs somebody a race.
     if (Race.media.configured() !== true) { host.style.display = 'none'; return; }
     host.style.display = '';
+    if (!photoSkeleton) { photoSkeleton = true; buildPhotoSkeleton(host); }
 
+    host.className = 'photo-bar' + (photosOpen ? '' : ' collapsed');
+    const body = host.querySelector('#photo-body');
+    body.hidden = !photosOpen;
+    host.querySelector('#photo-toggle').setAttribute('aria-expanded', String(photosOpen));
+
+    // The selects, only when what goes in them changed. Rebuilding these on
+    // the poll would reset a choice somebody had just made.
     const legs = Race.course.legs(cfg) || [];
-    const chosen = host.querySelector('#photo-leg');
-    const keepLeg = chosen ? chosen.value : String(defaultLegIndex());
-    const keepRunner = (host.querySelector('#photo-runner') || {}).value || '';
-    const keepCaption = (host.querySelector('#photo-caption') || {}).value || '';
-
-    const legOpts = legs.map(l =>
-      `<option value="${l.index}"${String(l.index) === String(keepLeg) ? ' selected' : ''}>` +
-      `Leg ${l.index}${l.toAid ? ' · ' + escapeHtml(l.toAid) : ''}</option>`).join('');
-    const runners = (cfg.runners || []);
-    const runnerOpts = '<option value="">Nobody in particular</option>' +
-      runners.map(r =>
-        `<option value="${escapeHtml(r.id)}"${r.id === keepRunner ? ' selected' : ''}>` +
-        `${escapeHtml(r.name || r.id)}</option>`).join('');
+    const legSig = legs.map(l => l.index + ':' + (l.toAid || '')).join('|');
+    const legSel = host.querySelector('#photo-leg');
+    if (legSig !== photoLegSig) {
+      photoLegSig = legSig;
+      const keep = legSel.value || String(defaultLegIndex());
+      legSel.innerHTML = legs.map(l =>
+        `<option value="${l.index}">Leg ${l.index}${l.toAid ? ' · ' + escapeHtml(l.toAid) : ''}</option>`).join('');
+      legSel.value = keep;
+      if (!legSel.value) legSel.value = String(defaultLegIndex());
+    }
+    const runners = cfg.runners || [];
+    const runnerSig = runners.map(r => r.id + ':' + (r.name || '')).join('|');
+    const runnerSel = host.querySelector('#photo-runner');
+    if (runnerSig !== photoRunnerSig) {
+      photoRunnerSig = runnerSig;
+      const keep = runnerSel.value;
+      runnerSel.innerHTML = '<option value="">Nobody in particular</option>' +
+        runners.map(r => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name || r.id)}</option>`).join('');
+      runnerSel.value = keep;
+    }
 
     const waiting = photoQueued.filter(q => !q.failed).length;
     const stuck = photoQueued.filter(q => q.failed);
-    const thumbs = photoQueued.map(q =>
-        `<figure class="queued" data-queued="${escapeHtml(q.id)}">` +
-        `<img alt="Waiting to send" src="${URL.createObjectURL(q.blob)}">` +
-        `<button class="kill" type="button" data-drop="${escapeHtml(q.id)}" aria-label="Discard">×</button>` +
-        `</figure>`).join('') +
-      photoRows.slice().reverse().slice(0, 12).map(m =>
-        `<figure><img alt="${escapeHtml(m.caption || 'Race photo')}" src="${escapeHtml(m.url)}">` +
-        `<button class="kill" type="button" data-remove="${escapeHtml(m.id)}" aria-label="Delete">×</button>` +
-        `</figure>`).join('');
 
-    // What the head says with the body shut. The count of photos waiting for
-    // signal has to be one of them: a crew member with three unsent pictures
-    // should not have to open anything to find that out.
-    const summary = stuck.length ? `${stuck.length} stuck`
+    // What the head says while the body is shut. The count of photos waiting
+    // for signal has to be one of them: a crew member with three unsent
+    // pictures should not have to open anything to find that out.
+    const summary = host.querySelector('#photo-summary');
+    summary.textContent = stuck.length ? `${stuck.length} stuck`
       : waiting ? `${waiting} waiting for signal`
       : `${photoRows.length} on this race`;
+    summary.className = stuck.length ? 'photo-head-err' : waiting ? 'photo-head-warn' : '';
 
-    host.className = 'photo-bar' + (photosOpen ? '' : ' collapsed');
-    host.innerHTML =
-      `<button type="button" class="photo-head" id="photo-toggle" aria-expanded="${photosOpen}"` +
-        ` aria-controls="photo-body">` +
-        `<span>Photos</span>` +
-        `<span class="photo-head-right"><span class="${
-          stuck.length ? 'photo-head-err' : waiting ? 'photo-head-warn' : ''
-        }">${summary}</span><span class="photo-head-caret"></span></span>` +
-      `</button>` +
-      `<div class="photo-body" id="photo-body"${photosOpen ? '' : ' hidden'}>` +
-      `<div class="photo-row">` +
-        `<select id="photo-leg" aria-label="Which leg">${legOpts}</select>` +
-        `<select id="photo-runner" aria-label="Who is in it">${runnerOpts}</select>` +
-      `</div>` +
-      `<div class="photo-row">` +
-        `<input type="text" id="photo-caption" maxlength="280" placeholder="A line about it (optional)" value="${escapeHtml(keepCaption)}">` +
-        `<label class="photo-pick">Add photo` +
-          `<input type="file" id="photo-file" accept="image/*" multiple></label>` +
-      `</div>` +
-      `<div class="photo-state${stuck.length ? ' err' : waiting ? ' warn' : ''}" id="photo-state">${
-        stuck.length ? `${stuck.length} could not be sent: ${escapeHtml(stuck[0].failed || '')}`
+    const state = host.querySelector('#photo-state');
+    // Left alone while it is saying something about what just happened, which
+    // is the one message the poll must not talk over.
+    if (!state.dataset.sticky) {
+      state.className = 'photo-state' + (stuck.length ? ' err' : waiting ? ' warn' : '');
+      state.textContent = stuck.length
+        ? `${stuck.length} could not be sent: ${stuck[0].failed || ''}`
         : waiting ? `${waiting} waiting for signal. They go out on their own.`
-        : 'Resized on this phone before sending, which takes the location off them too.'
-      }</div>` +
-      (thumbs ? `<div class="photo-thumbs">${thumbs}</div>` : '') +
-      `</div>`;
-
-    if (!photosWired) {
-      photosWired = true;
-      host.addEventListener('click', (e) => {
-        if (!e.target.closest('#photo-toggle')) return;
-        photosOpen = !photosOpen;
-        renderPhotos();
-        // Straight into the leg picker on the way open: the whole section is
-        // three controls and the first one is the one that gets changed.
-        if (photosOpen) { const l = host.querySelector('#photo-leg'); if (l) l.focus(); }
-      });
-      host.addEventListener('change', async (e) => {
-        if (e.target.id !== 'photo-file') return;
-        const files = [...(e.target.files || [])];
-        e.target.value = '';
-        if (!files.length) return;
-        const legIndex = parseInt(host.querySelector('#photo-leg').value, 10);
-        const runnerId = host.querySelector('#photo-runner').value || null;
-        const caption = host.querySelector('#photo-caption').value || '';
-        const state = host.querySelector('#photo-state');
-        state.className = 'photo-state';
-        state.textContent = files.length > 1 ? `Preparing ${files.length} photos…` : 'Preparing…';
-        for (const file of files) {
-          try {
-            await Race.media.enqueue(slug, { legIndex, runnerId, caption, file });
-          } catch (err) {
-            state.className = 'photo-state err';
-            state.textContent = err.message || 'Could not add that photo.';
-            break;
-          }
-        }
-        // The caption belonged to that batch, not to the next one.
-        const box = host.querySelector('#photo-caption');
-        if (box) box.value = '';
-        await refreshPhotos();
-      });
-      host.addEventListener('click', async (e) => {
-        const drop = e.target.closest('[data-drop]');
-        if (drop) { await Race.media.drop(drop.dataset.drop); return refreshPhotos(); }
-        const kill = e.target.closest('[data-remove]');
-        if (!kill) return;
-        if (!confirm('Delete this photo? It comes off the race page for everybody.')) return;
-        try { await Race.media.remove(kill.dataset.remove); } catch (err) {}
-        refreshPhotos();
-      });
-      // A photo that went out while the page was open should stop looking like
-      // one that is waiting.
-      Race.media.onChange(() => { Race.media.pending(slug).then(q => { photoQueued = q; }); });
+        : 'Resized on this phone before sending, which takes the location off them too.';
     }
+
+    renderPhotoThumbs(host);
+  }
+
+  function renderPhotoThumbs(host) {
+    const box = host.querySelector('#photo-thumbs');
+    // One object URL per queued photo per render leaks them all otherwise, on
+    // a page that renders every five seconds for as long as a hundred miler.
+    for (const u of photoThumbUrls) { try { URL.revokeObjectURL(u); } catch (e) {} }
+    photoThumbUrls = [];
+    const queued = photoQueued.map(q => {
+      const u = URL.createObjectURL(q.blob);
+      photoThumbUrls.push(u);
+      return `<figure class="queued"><img alt="Waiting to send" src="${u}">` +
+        `<button class="kill" type="button" data-drop="${escapeHtml(q.id)}" aria-label="Discard">×</button>` +
+        `</figure>`;
+    }).join('');
+    const sent = photoRows.slice().reverse().slice(0, 12).map(m =>
+      `<figure><img alt="${escapeHtml(m.caption || 'Race photo')}" src="${escapeHtml(m.url)}">` +
+      `<button class="kill" type="button" data-remove="${escapeHtml(m.id)}" aria-label="Delete">×</button>` +
+      `</figure>`).join('');
+    box.innerHTML = queued + sent;
+    box.hidden = !(queued || sent);
+  }
+
+  // Says something for a few seconds and stops the poll writing over it.
+  function photoSay(text, cls) {
+    const state = document.getElementById('photo-state');
+    if (!state) return;
+    state.className = 'photo-state' + (cls ? ' ' + cls : '');
+    state.textContent = text;
+    state.dataset.sticky = '1';
+    clearTimeout(photoSay._t);
+    photoSay._t = setTimeout(() => { delete state.dataset.sticky; renderPhotos(); }, 4000);
+  }
+
+  function wirePhotos(host) {
+    host.addEventListener('click', (e) => {
+      if (!e.target.closest('#photo-toggle')) return;
+      photosOpen = !photosOpen;
+      renderPhotos();
+      // Straight into the leg picker on the way open: the whole section is
+      // three controls and the first one is the one that gets changed.
+      if (photosOpen) { const l = host.querySelector('#photo-leg'); if (l) l.focus(); }
+    });
+    host.addEventListener('change', async (e) => {
+      if (e.target.id !== 'photo-file') return;
+      const files = [...(e.target.files || [])];
+      e.target.value = '';
+      if (!files.length) return;
+      const legIndex = parseInt(host.querySelector('#photo-leg').value, 10);
+      const runnerId = host.querySelector('#photo-runner').value || null;
+      const caption = host.querySelector('#photo-caption').value || '';
+      photoSay(files.length > 1 ? `Preparing ${files.length} photos…` : 'Preparing…');
+      let added = 0;
+      for (const file of files) {
+        try {
+          await Race.media.enqueue(slug, { legIndex, runnerId, caption, file });
+          added++;
+        } catch (err) {
+          photoSay(err.message || 'Could not add that photo.', 'err');
+          break;
+        }
+      }
+      const box = host.querySelector('#photo-caption');
+      if (box) box.value = '';
+      await refreshPhotos();
+      // Said after the refresh, so it is the last word rather than the first.
+      // "Added" and nothing else was the complaint: a photo that queued with
+      // no signal looked exactly like one that had not been taken.
+      if (added) {
+        const waiting = photoQueued.filter(q => !q.failed).length;
+        photoSay(waiting
+          ? `Added. ${waiting} waiting for signal, and they go out on their own.`
+          : `Added.`, waiting ? 'warn' : '');
+      }
+    });
+    host.addEventListener('click', async (e) => {
+      const drop = e.target.closest('[data-drop]');
+      if (drop) { await Race.media.drop(drop.dataset.drop); return refreshPhotos(); }
+      const kill = e.target.closest('[data-remove]');
+      if (!kill) return;
+      if (!confirm('Delete this photo? It comes off the race page for everybody.')) return;
+      try { await Race.media.remove(kill.dataset.remove); } catch (err) {}
+      refreshPhotos();
+    });
+    // A photo that went out while the page was open should stop looking like
+    // one that is waiting.
+    Race.media.onChange(() => {
+      Race.media.pending(slug).then(q => { photoQueued = q; renderPhotos(); });
+    });
   }
 
   (async () => {

@@ -158,6 +158,69 @@ ok('and its caption', landed[0].caption, 'Quesadilla');
 ok('the queue emptied once it went', await page.evaluate(
   () => Race.media.pending('six-0-trail-marathon').then(q => q.length)), 0);
 
+// The bug this exists for. The section used to rebuild its own innerHTML on
+// every poll, so tapping Add photo, waiting for the operating system's picker
+// (which is up for longer than five seconds), and coming back handed the photo
+// to an <input> the poll had already replaced. The change event fired on a
+// detached node, never reached the listener, and nothing happened at all: no
+// thumbnail, no error, no queue entry. Reported from a real airplane-mode test
+// and silent in every way that matters.
+console.log('\nthe poll does not pull the picker out from under a crew member');
+const survives = await page.evaluate(async () => {
+  const before = document.querySelector('#photo-file');
+  // Exactly what the poll does, and more times than it would in one pick.
+  for (let i = 0; i < 4; i++) renderPhotos();
+  const after = document.querySelector('#photo-file');
+  return { same: before === after, attached: document.contains(before) };
+});
+ok('the file input is the same element afterwards', survives.same, true);
+ok('and still in the document', survives.attached, true);
+
+// The other half: what somebody typed or chose is still there.
+await page.selectOption('#photo-leg', '7');
+await page.fill('#photo-caption', 'Half a quesadilla');
+await page.evaluate(() => { for (let i = 0; i < 3; i++) renderPhotos(); });
+ok('the leg they chose survives the poll',
+   await page.evaluate(() => document.querySelector('#photo-leg').value), '7');
+ok('and so does the caption they typed',
+   await page.evaluate(() => document.querySelector('#photo-caption').value), 'Half a quesadilla');
+
+// With no signal a photo has to look like it was taken, or a crew member
+// takes it again, or gives up on the feature at the aid station it is for.
+console.log('\nwith the worker unreachable it still queues, and says so');
+await page.evaluate(async (bytes) => {
+  const real = window.fetch;
+  window.__realFetch = real;
+  window.fetch = (u, o) => String(u).includes('/media')
+    ? Promise.reject(new TypeError('Failed to fetch')) : real(u, o);
+  const file = new File([new Uint8Array(bytes)], 'offline.jpg', { type: 'image/jpeg' });
+  await Race.media.enqueue('six-0-trail-marathon',
+    { legIndex: 7, runnerId: null, caption: 'No signal', file });
+}, EXIF_JPEG);
+await page.waitForTimeout(600);
+await page.evaluate(() => refreshPhotos());
+await page.waitForTimeout(300);
+ok('it is in the queue', await page.evaluate(
+  () => Race.media.pending('six-0-trail-marathon').then(q => q.length)), 1);
+ok('a thumbnail shows it', await page.evaluate(
+  () => document.querySelectorAll('#photo-thumbs figure.queued').length), 1);
+ok('and the head says so without opening anything', await page.evaluate(
+  () => document.querySelector('#photo-summary').textContent), '1 waiting for signal');
+// The camera must not disappear just because this load could not reach the
+// worker. That is the aid station it exists for.
+ok('the section is still offered', await page.evaluate(
+  () => document.getElementById('photos').style.display !== 'none'), true);
+
+console.log('\nand it goes out when the signal comes back');
+await page.evaluate(() => { window.fetch = window.__realFetch; });
+await page.evaluate(() => Race.media.flush());
+await page.waitForTimeout(900);
+ok('the queue emptied', await page.evaluate(
+  () => Race.media.pending('six-0-trail-marathon').then(q => q.length)), 0);
+const landedOffline = await page.evaluate(() => Race.media.list('six-0-trail-marathon'));
+ok('and it landed on the leg it was taken on',
+   landedOffline.filter(m => m.caption === 'No signal').map(m => m.legIndex), [7]);
+
 console.log('\nthe race page shows it against that leg, and not before asked');
 const spectator = await b.newContext({ viewport:{width:900,height:1100}, serviceWorkers:'block' });
 const sp = await spectator.newPage();
@@ -187,8 +250,12 @@ ok('the button appeared', await sp.locator('#gallery-open').count(), 1);
 await sp.click('#gallery-open');
 await sp.waitForTimeout(300);
 ok('the gallery opened', await sp.locator('.gallery-overlay').count(), 1);
-ok('with the photo in it', await sp.evaluate(() =>
-  document.querySelectorAll('.gallery-body img').length), 1);
+// Both of them: the one added with signal and the one that queued without.
+// Counted from what the race has rather than written down, so adding a case
+// above does not quietly make this assert the wrong number.
+ok('with every photo in it', await sp.evaluate(() =>
+  document.querySelectorAll('.gallery-body img').length),
+  (await sp.evaluate(() => Race.media.list('six-0-trail-marathon'))).length);
 await sp.keyboard.press('Escape');
 await sp.waitForTimeout(200);
 ok('and Escape closes it', await sp.locator('.gallery-overlay').count(), 0);
