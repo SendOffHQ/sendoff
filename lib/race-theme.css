@@ -83,6 +83,9 @@
   .tut { padding: 12px 14px 14px; }
   .tut-points { font-size: 13px; padding-left: 18px; }
 }
+/* The printable report carries one of these, and a page explaining how to
+   print itself is not something anybody wants on the paper. */
+@media print { .tut { display: none !important; } }
 
 /* ---------- SendOff wordmark ----------
    brand/sendoff-wordmark.svg inlined. Outlined paths, so no webfont needed.

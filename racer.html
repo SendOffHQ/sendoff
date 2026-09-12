@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=32">
+<link rel="stylesheet" href="lib/race-theme.css?v=33">
 <style>
   /* The screen for the person running, when there is no crew at this aid
      station. One job: say where you stand, and take one press. Everything
@@ -174,6 +174,9 @@
 
 <div id="error" class="error-banner" style="display:none;"></div>
 
+<!-- Where the first-visit tutorial goes. See Race.tutorial. -->
+<div id="tut-host"></div>
+
 <section class="racer-readout" id="readout"></section>
 <div class="ract" id="act"></div>
 
@@ -181,7 +184,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=86"></script>
+<script src="lib/race-core.js?v=87"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -437,6 +440,8 @@
 
   // ---------- the press ----------
   async function pressGo() {
+    // Same as the pit board: working is the answer to "have you read this".
+    Race.tutorial.dismiss();
     const runner = merged();
     const next = Race.compute.nextActionFor(runner, cfg);
     if (!next.nextAction) return;
@@ -601,8 +606,30 @@
     try { localStorage.setItem(MODE_KEY, 'crew'); } catch (err) {}
   }, true);
 
+  // What this screen says the first time somebody lands on it.
+  //
+  // Three points, not four. The person reading this is about to run a hundred
+  // miles, or is partway through one.
+  function registerTutorial() {
+    Race.tutorial.register({
+      key: 'racer',
+      version: 1,
+      where: '#tut-host',
+      title: 'Your race',
+      points: [
+        'One button, and it alternates. <b>Leaving</b> when you head out, ' +
+          '<b>Arrived</b> when you reach the next aid. Your crew sees it land.',
+        'Pressed the wrong one? <b>Undo</b> sits there for fifteen seconds ' +
+          'afterwards.',
+        'No signal is fine. Presses are held on this phone and go out the ' +
+          'moment you have bars again.'
+      ]
+    });
+  }
+
   (async () => {
     await Race.hub.load();
+    registerTutorial();
     await load();
     // Only the two numbers that move are touched each second. Redrawing the
     // whole readout would take a chip out from under a thumb already on it.
