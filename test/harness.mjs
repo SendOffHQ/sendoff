@@ -177,7 +177,9 @@ const server = http.createServer((req, res) => {
   }
   if (url.pathname === '/api/media' && req.method === 'GET') {
     const slug = url.searchParams.get('id');
-    return send(200, JSON.stringify({ media: MEDIA.filter(m => m.slug === slug) }), 'application/json');
+    return send(200, JSON.stringify({
+      media: MEDIA.filter(m => m.slug === slug), configured: true
+    }), 'application/json');
   }
   if (url.pathname === '/api/media/delete') {
     const chunks = [];

@@ -279,7 +279,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=89"></script>
+<script src="lib/race-core.js?v=90"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -917,6 +917,12 @@
     // Crew only. Everything the roadmap says about moderation starts the
     // moment somebody not on the roster can put a picture on the page.
     if (!canWorkPit()) { host.style.display = 'none'; return; }
+    // And only where photos can actually land. This shipped ahead of the
+    // worker that takes them once, and the board offered a camera whose every
+    // upload could only fail, on the one screen where a thing that does not
+    // work costs somebody a race. Null means the answer has not come back yet,
+    // which is also not a reason to offer it.
+    if (Race.media.configured() !== true) { host.style.display = 'none'; return; }
     host.style.display = '';
 
     const legs = Race.course.legs(cfg) || [];

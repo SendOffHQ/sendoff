@@ -1989,7 +1989,11 @@ async function handleMediaUpload(req, env) {
 
 // GET /media?id=<slug>
 async function handleMediaList(req, env) {
-  if (!mediaEnabled(env)) return json({ media: [] }, { status: 200 }, env, req);
+  // `configured` rather than just an empty list. A deployment with no bucket
+  // and a race with no photographs look identical from an empty array, and the
+  // pit board has to tell them apart: one means "nobody has taken one yet" and
+  // the other means "do not offer this, it cannot work".
+  if (!mediaEnabled(env)) return json({ media: [], configured: false }, { status: 200 }, env, req);
   const url = new URL(req.url);
   const slug = url.searchParams.get('id');
   if (!slug) return json({ error: 'Missing id' }, { status: 400 }, env, req);
@@ -2000,7 +2004,7 @@ async function handleMediaList(req, env) {
   const rows = await env.DB.prepare(
     'SELECT * FROM media WHERE slug = ? ORDER BY leg_idx ASC, created_at ASC'
   ).bind(slug).all();
-  return json({ media: (rows.results || []).map(r => mediaRow(env, r)) }, {
+  return json({ media: (rows.results || []).map(r => mediaRow(env, r)), configured: true }, {
     headers: { 'Cache-Control': 'public, max-age=5' }
   }, env, req);
 }
