@@ -1083,11 +1083,53 @@ archive in section 2.
 ### Follow a race — *not built*
 The same, for an event rather than a person. Cheap once following exists.
 
-### Crew updates from the aid station — *not built*
-A line of text and optionally a photo, posted by the crew to the public race
-page. This is what spectators actually want and refresh for: not another
-split, but "he ate a full quesadilla and looks brighter than he did at
-sixty."
+### Crew updates from the aid station — *built, as photos on a leg*
+Shipped inverted from how this was written. It said a line of text and
+optionally a photo; what exists is a photo and optionally a line of text,
+attached to a leg of the course rather than posted to a timeline.
+
+Attaching to the leg is the part worth keeping. The leg is already the spine
+of the charts, the print report and the finish card, so a photo on leg 7 sits
+next to that leg's split, pace and climb for nothing, and the timeline this
+entry wanted comes out of it derived rather than stored: "view all" walks the
+legs in order, which is the order the race happened in.
+
+The leg of the course, not one runner's leg. An aid station, or two of your
+runners standing together, is not any one person's; `runner_id` is an optional
+tag for when a photo really is of somebody. A single-runner race hides that
+difference until the first time somebody crews two people.
+
+Three things that decided the shape:
+
+- **R2, served off a bucket hostname, not through the worker.** R2 bills no
+  egress and a photo never changes once written, so it caches at the edge
+  forever. Two hundred spectators opening a race with twenty photos is four
+  thousand requests, against a hundred thousand a day for everything, if those
+  reads go through the worker. `MEDIA_BASE_URL` is the difference; without it
+  reads fall back through `/media-file`, which works and is the thing to move
+  off.
+- **Resized on the phone before it leaves.** 1600px long edge, which is a
+  tenth of the original. That is a tenth of the spectator's mobile data, and it
+  is also what makes the queue below tractable.
+- **The re-encode is the EXIF stripping.** A photo of a runner at an aid
+  station carries that person's exact coordinates until something takes them
+  off. A canvas knows nothing about the metadata of the image drawn onto it,
+  so the resize removes it. That is a privacy property living inside an
+  optimisation, which is a fragile place for one, so `test/media.mjs` asserts
+  it directly against a file that really has a GPS tag in it.
+
+The queue is IndexedDB rather than the localStorage one everything else uses.
+That one holds about five megabytes of string, a phone photo is three to five
+on its own, base64 adds a third, and `queue.save` swallows its quota error: a
+photo pushed through it would fail silently and a crew member would believe it
+was saved. The person taking the photograph is standing at an aid station with
+no signal, so this is the normal path and not the edge case.
+
+Still open: only the crew can upload, which is what keeps this out of the
+moderation problem named below. Nothing resizes server-side, so an upload
+larger than 3MB is refused rather than shrunk. And the photos of an unlisted
+race are exactly as unsealed as the rest of it, which is the same bargain
+already made for splits and worth deciding separately for pictures of people.
 
 ### Finish card — *built*
 Shipped. Drawn on the finisher's own device in four shapes (4:5, 1:1, 4:3,

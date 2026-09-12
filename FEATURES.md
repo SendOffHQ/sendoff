@@ -8,6 +8,7 @@ optional Cloudflare Worker auth proxy.
 - Pit/leg logging (`pit.html`): leg start/end times, calories, fluid, sodium, gear changes, meds, issues, notes
 - Worker-routed reads for signed-in crew to avoid GitHub Pages publish lag
 - Predicted mileage / position for runners on course or in a pit
+- Photos on a leg (`pit.html` to add, `race.html` to look): crew attach photographs to a leg of the course, with an optional runner tag and a caption. The leg is chosen for them and defaults to where the race actually is. Resized to 1600px on the phone before sending, which is also what strips the EXIF, so a photo of somebody at an aid station does not publish their coordinates. Queued in IndexedDB when there is no signal and sent when there is. On the race page each leg with photos offers them behind a Media control, loaded only when opened, and one button shows all of them in leg order. Stored in R2 and served from the bucket rather than through the worker.
 
 ## Course types
 - Point-to-point segments, multi-loop courses, and loops-with-aid-segments

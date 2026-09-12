@@ -1835,6 +1835,240 @@ async function archiveIfDone(env, slug) {
 
 // The escape hatch. A race that ended in a way the rules above do not catch,
 // or one that needs archiving now rather than on the next press.
+// ---------- photos ----------
+// Attached to a leg of the course. See migrations/0004_media.sql for why the
+// leg and not the runner.
+//
+// The worker gates the upload and then gets out of the way. R2 charges nothing
+// for egress and a photo never changes once written, so the object is served
+// from a bucket hostname straight off the edge rather than through here: two
+// hundred spectators opening a race with twenty photos on it is four thousand
+// requests, and this account has a hundred thousand a day for everything.
+// MEDIA_BASE_URL is that hostname. Without it reads fall back through
+// /media-file below, which works and costs a request each, so the feature runs
+// the day the bucket exists and gets cheaper the day it gets a hostname.
+const MEDIA_MAX_BYTES = 3 * 1024 * 1024;
+// Resized on the phone before it leaves, so anything this big arrived from
+// something other than our own uploader.
+const MEDIA_MAX_PER_RACE = 400;
+const MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+function mediaEnabled(env) { return !!(env.MEDIA && env.DB); }
+
+// What a client is handed. The URL is the capability when a bucket hostname is
+// configured: unguessable, and checked at upload rather than at read. That is
+// the same bargain the rest of an unlisted race already makes, and it is worth
+// saying out loud rather than discovering.
+function mediaRow(env, r) {
+  const base = (env.MEDIA_BASE_URL || '').replace(/\/+$/, '');
+  return {
+    id: r.id,
+    legIndex: r.leg_idx,
+    runnerId: r.runner_id || null,
+    caption: r.caption || '',
+    width: r.width || null,
+    height: r.height || null,
+    bytes: r.bytes || null,
+    createdBy: r.created_by || null,
+    createdAt: r.created_at,
+    url: base ? `${base}/${r.r2_key}` : `${apiBase(env)}/media-file?k=${encodeURIComponent(r.r2_key)}`
+  };
+}
+
+// The worker's own address, for the fallback URL above. Relative would be
+// wrong: the pages are on another hostname.
+function apiBase(env) {
+  return (env.PUBLIC_API_URL || '').replace(/\/+$/, '') || '';
+}
+
+// Who may look. Exactly the rules /get uses, because a photo on a race is not
+// less private than that race's splits, and on an unlisted race it is a good
+// deal more so.
+async function mediaViewer(req, env, slug, shareToken) {
+  const session = await requireAuth(req, env);
+  const email = session && session.email ? session.email : null;
+  const cfg = await loadRaceConfigShared(env, slug);
+  if (!cfg) return { error: json({ error: 'Not found' }, { status: 404 }, env, req) };
+  if (email && canViewRace(cfg, email)) return { cfg, email };
+  if (shareToken && env.AUTH_KV) {
+    const raw = await env.AUTH_KV.get('share:' + shareToken);
+    if (raw) {
+      try {
+        const sh = JSON.parse(raw);
+        if (sh.slug === slug && (!sh.expiresAt || sh.expiresAt > Date.now())) return { cfg, email };
+      } catch (e) {}
+    }
+  }
+  if (cfg.visibility === 'public') return { cfg, email };
+  return { error: json({ error: email ? 'Forbidden, not invited to this race' : 'Unauthorized' },
+    { status: email ? 403 : 401 }, env, req) };
+}
+
+// POST /media?id=<slug>&leg=<n>&runner=<id>&caption=<text>
+// Body is the image itself. Not multipart: the client has already resized and
+// re-encoded it, there is exactly one part, and a form parser here would be
+// machinery in the path of a crew member with one bar of signal.
+async function handleMediaUpload(req, env) {
+  if (!mediaEnabled(env)) {
+    return json({ error: 'Photos are not configured on this deployment.' }, { status: 503 }, env, req);
+  }
+  const session = await requireAuth(req, env);
+  if (!session) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+
+  const url = new URL(req.url);
+  const slug = url.searchParams.get('id');
+  if (!slug) return json({ error: 'Missing id' }, { status: 400 }, env, req);
+
+  const cfg = await loadRaceConfigShared(env, slug);
+  if (!cfg) return json({ error: 'Race not found' }, { status: 404 }, env, req);
+  // Crew only. Everything the roadmap says about moderation starts the moment
+  // somebody who is not on the roster can put a picture on the page.
+  if (!canEditRace(cfg, session.email)) {
+    return json({ error: 'Forbidden, no write access on this race' }, { status: 403 }, env, req);
+  }
+
+  const legIdx = parseInt(url.searchParams.get('leg'), 10);
+  if (!Number.isFinite(legIdx) || legIdx < 0) {
+    return json({ error: 'A photo needs a leg' }, { status: 400 }, env, req);
+  }
+  const type = (req.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+  if (!MEDIA_TYPES.includes(type)) {
+    return json({ error: `Unsupported image type: ${type || 'none given'}` }, { status: 415 }, env, req);
+  }
+
+  const body = await req.arrayBuffer();
+  if (!body.byteLength) return json({ error: 'Empty upload' }, { status: 400 }, env, req);
+  if (body.byteLength > MEDIA_MAX_BYTES) {
+    return json({ error: 'That photo is too large. It should have been resized before sending.' },
+      { status: 413 }, env, req);
+  }
+
+  const countRow = await env.DB.prepare('SELECT COUNT(*) AS n FROM media WHERE slug = ?').bind(slug).all();
+  if (((countRow.results[0] || {}).n || 0) >= MEDIA_MAX_PER_RACE) {
+    return json({ error: `This race is at its limit of ${MEDIA_MAX_PER_RACE} photos.` },
+      { status: 409 }, env, req);
+  }
+
+  const ext = type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg';
+  const id = crypto.randomUUID();
+  const key = `races/${slug}/media/${id}.${ext}`;
+
+  await env.MEDIA.put(key, body, {
+    httpMetadata: {
+      contentType: type,
+      // A photo never changes once written, and the key is a fresh uuid every
+      // time, so this is safe to cache for as long as anything is.
+      cacheControl: 'public, max-age=31536000, immutable'
+    }
+  });
+
+  const w = parseInt(url.searchParams.get('w'), 10);
+  const h = parseInt(url.searchParams.get('h'), 10);
+  const runner = (url.searchParams.get('runner') || '').trim() || null;
+  const caption = (url.searchParams.get('caption') || '').trim().slice(0, 280);
+  const row = {
+    id, slug, leg_idx: legIdx, runner_id: runner, r2_key: key,
+    content_type: type, bytes: body.byteLength,
+    width: Number.isFinite(w) ? w : null, height: Number.isFinite(h) ? h : null,
+    caption, created_by: session.email, created_at: new Date().toISOString()
+  };
+  try {
+    await env.DB.prepare(
+      `INSERT INTO media (id, slug, leg_idx, runner_id, r2_key, content_type, bytes, width, height, caption, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(row.id, row.slug, row.leg_idx, row.runner_id, row.r2_key, row.content_type,
+           row.bytes, row.width, row.height, row.caption, row.created_by, row.created_at).run();
+  } catch (e) {
+    // The object landed and the row did not, which would be a photo nobody can
+    // find and nobody can delete. Take the object back out.
+    try { await env.MEDIA.delete(key); } catch (e2) {}
+    return json({ error: 'Could not record that photo: ' + (e.message || e) }, { status: 503 }, env, req);
+  }
+  return json({ media: mediaRow(env, row) }, { status: 200 }, env, req);
+}
+
+// GET /media?id=<slug>
+async function handleMediaList(req, env) {
+  if (!mediaEnabled(env)) return json({ media: [] }, { status: 200 }, env, req);
+  const url = new URL(req.url);
+  const slug = url.searchParams.get('id');
+  if (!slug) return json({ error: 'Missing id' }, { status: 400 }, env, req);
+
+  const seen = await mediaViewer(req, env, slug, url.searchParams.get('t'));
+  if (seen.error) return seen.error;
+
+  const rows = await env.DB.prepare(
+    'SELECT * FROM media WHERE slug = ? ORDER BY leg_idx ASC, created_at ASC'
+  ).bind(slug).all();
+  return json({ media: (rows.results || []).map(r => mediaRow(env, r)) }, {
+    headers: { 'Cache-Control': 'public, max-age=5' }
+  }, env, req);
+}
+
+// POST /media/delete  { id, slug }
+async function handleMediaDelete(req, env) {
+  if (!mediaEnabled(env)) return json({ error: 'Photos are not configured.' }, { status: 503 }, env, req);
+  const session = await requireAuth(req, env);
+  if (!session) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  let body; try { body = await req.json(); } catch (e) { body = null; }
+  const id = body && body.id;
+  if (!id) return json({ error: 'Missing id' }, { status: 400 }, env, req);
+
+  const row = (await env.DB.prepare('SELECT * FROM media WHERE id = ?').bind(id).all()).results[0];
+  if (!row) return json({ ok: true, alreadyGone: true }, { status: 200 }, env, req);
+  const cfg = await loadRaceConfigShared(env, row.slug);
+  if (!cfg || !canEditRace(cfg, session.email)) {
+    return json({ error: 'Forbidden' }, { status: 403 }, env, req);
+  }
+  // The row first. An orphaned object is invisible and costs a fraction of a
+  // penny; an orphaned row is a broken image on the race page.
+  await env.DB.prepare('DELETE FROM media WHERE id = ?').bind(id).run();
+  try { await env.MEDIA.delete(row.r2_key); } catch (e) {}
+  return json({ ok: true }, { status: 200 }, env, req);
+}
+
+// GET /media-file?k=<key>
+// The fallback for a deployment with no bucket hostname yet. Costs a worker
+// request per image, which is exactly what MEDIA_BASE_URL exists to avoid, so
+// this is the thing that works today rather than the thing to leave running.
+async function handleMediaFile(req, env) {
+  if (!mediaEnabled(env)) return json({ error: 'Not found' }, { status: 404 }, env, req);
+  const url = new URL(req.url);
+  const key = url.searchParams.get('k') || '';
+  const m = /^races\/([^/]+)\/media\/[^/]+$/.exec(key);
+  if (!m) return json({ error: 'Not found' }, { status: 404 }, env, req);
+
+  const seen = await mediaViewer(req, env, m[1], url.searchParams.get('t'));
+  if (seen.error) return seen.error;
+
+  const obj = await env.MEDIA.get(key);
+  if (!obj) return json({ error: 'Not found' }, { status: 404 }, env, req);
+  return new Response(obj.body, {
+    headers: {
+      'Content-Type': (obj.httpMetadata && obj.httpMetadata.contentType) || 'application/octet-stream',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      ...corsHeaders(env, req)
+    }
+  });
+}
+
+// Everything a race's photos consist of, for the delete path. Called there
+// rather than left to a sweeper: a deleted race that leaves its photographs on
+// a public bucket has not been deleted.
+async function deleteRaceMedia(env, slug) {
+  if (!mediaEnabled(env)) return null;
+  try {
+    const rows = await env.DB.prepare('SELECT r2_key FROM media WHERE slug = ?').bind(slug).all();
+    for (const r of (rows.results || [])) {
+      try { await env.MEDIA.delete(r.r2_key); } catch (e) {}
+    }
+    await env.DB.prepare('DELETE FROM media WHERE slug = ?').bind(slug).run();
+    return null;
+  } catch (e) {
+    return e.message || String(e);
+  }
+}
+
 async function handleArchive(req, env) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -3594,6 +3828,11 @@ async function handleRaceDelete(req, env) {
   // nothing left pointing at them. Git is the archive now. The stores that
   // answer a read, and the ones holding people's addresses, go first.
 
+  // The photographs, with the rest of what answers a read. A deleted race that
+  // leaves its pictures on a public bucket has not been deleted, and of
+  // everything a race holds these are the part somebody would most mind.
+  const mediaErr = await deleteRaceMedia(env, slug);
+
   // Then the manifest. If a file delete then fails we are left with
   // orphaned files, which are invisible and harmless; the other order leaves a
   // listed race whose config 404s, which is the failure we are here to fix.
@@ -3651,8 +3890,8 @@ async function handleRaceDelete(req, env) {
   // with an error nobody can act on. Both key spaces are paginated: a listing
   // that stops at the first page would leave tokens behind on a busy account.
 
-  if (failed.length || manifestErr) {
-    return json({ ok: false, deleted, failed, manifestErr }, { status: 207 }, env, req);
+  if (failed.length || manifestErr || mediaErr) {
+    return json({ ok: false, deleted, failed, manifestErr, mediaErr }, { status: 207 }, env, req);
   }
   return json({ ok: true, deleted }, {}, env, req);
 }
@@ -3709,6 +3948,10 @@ async function route(request, env, ctx) {
     if (request.method === 'GET'  && path === '/get')             return handleGet(request, env);
     if (request.method === 'GET'  && path === '/public')          return handlePublicRead(request, env);
     if (request.method === 'POST' && path === '/archive')         return handleArchive(request, env);
+    if (request.method === 'POST' && path === '/media')           return handleMediaUpload(request, env);
+    if (request.method === 'GET'  && path === '/media')           return handleMediaList(request, env);
+    if (request.method === 'POST' && path === '/media/delete')    return handleMediaDelete(request, env);
+    if (request.method === 'GET'  && path === '/media-file')      return handleMediaFile(request, env);
     if (request.method === 'POST' && path === '/invite')          return handleInvite(request, env);
     if (request.method === 'POST' && path === '/share-link')      return handleShareLink(request, env);
     if (request.method === 'POST' && path === '/share/revoke')    return handleShareRevoke(request, env);

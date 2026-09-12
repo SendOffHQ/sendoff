@@ -30,6 +30,10 @@ const raceFile = (slug, file) => {
   return null;
 };
 
+// Photos uploaded during a run. Reset by restarting the harness, which every
+// test does.
+const MEDIA = [];
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const send = (code, body, type) => {
@@ -142,6 +146,52 @@ const server = http.createServer((req, res) => {
         writtenAt: '2026-09-26T14:03:00Z', sentAt: '2026-09-26T17:41:00Z' }
     ] }), 'application/json');
   }
+  // Photos. Enough of R2 and the media table to exercise the client: an
+  // in-memory list per race, and the bytes handed back on a data: URL so a
+  // browser really renders what was uploaded. The point under test on this
+  // side is what leaves the phone, which is the resize and the stripping.
+  if (url.pathname === '/api/media' && req.method === 'POST') {
+    if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+    const chunks = [];
+    req.on('data', c => chunks.push(c));
+    req.on('end', () => {
+      const body = Buffer.concat(chunks);
+      const slug = url.searchParams.get('id');
+      const row = {
+        id: 'm' + (MEDIA.length + 1),
+        legIndex: parseInt(url.searchParams.get('leg'), 10),
+        runnerId: url.searchParams.get('runner') || null,
+        caption: url.searchParams.get('caption') || '',
+        width: parseInt(url.searchParams.get('w'), 10) || null,
+        height: parseInt(url.searchParams.get('h'), 10) || null,
+        bytes: body.length,
+        contentType: req.headers['content-type'] || '',
+        slug,
+        createdAt: new Date().toISOString(),
+        url: 'data:' + (req.headers['content-type'] || 'image/jpeg') + ';base64,' + body.toString('base64')
+      };
+      MEDIA.push(row);
+      send(200, JSON.stringify({ media: row }), 'application/json');
+    });
+    return;
+  }
+  if (url.pathname === '/api/media' && req.method === 'GET') {
+    const slug = url.searchParams.get('id');
+    return send(200, JSON.stringify({ media: MEDIA.filter(m => m.slug === slug) }), 'application/json');
+  }
+  if (url.pathname === '/api/media/delete') {
+    const chunks = [];
+    req.on('data', c => chunks.push(c));
+    req.on('end', () => {
+      let id = null;
+      try { id = JSON.parse(Buffer.concat(chunks).toString('utf8')).id; } catch (e) {}
+      const at = MEDIA.findIndex(m => m.id === id);
+      if (at >= 0) MEDIA.splice(at, 1);
+      send(200, '{"ok":true}', 'application/json');
+    });
+    return;
+  }
+
   if (url.pathname.startsWith('/api/')) return send(200, '{}', 'application/json');
 
   // --- the site ---
