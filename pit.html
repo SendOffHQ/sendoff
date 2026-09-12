@@ -53,11 +53,26 @@
     background: var(--bg-card); border: 1px solid var(--border);
     border-radius: 6px; padding: 12px 14px; margin-bottom: 16px;
   }
+  /* The head is the whole control: shut by default, and the one thing it has
+     to say while shut is how many photos are waiting for signal. */
   .photo-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    width: 100%; background: transparent; border: 0; padding: 0; cursor: pointer;
+    text-align: left; color: var(--text-muted);
     font-family: 'JetBrains Mono', monospace; font-size: 10px;
-    letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted);
+    letter-spacing: 0.18em; text-transform: uppercase;
   }
+  .photo-head:hover { color: var(--accent); }
+  .photo-head-right { display: flex; align-items: center; gap: 8px; }
+  .photo-head-warn { color: var(--yellow); }
+  .photo-head-err { color: var(--red); }
+  .photo-head-caret::before { content: '▼'; font-size: 8px; }
+  .photo-bar.collapsed .photo-head-caret::before { content: '▶'; }
+  .photo-body { margin-top: 2px; }
+  /* `hidden` works through a UA display rule and any author display outranks
+     it. Nothing here sets one, but the next person to add a flex row to this
+     body would find the section open at every load and not know why. */
+  .photo-body[hidden] { display: none; }
   .photo-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
   .photo-row select, .photo-row input[type="text"] {
     background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text);
@@ -279,7 +294,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=90"></script>
+<script src="lib/race-core.js?v=91"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -891,6 +906,14 @@
   // right leg in a list of sixteen before they can take a picture is how the
   // picture does not get taken.
   let photoRows = [], photoQueued = [], photosWired = false;
+  // Shut on arrival. Everything on this screen competes with the button
+  // somebody came to press, and the pit board is opened with a runner in front
+  // of you far more often than it is opened to add a photograph.
+  //
+  // Kept across renders rather than across loads: the board redraws every five
+  // seconds, and a section that folded itself up mid-caption would be unusable.
+  // A reload starts closed again, which is the right default to return to.
+  let photosOpen = false;
 
   function defaultLegIndex() {
     if (!cfg || !data) return 1;
@@ -952,9 +975,23 @@
         `<button class="kill" type="button" data-remove="${escapeHtml(m.id)}" aria-label="Delete">×</button>` +
         `</figure>`).join('');
 
+    // What the head says with the body shut. The count of photos waiting for
+    // signal has to be one of them: a crew member with three unsent pictures
+    // should not have to open anything to find that out.
+    const summary = stuck.length ? `${stuck.length} stuck`
+      : waiting ? `${waiting} waiting for signal`
+      : `${photoRows.length} on this race`;
+
+    host.className = 'photo-bar' + (photosOpen ? '' : ' collapsed');
     host.innerHTML =
-      `<div class="photo-head"><span>Photos</span>` +
-        `<span>${photoRows.length} on this race</span></div>` +
+      `<button type="button" class="photo-head" id="photo-toggle" aria-expanded="${photosOpen}"` +
+        ` aria-controls="photo-body">` +
+        `<span>Photos</span>` +
+        `<span class="photo-head-right"><span class="${
+          stuck.length ? 'photo-head-err' : waiting ? 'photo-head-warn' : ''
+        }">${summary}</span><span class="photo-head-caret"></span></span>` +
+      `</button>` +
+      `<div class="photo-body" id="photo-body"${photosOpen ? '' : ' hidden'}>` +
       `<div class="photo-row">` +
         `<select id="photo-leg" aria-label="Which leg">${legOpts}</select>` +
         `<select id="photo-runner" aria-label="Who is in it">${runnerOpts}</select>` +
@@ -969,10 +1006,19 @@
         : waiting ? `${waiting} waiting for signal. They go out on their own.`
         : 'Resized on this phone before sending, which takes the location off them too.'
       }</div>` +
-      (thumbs ? `<div class="photo-thumbs">${thumbs}</div>` : '');
+      (thumbs ? `<div class="photo-thumbs">${thumbs}</div>` : '') +
+      `</div>`;
 
     if (!photosWired) {
       photosWired = true;
+      host.addEventListener('click', (e) => {
+        if (!e.target.closest('#photo-toggle')) return;
+        photosOpen = !photosOpen;
+        renderPhotos();
+        // Straight into the leg picker on the way open: the whole section is
+        // three controls and the first one is the one that gets changed.
+        if (photosOpen) { const l = host.querySelector('#photo-leg'); if (l) l.focus(); }
+      });
       host.addEventListener('change', async (e) => {
         if (e.target.id !== 'photo-file') return;
         const files = [...(e.target.files || [])];
