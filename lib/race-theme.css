@@ -28,6 +28,62 @@
   --beam: #5efdf6;            /* glow only: 1.2:1 on white, never a surface */
 }
 
+/* ---------- the tutorial banner ----------
+   What a screen says the first time somebody lands on it. Race.tutorial builds
+   it; the copy belongs to the page.
+
+   Quiet on purpose. It sits above the thing somebody came to do, so it is a
+   panel in the page's own colours with a left rule in the signal, not a
+   coloured box shouting at them. The one that shouts is the one people learn
+   to dismiss without reading, and it only gets one chance. */
+.tut {
+  display: block;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 14px 18px 16px;
+  margin: 0 0 22px;
+}
+.tut-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; margin-bottom: 8px;
+}
+.tut-title {
+  font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif;
+  font-size: 18px; font-weight: 600; color: var(--text);
+}
+/* Words rather than a cross. The cross is for a thing that interrupted you;
+   this one is answering a question you had, and "Got it" is the answer. */
+.tut-close {
+  flex: none;
+  background: transparent; border: 1px solid var(--border-bright);
+  color: var(--text-dim); cursor: pointer;
+  padding: 6px 12px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+}
+.tut-close:hover { color: var(--accent); border-color: var(--accent); }
+.tut-points {
+  margin: 0; padding-left: 20px;
+  color: var(--text-dim); font-size: 13.5px; line-height: 1.65;
+}
+.tut-points li { margin-bottom: 7px; }
+.tut-points li:last-child { margin-bottom: 0; }
+.tut-points li::marker { color: var(--text-muted); font-size: 12px; }
+.tut-points b { color: var(--text); font-weight: 600; }
+/* A control named in the copy, set the way the control itself is set, so the
+   sentence points at something findable rather than describing it. */
+.tut-points code {
+  font-family: 'JetBrains Mono', monospace; font-size: 11.5px;
+  color: var(--accent); background: var(--bg-elevated);
+  padding: 1px 6px; border-radius: 3px;
+}
+@media (max-width: 480px) {
+  .tut { padding: 12px 14px 14px; }
+  .tut-points { font-size: 13px; padding-left: 18px; }
+}
+
 /* ---------- SendOff wordmark ----------
    brand/sendoff-wordmark.svg inlined. Outlined paths, so no webfont needed.
    Height is set by --wm-size; the two colours come from CSS vars the SVG

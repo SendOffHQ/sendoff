@@ -42,17 +42,23 @@ await page.evaluate(base => localStorage.setItem('race-hub-session-v1', JSON.str
 await page.goto(BASE + '/setup.html');
 await page.waitForTimeout(800);
 
-// Start and Finish come with the page; two more make a list worth reordering.
-await page.click('#add-aid'); await page.click('#add-aid');
+const rows = () => page.evaluate(() =>
+  [...document.querySelectorAll('#aid-rows [data-k="name"]')].map((e, i) =>
+    [e.value, document.querySelector(`#aid-rows [data-aid="${i}"][data-k="mileage"]`).value]));
+
+// The shape a new race starts from. Start and Finish alone validates and
+// teaches the wrong thing: a course with no aid station in it is not a course
+// anybody is crewing.
+console.log('\nthe table a new race opens with');
+ok('start, one aid, finish', await rows(), [['Start','0'],['Aid station 1',''],['Finish','']]);
+
+// A fourth row makes a list worth reordering.
+await page.click('#add-aid');
 const fill = async (i, name, mi) => {
   await page.fill(`[data-aid="${i}"][data-k="name"]`, name);
   if (i > 0) await page.fill(`[data-aid="${i}"][data-k="mileage"]`, String(mi));
 };
 await fill(0,'Start',0); await fill(1,'Finish',26); await fill(2,'Bravo',12); await fill(3,'Alpha',5);
-
-const rows = () => page.evaluate(() =>
-  [...document.querySelectorAll('#aid-rows [data-k="name"]')].map((e, i) =>
-    [e.value, document.querySelector(`#aid-rows [data-aid="${i}"][data-k="mileage"]`).value]));
 
 console.log('\nfour stations, typed in the wrong order');
 ok('as typed', await rows(), [['Start','0'],['Finish','26'],['Bravo','12'],['Alpha','5']]);
