@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=33">
+<link rel="stylesheet" href="lib/race-theme.css?v=34">
 <style>
   /* The screen for the person running, when there is no crew at this aid
      station. One job: say where you stand, and take one press. Everything
@@ -184,7 +184,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=87"></script>
+<script src="lib/race-core.js?v=88"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -610,10 +610,10 @@
   //
   // Three points, not four. The person reading this is about to run a hundred
   // miles, or is partway through one.
-  function registerTutorial() {
+  function registerTutorial(ent) {
     Race.tutorial.register({
       key: 'racer',
-      version: 1,
+      version: 2,
       where: '#tut-host',
       title: 'Your race',
       points: [
@@ -621,15 +621,17 @@
           '<b>Arrived</b> when you reach the next aid. Your crew sees it land.',
         'Pressed the wrong one? <b>Undo</b> sits there for fifteen seconds ' +
           'afterwards.',
-        'No signal is fine. Presses are held on this phone and go out the ' +
-          'moment you have bars again.'
+        Race.plans.offlineNote(ent)
       ]
     });
   }
 
   (async () => {
     await Race.hub.load();
-    registerTutorial();
+    // Not awaited, for the same reason as the pit board: the plan decides what
+    // the offline line says, and somebody halfway through a hundred miles is
+    // not waiting on a sentence.
+    Race.plans.entitlements().then(registerTutorial, () => registerTutorial(null));
     await load();
     // Only the two numbers that move are touched each second. Redrawing the
     // whole readout would take a chip out from under a thumb already on it.

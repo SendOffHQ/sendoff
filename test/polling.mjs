@@ -147,7 +147,14 @@ await page.goto(`${BASE}/race.html?id=${SLUG}`);
 await page.waitForTimeout(5000);
 const done = await count(page, 16);
 console.log(`     ${done} data reads in 16s`);
-ok('is left nearly alone', done, 0);
+// At most one, not exactly none, and the label always said "nearly". The
+// window opens wherever the slow poll happens to be in its cycle, so a single
+// read landing inside sixteen seconds is the interval working, not failing.
+// Held at one rather than loosened further: two would mean the finished-race
+// backoff is not happening at all, which is the thing this is here to catch.
+// The hidden-tab counts above stay at exactly zero, because a hidden tab
+// asking anything is a real failure and nothing about it is timing.
+ok('is left nearly alone', done <= 1, true);
 await page.context().close();
 
 await b.close(); srv.kill('SIGKILL');
