@@ -67,7 +67,19 @@ ok('and an older worker that never heard of them cannot', await page.evaluate(as
 }), false);
 
 console.log('\nthe crew get a way to add one, on the leg the race is on');
-ok('the strip is there', await page.locator('#photos').isVisible(), true);
+ok('the section is there', await page.locator('#photos').isVisible(), true);
+
+// Shut on arrival. Everything on this screen competes with the button somebody
+// came to press, and the board is opened with a runner in front of you far
+// more often than it is opened to add a photograph.
+ok('and shut', await page.locator('#photo-body').isVisible(), false);
+ok('with nothing under it to tab into',
+   await page.locator('#photo-leg').isVisible(), false);
+await page.click('#photo-toggle');
+await page.waitForTimeout(200);
+ok('the head opens it', await page.locator('#photo-body').isVisible(), true);
+ok('and lands on the leg picker',
+   await page.evaluate(() => document.activeElement && document.activeElement.id), 'photo-leg');
 const legDefault = await page.evaluate(() => document.querySelector('#photo-leg').value);
 ok('a leg is chosen for them', /^\d+$/.test(legDefault), true);
 ok('and every leg is offered', await page.evaluate(() =>

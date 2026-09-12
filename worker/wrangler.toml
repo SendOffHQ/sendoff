@@ -70,6 +70,25 @@ NOTIFY_FROM = "invites@sendoff.run"
 # Sender for everything that is not an invite: password resets and the note to
 # the operator. "invites@" on a reset reads like the wrong department answered.
 INFO_FROM = "info@sendoff.run"
+# Where a photo is read from. This is the whole of what stands between an image
+# view costing a worker request and costing none, and the budget it protects is
+# the 100,000 a day that everything else also draws on: two hundred spectators
+# opening a race with twenty photos on it is four thousand requests.
+#
+# Empty, and reads fall back through the worker's own /media-file, which works
+# and is correct and is the thing to move off. Set, and the object comes
+# straight off the edge, cached for a year, costing nothing in requests and
+# nothing in egress: R2 bills no egress either way, so this buys requests.
+#
+# It goes here rather than in the dashboard on purpose. A plain-text var set in
+# the dashboard is replaced by this file on the next `wrangler deploy`, and
+# this worker deploys from CI on every change, so a value typed into the
+# dashboard would disappear on somebody else's commit and take the photographs
+# with it. It is a public hostname, not a secret, so there is nothing to hide.
+#
+# Fill it in from R2 -> sendoff-media -> Settings, either the r2.dev subdomain
+# or a custom domain such as media.sendoff.run. No trailing slash.
+MEDIA_BASE_URL = ""
 
 # Secrets to set with `wrangler secret put`:
 #   GITHUB_TOKEN   PAT with Contents: Read and write
