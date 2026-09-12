@@ -47,6 +47,25 @@ await page.evaluate(base => localStorage.setItem('race-hub-session-v1', JSON.str
 await page.goto(BASE + '/pit.html?id=' + SLUG);
 await page.waitForTimeout(1800);
 
+// A deployment with no bucket and a race with no photographs look identical
+// from an empty list, and the difference decides whether the pit board offers
+// a camera at all. It shipped once offering one that could only fail.
+console.log('\nthe board knows whether photos can land at all');
+ok('this one can', await page.evaluate(async () => {
+  await Race.media.list('six-0-trail-marathon');
+  return Race.media.configured();
+}), true);
+ok('and an older worker that never heard of them cannot', await page.evaluate(async () => {
+  const real = window.fetch;
+  window.fetch = (u, o) => String(u).includes('/media?')
+    ? Promise.resolve(new Response('not found', { status: 404 })) : real(u, o);
+  await Race.media.list('six-0-trail-marathon');
+  const out = Race.media.configured();
+  window.fetch = real;
+  await Race.media.list('six-0-trail-marathon');
+  return out;
+}), false);
+
 console.log('\nthe crew get a way to add one, on the leg the race is on');
 ok('the strip is there', await page.locator('#photos').isVisible(), true);
 const legDefault = await page.evaluate(() => document.querySelector('#photo-leg').value);
