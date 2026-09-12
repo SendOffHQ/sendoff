@@ -33,7 +33,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=33">
+<link rel="stylesheet" href="lib/race-theme.css?v=34">
 <style>
   .wrap { max-width: 860px; margin: 0 auto; }
   .section {
@@ -622,7 +622,12 @@
   </section>
 
   <div class="submit-bar">
-    <div class="left">Writes <code id="dest-preview">races/&lt;slug&gt;/</code> and updates <code>races/index.json</code>.</div>
+    <!-- What this said was true when every race file was a git commit. The
+         race itself lives in the database now and only the hub listing still
+         commits, so naming two paths was describing a thing that had stopped
+         happening. It says where the race will be instead, which is what
+         somebody filling in this form wanted to know anyway. -->
+    <div class="left">Creates <code id="dest-preview">races/&lt;slug&gt;/</code>.</div>
     <div class="right">
       <a class="btn" href="/app/">Cancel</a>
       <button class="btn primary" type="button" id="btn-submit">Create race</button>
@@ -633,7 +638,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=87"></script>
+<script src="lib/race-core.js?v=88"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 

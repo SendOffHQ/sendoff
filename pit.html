@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=33">
+<link rel="stylesheet" href="lib/race-theme.css?v=34">
 <style>
   body { padding: 20px 16px 32px; }
   .wrap { max-width: 860px; margin: 0 auto; }
@@ -227,7 +227,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=87"></script>
+<script src="lib/race-core.js?v=88"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -808,10 +808,10 @@
   // them and the button is worse than no teaching at all. So it sits above the
   // cards, out of the way, and press() puts it away on the first press:
   // whoever has started working has read it or decided not to.
-  function registerTutorial() {
+  function registerTutorial(ent) {
     Race.tutorial.register({
       key: 'pit',
-      version: 1,
+      version: 2,
       where: '#tut-host',
       title: 'Working the pit board',
       // Three short lines, not four longer ones. At four this pushed the first
@@ -823,15 +823,19 @@
           'leave, <b>Check In</b> when they reach you.',
         'Fluids, food and notes go in afterwards. None of it is needed to log ' +
           'a split.',
-        '<b>Undo last</b> fixes a wrong press. No signal is fine: presses are ' +
-          'held on this phone until you have bars.'
+        '<b>Undo last</b> fixes a wrong press. ' + Race.plans.offlineNote(ent)
       ]
     });
   }
 
   (async () => {
     await Race.hub.load();
-    registerTutorial();
+    // Not awaited. What the banner says about logging with no signal depends on
+    // the plan, and asking costs a round trip; the board is what somebody came
+    // for and it is not waiting on a sentence. Either way it registers: the
+    // rejection path in entitlements() answers generously, which is the right
+    // way round for a screen somebody opens where the signal is worst.
+    Race.plans.entitlements().then(registerTutorial, () => registerTutorial(null));
     await load();
     // Never forced: see render(). Adaptive, and stopped while the tab is
     // hidden, which is most of the time a phone spends in a vest pocket.

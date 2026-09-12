@@ -128,6 +128,49 @@ for (const [path, key, title] of SCREENS) {
 }
 ok('none of them is missing its tutorial', missing, []);
 
+// Two screens say something different depending on who is reading, and both
+// are the kind of wrong that is invisible in a screenshot: a crew member told
+// to sign in when they already have, or somebody promised at an aid station
+// that their presses will be held when their plan does not hold them.
+console.log('\nthe race page points a signed-out reader at the way in');
+const say = async (session, where) => {
+  const c = await b.newContext({ viewport:{width:900,height:1100}, serviceWorkers:'block' });
+  const pg = await c.newPage();
+  await pg.goto(BASE + '/index.html');
+  await pg.evaluate(([base, sess]) => {
+    if (sess) localStorage.setItem('race-hub-session-v1', JSON.stringify(Object.assign(
+      { session:'stub', proxyUrl: base + '/api', expiresAt: Date.now() + 7*24*3600e3 }, sess)));
+    else localStorage.removeItem('race-hub-session-v1');
+  }, [BASE, session]);
+  await pg.goto(BASE + where);
+  await pg.waitForTimeout(2000);
+  const out = await pg.evaluate(() => {
+    const el = document.querySelector('.tut');
+    return el ? [...el.querySelectorAll('.tut-points li')].map(li => li.textContent) : null;
+  });
+  await c.close();
+  return out;
+};
+const anon = await say(null, '/race.html?id=' + SLUG);
+ok('four points either way', anon && anon.length, 4);
+ok('and the last one offers the way in', /Sign in/.test(anon[3]), true);
+
+console.log('\nand a crew member at the pages they came for');
+const crew = await say({ email:'crew@example.com', role:'crew' }, '/race.html?id=' + SLUG);
+ok('no sign-in prompt for somebody signed in', /Sign in/.test(crew[3]), false);
+ok('the pit board is named', /Pit Board/.test(crew[3]), true);
+
+console.log('\nthe crew screens say what the plan actually gives them');
+ok('with offline logging, the plain fact', await page.evaluate(
+  () => Race.plans.offlineNote({ offlineLogging: true })),
+  'No signal is fine: presses are held on this phone until you have bars.');
+ok('without it, it says so and says whose it is', await page.evaluate(
+  () => /Pro/.test(Race.plans.offlineNote({ offlineLogging: false }))), true);
+// Unknown is the answer entitlements() gives when it cannot ask, which on these
+// two screens is exactly where the signal is worst.
+ok('and unknown answers generously', await page.evaluate(
+  () => Race.plans.offlineNote(null) === Race.plans.offlineNote({ offlineLogging: true })), true);
+
 // The pit board is the screen this had to not get in the way of. Somebody who
 // has started pressing has read it or decided not to, and either way a banner
 // between them and the next racer is in the way.
@@ -167,8 +210,11 @@ ok('and there is a racer to press', await big.count(), 1);
 await big.click();
 await pp.waitForTimeout(400);
 ok('pressing puts it away', await pp.evaluate(() => !!document.querySelector('.tut')), false);
+// That a version was written down, not which one. The number goes up every
+// time this screen's copy is rewritten, and a test that has to be edited for
+// that is a test that will be edited without being read.
 ok('and it stays away next time', await pp.evaluate(
-  k => JSON.parse(localStorage.getItem(k)).pit, KEY), 1);
+  k => JSON.parse(localStorage.getItem(k)).pit >= 1, KEY), true);
 await pit.close();
 
 // The hub is the exception, and an intended one: it has a dialog of its own.

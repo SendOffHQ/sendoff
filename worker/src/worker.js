@@ -520,14 +520,24 @@ const PLANS = {
     maxRunnersPerRace: 1,
     maxCrewPerRace: 2,
     privateRaces: false,
-    shareLinks: false
+    shareLinks: false,
+    // True on both, on purpose. The pricing plan puts offline logging in Pro
+    // and nothing gates it yet, so today every account has it. It is named
+    // here so the crew screens can say which it is from the entitlement rather
+    // than from somebody's memory of what the plan says this month.
+    //
+    // Flipping this to false is the act of gating it, and see GRANDFATHERED
+    // below: it goes into that list in the same commit or the promise breaks
+    // quietly for everybody who signed up while it was free.
+    offlineLogging: true
   },
   pro: {
     label: 'Pro',
     maxRunnersPerRace: null,     // null means no cap
     maxCrewPerRace: null,
     privateRaces: true,
-    shareLinks: true
+    shareLinks: true,
+    offlineLogging: true
   }
 };
 const DEFAULT_PLAN = 'pro';

@@ -38,7 +38,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=33">
+<link rel="stylesheet" href="lib/race-theme.css?v=34">
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css" />
 <style>
   .cutoffs {
@@ -521,7 +521,7 @@
      Esri's and will be missing offline; the map is useful without them. -->
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8"></script>
-<script src="lib/race-core.js?v=87"></script>
+<script src="lib/race-core.js?v=88"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -1024,6 +1024,9 @@
       // The other three pages of this race, and the hub. The pit board only
       // appears for someone who can actually work it.
       Race.nav.setRace(slug, 'race', canEdit);
+      // The same moment the nav learns whether to offer the pit board is the
+      // moment the tutorial can say so. Guarded inside: this runs on every poll.
+      registerTutorial();
       updateLastUpdated();
       tick();
       initCourseVisuals();
@@ -1431,10 +1434,32 @@
   // The lightest of any of them, on purpose. This is the page a stranger opens
   // from a link somebody texted them, more people see it than all the other
   // screens put together, and none of them asked to be taught anything.
+  // The last line depends on who is reading, which is why this waits for the
+  // config: until the roster has loaded there is no telling a crew member from
+  // a stranger, and those two want opposite things from this page. Getting it
+  // wrong the useful way round is worse than waiting a moment, because telling
+  // a crew member to sign in when they already have is how somebody decides
+  // the app does not know them.
+  let tutorialDone = false;
   function registerTutorial() {
+    if (tutorialDone) return;
+    tutorialDone = true;
+    const signedIn = Race.hub.isProxyMode() && Race.auth.has();
+    const last = canEdit()
+      // Crew and racers. The pit board is the point of the whole thing and it
+      // is behind a menu they have no reason to have opened.
+      ? 'Crewing or racing this one? Your <b>Pit Board</b>, <b>Racer</b> and ' +
+        '<b>Settings</b> pages are all in the menu, top right.'
+      : (signedIn
+          // Signed in, but not on this race's roster. Pointing them at a pit
+          // board they cannot open would be worse than saying nothing.
+          ? 'Charts and a printable report are in the menu, top right.'
+          : 'Crewing or racing this one? <b>Sign in</b> from the menu, top ' +
+            'right, and the pit board and settings open up. Watching needs no ' +
+            'account at all.');
     Race.tutorial.register({
       key: 'race',
-      version: 1,
+      version: 2,
       where: '#tut-host',
       title: 'Following the race',
       points: [
@@ -1444,13 +1469,12 @@
           'they spent at the aid station.',
         '<b>Green</b> is on pace for the cutoff and <b>red</b> is not. The ' +
           'cutoffs themselves are at the top of the page.',
-        'Charts and a printable report are in the menu, top right.'
+        last
       ]
     });
   }
 
   Race.hub.load().then(() => {
-    registerTutorial();
     if (Race.qs('new')) { noteSettling(); loadNewRace(); } else load();
   });
   setInterval(tick, 1000);
