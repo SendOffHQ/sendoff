@@ -33,7 +33,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=31">
+<link rel="stylesheet" href="lib/race-theme.css?v=32">
 <style>
   .wrap { max-width: 860px; margin: 0 auto; }
   .section {
@@ -251,6 +251,11 @@
 <div class="wrap">
 
   <div id="error" class="error-banner" style="display:none;"></div>
+
+  <!-- Where the first-visit banner goes. An empty element rather than a
+       position argument: this is above the sign-in panel when there is one,
+       and above the form when there is not. -->
+  <div id="tut-host"></div>
 
   <!-- Auth (PAT or login depending on hub.json) -->
   <section class="section" id="sec-github">
@@ -628,7 +633,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=85"></script>
+<script src="lib/race-core.js?v=86"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -638,8 +643,13 @@
     activity: 'trail-run',
     visibility: 'public',
     units: { distance: 'mi', elevation: 'ft' },
+    // Start, one aid, finish. Two rows was the smallest thing that validates
+    // and it taught the wrong shape: a course with no aid station in it is not
+    // a course anybody is crewing. The middle row is named rather than blank so
+    // it reads as a row to fill in rather than one that arrived by accident.
     aidStations: [
       { name: 'Start', mileage: 0, arriveCutoffHours: '' },
+      { name: 'Aid station 1', mileage: '', arriveCutoffHours: '' },
       { name: 'Finish', mileage: '', arriveCutoffHours: '' }
     ],
     // Aid stations within one lap (loops mode). Empty = simple lap-only loop.
@@ -1717,9 +1727,35 @@
     renderUnitLabels();
   });
 
+  // What this screen says the first time somebody opens it.
+  //
+  // A banner rather than the modal the hub uses. Somebody here has already
+  // decided to set a race up; a dialog in front of a form is a door in front
+  // of a door. Four points, because the fifth would not be read.
+  function registerTutorial() {
+    Race.tutorial.register({
+      key: 'setup',
+      version: 1,
+      where: '#tut-host',
+      title: 'Setting up a race',
+      points: [
+        'Work down the page and press <b>Create race</b> at the bottom. ' +
+          'Nothing is written until you do, so none of this is a commitment yet.',
+        'The course is the start, every aid, every checkpoint, and the finish, ' +
+          'each with its distance from the start. Segments, cutoffs and pace are ' +
+          'all worked out from those numbers.',
+        'A <b>GPX file</b> is optional. It draws the elevation profile and nothing ' +
+          'else, and the race runs fine without one.',
+        'Crew, share links and anything you forget are added afterwards, from the ' +
+          "race's own settings page. You do not need anybody's email address now."
+      ]
+    });
+  }
+
   // ---------- init ----------
   (async () => {
     await Race.hub.load();
+    registerTutorial();
     applyAuthMode();
     fillGhForm();
     renderGhStatus();
