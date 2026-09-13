@@ -72,21 +72,21 @@ ok('the section is there', await page.locator('#photos').isVisible(), true);
 // Shut on arrival. Everything on this screen competes with the button somebody
 // came to press, and the board is opened with a runner in front of you far
 // more often than it is opened to add a photograph.
-ok('and shut', await page.locator('#photo-body').isVisible(), false);
+ok('and shut', await page.locator('[data-ph-body]').isVisible(), false);
 ok('with nothing under it to tab into',
-   await page.locator('#photo-leg').isVisible(), false);
-await page.click('#photo-toggle');
+   await page.locator('[data-ph-leg]').isVisible(), false);
+await page.click('[data-ph-toggle]');
 await page.waitForTimeout(200);
-ok('the head opens it', await page.locator('#photo-body').isVisible(), true);
+ok('the head opens it', await page.locator('[data-ph-body]').isVisible(), true);
 ok('and lands on the leg picker',
-   await page.evaluate(() => document.activeElement && document.activeElement.id), 'photo-leg');
-const legDefault = await page.evaluate(() => document.querySelector('#photo-leg').value);
+   await page.evaluate(() => document.activeElement && document.activeElement.dataset.phLeg !== undefined), true);
+const legDefault = await page.evaluate(() => document.querySelector('[data-ph-leg]').value);
 ok('a leg is chosen for them', /^\d+$/.test(legDefault), true);
 ok('and every leg is offered', await page.evaluate(() =>
-  document.querySelectorAll('#photo-leg option').length > 1), true);
+  document.querySelectorAll('[data-ph-leg] option').length > 1), true);
 // The optional tag, offered second and never required.
 ok('nobody in particular is the default', await page.evaluate(() =>
-  document.querySelector('#photo-runner').value), '');
+  document.querySelector('[data-ph-runner]').value), '');
 
 // A real JPEG with a real GPS tag, built here so the assertion below is about
 // this code and not about whatever a fixture happened to contain.
@@ -171,22 +171,22 @@ ok('the queue emptied once it went', await page.evaluate(
 // member never reaches our code at all. capture goes to the camera app, which
 // has never needed a network.
 console.log('\nthere is a way to take one that does not go through a gallery');
-ok('the camera input is there', await page.locator('#photo-camera').count(), 1);
+ok('the camera input is there', await page.locator('[data-ph-camera]').count(), 1);
 ok('and asks for the camera', await page.evaluate(
-  () => document.querySelector('#photo-camera').getAttribute('capture')), 'environment');
+  () => document.querySelector('[data-ph-camera]').getAttribute('capture')), 'environment');
 // capture takes one picture at a time; multiple on it would be a lie.
 ok('one at a time', await page.evaluate(
-  () => document.querySelector('#photo-camera').multiple), false);
-ok('the gallery is still offered alongside', await page.locator('#photo-file').count(), 1);
+  () => document.querySelector('[data-ph-camera]').multiple), false);
+ok('the gallery is still offered alongside', await page.locator('[data-ph-file]').count(), 1);
 ok('and that one takes several', await page.evaluate(
-  () => document.querySelector('#photo-file').multiple), true);
+  () => document.querySelector('[data-ph-file]').multiple), true);
 // Both go the same way in, or one of them silently does nothing.
 ok('a camera photo queues like any other', await page.evaluate(async (bytes) => {
   const before = (await Race.media.pending('six-0-trail-marathon')).length;
   const file = new File([new Uint8Array(bytes)], 'cam.jpg', { type: 'image/jpeg' });
   const dt = new DataTransfer();
   dt.items.add(file);
-  const input = document.querySelector('#photo-camera');
+  const input = document.querySelector('[data-ph-camera]');
   input.files = dt.files;
   input.dispatchEvent(new Event('change', { bubbles: true }));
   await new Promise(r => setTimeout(r, 1200));
@@ -196,23 +196,23 @@ ok('a camera photo queues like any other', await page.evaluate(async (bytes) => 
 
 console.log('\nthe poll does not pull the picker out from under a crew member');
 const survives = await page.evaluate(async () => {
-  const before = document.querySelector('#photo-file');
+  const before = document.querySelector('[data-ph-file]');
   // Exactly what the poll does, and more times than it would in one pick.
   for (let i = 0; i < 4; i++) renderPhotos();
-  const after = document.querySelector('#photo-file');
+  const after = document.querySelector('[data-ph-file]');
   return { same: before === after, attached: document.contains(before) };
 });
 ok('the file input is the same element afterwards', survives.same, true);
 ok('and still in the document', survives.attached, true);
 
 // The other half: what somebody typed or chose is still there.
-await page.selectOption('#photo-leg', '7');
-await page.fill('#photo-caption', 'Half a quesadilla');
+await page.selectOption('[data-ph-leg]', '7');
+await page.fill('[data-ph-caption]', 'Half a quesadilla');
 await page.evaluate(() => { for (let i = 0; i < 3; i++) renderPhotos(); });
 ok('the leg they chose survives the poll',
-   await page.evaluate(() => document.querySelector('#photo-leg').value), '7');
+   await page.evaluate(() => document.querySelector('[data-ph-leg]').value), '7');
 ok('and so does the caption they typed',
-   await page.evaluate(() => document.querySelector('#photo-caption').value), 'Half a quesadilla');
+   await page.evaluate(() => document.querySelector('[data-ph-caption]').value), 'Half a quesadilla');
 
 // With no signal a photo has to look like it was taken, or a crew member
 // takes it again, or gives up on the feature at the aid station it is for.
@@ -232,9 +232,9 @@ await page.waitForTimeout(300);
 ok('it is in the queue', await page.evaluate(
   () => Race.media.pending('six-0-trail-marathon').then(q => q.length)), 1);
 ok('a thumbnail shows it', await page.evaluate(
-  () => document.querySelectorAll('#photo-thumbs figure.queued').length), 1);
+  () => document.querySelectorAll('[data-ph-thumbs] figure.queued').length), 1);
 ok('and the head says so without opening anything', await page.evaluate(
-  () => document.querySelector('#photo-summary').textContent), '1 waiting for signal');
+  () => document.querySelector('[data-ph-summary]').textContent), '1 waiting for signal');
 // The camera must not disappear just because this load could not reach the
 // worker. That is the aid station it exists for.
 ok('the section is still offered', await page.evaluate(
@@ -262,7 +262,7 @@ ok('the foreground alone sent it', await page.evaluate(
 // photograph looked thrown away.
 await page.waitForTimeout(400);
 ok('and the board has it, without a minute of nothing', await page.evaluate(
-  () => document.querySelectorAll('#photo-thumbs figure:not(.queued)').length > 0), true);
+  () => document.querySelectorAll('[data-ph-thumbs] figure:not(.queued)').length > 0), true);
 
 await page.evaluate(() => Race.media.flush());
 await page.waitForTimeout(900);
@@ -271,6 +271,37 @@ ok('the queue emptied', await page.evaluate(
 const landedOffline = await page.evaluate(() => Race.media.list('six-0-trail-marathon'));
 ok('and it landed on the leg it was taken on',
    landedOffline.filter(m => m.caption === 'No signal').map(m => m.legIndex), [7]);
+
+// The panel is one implementation now, mounted by two pages. The thing that
+// differs is the leg it opens on, and it is the whole reason the pit board
+// keeps a defaultLeg of its own: a crew member photographs whoever is in front
+// of them, and a racer photographs where they are.
+console.log('\nthe racer page has the same panel, below what they press');
+const racer = await b.newContext({ viewport:{width:390,height:844}, serviceWorkers:'block' });
+const rp = await racer.newPage();
+const rerrs = [];
+rp.on('pageerror', e => rerrs.push(e.message));
+await rp.goto(BASE + '/index.html');
+await rp.evaluate(base => localStorage.setItem('race-hub-session-v1', JSON.stringify({
+  session:'stub', proxyUrl: base + '/api', email:'crew@example.com', role:'crew',
+  expiresAt: Date.now() + 7*24*3600e3 })), BASE);
+await rp.goto(BASE + '/racer.html?id=' + SLUG);
+await rp.waitForTimeout(2200);
+ok('the panel is there', await rp.locator('#photos').isVisible(), true);
+ok('shut, like the other one', await rp.locator('[data-ph-body]').isVisible(), false);
+// Below the button, never above it. Somebody halfway through a hundred miles
+// came here to press one thing.
+ok('and below what they came to press', await rp.evaluate(() => {
+  const act = document.getElementById('act');
+  const ph = document.getElementById('photos');
+  return !!(act && ph) && (act.compareDocumentPosition(ph) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+}), true);
+await rp.click('[data-ph-toggle]');
+await rp.waitForTimeout(250);
+ok('it opens', await rp.locator('[data-ph-body]').isVisible(), true);
+ok('with the camera on it', await rp.locator('[data-ph-camera]').count(), 1);
+ok('nothing threw', rerrs, []);
+await racer.close();
 
 console.log('\nthe race page shows it against that leg, and not before asked');
 const spectator = await b.newContext({ viewport:{width:900,height:1100}, serviceWorkers:'block' });
