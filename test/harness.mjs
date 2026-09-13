@@ -23,12 +23,24 @@ const TYPES = { '.html':'text/html', '.js':'application/javascript', '.css':'tex
 // the failure looked like a bug in the app: no crew pages, no role, and a hang.
 // A test that a person can break by tidying up is not testing what it says.
 const FIXTURES = path.join(ROOT, 'test', 'fixtures', 'races');
-const raceFile = (slug, file) => {
-  for (const p of [path.join(ROOT, 'races', slug, file), path.join(FIXTURES, slug, file)]) {
-    if (fs.existsSync(p)) return fs.readFileSync(p, 'utf8');
+
+// Whatever this run has written, by path, newest wins. Held in memory and gone
+// when the harness restarts, which every test does, so no test can leave a
+// fixture edited for the next one. It exists so a save can round-trip: a page
+// that saves and then reloads to confirm needs the reload to see what it just
+// wrote, and without this every save test would be testing the request and not
+// the outcome.
+const WRITTEN = new Map();
+
+const fileAt = (p) => {
+  if (WRITTEN.has(p)) return WRITTEN.get(p);
+  for (const base of [ROOT, path.join(ROOT, 'test', 'fixtures')]) {
+    const full = path.join(base, p);
+    if (fs.existsSync(full)) return fs.readFileSync(full, 'utf8');
   }
   return null;
 };
+const raceFile = (slug, file) => fileAt(path.posix.join('races', slug, file));
 
 // Photos uploaded during a run. Reset by restarting the harness, which every
 // test does.
@@ -52,8 +64,34 @@ const server = http.createServer((req, res) => {
   }
 
   // --- the stub worker ---
+  // A write. Held in memory, so the read that follows it sees it.
+  if (url.pathname === '/api/commit') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+      let j;
+      try { j = JSON.parse(body); } catch (e) { return send(400, '{"error":"Invalid JSON"}', 'application/json'); }
+      if (!j || !j.path || typeof j.content !== 'string') {
+        return send(400, '{"error":"Missing path or content"}', 'application/json');
+      }
+      WRITTEN.set(j.path, j.content);
+      send(200, JSON.stringify({ content: { path: j.path, sha: 'stub-sha-' + WRITTEN.size } }),
+           'application/json');
+    });
+  }
   if (url.pathname === '/api/get') {
     const p = url.searchParams.get('path') || '';
+    // The hub manifest is not inside a race, and a save that touches it
+    // (aid stations move a race's total distance) has to be able to read it
+    // first or the save fails on its second write.
+    if (p === 'races/index.json') {
+      if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+      const text = fileAt(p) || '{"races":[]}\n';
+      return send(200, JSON.stringify({ sha: 'stub-sha', path: p,
+        content: Buffer.from(text, 'utf8').toString('base64'), encoding: 'base64' }),
+        'application/json');
+    }
     const m = p.match(/^races\/([^/]+)\/(.+)$/);
     if (!m) return send(400, '{}', 'application/json');
     // Who is asking. A session, or a share token that names this race, or
