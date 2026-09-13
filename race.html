@@ -548,6 +548,11 @@
 
 <div id="error" class="error-banner" style="display:none;"></div>
 
+<!-- A race that arrived from the wizard with more than one racer on it. Its
+     own element rather than the banner above, which the load path owns and
+     clears. See the ?invite=1 note in setup.html. -->
+<div id="new-note" class="info-banner" style="display:none;"></div>
+
 <!-- Where the first-visit tutorial goes. See Race.tutorial. -->
 <div id="tut-host"></div>
 <div id="share-banner" class="share-banner" style="display:none;"></div>
@@ -1260,11 +1265,13 @@
       if (await load({ quiet: true })) {
         note.className = 'error-banner';
         note.style.display = 'none';
+        showInviteNote();
         // Drop the marker so a refresh, or a link someone copied out of the
         // address bar, behaves like any other visit to the race.
         try {
           const u = new URL(location.href);
           u.searchParams.delete('new');
+          u.searchParams.delete('invite');
           history.replaceState(null, '', u.pathname + u.search + u.hash);
         } catch (e) {}
         return;
@@ -1273,6 +1280,26 @@
     }
     note.className = 'error-banner';
     load();  // one last try, this time saying what is actually wrong
+  }
+
+  // The wizard takes names and bibs and cannot take accounts: linking a racer
+  // to an account offers the people on the race, and until the race exists
+  // there is nobody to offer. So a race made with more than one racer arrives
+  // here with a thing left to do, and this is the only moment anybody is
+  // looking for what it is.
+  //
+  // Said once and not stored: the marker is dropped from the URL on the same
+  // pass, so a refresh is an ordinary visit to the race.
+  function showInviteNote() {
+    if (!Race.qs('invite')) return;
+    const el = document.getElementById('new-note');
+    if (!el) return;
+    el.innerHTML = 'Your race is up. The other racers are names on the board ' +
+      'until they are invited: bring them on from ' +
+      '<a href="settings.html?id=' + encodeURIComponent(slug) + '" ' +
+      'style="color: var(--accent);">race settings</a>, then link each racer ' +
+      'to their account there so they can log their own legs.';
+    el.style.display = 'block';
   }
 
   // ---------- course visuals (Leaflet map + elevation profile) ----------
