@@ -184,7 +184,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=94"></script>
+<script src="lib/race-core.js?v=95"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -196,6 +196,12 @@
   const MODE_KEY = `sendoff-mode-${slug}`;
 
   let cfg = null, data = null;
+  // How stale the race's own settings are allowed to get. The same number
+  // race.html uses, for the same reason: splits change constantly and the
+  // course, the roster and the fuel plan hardly ever, and this page asks
+  // every few seconds for as long as a race lasts.
+  const CFG_MAX_AGE_MS = 60000;
+  let cfgFetchedAt = 0;
   let meId = null;
   // A press is committed immediately and undone from the bar that replaces the
   // button, rather than guarded by a confirm nobody reads at mile eighty.
@@ -566,10 +572,15 @@
   // ---------- data ----------
   async function load() {
     try {
+      // Once a minute, not every poll. See the note on the same read in
+      // pit.html: the settings hardly ever change and this page asks for as
+      // long as somebody is running.
+      const stale = !cfg || Date.now() - cfgFetchedAt > CFG_MAX_AGE_MS;
       const [c, d] = await Promise.all([
-        Race.gh.readRaceJson(slug, 'config.json', Race.auth.has()),
+        stale ? Race.gh.readRaceJson(slug, 'config.json', Race.auth.has()) : Promise.resolve(cfg),
         Race.gh.readRaceJson(slug, 'data.json', true)
       ]);
+      if (stale) cfgFetchedAt = Date.now();
       cfg = c;
       data = Race.queue.applyTo(DATA_PATH, d);
       Race.nav.setRace(slug, 'racer', () => Race.roles.canEdit(cfg, Race.auth.email()));

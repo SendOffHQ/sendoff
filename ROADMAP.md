@@ -481,16 +481,35 @@ through `commitToD1` while `WRITE_TO_GIT` is false. The hub manifest skips it
 and the addresses on it live in KV, never in a file. The archive no longer
 publishes it at the finish, fixed the same day.
 
-**Gap one: `course.gpx` still goes to the public repository.** `commitToD1`
-guards the two files that have a version column and passes everything else
-through to git, and `setup.html` writes the GPX through the same endpoint. So a
-private race's route file, and the path naming its slug, are readable by
-anybody. Splits, names, notes and the roster are not — but the race's
-*existence* is, which is the thing an unlisted race is trying to keep.
+**Gap one: `course.gpx` went to the public repository — closed 2026-09-13.**
+`commitToD1` guarded the two files with a version column and passed everything
+else through to git, so an unlisted race's route file, and the path naming its
+slug, were readable by anybody. Splits, names, notes and the roster were not,
+but the race's *existence* was, which is the thing an unlisted race is trying
+to keep. A GPX is also the most revealing file a race has, because it is a list
+of coordinates.
 
-Fixing it means somewhere for the GPX to live that is not git: a column on
-`races` and a branch in `readFromD1`, which is a migration plus both sides of
-the read. Not a patch, and worth doing deliberately.
+This entry said the fix was a column on `races` and a branch in `readFromD1`.
+It was not, in the end: R2 arrived for the photographs and the GPX is exactly
+what the storage table at the top of this section always said belonged there,
+being large, immutable per race and wanting a URL. An unlisted race's course
+goes to the bucket and comes back through `/get`, which already checks the
+access list, so the client needed no change at all: `readRaceText` has read
+through the worker since the published-copy work. A public race still commits,
+because it is public and a spectator with no account gets the map off the
+static path with no round trip.
+
+The rule hangs on visibility and deliberately not on `WRITE_TO_GIT`. Where a
+race's JSON is written is a migration question with a rollback behind it;
+whether an unlisted race's coordinates are published is not, and the first
+version of the fix sat inside that flag's block, where a rollback would have
+quietly started publishing them again. `worker/test/course-privacy.mjs` holds
+it with git left as the write path, so it fails if anybody hangs it back on
+the flag.
+
+Nothing needed cleaning up behind it: every race directory in the tree at the
+time was public. What was already in the history is gap two, below, and always
+was.
 
 **Gap two: history.** Every private race that has ever existed is still in this
 public repository's history — 45 commits for the dry run alone, and it was

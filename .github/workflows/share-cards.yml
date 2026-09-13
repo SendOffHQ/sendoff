@@ -1,0 +1,94 @@
+# Builds the per-race share page and preview card when a race is registered.
+#
+# A public race's card links at /races/<slug>/, and that is a real page in this
+# repository with that race's own Open Graph tags and its own preview image.
+# Crawlers do not run JavaScript, which is why it has to be a page and not a
+# client-side title.
+#
+# It was built by hand. On 2026-09-11 a race went live, was listed on the hub,
+# and every click on it landed on the 404 page, because the manifest entry
+# commits and the page was a separate step somebody had to remember. 404.html
+# now forwards those addresses into the app, so the link works either way; what
+# this fixes is the other half, which is that a link shared into a text message
+# or Discord got the generic SendOff image instead of that race's own card.
+#
+# Triggered by the manifest and only the manifest. That file is written once
+# when a race is created or deleted, never by a crew member pressing a button,
+# so this cannot land in the path between a press and the copy spectators read.
+# Its own commit touches races/<slug>/index.html and og.png and never
+# races/index.json, so it cannot trigger itself.
+name: Share cards
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'races/index.json'
+      - 'tools/make-og.py'
+      - '.github/workflows/share-cards.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: share-cards
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      # To commit the cards it builds, and to start the deploy afterwards: a
+      # push made with GITHUB_TOKEN does not trigger other workflows, which
+      # would leave the new page sitting in the repository unserved until
+      # somebody else committed something.
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # make-og.py looks for a browser in a list of usual places, and the
+      # runner image has Chrome at one of them. Named rather than assumed: a
+      # missing browser should fail here with that sentence, not somewhere
+      # further in.
+      - name: Check for a browser
+        run: |
+          test -x /usr/bin/google-chrome || test -x /usr/bin/chromium-browser || {
+            echo "::error::No Chromium on this runner. make-og.py needs one to draw the cards."
+            exit 1
+          }
+
+      - name: Build the cards
+        run: python3 tools/make-og.py
+
+      # Nothing to say when nothing changed, which is most runs: the manifest
+      # also moves when a race is deleted, and a delete removes a card rather
+      # than needing one drawn.
+      - name: Commit them
+        id: commit
+        run: |
+          if [ -z "$(git status --porcelain races brand)" ]; then
+            echo "nothing to do"
+            echo "changed=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add races brand
+          git commit -m "hub: build share cards
+
+          Drawn by .github/workflows/share-cards.yml after a change to the race
+          manifest. See tools/make-og.py."
+          git pull --rebase origin main
+          git push origin HEAD:main
+          echo "changed=yes" >> "$GITHUB_OUTPUT"
+
+      # The push above was made with GITHUB_TOKEN, and GitHub deliberately does
+      # not let that trigger further workflows: without this the card would sit
+      # in the repository until somebody else pushed something, which on a quiet
+      # week is the whole point of the exercise missed.
+      - name: Deploy the site
+        if: steps.commit.outputs.changed == 'yes'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run deploy-pages.yml --ref main || echo "::warning::Could not start deploy-pages."
+          gh workflow run deploy-cf-pages.yml --ref main || echo "::warning::Could not start deploy-cf-pages."
