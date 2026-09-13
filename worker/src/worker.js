@@ -2261,6 +2261,37 @@ async function handleCommit(req, env, ctx) {
     // passthrough: course.gpx and friends still go to git below.
   }
 
+  // The one file of an unlisted race that was still being published.
+  //
+  // config.json and data.json moved to the database and the roster moved to
+  // KV, and this went on being committed to a public repository the whole
+  // time: the course of a race somebody deliberately kept off the hub, at a
+  // guessable path, readable by anybody who looked. A GPX is also the most
+  // revealing file a race has, because it is a list of coordinates.
+  //
+  // R2, which the photographs already use. Reads come back through /get, which
+  // checks the access list. A public race keeps going to git: it is public,
+  // the static path costs the worker nothing, and a spectator with no account
+  // gets the map without a round trip.
+  //
+  // Outside the WRITE_TO_GIT block above, and that is the point. Where a
+  // race's JSON is written is a migration question with a flag on it and a
+  // rollback behind it; whether an unlisted race's coordinates go into a
+  // public repository is not, and hanging this off that flag would mean a
+  // rollback quietly started publishing them again.
+  if (isRacePath(path) && path.endsWith('/course.gpx') &&
+      String((liveCfg && liveCfg.visibility) || 'public') !== 'public') {
+    if (!env.MEDIA) {
+      return json({ error: 'An unlisted race needs the media bucket for its course.' },
+        { status: 503 }, env, req);
+    }
+    await env.MEDIA.put(`course/${racePathSlug(path)}/course.gpx`, content, {
+      httpMetadata: { contentType: 'application/gpx+xml' }
+    });
+    await purgeReadCache(env, path);
+    return json({ content: { path } }, { status: 200 }, env, req);
+  }
+
   const ghUrl = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURI(path)}`;
   const ghBody = {
     message: commitMessage(message),
@@ -2487,6 +2518,22 @@ async function handleGet(req, env) {
     }
   } else {
     return json({ error: 'Forbidden path' }, { status: 403 }, env, req);
+  }
+
+  // An unlisted race's course is in R2 rather than in a public repository: see
+  // the write path in handleCommit. Checked before the mirror, because the
+  // mirror has no column for it and git is exactly where it must not be.
+  if (path.endsWith('/course.gpx') && env.MEDIA) {
+    const obj = await env.MEDIA.get(`course/${racePathSlug(path)}/course.gpx`);
+    if (obj) {
+      // The shape every other read of this endpoint hands back, so the client
+      // needs to know nothing about where a course file lives.
+      return json({
+        name: 'course.gpx', path, sha: obj.etag || '',
+        size: obj.size || 0, encoding: 'base64',
+        content: utf8ToBase64(await obj.text())
+      }, { status: 200 }, env, req);
+    }
   }
 
   // The mirror answers if it can, and git answers if it cannot. A miss here
@@ -3836,6 +3883,11 @@ async function handleRaceDelete(req, env) {
   // leaves its pictures on a public bucket has not been deleted, and of
   // everything a race holds these are the part somebody would most mind.
   const mediaErr = await deleteRaceMedia(env, slug);
+  // And the course, for an unlisted race whose GPX is in R2 rather than git.
+  // A list of coordinates is not a thing to leave behind.
+  if (env.MEDIA) {
+    try { await env.MEDIA.delete(`course/${slug}/course.gpx`); } catch (e) {}
+  }
 
   // Then the manifest. If a file delete then fails we are left with
   // orphaned files, which are invisible and harmless; the other order leaves a

@@ -54,12 +54,13 @@ MOUNT_PATH = ""
 # real answer, and it is a Cloudflare Redirect Rule, because _redirects cannot
 # cross hostnames.
 #
-# The trial host below is temporary:
-# take it out at the cutover, or if the trial is abandoned. Without it a
-# browser refuses every signed-in call from the trial site, and the trial
-# would only be testing the signed-out half. Named exactly, never a
-# wildcard over pages.dev, which anybody can get a subdomain of.
-ALLOWED_ORIGINS = "https://sendoff.run,https://www.sendoff.run,https://sendoff-abi.pages.dev"
+# sendoff-abi.pages.dev was here for the hosting trial and came out on
+# 2026-09-13, the cutover being long done: the site has been served from
+# Cloudflare Pages on the apex since the 10th and nothing signs in from a
+# preview host any more. It was named exactly while it was here, never a
+# wildcard over pages.dev, which anybody can get a subdomain of. A future
+# preview goes back on the same way: by name, and out again afterwards.
+ALLOWED_ORIGINS = "https://sendoff.run,https://www.sendoff.run"
 # Public URL of the hub frontend, used when building invite & share URLs.
 # The site is served from the root of its domain. If empty, the worker
 # falls back to the request's Origin header.

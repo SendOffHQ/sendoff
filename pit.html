@@ -298,7 +298,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=94"></script>
+<script src="lib/race-core.js?v=95"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -311,6 +311,12 @@
   const DATA_PATH   = `races/${slug}/data.json`;
 
   let cfg = null, data = null;
+  // How stale the race's own settings are allowed to get. The same number
+  // race.html uses, for the same reason: splits change constantly and the
+  // course, the roster and the fuel plan hardly ever, and this page asks
+  // every few seconds for as long as a race lasts.
+  const CFG_MAX_AGE_MS = 60000;
+  let cfgFetchedAt = 0;
   // Reading a file back straight after writing it is the one thing that does
   // not work: neither Pages nor GitHub's contents API is read-after-write
   // consistent, so the poll that follows a save can hand back the version from
@@ -822,10 +828,22 @@
       // gets config through the worker from the very first load rather than
       // only after this tab has written something. A reader with no account
       // cannot edit anything and is happy with the CDN copy.
+      //
+      // Once a minute, not every poll. The splits change constantly and the
+      // race's own settings hardly ever, and this page asks every five
+      // seconds for as long as a hundred miler: that is around seven hundred
+      // reads of a file nobody edited, per crew member, per race, against a
+      // request budget the spectators also draw on. race.html has read it this
+      // way since before the D1 move; these two were simply missed.
+      //
+      // A write from this tab is not affected: it sets configWrittenUntil and
+      // renders its own copy, so a save still shows immediately.
+      const stale = !cfg || Date.now() - cfgFetchedAt > CFG_MAX_AGE_MS;
       const [c, d] = await Promise.all([
-        Race.gh.readRaceJson(slug, 'config.json', Race.auth.has()),
+        stale ? Race.gh.readRaceJson(slug, 'config.json', Race.auth.has()) : Promise.resolve(cfg),
         Race.gh.readRaceJson(slug, 'data.json', true)
       ]);
+      if (stale) cfgFetchedAt = Date.now();
       // Within the settle window the copy we wrote wins, because a read that
       // arrives stale would put the old value back on screen.
       if (Date.now() >= configWrittenUntil) cfg = c;

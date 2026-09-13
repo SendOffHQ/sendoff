@@ -18,7 +18,7 @@ Needs headless Chromium. Fonts are fetched once into .ogcache/ (gitignored);
 the brand artwork and colours come from brand/ so the cards can't drift from
 the rest of the identity.
 """
-import json, pathlib, re, subprocess, sys, urllib.request
+import base64, json, pathlib, re, subprocess, sys, urllib.request
 from datetime import datetime
 
 ROOT  = pathlib.Path(__file__).resolve().parent.parent
@@ -26,6 +26,8 @@ CACHE = ROOT / '.ogcache'
 UA    = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36'
 W, H  = 1200, 630
 BASE  = 'https://sendoff.run'
+# The worker, for race settings that no longer live in this repository.
+API   = 'https://api.sendoff.run'
 
 CHROME_CANDIDATES = [
     '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
@@ -87,6 +89,49 @@ STUB = """<!DOCTYPE html>
 </body>
 </html>
 """
+
+def read_config(slug):
+    """That race's config, from the repository or from the worker.
+
+    It used to be a file in this repository and now it is a row in D1, so the
+    file is only there for races created before the move. Without this, every
+    race made from here on gets a card with no distance, no climb and no
+    cutoff on it: the three numbers somebody wants when they are deciding
+    whether to click.
+
+    /public needs no credentials and answers only for public races, which is
+    exactly the set this script builds cards for, because it reads the manifest
+    and unlisted races are never in it. A race it will not answer for gets the
+    plain layout, the same as a config that could not be read has always done.
+    """
+    local = ROOT / 'races' / slug / 'config.json'
+    if local.exists():
+        try:
+            return json.loads(local.read_text())
+        except Exception:
+            return None
+    url = f'{API}/public?path=races/{slug}/config.json'
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': UA})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            body = json.loads(r.read().decode('utf-8'))
+    except Exception as e:
+        print(f'  (no config for {slug}: {e})')
+        return None
+    # The endpoint answers in the shape the GitHub contents API used, because
+    # that is what the client already knew how to read when the race files
+    # moved out of git: the document is base64 in `content`, not the body. The
+    # first version of this read the envelope, found no course in it, and drew
+    # a plain card without complaining, which is the failure this comment is
+    # here to stop somebody repeating.
+    if isinstance(body, dict) and 'content' in body:
+        try:
+            return json.loads(base64.b64decode(body['content']).decode('utf-8'))
+        except Exception as e:
+            print(f'  (unreadable config for {slug}: {e})')
+            return None
+    return body if isinstance(body, dict) else None
+
 
 def chrome():
     for c in CHROME_CANDIDATES:
@@ -153,9 +198,8 @@ def race_stats(slug):
     Returns a list of (value, label) or [] when the config cannot be read, in
     which case the card lays out without them.
     """
-    try:
-        cfg = json.loads((ROOT / 'races' / slug / 'config.json').read_text())
-    except Exception:
+    cfg = read_config(slug)
+    if not cfg:
         return []
     co = cfg.get('course') or {}
     segs = co.get('segments') or co.get('loopSegments') or []
