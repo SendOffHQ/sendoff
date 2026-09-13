@@ -308,7 +308,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=96"></script>
+<script src="lib/race-core.js?v=97"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
@@ -435,7 +435,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
           <div class="card-row"><span class="k">Distance</span><span class="v">${dist}</span></div>
           <div class="card-row"><span class="k">Course</span><span class="v"><span class="badge ${finished ? 'past' : r.courseType}">${courseLabel}</span>${
             activityLabel ? `<span class="badge activity">${escapeHtml(activityLabel)}</span>` : ''}</span></div>
-          <div class="card-row"><span class="k">Runners</span><span class="v">${escapeHtml(runners)}</span></div>
+          <div class="card-row"><span class="k">Racers</span><span class="v">${escapeHtml(runners)}</span></div>
         </div>
       </a>
     `;

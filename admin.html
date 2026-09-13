@@ -285,7 +285,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=96"></script>
+<script src="lib/race-core.js?v=97"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -485,7 +485,7 @@
           <div class="acl-row">
             <span class="slug">${esc(x.slug)}</span>
             <span class="${x.inKv ? 'ok' : 'bad'}">${x.inKv ? 'in KV' : 'NOT in KV'}</span>
-            <span class="note">${x.kv ? `${x.kv.people} on the roster, ${x.kv.runnerLinks} runner link(s)` : ''}</span>
+            <span class="note">${x.kv ? `${x.kv.people} on the roster, ${x.kv.runnerLinks} racer link(s)` : ''}</span>
             <span class="note">${x.file && (x.file.createdBy || x.file.people || x.file.runnerLinks)
               ? 'file still names people' : 'file names nobody'}</span>
             <span class="${x.safeToStrip ? 'ok' : 'bad'}">${x.safeToStrip ? 'safe to strip' : 'do not strip'}</span>
