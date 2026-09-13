@@ -240,8 +240,30 @@ ok('and the head says so without opening anything', await page.evaluate(
 ok('the section is still offered', await page.evaluate(
   () => document.getElementById('photos').style.display !== 'none'), true);
 
-console.log('\nand it goes out when the signal comes back');
+// Without being asked, which is the whole of "it took a couple of refreshes".
+// The `online` event does not reliably fire when a phone comes off airplane
+// mode, and when it does it can arrive before the radio is carrying anything,
+// so the single retry it triggers fails and nothing tries again. Coming back
+// to the foreground is the moment that actually happens: somebody unlocks the
+// phone and looks at the board.
+console.log('\nand it goes out when the phone comes back, with nobody asking');
 await page.evaluate(() => { window.fetch = window.__realFetch; });
+await page.evaluate(() => {
+  Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
+  document.dispatchEvent(new Event('visibilitychange'));
+});
+await page.waitForTimeout(1200);
+ok('the foreground alone sent it', await page.evaluate(
+  () => Race.media.pending('six-0-trail-marathon').then(q => q.length)), 0);
+
+// And the board shows it as landed rather than as gone. The sent list used to
+// arrive only on the slow minute timer, so there was a window where the dimmed
+// thumbnail had disappeared and the real one had not shown up yet, and the
+// photograph looked thrown away.
+await page.waitForTimeout(400);
+ok('and the board has it, without a minute of nothing', await page.evaluate(
+  () => document.querySelectorAll('#photo-thumbs figure:not(.queued)').length > 0), true);
+
 await page.evaluate(() => Race.media.flush());
 await page.waitForTimeout(900);
 ok('the queue emptied', await page.evaluate(
