@@ -416,7 +416,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=96"></script>
+<script src="lib/race-core.js?v=97"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -914,7 +914,7 @@
       ? `<option value="${escapeAttr(linked)}" selected>${escapeHtml(linked)} (no longer on this race)</option>` : '';
 
     return `
-      <select data-runner="${i}" data-k="who" class="runner-who" aria-label="Account for runner ${i + 1}">
+      <select data-runner="${i}" data-k="who" class="runner-who" aria-label="Account for racer ${i + 1}">
         <option value=""${linked ? '' : ' selected'}>Not linked · type a name</option>
         ${opts}${stale}
       </select>

@@ -190,7 +190,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=96"></script>
+<script src="lib/race-core.js?v=97"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -553,7 +553,7 @@
     const runners = (cfg.runners || []);
     document.getElementById('readout').innerHTML = `
       <div class="rpick">
-        <p>More than one runner on this race, and none of them is tied to your
+        <p>More than one racer on this race, and none of them is tied to your
         account yet. Pick yourself, or link the account on the settings page and
         this screen will know next time.</p>
         <div class="rchips">
@@ -572,7 +572,7 @@
 
   function noRunners() {
     document.getElementById('readout').innerHTML =
-      `<div class="rpick"><p>This race has no runners yet. Add one on the settings page.</p></div>`;
+      `<div class="rpick"><p>This race has no racers yet. Add one on the settings page.</p></div>`;
     document.getElementById('act').innerHTML = '';
   }
 

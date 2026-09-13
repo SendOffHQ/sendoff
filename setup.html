@@ -216,10 +216,11 @@
     position: sticky; bottom: 0; z-index: 10;
     background: linear-gradient(0deg, var(--bg) 60%, transparent);
     padding: 20px 0 8px; margin: 0 -8px;
-    display: flex; justify-content: space-between; align-items: center;
+    /* flex-end, not space-between: there is one thing in here now, and
+       space-between would put the buttons against the left edge. */
+    display: flex; justify-content: flex-end; align-items: center;
     flex-wrap: wrap; gap: 12px;
   }
-  .submit-bar .left { color: var(--text-dim); font-size: 12px; flex: 1 1 200px; }
   .submit-bar .right { display: flex; gap: 10px; }
   .submit-bar .btn { padding: 14px 22px; font-size: 13px; }
   .progress {
@@ -392,7 +393,7 @@
       <label class="field">
         <span class="lbl">Last-leg-start gate (hours, optional)</span>
         <input type="number" id="race-last-leg-cutoff" min="0" step="0.25" />
-        <span class="hint">Loops only: when the runner must start the final lap.</span>
+        <span class="hint">Loops only: when the racer must start the final lap.</span>
       </label>
     </div>
     <div class="grid-2">
@@ -501,7 +502,7 @@
 
   <!-- Runners -->
   <section class="section">
-    <div class="section-head"><div class="section-title">Runner(s)</div></div>
+    <div class="section-head"><div class="section-title">Racer(s)</div></div>
     <table class="list" id="runner-table">
       <thead>
         <tr>
@@ -513,7 +514,7 @@
       </thead>
       <tbody id="runner-rows"></tbody>
     </table>
-    <button type="button" class="add-row" id="add-runner">+ Add runner</button>
+    <button type="button" class="add-row" id="add-runner">+ Add racer</button>
   </section>
 
   <!-- Fueling -->
@@ -621,13 +622,13 @@
     </div>
   </section>
 
+  <!-- This bar used to carry a line naming the path the race would be written
+       to. It was wrong for a while (it named files that stopped being written
+       when the race moved to the database), and once corrected it was still
+       a second copy of the slug, which is already shown beside the race name
+       up the page. On a private race it put the unguessable suffix in the
+       furniture of a sticky bar, which is the last place to leave a secret. -->
   <div class="submit-bar">
-    <!-- What this said was true when every race file was a git commit. The
-         race itself lives in the database now and only the hub listing still
-         commits, so naming two paths was describing a thing that had stopped
-         happening. It says where the race will be instead, which is what
-         somebody filling in this form wanted to know anyway. -->
-    <div class="left">Creates <code id="dest-preview">races/&lt;slug&gt;/</code>.</div>
     <div class="right">
       <a class="btn" href="/app/">Cancel</a>
       <button class="btn primary" type="button" id="btn-submit">Create race</button>
@@ -638,7 +639,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=96"></script>
+<script src="lib/race-core.js?v=97"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -962,7 +963,7 @@
     const tbody = document.getElementById('runner-rows');
     tbody.innerHTML = state.runners.map((r, i) => `
       <tr>
-        <td><input type="text" data-runner="${i}" data-k="name" value="${escapeAttr(r.name)}" placeholder="Runner name" /></td>
+        <td><input type="text" data-runner="${i}" data-k="name" value="${escapeAttr(r.name)}" placeholder="Racer name" /></td>
         <td><input type="text" data-runner="${i}" data-k="bib" value="${escapeAttr(r.bib)}" placeholder="e.g. #42 or display label" /></td>
         <td><input type="color" data-runner="${i}" data-k="color" value="${r.color || DEFAULT_COLORS[0]}" /></td>
         <td>${i > 0 ? `<button type="button" class="row-del" data-del-runner="${i}" aria-label="Delete">×</button>` : ''}</td>
@@ -1229,7 +1230,6 @@
     // showing a slug that would be wrong the moment it arrives.
     const preview = body ? `${state.raceId || '\u2026'}-${body}` : '';
     document.getElementById('slug-preview').textContent = preview || '–';
-    document.getElementById('dest-preview').textContent = preview ? `races/${preview}/` : 'races/<slug>/';
   }
 
   // ---------- build payload ----------
