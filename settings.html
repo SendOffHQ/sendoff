@@ -1004,6 +1004,10 @@
     const orphaned = (data.runners || []).filter(d => !keep.has(d.id) && (d.legs || []).some(l => l.startTime || l.endTime));
     if (orphaned.length && !confirm(`${orphaned.length} removed racer(s) have logged legs. Saving deletes that data. Continue?`)) return;
 
+    // After the confirms, not before: a save somebody backed out of should not
+    // have shown them a button that said it was saving.
+    const btn = document.getElementById('runner-save');
+    Race.saveBtn.busy(btn);
     try {
       const writtenCfg = await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
         // Each runner now carries their own goals, bands and notes.
@@ -1035,7 +1039,6 @@
         }, `pit: refresh index runners for ${slug}`);
       }
 
-      toast('Runners & fueling saved', 'ok');
       editingRunners = null;
       editingFuel = null;
       editingBands = null;
@@ -1045,7 +1048,11 @@
       planKey = null;
       adoptConfig(writtenCfg);
       await load();
+      // Last, after the reload. "Saved" should mean the race has been written
+      // and read back, not that a request left the phone.
+      Race.saveBtn.done(btn);
     } catch (err) {
+      Race.saveBtn.fail(btn);
       toast(`Save failed: ${err.message}`, 'error');
     }
   }
@@ -1117,7 +1124,7 @@
     const distance = dSel && dSel.value === 'km' ? 'km' : 'mi';
     const elevation = eSel && eSel.value === 'm' ? 'm' : 'ft';
     const btn = document.getElementById('race-save');
-    btn.disabled = true;
+    Race.saveBtn.busy(btn);
     try {
       await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
         if (chosen) remote.activity = chosen; else delete remote.activity;
@@ -1149,11 +1156,10 @@
         }
       }
       cfg.activity = chosen || undefined;
-      toast('Race details saved.', 'ok');
+      Race.saveBtn.done(btn);
     } catch (e) {
+      Race.saveBtn.fail(btn);
       toast(e.message || 'Could not save.', 'error');
-    } finally {
-      btn.disabled = false;
     }
   }
 
@@ -1177,6 +1183,8 @@
     }
 
     const newSegments = Race.course.segmentsFromAidStations(aids, cfg.course?.segments || []);
+    const btn = document.getElementById('aid-save');
+    Race.saveBtn.busy(btn);
     try {
       const writtenCfg = await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
         remote.course = remote.course || {};
@@ -1197,11 +1205,14 @@
         return m;
       }, `pit: refresh index totalDistance for ${slug}`);
 
-      toast('Aid stations saved', 'ok');
       editingAid = null;
       adoptConfig(writtenCfg);
       await load();
-    } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
+      Race.saveBtn.done(btn);
+    } catch (err) {
+      Race.saveBtn.fail(btn);
+      toast(`Save failed: ${err.message}`, 'error');
+    }
   }
 
   // ---------- tick / data ----------

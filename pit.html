@@ -441,16 +441,26 @@
     fields.meds        = meds   === '' ? null : meds;
     fields.gearChanges = gear   === '' ? null : gear;
 
+    // By selector, not by element: the redraw below throws this button away
+    // and builds another, so the thing to mark afterwards is whatever is
+    // standing in its place by then.
+    const btnSel = `[data-action="save-intake"][data-runner="${CSS.escape(runnerId)}"]`;
+    Race.saveBtn.busy(btnSel);
     try {
       const r = await Race.queue.write(DATA_PATH, 'setLegFields', { runnerId, legIndex, fields },
         `pit: intake ${runnerId} leg ${legIndex}`);
-      toast(r.queued
-        ? `No signal · intake for leg ${legIndex} saved on this phone`
-        : `Intake saved · leg ${legIndex}`, 'ok');
       // Forced: the boxes still hold what was just sent, so they read as
       // unsaved until this redraw replaces them with what landed.
       await load(true);
-    } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
+      // "On phone" rather than plain "Saved", because those are two different
+      // things and the difference is the one a crew member at an aid station
+      // with no bars actually needs: it is written down and it will send
+      // itself, but it is not anywhere else yet.
+      Race.saveBtn.done(btnSel, r.queued ? 'Saved on phone' : 'Saved');
+    } catch (err) {
+      Race.saveBtn.fail(btnSel);
+      toast(`Save failed: ${err.message}`, 'error');
+    }
   }
 
   // ---------- render ----------

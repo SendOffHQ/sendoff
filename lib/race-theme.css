@@ -272,6 +272,23 @@ h1.site em { font-style: italic; color: var(--accent); font-weight: 600; }
 .btn.danger { color: var(--red); border-color: var(--red); }
 .btn.danger:hover:not(:disabled) { background: rgba(229,72,77,0.10); }
 
+/* A save button reporting on itself. See Race.saveBtn.
+
+   .is-busy overrides the disabled fade rather than inheriting it: the button
+   is saying "Saving" and that word is the whole point of it being disabled, so
+   dropping it to 0.4 opacity would hide the message the state exists to send.
+   It is still disabled, and still says so with the cursor. */
+.btn.is-busy, .btn.is-busy:disabled { opacity: 0.75; cursor: progress; }
+.btn.is-saved {
+  background: rgba(110, 231, 168, 0.14);
+  border-color: var(--green); color: var(--green);
+}
+.btn.primary.is-saved { background: var(--green); border-color: var(--green); color: #07231a; }
+/* Held through the hover state too. Saved is an answer, and a button that
+   un-answers itself because a mouse is resting on it is worse than no answer. */
+.btn.is-saved:hover:not(:disabled) { background: rgba(110, 231, 168, 0.14); }
+.btn.primary.is-saved:hover:not(:disabled) { background: var(--green); border-color: var(--green); }
+
 footer.site {
   margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border);
   display: flex; justify-content: space-between; align-items: center;
