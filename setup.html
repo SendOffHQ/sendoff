@@ -185,6 +185,21 @@
     font-size: 9px; color: var(--text-muted); font-weight: 400; margin-top: 2px;
   }
   .table-scroll th { white-space: nowrap; }
+  /* The aid tables were the only ones on this page not wrapped, and they got
+     away with it until each row grew two more buttons for reordering: at that
+     point #aid-table's narrowest was wider than a 360px phone and it pushed the
+     whole page sideways. Fifteen pixels, which is enough to make every screen
+     on the wizard scroll and nothing to show for it.
+     The min-widths are the narrowest these are usable at, so they fill the
+     column on a normal phone and scroll only where they genuinely cannot fit. */
+  #aid-table { min-width: 372px; }
+  #loop-aid-table { min-width: 300px; }
+  /* Three buttons now, not one: up, down and delete. table-layout: fixed hands
+     out exactly what is declared, so the 36px below would clip two of them. */
+  #aid-table th:last-child, #aid-table td:last-child,
+  #loop-aid-table th:last-child, #loop-aid-table td:last-child { width: 104px; }
+  #aid-table th:first-child, #aid-table td:first-child,
+  #loop-aid-table th:first-child, #loop-aid-table td:first-child { width: 26px; }
   /* Name / Unit / Short / Goal / delete. Fixed shares rather than letting the
      browser divide by content, so the goal box never wins space off the name. */
   #fuel-table { min-width: 480px; }
@@ -456,6 +471,7 @@
 
       <div style="margin-top: 8px;">
         <div class="seg-summary" id="loop-aid-summary"></div>
+        <div class="table-scroll">
         <table class="list" id="loop-aid-table">
           <thead>
             <tr>
@@ -467,6 +483,7 @@
           </thead>
           <tbody id="loop-aid-rows"></tbody>
         </table>
+        </div>
         <button type="button" class="add-row" id="add-loop-aid">+ Add loop aid station</button>
         <p class="hint" style="margin-top:8px; color: var(--text-muted); font-size:11px;">
           Optional. List the pit/start, each aid on the loop, and the lap end
@@ -480,6 +497,7 @@
     <!-- Segments sub-form -->
     <div id="segments-fields" style="margin-top: 20px;">
       <div class="seg-summary" id="aid-summary">No aid stations yet. Add the start, every aid, and the finish.</div>
+      <div class="table-scroll">
       <table class="list" id="aid-table">
         <thead>
           <tr>
@@ -492,6 +510,7 @@
         </thead>
         <tbody id="aid-rows"></tbody>
       </table>
+      </div>
       <button type="button" class="add-row" id="add-aid">+ Add aid station</button>
       <p class="hint" style="margin-top:8px; color: var(--text-muted); font-size:11px;">
         Per-segment elevation gain/loss is estimated from the GPX file you upload
