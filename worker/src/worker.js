@@ -100,7 +100,7 @@ async function handleLive(req, env) {
   const slug = new URL(req.url).searchParams.get('race') || '';
   if (!slug || slug.includes('/')) return new Response('Missing race', { status: 400 });
 
-  const cfg = await loadRaceConfig(env, slug);
+  const cfg = await loadRaceConfigNow(env, slug);
   if (!cfg) return new Response('Race not found', { status: 404 });
   if (cfg.visibility !== 'public') {
     return new Response('Live push is public races only for now', { status: 403 });
@@ -115,7 +115,7 @@ async function publishChange(env, path) {
   try {
     const slug = racePathSlug(path);
     if (!slug || !path.endsWith('/data.json')) return;
-    const cfg = await loadRaceConfig(env, slug);
+    const cfg = await loadRaceConfigNow(env, slug);
     if (!cfg || cfg.visibility !== 'public') return;
     // Deliberately says nothing about what changed. The page already knows how
     // to read a race; this only tells it that reading again is worth doing.
@@ -804,7 +804,7 @@ async function mutateJsonAt(env, path, mutate, message, actor, onMissing) {
 // a config-shaped object, so the callers below read the same as they always
 // did.
 async function mutateRaceConfig(env, slug, mutate, message, actor) {
-  const cfg = await loadRaceConfig(env, slug);
+  const cfg = await loadRaceConfigNow(env, slug);
   if (!cfg) throw new Error(`Race not found: ${slug}`);
   const next = mutate(Object.assign({}, cfg)) || cfg;
   await writeAcl(env, slug, aclFromConfig(next));
@@ -919,6 +919,9 @@ async function attachAcl(env, slug, cfg) {
   return withAcl(cfg, fromFile);
 }
 
+// Git and only git. Every caller goes through loadRaceConfigNow below instead,
+// which falls back to this; it is left separate because that fallback is a
+// real one and not a formality, for the races that predate the mirror.
 async function loadRaceConfig(env, slug) {
   const r = await githubGetJson(env, `races/${slug}/config.json`);
   return r.missing ? null : attachAcl(env, slug, r.data);
@@ -941,9 +944,9 @@ async function mirroredConfig(env, slug, force) {
   } catch (e) { return null; }
 }
 
-// The config as it stands, for a write's ACL check. Deliberately uncached: it
-// carries the ACL fields across a write, and acting on a roster three seconds
-// out of date is not a trade worth making to save one API call.
+// The config as it stands. Deliberately uncached: it carries the ACL fields
+// across a write, and acting on a roster three seconds out of date is not a
+// trade worth making to save one API call.
 //
 // The mirror comes first once git stops being written, and getting this
 // backwards is not a small bug. A race created after the flip has no config in
@@ -951,10 +954,21 @@ async function mirroredConfig(env, slug, force) {
 // anyone but the session that made it is answered "Race not found". That is a
 // race the crew cannot work.
 //
+// It was named ForWrite and used only on the write path, which is how the same
+// 404 came back on 2026-09-13 from a direction nobody had looked: a race
+// created that morning, opened by its own creator, and Manage access answered
+// "Race not found". Reading the roster is not a write, so it had kept the
+// git-only loader, and so had invites, share links, team-invite, teammate
+// profiles and the live push. Every one of them is the same sentence about the
+// same race. There is no read of a race's roster or visibility that wants the
+// git-only answer once git has stopped being written, so the name no longer
+// says "for a write" and the git-only loader below it is for callers that
+// genuinely mean the archive.
+//
 // Forced past d1Enabled on purpose. WRITE_TO_GIT="false" with READ_FROM_D1
 // unset is an incoherent pair, but the failure it would cause here is bad
 // enough to be worth not depending on somebody setting both.
-async function loadRaceConfigForWrite(env, slug) {
+async function loadRaceConfigNow(env, slug) {
   if (!gitWrites(env)) {
     const m = await mirroredConfig(env, slug, true);
     if (m) return attachAcl(env, slug, m);
@@ -1587,25 +1601,13 @@ async function handleAccountRaces(req, env) {
   const email = normalizeEmail(new URL(req.url).searchParams.get('email'));
   if (!email) return json({ error: 'email required' }, { status: 400 }, env, req);
 
-  const treeUrl = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/git/trees/${encodeURIComponent(env.GITHUB_BRANCH || 'main')}?recursive=1`;
-  const treeRes = await fetch(treeUrl, {
-    headers: {
-      Authorization: `token ${env.GITHUB_TOKEN}`,
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'race-dashboard-proxy'
-    }
-  });
-  if (!treeRes.ok) return json({ email, races: [] }, {}, env, req);
-  const tree = await treeRes.json();
-  const configPaths = (tree.tree || [])
-    .filter(t => t.type === 'blob' && /^races\/[^/]+\/config\.json$/.test(t.path))
-    .map(t => t.path);
+  const slugs = await listRaceSlugs(env);
+  if (!slugs) return json({ email, races: [] }, {}, env, req);
 
   const races = [];
-  for (const p of configPaths) {
-    const slug = p.split('/')[1];
+  for (const slug of slugs) {
     let cfg = null;
-    try { cfg = await loadRaceConfig(env, slug); } catch (e) { continue; }
+    try { cfg = await loadRaceConfigNow(env, slug); } catch (e) { continue; }
     if (!cfg) continue;
     let role = null;
     role = roleForRace(cfg, email);
@@ -1783,7 +1785,7 @@ async function archiveRace(env, slug) {
   //
   // So an unlisted race has no archive, and D1 is its store. If it ever needs
   // one it has to be somewhere that is not a public repository.
-  const cfg = await loadRaceConfigForWrite(env, slug);
+  const cfg = await loadRaceConfigNow(env, slug);
   if (!cfg || cfg.visibility !== 'public') {
     return { slug, skipped: 'not a public race' };
   }
@@ -2079,7 +2081,7 @@ async function handleArchive(req, env) {
   let body; try { body = await req.json(); } catch (e) { body = {}; }
   const slug = (body && body.slug) || '';
   if (!slug || slug.includes('/')) return json({ error: 'Missing slug' }, { status: 400 }, env, req);
-  const cfg = await loadRaceConfigForWrite(env, slug);
+  const cfg = await loadRaceConfigNow(env, slug);
   if (!cfg) return json({ error: 'Not found' }, { status: 404 }, env, req);
   if (session.role !== 'admin' && !WRITING_ROLES.has(roleForRace(cfg, session.email))) {
     return json({ error: 'Only somebody who works this race can archive it' }, { status: 403 }, env, req);
@@ -2135,7 +2137,7 @@ async function handleCommit(req, env, ctx) {
   } else if (isRacePath(path)) {
     const slug = racePathSlug(path);
     creationSlug = slug;
-    const raceCfg = await loadRaceConfigForWrite(env, slug);
+    const raceCfg = await loadRaceConfigNow(env, slug);
     liveCfg = raceCfg;
     if (!raceCfg) {
       // Brand-new race: only allow writes to files under this slug if the body
@@ -3206,7 +3208,7 @@ function publicBaseUrl(env, req) {
 // Anyone who can write the race. Enough to read the roster and see who else is
 // on it, which the whole team has a reason to do.
 async function requireRaceWriter(env, slug, sessionEmail) {
-  const raceCfg = await loadRaceConfig(env, slug);
+  const raceCfg = await loadRaceConfigNow(env, slug);
   if (!raceCfg) throw Object.assign(new Error('Race not found'), { status: 404 });
   if (!canEditRace(raceCfg, sessionEmail)) {
     throw Object.assign(new Error('Forbidden, no write access on this race'), { status: 403 });
@@ -3224,7 +3226,7 @@ function canManageAccess(raceCfg, email) {
 }
 
 async function requireAccessManager(env, slug, sessionEmail) {
-  const raceCfg = await loadRaceConfig(env, slug);
+  const raceCfg = await loadRaceConfigNow(env, slug);
   if (!raceCfg) throw Object.assign(new Error('Race not found'), { status: 404 });
   if (!canManageAccess(raceCfg, sessionEmail)) {
     throw Object.assign(new Error(
@@ -3421,7 +3423,7 @@ async function handleProfileGet(req, env) {
 
   if (wanted !== normalizeEmail(session.email)) {
     if (!slug) return json({ error: 'slug required to read a teammate profile' }, { status: 400 }, env, req);
-    const raceCfg = await loadRaceConfig(env, slug);
+    const raceCfg = await loadRaceConfigNow(env, slug);
     if (!raceCfg) return json({ error: 'Race not found' }, { status: 404 }, env, req);
     if (!canEditRace(raceCfg, session.email)) {
       return json({ error: 'Forbidden, no write access on this race' }, { status: 403 }, env, req);
@@ -3469,7 +3471,7 @@ async function handleTeamInvite(req, env) {
   const allowed = !!(body && body.allowed);
   if (!slug) return json({ error: 'slug required' }, { status: 400 }, env, req);
 
-  const raceCfg = await loadRaceConfig(env, slug);
+  const raceCfg = await loadRaceConfigNow(env, slug);
   if (!raceCfg) return json({ error: 'Race not found' }, { status: 404 }, env, req);
   if (roleForRace(raceCfg, session.email) !== 'owner') {
     return json({ error: 'Only the race creator can change this' }, { status: 403 }, env, req);
@@ -3675,12 +3677,13 @@ async function handleShareRevoke(req, env) {
 // Every race created from the wizard gets a zero-padded numeric prefix on its
 // slug (000042-forest-fifty), so two races sharing a name never collide. The
 // counter has to see private races too, and those are deliberately absent from
-// races/index.json, so it comes from the repo tree rather than the manifest.
+// races/index.json, so it comes from listRaceSlugs rather than the manifest.
 const RACE_ID_DIGITS = 6;
 
-// Returns every races/<slug>/ folder name in the repo, or null if the tree
-// listing failed.
-async function listRaceSlugs(env) {
+// Every races/<slug>/ folder name in the repo, or null if the tree listing
+// failed. One GitHub call for the lot, which is why it is a tree listing and
+// not a walk.
+async function gitRaceSlugs(env) {
   const treeUrl = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/git/trees/${encodeURIComponent(env.GITHUB_BRANCH || 'main')}?recursive=1`;
   const res = await fetch(treeUrl, {
     headers: {
@@ -3694,6 +3697,36 @@ async function listRaceSlugs(env) {
   return (tree.tree || [])
     .filter(t => t.type === 'blob' && /^races\/[^/]+\/config\.json$/.test(t.path))
     .map(t => t.path.split('/')[1]);
+}
+
+// The same list from the mirror, or null when there is no database to ask.
+// A deleted race is deleted from this table in the same batch that takes its
+// legs and its roster, so a row here means a race that exists.
+async function mirroredSlugs(env) {
+  if (!env.DB) return null;
+  try {
+    return ((await env.DB.prepare('SELECT slug FROM races').all()).results || [])
+      .map(r => r.slug).filter(Boolean);
+  } catch (e) { return null; }
+}
+
+// Every race this deployment knows about, from both stores, or null when
+// neither could answer.
+//
+// Both, and not whichever one is the authority, because the two do not hold
+// the same races. Git has everything made before the mirror; the mirror has
+// everything made since git stopped being written. A list from either alone is
+// a list with a hole in it, and what falls in the hole is different at each
+// caller: the race-number counter hands out a number already in use, /my-races
+// leaves a private race off the hub, and the admin view shows an account fewer
+// races than it has.
+async function listRaceSlugs(env) {
+  const [git, mirrored] = await Promise.all([
+    gitRaceSlugs(env).catch(() => null),
+    mirroredSlugs(env)
+  ]);
+  if (git === null && mirrored === null) return null;
+  return [...new Set([...(git || []), ...(mirrored || [])])];
 }
 
 // Highest prefix in use, plus one. Slugs without a numeric prefix (the races
@@ -3724,31 +3757,22 @@ async function handleMyRaces(req, env) {
   const r = await githubGetJson(env, 'races/index.json');
   const publicEntries = (r.data && r.data.races) || [];
 
-  // Public races are already listed; we add private races the user has access to.
-  // Approach: list races/ directory via GitHub Trees API for fast slug enumeration.
-  const treeUrl = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/git/trees/${encodeURIComponent(env.GITHUB_BRANCH || 'main')}?recursive=1`;
-  const treeRes = await fetch(treeUrl, {
-    headers: {
-      Authorization: `token ${env.GITHUB_TOKEN}`,
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'race-dashboard-proxy'
-    }
-  });
-  if (!treeRes.ok) {
+  // Public races are already listed; we add private races the user has access
+  // to. Those are deliberately absent from the manifest, so they have to be
+  // enumerated, and listRaceSlugs asks both stores: an unlisted race made
+  // after WRITE_TO_GIT went false is in the mirror and nowhere else, and a
+  // tree listing alone would leave its own creator's hub without it.
+  const slugs = await listRaceSlugs(env);
+  if (!slugs) {
     return json({ races: publicEntries }, {}, env, req);
   }
-  const tree = await treeRes.json();
-  const configPaths = (tree.tree || [])
-    .filter(t => t.type === 'blob' && /^races\/[^/]+\/config\.json$/.test(t.path))
-    .map(t => t.path);
 
   const seen = new Set(publicEntries.map(e => e.slug));
   const privateAccessible = [];
-  for (const p of configPaths) {
-    const slug = p.split('/')[1];
+  for (const slug of slugs) {
     if (seen.has(slug)) continue;
     let cfg = null;
-    try { cfg = await loadRaceConfig(env, slug); } catch (e) { continue; }
+    try { cfg = await loadRaceConfigNow(env, slug); } catch (e) { continue; }
     if (!cfg || cfg.visibility !== 'private') continue;
     if (!canViewRace(cfg, session.email)) continue;
     privateAccessible.push({
@@ -3783,7 +3807,7 @@ async function handleMyRaces(req, env) {
   // is a session to answer it for.
   const annotated = [];
   for (const e of publicEntries) {
-    const cfg = await loadRaceConfig(env, e.slug).catch(() => null);
+    const cfg = await loadRaceConfigNow(env, e.slug).catch(() => null);
     const role = cfg ? roleForRace(cfg, session.email) : null;
     annotated.push(Object.assign({}, e, {
       mine: !!(cfg && normalizeEmail(cfg.createdBy) === normalizeEmail(session.email)),
@@ -3813,7 +3837,7 @@ async function handleRaceDelete(req, env) {
   // Through the mirror when the mirror is the authority, or a race created
   // after WRITE_TO_GIT went false has no config in git and cannot be deleted
   // at all: the lookup 404s at its own creator.
-  const raceCfg = await loadRaceConfigForWrite(env, slug);
+  const raceCfg = await loadRaceConfigNow(env, slug);
   if (!raceCfg) return json({ error: 'Race not found' }, { status: 404 }, env, req);
 
   const me = normalizeEmail(session.email);

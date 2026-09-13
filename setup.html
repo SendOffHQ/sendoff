@@ -534,6 +534,16 @@
       <tbody id="runner-rows"></tbody>
     </table>
     <button type="button" class="add-row" id="add-runner">+ Add racer</button>
+    <!-- Asked for directly: somebody set up a two-racer race here and went
+         looking for where to put the second racer's account. There is nowhere,
+         and there cannot be: linking a racer to an account offers the people
+         already on the race, and nobody is on it until it exists to invite
+         them to. So say where it happens instead of leaving it to be hunted. -->
+    <p class="hint" style="margin-top:10px; color: var(--text-muted); font-size:11px;">
+      Names and bibs are all that is needed here. A racer who has their own
+      account is linked to it on the race settings page, after you have invited
+      them, and that link is what lets them log their own legs.
+    </p>
   </section>
 
   <!-- Fueling -->
@@ -1486,7 +1496,16 @@
         // ?new=1 tells the race page it is arriving before GitHub is
         // read-after-write consistent, so it waits rather than reporting a
         // race that plainly exists as missing.
-        location.href = `race.html?id=${encodeURIComponent(slug)}&new=1`;
+        //
+        // ?invite=1 on a race with more than one racer, which is the race with
+        // something left to do: the other racers are names in a table and
+        // nothing more until they are invited and linked, and the race page is
+        // where somebody would otherwise stop. It rides on the race page
+        // rather than hopping straight to settings so the patience above still
+        // applies; a race nobody can read yet is not a settings page anybody
+        // can use.
+        const more = (raceConfig.runners || []).length > 1 ? '&invite=1' : '';
+        location.href = `race.html?id=${encodeURIComponent(slug)}&new=1${more}`;
       }, 800);
     } catch (err) {
       progressLine(err.message || String(err), 'fail');
