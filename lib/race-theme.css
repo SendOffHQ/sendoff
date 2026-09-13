@@ -28,6 +28,77 @@
   --beam: #5efdf6;            /* glow only: 1.2:1 on white, never a surface */
 }
 
+/* ---------- the photo panel ----------
+   Race.media.mountPanel builds this. It was written into pit.html and moved
+   here when the racer page wanted the same thing: two copies of a panel is
+   how two pages start disagreeing about what a button does. */
+/* A strip rather than a panel. On both screens it sits above or below the
+ thing somebody actually came to press, and it must not compete with it. */
+.photo-bar {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 6px; padding: 12px 14px; margin-bottom: 16px;
+}
+/* The head is the whole control: shut by default, and the one thing it has
+   to say while shut is how many photos are waiting for signal. */
+.photo-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; background: transparent; border: 0; padding: 0; cursor: pointer;
+  text-align: left; color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 0.18em; text-transform: uppercase;
+}
+.photo-head:hover { color: var(--accent); }
+.photo-head-right { display: flex; align-items: center; gap: 8px; }
+.photo-head-warn { color: var(--yellow); }
+.photo-head-err { color: var(--red); }
+.photo-head-caret::before { content: '▼'; font-size: 8px; }
+.photo-bar.collapsed .photo-head-caret::before { content: '▶'; }
+.photo-body { margin-top: 2px; }
+/* `hidden` works through a UA display rule and any author display outranks
+   it. Nothing here sets one, but the next person to add a flex row to this
+   body would find the section open at every load and not know why. */
+.photo-body[hidden] { display: none; }
+.photo-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.photo-row select, .photo-row input[type="text"] {
+  background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text);
+  border-radius: 4px; padding: 9px 10px; font-size: 13px; font-family: inherit;
+}
+.photo-row select { flex: 1 1 190px; min-width: 0; }
+.photo-row input[type="text"] { flex: 2 1 220px; min-width: 0; }
+/* The file input itself is hidden behind a label: every browser styles it
+   differently and none of them the way the rest of this page is styled. */
+.photo-pick {
+  flex: 1 1 130px; text-align: center; cursor: pointer;
+  background: transparent; border: 1px dashed var(--border-bright); color: var(--text-dim);
+  padding: 10px 14px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+}
+.photo-pick:hover { color: var(--accent); border-color: var(--accent); }
+/* The camera is the one that works at an aid station with no signal, so it
+   is the one that looks like the button. */
+.photo-pick.primary { border-style: solid; border-color: var(--accent); color: var(--accent); }
+.photo-pick.primary:hover { background: var(--accent-glow); }
+.photo-pick input { display: none; }
+.photo-state { margin-top: 9px; font-size: 11.5px; color: var(--text-muted); }
+.photo-state.warn { color: var(--yellow); }
+.photo-state.err { color: var(--red); }
+.photo-thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.photo-thumbs figure { margin: 0; position: relative; }
+.photo-thumbs img {
+  width: 62px; height: 62px; object-fit: cover; border-radius: 4px;
+  border: 1px solid var(--border); display: block;
+}
+/* A photo still waiting for signal looks like one: dimmed, with the count in
+   the line above saying why. */
+.photo-thumbs figure.queued img { opacity: 0.45; }
+.photo-thumbs .kill {
+  position: absolute; top: -6px; right: -6px; width: 20px; height: 20px;
+  border-radius: 50%; border: 1px solid var(--border-bright); background: var(--bg);
+  color: var(--text-muted); font-size: 12px; line-height: 1; cursor: pointer; padding: 0;
+}
+.photo-thumbs .kill:hover { color: var(--red); border-color: var(--red); }
+
 /* ---------- the tutorial banner ----------
    What a screen says the first time somebody lands on it. Race.tutorial builds
    it; the copy belongs to the page.

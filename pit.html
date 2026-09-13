@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=34">
+<link rel="stylesheet" href="lib/race-theme.css?v=35">
 <style>
   body { padding: 20px 16px 32px; }
   .wrap { max-width: 860px; margin: 0 auto; }
@@ -46,73 +46,6 @@
   }
   .status-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); }
   .status-dot.error { background: var(--red); box-shadow: 0 0 8px var(--red); }
-
-  /* Photos. A strip rather than a panel: it sits above the racer cards and
-     everything on this screen competes with the button somebody came to press. */
-  .photo-bar {
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: 6px; padding: 12px 14px; margin-bottom: 16px;
-  }
-  /* The head is the whole control: shut by default, and the one thing it has
-     to say while shut is how many photos are waiting for signal. */
-  .photo-head {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    width: 100%; background: transparent; border: 0; padding: 0; cursor: pointer;
-    text-align: left; color: var(--text-muted);
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
-    letter-spacing: 0.18em; text-transform: uppercase;
-  }
-  .photo-head:hover { color: var(--accent); }
-  .photo-head-right { display: flex; align-items: center; gap: 8px; }
-  .photo-head-warn { color: var(--yellow); }
-  .photo-head-err { color: var(--red); }
-  .photo-head-caret::before { content: '▼'; font-size: 8px; }
-  .photo-bar.collapsed .photo-head-caret::before { content: '▶'; }
-  .photo-body { margin-top: 2px; }
-  /* `hidden` works through a UA display rule and any author display outranks
-     it. Nothing here sets one, but the next person to add a flex row to this
-     body would find the section open at every load and not know why. */
-  .photo-body[hidden] { display: none; }
-  .photo-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
-  .photo-row select, .photo-row input[type="text"] {
-    background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text);
-    border-radius: 4px; padding: 9px 10px; font-size: 13px; font-family: inherit;
-  }
-  .photo-row select { flex: 1 1 190px; min-width: 0; }
-  .photo-row input[type="text"] { flex: 2 1 220px; min-width: 0; }
-  /* The file input itself is hidden behind a label: every browser styles it
-     differently and none of them the way the rest of this page is styled. */
-  .photo-pick {
-    flex: 1 1 130px; text-align: center; cursor: pointer;
-    background: transparent; border: 1px dashed var(--border-bright); color: var(--text-dim);
-    padding: 10px 14px; border-radius: 4px;
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
-    letter-spacing: 0.1em; text-transform: uppercase;
-  }
-  .photo-pick:hover { color: var(--accent); border-color: var(--accent); }
-  /* The camera is the one that works at an aid station with no signal, so it
-     is the one that looks like the button. */
-  .photo-pick.primary { border-style: solid; border-color: var(--accent); color: var(--accent); }
-  .photo-pick.primary:hover { background: var(--accent-glow); }
-  .photo-pick input { display: none; }
-  .photo-state { margin-top: 9px; font-size: 11.5px; color: var(--text-muted); }
-  .photo-state.warn { color: var(--yellow); }
-  .photo-state.err { color: var(--red); }
-  .photo-thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-  .photo-thumbs figure { margin: 0; position: relative; }
-  .photo-thumbs img {
-    width: 62px; height: 62px; object-fit: cover; border-radius: 4px;
-    border: 1px solid var(--border); display: block;
-  }
-  /* A photo still waiting for signal looks like one: dimmed, with the count in
-     the line above saying why. */
-  .photo-thumbs figure.queued img { opacity: 0.45; }
-  .photo-thumbs .kill {
-    position: absolute; top: -6px; right: -6px; width: 20px; height: 20px;
-    border-radius: 50%; border: 1px solid var(--border-bright); background: var(--bg);
-    color: var(--text-muted); font-size: 12px; line-height: 1; cursor: pointer; padding: 0;
-  }
-  .photo-thumbs .kill:hover { color: var(--red); border-color: var(--red); }
 
   /* runner cards */
   .runners { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 22px; }
@@ -290,7 +223,11 @@
 <section id="runners" class="runners"></section>
 
 <footer class="site">
-  <span>Pit times stored in this race's data.json</span>
+  <!-- What the page is, the way the settings page's footer does it. It used
+       to say "Pit times stored in this race's data.json", which named a file
+       nobody working an aid station has an opinion about, and stopped being
+       true when the splits moved to the database. -->
+  <span>Check-ins and send-offs for this race</span>
   <span id="last-updated">–</span>
 </footer>
 
@@ -298,7 +235,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=95"></script>
+<script src="lib/race-core.js?v=96"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -919,24 +856,16 @@
   }
 
   // ---------- photos ----------
-  // A photo belongs to a leg of the course, not to a racer: the aid station
-  // itself, or two of your runners standing together, is not any one person's.
-  // runnerId is there as an optional tag and the picker offers it second.
-  //
-  // The leg defaults to where the race actually is. A crew member at an aid
-  // station photographs what is in front of them, and making them find the
-  // right leg in a list of sixteen before they can take a picture is how the
-  // picture does not get taken.
-  let photoRows = [], photoQueued = [];
-  // Shut on arrival. Everything on this screen competes with the button
-  // somebody came to press, and the pit board is opened with a runner in front
-  // of you far more often than it is opened to add a photograph.
-  //
-  // Kept across renders rather than across loads: the board redraws every five
-  // seconds, and a section that folded itself up mid-caption would be unusable.
-  // A reload starts closed again, which is the right default to return to.
-  let photosOpen = false;
+  // The panel itself is Race.media.mountPanel: the racer page has the same one
+  // and two copies of it is how two pages start disagreeing about what a
+  // button does. What is local is where the race is, which the two screens
+  // know differently.
+  let photoPanel = null;
 
+  // A crew member at an aid station photographs what is in front of them, and
+  // making them find the right leg in a list of sixteen before they can take a
+  // picture is how the picture does not get taken. The first racer still going
+  // decides it.
   function defaultLegIndex() {
     if (!cfg || !data) return 1;
     const merged = Race.queue.applyTo(DATA_PATH, JSON.parse(JSON.stringify(data))).runners || [];
@@ -950,231 +879,19 @@
 
   function canWorkPit() { return Race.roles.canEdit(cfg, Race.auth.email()); }
 
-  async function refreshPhotos() {
-    try { photoRows = await Race.media.list(slug); } catch (e) { photoRows = []; }
-    try { photoQueued = await Race.media.pending(slug); } catch (e) { photoQueued = []; }
-    renderPhotos();
-  }
-
-  // Built once, then updated in place. It used to rebuild its own innerHTML on
-  // every poll, which is five seconds, and that quietly broke the whole thing:
-  // tapping Add photo opens the operating system's picker, the picker stays up
-  // for longer than five seconds, a poll replaces the <input type="file"> while
-  // it is up, and the picker hands the photo back to an element that is no
-  // longer in the document. The change event fires on a detached node, never
-  // reaches the delegated listener on the section, and nothing happens at all:
-  // no thumbnail, no error, no queue entry. Airplane mode made it certain
-  // rather than occasional, because everything takes longer with no signal.
-  //
-  // render() above already carries the same lesson for the intake fields, in
-  // the comment about the poll throwing away what somebody was typing. The
-  // file input is worse than a text field: a text field loses its contents and
-  // the person sees it, and this lost the photograph and said nothing.
-  //
-  // So nothing in the body is ever replaced. The head, the state line and the
-  // thumbnails are updated; the selects are only rebuilt when the course or
-  // the roster actually changed, keeping the choice; the caption and the file
-  // input are never touched at all.
-  let photoSkeleton = false, photoLegSig = '', photoRunnerSig = '', photoThumbUrls = [];
-
-  function buildPhotoSkeleton(host) {
-    host.innerHTML =
-      `<button type="button" class="photo-head" id="photo-toggle" aria-expanded="false"` +
-        ` aria-controls="photo-body">` +
-        `<span>Photos</span>` +
-        `<span class="photo-head-right"><span id="photo-summary"></span>` +
-        `<span class="photo-head-caret"></span></span>` +
-      `</button>` +
-      `<div class="photo-body" id="photo-body" hidden>` +
-        `<div class="photo-row">` +
-          `<select id="photo-leg" aria-label="Which leg"></select>` +
-          `<select id="photo-runner" aria-label="Who is in it"></select>` +
-        `</div>` +
-        `<div class="photo-row">` +
-          `<input type="text" id="photo-caption" maxlength="280" placeholder="A line about it (optional)">` +
-          // Two ways in, and the camera is first for a reason. An aid station
-          // with no signal is exactly where Google Photos cannot show you
-          // anything: most of a phone's library lives in the cloud, and the
-          // Android picker opens Google Photos, which answers "Can't load some
-          // Photos" and never hands a file back. The crew member never reaches
-          // our code at all.
-          //
-          // capture sends the tap straight to the camera app instead, which
-          // has never needed a network. It is also the honest default: a crew
-          // member at an aid station is photographing what is in front of
-          // them, not going shopping in an album. No `multiple`, because
-          // capture takes one picture at a time; the picker below keeps it.
-          `<label class="photo-pick primary">Take photo` +
-            `<input type="file" id="photo-camera" accept="image/*" capture="environment"></label>` +
-          `<label class="photo-pick">Choose` +
-            `<input type="file" id="photo-file" accept="image/*" multiple></label>` +
-        `</div>` +
-        `<div class="photo-state" id="photo-state"></div>` +
-        `<div class="photo-thumbs" id="photo-thumbs"></div>` +
-      `</div>`;
-    wirePhotos(host);
-  }
-
   function renderPhotos() {
-    const host = document.getElementById('photos');
-    if (!host || !cfg) return;
-    // Crew only. Everything the roadmap says about moderation starts the
-    // moment somebody not on the roster can put a picture on the page.
-    if (!canWorkPit()) { host.style.display = 'none'; return; }
-    // And only where photos can actually land. This shipped ahead of the
-    // worker that takes them once, and the board offered a camera whose every
-    // upload could only fail, on the one screen where a thing that does not
-    // work costs somebody a race.
-    if (Race.media.configured() !== true) { host.style.display = 'none'; return; }
-    host.style.display = '';
-    if (!photoSkeleton) { photoSkeleton = true; buildPhotoSkeleton(host); }
-
-    host.className = 'photo-bar' + (photosOpen ? '' : ' collapsed');
-    const body = host.querySelector('#photo-body');
-    body.hidden = !photosOpen;
-    host.querySelector('#photo-toggle').setAttribute('aria-expanded', String(photosOpen));
-
-    // The selects, only when what goes in them changed. Rebuilding these on
-    // the poll would reset a choice somebody had just made.
-    const legs = Race.course.legs(cfg) || [];
-    const legSig = legs.map(l => l.index + ':' + (l.toAid || '')).join('|');
-    const legSel = host.querySelector('#photo-leg');
-    if (legSig !== photoLegSig) {
-      photoLegSig = legSig;
-      const keep = legSel.value || String(defaultLegIndex());
-      legSel.innerHTML = legs.map(l =>
-        `<option value="${l.index}">Leg ${l.index}${l.toAid ? ' · ' + escapeHtml(l.toAid) : ''}</option>`).join('');
-      legSel.value = keep;
-      if (!legSel.value) legSel.value = String(defaultLegIndex());
+    if (!cfg) return;
+    if (!photoPanel) {
+      photoPanel = Race.media.mountPanel(document.getElementById('photos'), {
+        slug,
+        cfg: () => cfg,
+        defaultLeg: defaultLegIndex,
+        canAdd: canWorkPit
+      });
     }
-    const runners = cfg.runners || [];
-    const runnerSig = runners.map(r => r.id + ':' + (r.name || '')).join('|');
-    const runnerSel = host.querySelector('#photo-runner');
-    if (runnerSig !== photoRunnerSig) {
-      photoRunnerSig = runnerSig;
-      const keep = runnerSel.value;
-      runnerSel.innerHTML = '<option value="">Nobody in particular</option>' +
-        runners.map(r => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name || r.id)}</option>`).join('');
-      runnerSel.value = keep;
-    }
-
-    const waiting = photoQueued.filter(q => !q.failed).length;
-    const stuck = photoQueued.filter(q => q.failed);
-
-    // What the head says while the body is shut. The count of photos waiting
-    // for signal has to be one of them: a crew member with three unsent
-    // pictures should not have to open anything to find that out.
-    const summary = host.querySelector('#photo-summary');
-    summary.textContent = stuck.length ? `${stuck.length} stuck`
-      : waiting ? `${waiting} waiting for signal`
-      : `${photoRows.length} on this race`;
-    summary.className = stuck.length ? 'photo-head-err' : waiting ? 'photo-head-warn' : '';
-
-    const state = host.querySelector('#photo-state');
-    // Left alone while it is saying something about what just happened, which
-    // is the one message the poll must not talk over.
-    if (!state.dataset.sticky) {
-      state.className = 'photo-state' + (stuck.length ? ' err' : waiting ? ' warn' : '');
-      state.textContent = stuck.length
-        ? `${stuck.length} could not be sent: ${stuck[0].failed || ''}`
-        : waiting ? `${waiting} waiting for signal. They go out on their own.`
-        : 'Resized on this phone before sending, which takes the location off them too.';
-    }
-
-    renderPhotoThumbs(host);
+    photoPanel.render();
   }
-
-  function renderPhotoThumbs(host) {
-    const box = host.querySelector('#photo-thumbs');
-    // One object URL per queued photo per render leaks them all otherwise, on
-    // a page that renders every five seconds for as long as a hundred miler.
-    for (const u of photoThumbUrls) { try { URL.revokeObjectURL(u); } catch (e) {} }
-    photoThumbUrls = [];
-    const queued = photoQueued.map(q => {
-      const u = URL.createObjectURL(q.blob);
-      photoThumbUrls.push(u);
-      return `<figure class="queued"><img alt="Waiting to send" src="${u}">` +
-        `<button class="kill" type="button" data-drop="${escapeHtml(q.id)}" aria-label="Discard">×</button>` +
-        `</figure>`;
-    }).join('');
-    const sent = photoRows.slice().reverse().slice(0, 12).map(m =>
-      `<figure><img alt="${escapeHtml(m.caption || 'Race photo')}" src="${escapeHtml(m.url)}">` +
-      `<button class="kill" type="button" data-remove="${escapeHtml(m.id)}" aria-label="Delete">×</button>` +
-      `</figure>`).join('');
-    box.innerHTML = queued + sent;
-    box.hidden = !(queued || sent);
-  }
-
-  // Says something for a few seconds and stops the poll writing over it.
-  function photoSay(text, cls) {
-    const state = document.getElementById('photo-state');
-    if (!state) return;
-    state.className = 'photo-state' + (cls ? ' ' + cls : '');
-    state.textContent = text;
-    state.dataset.sticky = '1';
-    clearTimeout(photoSay._t);
-    photoSay._t = setTimeout(() => { delete state.dataset.sticky; renderPhotos(); }, 4000);
-  }
-
-  function wirePhotos(host) {
-    host.addEventListener('click', (e) => {
-      if (!e.target.closest('#photo-toggle')) return;
-      photosOpen = !photosOpen;
-      renderPhotos();
-      // Straight into the leg picker on the way open: the whole section is
-      // three controls and the first one is the one that gets changed.
-      if (photosOpen) { const l = host.querySelector('#photo-leg'); if (l) l.focus(); }
-    });
-    host.addEventListener('change', async (e) => {
-      if (e.target.id !== 'photo-file' && e.target.id !== 'photo-camera') return;
-      const files = [...(e.target.files || [])];
-      e.target.value = '';
-      if (!files.length) return;
-      const legIndex = parseInt(host.querySelector('#photo-leg').value, 10);
-      const runnerId = host.querySelector('#photo-runner').value || null;
-      const caption = host.querySelector('#photo-caption').value || '';
-      photoSay(files.length > 1 ? `Preparing ${files.length} photos…` : 'Preparing…');
-      let added = 0;
-      for (const file of files) {
-        try {
-          await Race.media.enqueue(slug, { legIndex, runnerId, caption, file });
-          added++;
-        } catch (err) {
-          photoSay(err.message || 'Could not add that photo.', 'err');
-          break;
-        }
-      }
-      const box = host.querySelector('#photo-caption');
-      if (box) box.value = '';
-      await refreshPhotos();
-      // Said after the refresh, so it is the last word rather than the first.
-      // "Added" and nothing else was the complaint: a photo that queued with
-      // no signal looked exactly like one that had not been taken.
-      if (added) {
-        const waiting = photoQueued.filter(q => !q.failed).length;
-        photoSay(waiting
-          ? `Added. ${waiting} waiting for signal, and they go out on their own.`
-          : `Added.`, waiting ? 'warn' : '');
-      }
-    });
-    host.addEventListener('click', async (e) => {
-      const drop = e.target.closest('[data-drop]');
-      if (drop) { await Race.media.drop(drop.dataset.drop); return refreshPhotos(); }
-      const kill = e.target.closest('[data-remove]');
-      if (!kill) return;
-      if (!confirm('Delete this photo? It comes off the race page for everybody.')) return;
-      try { await Race.media.remove(kill.dataset.remove); } catch (err) {}
-      refreshPhotos();
-    });
-    // A photo that went out while the page was open should stop looking like
-    // one that is waiting, and should appear as one that landed.
-    //
-    // The queued half alone was not enough. The list of sent photos only came
-    // back on the slow minute timer, so there was a window where the dimmed
-    // thumbnail had gone and the real one had not arrived: the photograph
-    // looked like it had been thrown away. Refreshing the list here closes it.
-    Race.media.onChange(() => { refreshPhotos(); });
-  }
+  function refreshPhotos() { return photoPanel ? photoPanel.refresh() : renderPhotos(); }
 
   (async () => {
     await Race.hub.load();

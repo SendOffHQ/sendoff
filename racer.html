@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=34">
+<link rel="stylesheet" href="lib/race-theme.css?v=35">
 <style>
   /* The screen for the person running, when there is no crew at this aid
      station. One job: say where you stand, and take one press. Everything
@@ -180,11 +180,17 @@
 <section class="racer-readout" id="readout"></section>
 <div class="ract" id="act"></div>
 
+<!-- Photos, below everything a runner presses. Race.media.mountPanel builds
+     it; the pit board has the same one. Below and not above on purpose: the
+     big button is what somebody halfway through a hundred miles came here
+     for, and nothing goes between them and it. -->
+<section id="photos" class="photo-bar" style="display:none;"></section>
+
 </div>
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=95"></script>
+<script src="lib/race-core.js?v=96"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -419,6 +425,7 @@
     if (!cfg || !data || !meId) return;
     renderReadout();
     renderAct();
+    renderPhotos();
   }
 
   // The race clock and the aid timer, in place. Nothing else on the readout
@@ -617,6 +624,37 @@
     try { localStorage.setItem(MODE_KEY, 'crew'); } catch (err) {}
   }, true);
 
+  // ---------- photos ----------
+  // The same panel the pit board mounts. What differs is the leg it opens on:
+  // a racer photographs where they are, which is the leg they are running.
+  let photoPanel = null;
+
+  function defaultLegIndex() {
+    if (!cfg || !data) return 1;
+    const me = merged();
+    if (me) {
+      const next = Race.compute.nextActionFor(me, cfg);
+      if (next.state === 'on-course' && next.currentLegIndex) return next.currentLegIndex;
+      if (next.nextLegIndex) return next.nextLegIndex;
+    }
+    return Race.course.legCount(cfg) || 1;
+  }
+
+  function renderPhotos() {
+    if (!cfg) return;
+    if (!photoPanel) {
+      photoPanel = Race.media.mountPanel(document.getElementById('photos'), {
+        slug,
+        cfg: () => cfg,
+        defaultLeg: defaultLegIndex,
+        // A racer on the roster can write their own race, which is what puts
+        // them on this screen at all.
+        canAdd: () => Race.roles.canEdit(cfg, Race.auth.email())
+      });
+    }
+    photoPanel.render();
+  }
+
   // What this screen says the first time somebody lands on it.
   //
   // Three points, not four. The person reading this is about to run a hundred
@@ -643,7 +681,14 @@
     // the offline line says, and somebody halfway through a hundred miles is
     // not waiting on a sentence.
     Race.plans.entitlements().then(registerTutorial, () => registerTutorial(null));
+    // Anything taken with no signal last time goes out now.
+    Race.media.flush().catch(() => {});
     await load();
+    // The list once, then slowly. The splits are what need to be fresh every
+    // few seconds; a photograph somebody else added arriving a minute late
+    // costs nobody anything, and this page is on a phone in a vest pocket.
+    if (photoPanel) photoPanel.refresh();
+    setInterval(() => { if (photoPanel) photoPanel.refresh(); }, 60000);
     // Only the two numbers that move are touched each second. Redrawing the
     // whole readout would take a chip out from under a thumb already on it.
     setInterval(() => {
