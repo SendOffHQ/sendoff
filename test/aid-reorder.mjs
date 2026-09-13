@@ -89,6 +89,33 @@ ok('which rows offer it',
    await page.evaluate(() => [...document.querySelectorAll('#aid-rows [data-del-aid]')].map(e => e.dataset.delAid)),
    ['1','2','3']);
 
+// A phone, and the width a lot of Androids actually report. The row grew two
+// buttons for reordering and #aid-table was the one table on this page never
+// wrapped in a scroller: its narrowest went past 360 and pushed the whole page
+// sideways. Fifteen pixels, and every screen of the wizard scrolled for it.
+//
+// Asserted against the page rather than the table. A table wider than the
+// phone is fine and expected here, the same way the fueling tables are; what
+// is not fine is the document scrolling.
+console.log('\nand none of it pushes the page sideways on a phone');
+await page.setViewportSize({ width: 360, height: 900 });
+await page.waitForTimeout(300);
+const narrow = await page.evaluate(() => ({
+  over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  wrapped: !!document.querySelector('#aid-table').closest('.table-scroll'),
+  loopWrapped: !!document.querySelector('#loop-aid-table').closest('.table-scroll')
+}));
+ok('the document does not scroll across', narrow.over <= 0, true);
+ok('because the aid table can scroll on its own', narrow.wrapped, true);
+ok('and so can the loop one', narrow.loopWrapped, true);
+
+// The buttons have to be reachable inside that scroller, not clipped out of it.
+ok('the row controls are all inside the scroller', await page.evaluate(() => {
+  const wrap = document.querySelector('#aid-table').closest('.table-scroll');
+  const btns = [...document.querySelectorAll('#aid-rows .row-move, #aid-rows .row-del')];
+  return btns.length > 0 && btns.every(b => b.offsetLeft + b.offsetWidth <= wrap.scrollWidth + 1);
+}), true);
+
 ok('nothing threw', errs, []);
 await b.close();
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
