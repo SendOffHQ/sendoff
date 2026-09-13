@@ -298,7 +298,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=93"></script>
+<script src="lib/race-core.js?v=94"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -1149,10 +1149,13 @@
       refreshPhotos();
     });
     // A photo that went out while the page was open should stop looking like
-    // one that is waiting.
-    Race.media.onChange(() => {
-      Race.media.pending(slug).then(q => { photoQueued = q; renderPhotos(); });
-    });
+    // one that is waiting, and should appear as one that landed.
+    //
+    // The queued half alone was not enough. The list of sent photos only came
+    // back on the slow minute timer, so there was a window where the dimmed
+    // thumbnail had gone and the real one had not arrived: the photograph
+    // looked like it had been thrown away. Refreshing the list here closes it.
+    Race.media.onChange(() => { refreshPhotos(); });
   }
 
   (async () => {
