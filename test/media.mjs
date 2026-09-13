@@ -165,6 +165,35 @@ ok('the queue emptied once it went', await page.evaluate(
 // detached node, never reached the listener, and nothing happened at all: no
 // thumbnail, no error, no queue entry. Reported from a real airplane-mode test
 // and silent in every way that matters.
+// The camera, and why it is first. In airplane mode the Android picker opens
+// Google Photos, most of a phone's library is in the cloud, and Google Photos
+// answers "Can't load some Photos" and never hands a file back: the crew
+// member never reaches our code at all. capture goes to the camera app, which
+// has never needed a network.
+console.log('\nthere is a way to take one that does not go through a gallery');
+ok('the camera input is there', await page.locator('#photo-camera').count(), 1);
+ok('and asks for the camera', await page.evaluate(
+  () => document.querySelector('#photo-camera').getAttribute('capture')), 'environment');
+// capture takes one picture at a time; multiple on it would be a lie.
+ok('one at a time', await page.evaluate(
+  () => document.querySelector('#photo-camera').multiple), false);
+ok('the gallery is still offered alongside', await page.locator('#photo-file').count(), 1);
+ok('and that one takes several', await page.evaluate(
+  () => document.querySelector('#photo-file').multiple), true);
+// Both go the same way in, or one of them silently does nothing.
+ok('a camera photo queues like any other', await page.evaluate(async (bytes) => {
+  const before = (await Race.media.pending('six-0-trail-marathon')).length;
+  const file = new File([new Uint8Array(bytes)], 'cam.jpg', { type: 'image/jpeg' });
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  const input = document.querySelector('#photo-camera');
+  input.files = dt.files;
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 1200));
+  const after = await Race.media.list('six-0-trail-marathon');
+  return after.length > 0 && before === 0;
+}, EXIF_JPEG), true);
+
 console.log('\nthe poll does not pull the picker out from under a crew member');
 const survives = await page.evaluate(async () => {
   const before = document.querySelector('#photo-file');

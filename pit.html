@@ -90,6 +90,10 @@
     letter-spacing: 0.1em; text-transform: uppercase;
   }
   .photo-pick:hover { color: var(--accent); border-color: var(--accent); }
+  /* The camera is the one that works at an aid station with no signal, so it
+     is the one that looks like the button. */
+  .photo-pick.primary { border-style: solid; border-color: var(--accent); color: var(--accent); }
+  .photo-pick.primary:hover { background: var(--accent-glow); }
   .photo-pick input { display: none; }
   .photo-state { margin-top: 9px; font-size: 11.5px; color: var(--text-muted); }
   .photo-state.warn { color: var(--yellow); }
@@ -294,7 +298,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=92"></script>
+<script src="lib/race-core.js?v=93"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -970,7 +974,21 @@
         `</div>` +
         `<div class="photo-row">` +
           `<input type="text" id="photo-caption" maxlength="280" placeholder="A line about it (optional)">` +
-          `<label class="photo-pick">Add photo` +
+          // Two ways in, and the camera is first for a reason. An aid station
+          // with no signal is exactly where Google Photos cannot show you
+          // anything: most of a phone's library lives in the cloud, and the
+          // Android picker opens Google Photos, which answers "Can't load some
+          // Photos" and never hands a file back. The crew member never reaches
+          // our code at all.
+          //
+          // capture sends the tap straight to the camera app instead, which
+          // has never needed a network. It is also the honest default: a crew
+          // member at an aid station is photographing what is in front of
+          // them, not going shopping in an album. No `multiple`, because
+          // capture takes one picture at a time; the picker below keeps it.
+          `<label class="photo-pick primary">Take photo` +
+            `<input type="file" id="photo-camera" accept="image/*" capture="environment"></label>` +
+          `<label class="photo-pick">Choose` +
             `<input type="file" id="photo-file" accept="image/*" multiple></label>` +
         `</div>` +
         `<div class="photo-state" id="photo-state"></div>` +
@@ -1090,7 +1108,7 @@
       if (photosOpen) { const l = host.querySelector('#photo-leg'); if (l) l.focus(); }
     });
     host.addEventListener('change', async (e) => {
-      if (e.target.id !== 'photo-file') return;
+      if (e.target.id !== 'photo-file' && e.target.id !== 'photo-camera') return;
       const files = [...(e.target.files || [])];
       e.target.value = '';
       if (!files.length) return;
