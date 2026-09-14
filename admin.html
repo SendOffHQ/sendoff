@@ -563,9 +563,17 @@
     btn.disabled = true; btn.textContent = 'Generating…';
     try {
       const r = await Race.api.accountInvite(email);
+      // The same four ways out the requests queue below already offers, and it
+      // had them from the day it shipped while this panel had only Copy link.
+      // The two generate the same invite, so an invite typed in by hand went
+      // out as a bare signup URL and an invite raised from a request went out
+      // branded. One of those reads like phishing to somebody who has never
+      // heard of SendOff, and it was not the one with the wordmark on it.
       out.innerHTML = '<div class="ok">Send this signup link to <strong>' + esc(email) +
         '</strong>. They set a password and can then create their own races. Expires in 14 days.' +
-        '<span class="url">' + esc(r.url) + '</span>' + copyBtn(r.url) + '</div>';
+        '<span class="url">' + esc(r.url) + '</span>' +
+        composeBtns('invite', '', email, r.url) + '</div>';
+      wireCompose(out, r.mail);
       document.getElementById('inv-email').value = '';
       loadAccounts();
     } catch (err) {
@@ -583,9 +591,15 @@
     btn.disabled = true; btn.textContent = 'Generating…';
     try {
       const r = await Race.api.resetLink(email);
+      // Same gap as the invite panel above, and worse in one way: somebody
+      // locked out of their account is already unsure, and a bare reset URL in
+      // their inbox is exactly the shape of the mail they have been told their
+      // whole life not to click.
       out.innerHTML = '<div class="ok">Send this reset link to <strong>' + esc(email) +
         '</strong>. They open it and set a new password. Expires in 2 days.' +
-        '<span class="url">' + esc(r.url) + '</span>' + copyBtn(r.url) + '</div>';
+        '<span class="url">' + esc(r.url) + '</span>' +
+        composeBtns('reset', '', email, r.url) + '</div>';
+      wireCompose(out, r.mail);
     } catch (err) {
       out.innerHTML = '<div class="err">' + esc(err.message || 'Could not generate reset link.') + '</div>';
     } finally {
