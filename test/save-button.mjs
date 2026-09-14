@@ -141,6 +141,23 @@ const pitLabel = () => page.evaluate(sel => {
 }, intake);
 ok('starts as Save intake', await pitLabel(), { text: 'Save intake', saved: false });
 
+// The three buttons here used to share one wrapping flex row, so on a phone
+// the wrap fell wherever the widths landed and Save ended up beside a time
+// correction with the other one orphaned below it. The two corrections belong
+// together; saving is what the panel is for and gets its own line.
+console.log('\nand the buttons are laid out by what they do');
+const rows = await page.evaluate(() => {
+  const box = el => { const r = el.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom) }; };
+  const times = [...document.querySelectorAll('[data-action="edit-time"]')].map(box);
+  const save = box(document.querySelector('[data-action="save-intake"]'));
+  return { times, save };
+});
+ok('both time buttons are on the same line', rows.times.length === 2 &&
+   Math.abs(rows.times[0].top - rows.times[1].top) < 2, true);
+ok('and save is below them, on its own', rows.save.top >= rows.times[0].bottom - 1, true);
+
+const idleWidth = await page.evaluate(sel => document.querySelector(sel).offsetWidth, intake);
+
 // Something to actually save, or the write is a no-op and proves nothing.
 await page.evaluate(sel => {
   const box = document.querySelector('[data-intake="notes"]');
@@ -155,6 +172,12 @@ await page.waitForFunction(sel => {
 }, intake, { timeout: 15000 }).catch(() => {});
 ok('and says Saved on the button the redraw left behind', await pitLabel(),
    { text: 'Saved', saved: true });
+
+// The redraw hands back an element that never saw busy() and so carries no
+// pinned width, which is how this button shrank to fit the word "Saved" while
+// the settings ones held still. done() measures too, for exactly this.
+ok('without changing size under the finger', await page.evaluate(sel =>
+  document.querySelector(sel).offsetWidth, intake), idleWidth);
 
 // The redraw really did happen, so this is a different element than the one
 // that was clicked. If it were the same, the test above would pass for the
