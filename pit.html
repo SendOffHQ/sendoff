@@ -617,10 +617,18 @@
             <input type="text" data-intake="gearChanges" value="${escapeAttr(selectedLeg?.gearChanges ?? '')}" />
           </label>
         </div>
+        <!-- Two rows, not one wrapping row. The three buttons used to share a
+             flex row and the wrap fell wherever the widths happened to land:
+             on a phone that put Save intake beside Edit start time with Set
+             end time orphaned underneath, so the button this whole panel
+             exists for read as one of a set of three. The corrections belong
+             together; saving belongs on its own line. -->
         <div class="intake-actions">
-          <button class="btn primary" data-action="save-intake" data-runner="${runner.id}">Save intake</button>
           <button class="btn" data-action="edit-time" data-runner="${runner.id}" data-leg="${selectedLeg?.index || ''}" data-field="startTime">${selectedLeg?.startTime ? 'Edit' : 'Set'} start time</button>
           <button class="btn" data-action="edit-time" data-runner="${runner.id}" data-leg="${selectedLeg?.index || ''}" data-field="endTime">${selectedLeg?.endTime ? 'Edit' : 'Set'} end time</button>
+        </div>
+        <div class="intake-actions">
+          <button class="btn primary" data-action="save-intake" data-runner="${runner.id}">Save intake</button>
         </div>
       </div>
     `;
