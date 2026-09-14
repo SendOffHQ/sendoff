@@ -46,6 +46,11 @@ const raceFile = (slug, file) => fileAt(path.posix.join('races', slug, file));
 // test does.
 const MEDIA = [];
 
+// Whether an invite comes back with a rendered message beside the link. An
+// older worker does not send one, and the page has to cope by not offering a
+// button that could only fail, which is a thing worth being able to ask for.
+let noMail = false;
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const send = (code, body, type) => {
@@ -232,6 +237,38 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // An account invite, with the rendered message beside the link. The message
+  // is deliberately not a copy of the worker's template: reproducing that here
+  // would be the second copy of a mail the design exists to have only one of,
+  // and what the browser test is asking is whether the page carries whatever
+  // it was handed. /api/account-invite-nomail is how it asks what an older
+  // worker, which returns the link alone, looks like.
+  if (url.pathname === '/api/account-invite-nomail') { noMail = true; return send(200, '{"ok":true}'); }
+  if (url.pathname === '/api/account-invite' || url.pathname === '/api/reset-link') {
+    const isReset = url.pathname === '/api/reset-link';
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+      let j = {}; try { j = JSON.parse(body); } catch (e) {}
+      const link = isReset ? 'http://localhost:8787/reset.html?reset=stub-reset'
+                           : 'http://localhost:8787/signup.html?account=stub-account';
+      const out = { token: isReset ? 'stub-reset' : 'stub-account', url: link, email: j.email,
+                    expiresAt: Date.now() + 14 * 24 * 3600e3, emailed: false, emailError: null };
+      if (!noMail) {
+        out.mail = {
+          subject: isReset ? 'Reset your SendOff password' : 'Your SendOff invite',
+          html: '<html><body><h1>' + (isReset ? 'Set a new password' : 'You are in.') + '</h1>' +
+                '<img src="/brand/wordmark-email.png" alt="SendOff">' +
+                '<a href="' + link + '">' +
+                (isReset ? 'Choose a new password' : 'Set up your account') + '</a></body></html>',
+          text: (isReset ? 'Set a new password. ' : 'You are in. ') + link
+        };
+      }
+      send(200, JSON.stringify(out), 'application/json');
+    });
+  }
+
   if (url.pathname.startsWith('/api/')) return send(200, '{}', 'application/json');
 
   // --- the site ---
@@ -257,7 +294,14 @@ const server = http.createServer((req, res) => {
   }
   if (!fs.existsSync(full) && fs.existsSync(full + '.html')) full += '.html';
   if (full.startsWith(ROOT) && fs.existsSync(full) && fs.statSync(full).isDirectory()) {
-    full = path.join(full, 'index.html');
+    // A file beside a directory of the same name wins. This repo has both
+    // admin.html and admin/ (which holds the password hasher), and the harness
+    // answered /admin with its 404 page while the live host serves admin.html,
+    // so nothing on the admin page could be opened in a browser test at all.
+    // Checked against sendoff.run rather than assumed: /admin.html 308s to
+    // /admin there, and /admin returns the admin page.
+    if (fs.existsSync(full + '.html')) full += '.html';
+    else full = path.join(full, 'index.html');
   }
   if (!full.startsWith(ROOT) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) {
     // What the host does, rather than a bare string. Cloudflare Pages answers
