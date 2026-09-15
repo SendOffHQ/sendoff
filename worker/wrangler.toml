@@ -99,6 +99,24 @@ MEDIA_BASE_URL = "https://media.sendoff.run"
 #                  secret rather than a var so a personal inbox stays out of
 #                  git. Must be a verified Email Routing destination, which is
 #                  the free path; without it the worker simply does not notify.
+#   RESEND_API_KEY optional, and the difference between inviting somebody and
+#                  asking somebody to paste a link into their own mail client.
+#                  Cloudflare Email Routing's send binding, below, only
+#                  delivers to addresses verified as destinations on the
+#                  account, which is fine for telling the operator something
+#                  happened and no use at all for an invite: an invite goes to
+#                  a stranger by definition. With this set the worker sends
+#                  through Resend instead and can reach anyone.
+#                  Set it and sending starts on the next request, no deploy.
+#                  Remove it and the binding takes over again, which is the
+#                  whole of the rollback. Nothing else changes: the templates,
+#                  the from-addresses and every caller are the same either way.
+#                  A secret and not a var because it is a credential that can
+#                  send mail as this domain, and this repository is public.
+#                  From resend.com, after verifying sendoff.run there, which
+#                  means adding their DKIM records and adding their include: to
+#                  the SPF record already on the domain. Keep the Cloudflare
+#                  include as well or inbound forwarding stops working.
 #   DISCORD_WEBHOOK  optional. A channel webhook URL, from Discord's Server
 #                  Settings, Integrations, Webhooks. When set, the worker
 #                  announces a public race being created and a racer finishing
@@ -112,6 +130,12 @@ MEDIA_BASE_URL = "https://media.sendoff.run"
 
 # Lets the worker send the notification above. Sending to a verified
 # destination address is free on all plans with Email Routing configured.
+#
+# Kept even once RESEND_API_KEY is set, rather than deleted. It costs nothing
+# while unused, it depends on nobody outside Cloudflare, and it is what still
+# reaches the operator's own inbox if the Resend key is revoked or the free
+# tier runs out in the middle of a race. sendMail prefers Resend and falls back
+# to this.
 [[send_email]]
 name = "EMAIL"
 
