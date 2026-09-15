@@ -174,6 +174,10 @@
     font-size: 12px; font-weight: 600; cursor: pointer; line-height: 1;
     min-height: 34px;
   }
+  /* The staged count, on the chip, so a crew member can see three gels are
+     waiting to be saved without reading the boxes. Empty until something is
+     tapped, and it takes no room when empty. */
+  .preset-chip .chip-count:not(:empty) { margin-left: 6px; color: var(--accent); font-weight: 700; }
   .preset-chip:hover { border-color: var(--accent); color: var(--accent); }
   .preset-chip:active { transform: translateY(1px); }
 
@@ -235,7 +239,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=5cea7e32"></script>
+<script src="lib/race-core.js?v=398f589a"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -402,10 +406,29 @@
   // Adds a preset's numbers to the boxes without saving. Two flasks is two
   // taps, and a wrong tap is fixed by editing the number rather than by an
   // undo the crew has to find.
+  // Items tapped but not yet saved, per runner and leg. The board stages
+  // intake rather than committing it, so an item has to stage too: a tap fills
+  // the boxes and Save intake writes them, and a tap on an item that has no
+  // boxes to fill would otherwise do nothing at all.
+  //
+  // Which is what "track a medicine" needs. An item with no numbers records
+  // that it was taken, and that count is the only thing it records, so if the
+  // tap does not stage it the button is decoration.
+  //
+  // Keyed by leg as well as runner because the leg picker redraws the card:
+  // staging against leg 4 must not appear on leg 5.
+  const stagedItems = new Map();
+  const stageKey = (runnerId, legIndex) => `${runnerId}|${legIndex}`;
+  const stagedFor = (runnerId, legIndex) => stagedItems.get(stageKey(runnerId, legIndex)) || {};
+
   function applyPreset(runnerId, presetIndex) {
     const card = document.querySelector(`.runner[data-runner="${runnerId}"]`);
     const preset = Race.fuel.presets(cfg)[presetIndex];
     if (!card || !preset) return;
+    const sel = card.querySelector('[data-intake-leg]');
+    const legIndex = sel ? +sel.value : null;
+    if (!legIndex) return;
+
     for (const m of Race.fuel.metrics(cfg)) {
       const add = +preset.values[m.key];
       if (!add) continue;
@@ -413,7 +436,19 @@
       if (!el) continue;
       el.value = Race.fuel.round(m, (parseFloat(el.value) || 0) + add);
     }
-    toast(`Added ${preset.name}. Save intake to keep it.`, 'ok');
+
+    const key = stageKey(runnerId, legIndex);
+    const staged = stagedItems.get(key) || {};
+    staged[presetIndex] = (staged[presetIndex] || 0) + 1;
+    stagedItems.set(key, staged);
+
+    // Updated in place rather than by redrawing. A redraw here would replace
+    // the very inputs the tap just added to, which is the whole of what is
+    // waiting to be saved.
+    const chip = card.querySelector(`[data-action="preset"][data-preset="${presetIndex}"] .chip-count`);
+    if (chip) chip.textContent = '\u00d7' + staged[presetIndex];
+
+    toast(`${preset.name} \u00d7${staged[presetIndex]}. Save intake to keep it.`, 'ok');
   }
 
   async function saveIntake(runnerId) {
@@ -441,6 +476,17 @@
     fields.meds        = meds   === '' ? null : meds;
     fields.gearChanges = gear   === '' ? null : gear;
 
+    // The items tapped since the last save, added to what the leg already
+    // holds rather than replacing it: two crew members at one aid station both
+    // handing over a gel is two gels.
+    const staged = stagedFor(runnerId, legIndex);
+    const legNow = ((data.runners || []).find(r => r.id === runnerId)?.legs || [])
+      .find(l => l.index === legIndex) || {};
+    for (const [idx, n] of Object.entries(staged)) {
+      if (!n) continue;
+      fields[`preset_${idx}`] = (+legNow[`preset_${idx}`] || 0) + n;
+    }
+
     // By selector, not by element: the redraw below throws this button away
     // and builds another, so the thing to mark afterwards is whatever is
     // standing in its place by then.
@@ -449,6 +495,11 @@
     try {
       const r = await Race.queue.write(DATA_PATH, 'setLegFields', { runnerId, legIndex, fields },
         `pit: intake ${runnerId} leg ${legIndex}`);
+      // Cleared before the redraw, so the chips come back without the staged
+      // counts they have just been saved with. Only on success: a write that
+      // failed leaves them staged, which is what lets the crew press Save
+      // again rather than retapping everything.
+      stagedItems.delete(stageKey(runnerId, legIndex));
       // Forced: the boxes still hold what was just sent, so they read as
       // unsaved until this redraw replaces them with what landed.
       await load(true);
@@ -574,14 +625,24 @@
     // already in the boxes, so a crew member counts servings instead of doing
     // arithmetic at an aid station.
     const fuelMetrics = Race.fuel.metrics(cfg);
-    const presets = Race.fuel.presets(cfg).filter(p => fuelMetrics.some(m => +p.values[m.key]));
+    // Every item, an unnumbered one included, and each carrying its own
+    // position in the race config. That index is what applyPreset looks the
+    // item up by and what the leg counts it under, so handing out a filtered
+    // list's index would log one item under another's name the moment
+    // anything could be filtered out.
+    const presets = Race.fuel.presets(cfg);
+    const stagedNow = stagedFor(runner.id, selectedLegIdx);
     const presetBtns = presets.length === 0 ? '' : `
         <div class="intake-presets">
-          ${presets.map((p, i) => `<button type="button" class="preset-chip" data-action="preset"
+          ${presets.map((p, i) => {
+            const adds = fuelMetrics.filter(m => +p.values[m.key])
+              .map(m => Race.fuel.fmt(m, p.values[m.key]) + ' ' + m.short).join(' · ');
+            return `<button type="button" class="preset-chip" data-action="preset"
              data-runner="${runner.id}" data-preset="${i}"
-             title="${escapeAttr(fuelMetrics.filter(m => +p.values[m.key])
-                     .map(m => Race.fuel.fmt(m, p.values[m.key]) + ' ' + m.short).join(' · '))}"
-             >+ ${escapeHtml(p.name)}</button>`).join('')}
+             title="${escapeAttr(adds || 'Counted only, no amounts')}"
+             >+ ${escapeHtml(p.name)}<span class="chip-count">${
+               stagedNow[i] ? '\u00d7' + stagedNow[i] : ''}</span></button>`;
+          }).join('')}
         </div>`;
 
     const intakePanel = panelLegs.length === 0 ? '' : `

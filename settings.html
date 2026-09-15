@@ -154,7 +154,7 @@
     color: var(--text-muted); white-space: nowrap;
   }
   /* Both fueling tables have more columns than a phone is wide, and the
-     shorthand grows a column for every metric the race adds. Squeezing them to
+     item table grows a column for every metric the race adds. Squeezing them to
      fit turns "Calories" into "Calo"; scrolling sideways keeps every field
      usable, so the cells claim the width they need and the wrapper scrolls. */
   .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -168,7 +168,7 @@
   #fuel-table th:nth-child(3), #fuel-table td:nth-child(3) { width: 20%; }
   #fuel-table th:nth-child(4), #fuel-table td:nth-child(4) { width: 21%; }
   #fuel-table th:last-child,   #fuel-table td:last-child   { width: 10%; }
-  /* The shorthand grows a column per metric, so JS sets its min-width. */
+  /* The item table grows a column per metric, so JS sets its min-width. */
   #preset-table th:first-child, #preset-table td:first-child { width: 150px; }
   #preset-table th:last-child,  #preset-table td:last-child  { width: 46px; }
 
@@ -316,7 +316,7 @@
         <select id="plan-runner"></select>
         <span class="fuel-hint">The goal column, the hour bands and the crew
           notes below are this racer's. The metric names, units and the
-          shorthand are the race's, shared by everyone on it.</span>
+          items are the race's, shared by everyone on it.</span>
       </div>
       <div class="table-scroll">
         <table class="aid-list" id="fuel-table">
@@ -361,12 +361,19 @@
       <button class="add-row" type="button" id="add-band">+ Add an hour band</button>
       <div class="editor-warn" id="band-warn" style="display:none; margin:10px 0 0;"></div>
 
-      <div class="fuel-editor-title" style="margin-top:18px;">Shorthand</div>
+      <div class="fuel-editor-title" style="margin-top:18px;">One-tap items</div>
       <p class="fuel-hint">
-        The things you hand over by the item, not by the number. One tap on the
-        pit form adds a serving, two taps adds two, and the crew counts flasks
-        instead of doing arithmetic at an aid station. A flask is a flask
-        whoever drinks it, so these are the race's rather than one racer's.
+        The things handed over by the item rather than by the number: a flask,
+        a gel, a pill. Each becomes a button on the pit board and the racer
+        page. One tap logs one, two taps two, so the crew counts flasks instead
+        of doing arithmetic at an aid station.
+      </p>
+      <p class="fuel-hint">
+        Fill in the amounts and a tap adds them to the leg. <strong>Leave them
+        all blank for something you only need to count</strong>, like a
+        medicine: the tap records that it was taken, and the race page and the
+        printout show it against that leg. A flask is a flask whoever drinks
+        it, so these belong to the race rather than to one racer.
       </p>
       <div class="table-scroll">
         <table class="aid-list" id="preset-table">
@@ -374,7 +381,7 @@
           <tbody id="preset-rows"></tbody>
         </table>
       </div>
-      <button class="add-row" type="button" id="add-preset">+ Add shorthand</button>
+      <button class="add-row" type="button" id="add-preset">+ Add an item</button>
     </div>
 
     <div style="margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;">
@@ -416,7 +423,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=5cea7e32"></script>
+<script src="lib/race-core.js?v=398f589a"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -633,7 +640,7 @@
     return t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + (day > 0 ? ` D${day + 1}` : '');
   }
 
-  // Same column rule as the shorthand: one per metric currently in the editor,
+  // Same column rule as the item table: one per metric currently in the editor,
   // so adding Carbs gives every band a Carbs box without a save in between.
   // Which metrics the dependent tables are currently drawn for. A rename that
   // does not change this only needs new headings; anything else needs columns.
@@ -681,7 +688,7 @@
   }
 
   // Presets are keyed off the metrics as they stand in the editor right now,
-  // not as they are saved, so adding Carbs immediately gives every shorthand a
+  // not as they are saved, so adding Carbs immediately gives every item a
   // Carbs column to fill in.
   function renderPresetHead() {
     const metrics = Race.fuel.fromRows(editingFuel).metrics;
@@ -697,7 +704,7 @@
     const metrics = renderPresetHead();
     document.getElementById('preset-rows').innerHTML = editingPresets.map((pre, i) => `
       <tr>
-        <td><input type="text" data-preset="${i}" data-k="name" value="${escapeAttr(pre.name)}" placeholder="e.g. Tailwind flask" /></td>
+        <td><input type="text" data-preset="${i}" data-k="name" value="${escapeAttr(pre.name)}" placeholder="e.g. Tailwind flask, or Ibuprofen" /></td>
         ${metrics.map(m => `<td><input type="number" data-preset="${i}" data-mk="${escapeAttr(m.key)}"
              min="0" step="${m.step || 1}" value="${escapeAttr(pre.values[m.key] ?? '')}" placeholder="0" /></td>`).join('')}
         <td><button class="row-del" type="button" data-del-preset="${i}" aria-label="Delete">×</button></td>
@@ -975,13 +982,10 @@
 
     // Nothing somebody typed is thrown away without saying so.
     //
-    // fromRows drops a fueling row with no name and presetsFromRows drops a
-    // shorthand with no name or no amounts, both of which are right: a metric
-    // with no label has no column to be, and a shorthand with no numbers is a
-    // button on the pit board that adds nothing. What was wrong is that they
-    // did it in silence. Add a shorthand, type "Gel", press Save, and the row
-    // is gone with no message and nothing to reload, which reads as the app
-    // deleting your work, because that is what it is.
+    // fromRows drops a fueling row with no name, which is right: a metric with
+    // no label has no column to be. What was wrong is that it did so in
+    // silence, and an item with no amounts was dropped the same way, which
+    // read as the app deleting your work because that is what it was.
     //
     // A row nobody touched is still dropped in silence, and should be:
     // pressing "+ Add" and changing your mind must not block the save.
@@ -993,20 +997,14 @@
       return;
     }
 
-    const touchedPresets = (editingPresets || []).filter(pre =>
-      (pre.name || '').trim() || Object.values(pre.values || {}).some(v => +v));
-    for (const pre of touchedPresets) {
-      const name = (pre.name || '').trim();
-      const amounts = Object.values(pre.values || {}).some(v => +v);
-      if (!name) {
-        toast('A shorthand needs a name. Fill it in, or delete the row.', 'error');
-        return;
-      }
-      if (!amounts) {
-        toast(`"${name}" has no amounts. A shorthand adds numbers to a leg, so ` +
-              'it needs at least one, or delete the row.', 'error');
-        return;
-      }
+    // Only the name is required. An item with no amounts is the point of
+    // having items at all for anything that is not fuel: a medicine has no
+    // calories and no fluid, and what needs recording is that it was taken.
+    const namelessItem = (editingPresets || []).find(pre =>
+      !(pre.name || '').trim() && Object.values(pre.values || {}).some(v => +v));
+    if (namelessItem) {
+      toast('An item needs a name. Fill it in, or delete the row.', 'error');
+      return;
     }
 
     const fuelRows = Race.fuel.fromRows(editingFuel);

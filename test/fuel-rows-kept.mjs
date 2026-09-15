@@ -1,13 +1,17 @@
 // Saving the fueling editor does not throw away what somebody typed.
 //
-// Reported: added a shorthand on a real race, pressed Save, and it was gone.
-// No message, nothing to reload, the row simply not there.
+// Reported: added a one-tap item on a real race, pressed Save, and it was
+// gone. No message, nothing to reload, the row simply not there.
 //
-// The dropping was deliberate and the rules behind it are right. A fueling
-// metric with no name has no column to be. A shorthand with no numbers is a
-// button on the pit board that adds nothing when tapped. What was wrong is
-// that a half-filled row met those rules in silence, so the app looked like it
-// had deleted your work, which from where you are sitting is what happened.
+// A fueling metric with no name is still dropped, and rightly: it has no
+// column to be. What was wrong is that it happened in silence, so the app
+// looked like it had deleted your work, which from where you are sitting is
+// what happened.
+//
+// The same silence also swallowed an item with no amounts, and that one turned
+// out to be wrong outright rather than merely quiet: a medicine has no
+// calories and no fluid, and what needs recording is that it was taken. An
+// item needs only a name now, which test/one-tap-items.mjs covers.
 //
 // The line this draws: a row nobody touched is still dropped without comment,
 // because pressing "+ Add" and changing your mind must not block a save. A row
@@ -69,17 +73,9 @@ console.log('\nthe race as it starts');
 ok('one shorthand', await presetNames(), ['Flask of LMNT']);
 
 // The report, exactly: add a shorthand, type a name, press Save.
-console.log('\na shorthand with a name and no amounts');
+console.log('\nan item with a name and an amount');
 await page.click('#add-preset');
 await page.fill('#preset-rows tr:last-child [data-k="name"]', 'Gel');
-await save();
-ok('the row is still there', await presetNames(), ['Flask of LMNT', 'Gel']);
-ok('and it says why it cannot be saved',
-   /has no amounts/i.test(await toast() || ''), true);
-ok('naming the row, so it can be found', /Gel/.test(await toast() || ''), true);
-await clearToast();
-
-console.log('\nand once an amount is filled in');
 await page.fill('#preset-rows tr:last-child [data-mk="calories"]', '100');
 await save();
 await openEditor();
@@ -94,10 +90,10 @@ await save();
 ok('refused rather than dropped', (await presetNames()).length, 3);
 ok('and says what is missing', /needs a name/i.test(await toast() || ''), true);
 await clearToast();
+await page.fill('#preset-rows tr:last-child [data-mk="calories"]', '');
 
 // The other half of the line. An abandoned click must not wedge the editor.
 console.log('\nan added row nobody typed in');
-await page.fill('#preset-rows tr:last-child [data-mk="calories"]', '');
 await save();
 await openEditor();
 ok('the save goes through', await presetNames(), ['Flask of LMNT', 'Gel']);
@@ -121,7 +117,7 @@ await openEditor();
 ok('it is there', await fuelNames(), [...before, 'Carbs']);
 // A new metric means a new column in the shorthand table, and the shorthand
 // that was already saved has to come through that unchanged.
-ok('and the shorthands came through with it', await presetNames(), ['Flask of LMNT', 'Gel']);
+ok('and the items came through with it', await presetNames(), ['Flask of LMNT', 'Gel']);
 
 ok('nothing threw', errs, []);
 await b.close();

@@ -587,7 +587,7 @@
      Esri's and will be missing offline; the map is useful without them. -->
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=81ff34ca"></script>
-<script src="lib/race-core.js?v=5cea7e32"></script>
+<script src="lib/race-core.js?v=398f589a"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -877,7 +877,11 @@
       const pitCell = pitSec != null
         ? Race.fmt.durationShort(pitSec) + (next ? '' : ' <span style="color: var(--accent); font-size: 9px;">●</span>')
         : '–';
-      const noteParts = [l.gearChanges, l.meds, l.issues, l.notes].filter(Boolean);
+      // Items tapped on this leg first: they are the only record an item
+      // with no numbers leaves, and a medicine is the thing somebody
+      // reads this line looking for.
+      const noteParts = [...Race.fuel.itemsTaken(cfg, l),
+                         l.gearChanges, l.meds, l.issues, l.notes].filter(Boolean);
       const isOld = (arr.length - 1 - i) >= 2;
       const oldCls = isOld ? ' leg-old' : '';
       const noteOldCls = isOld ? ' note-old' : '';

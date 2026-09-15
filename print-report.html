@@ -318,7 +318,7 @@
   <div>Auto-generated · race-dashboard hub</div>
 </footer>
 
-<script src="lib/race-core.js?v=5cea7e32"></script>
+<script src="lib/race-core.js?v=398f589a"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -366,7 +366,11 @@
       const next = arr[i + 1];
       const pitSec = (l.endTime && next && next.startTime)
         ? (new Date(next.startTime) - new Date(l.endTime)) / 1000 : null;
-      const noteParts = [l.gearChanges, l.meds, l.issues, l.notes].filter(Boolean);
+      // Items tapped on this leg first: they are the only record an item
+      // with no numbers leaves, and a medicine is the thing somebody
+      // reads this line looking for.
+      const noteParts = [...Race.fuel.itemsTaken(cfg, l),
+                         l.gearChanges, l.meds, l.issues, l.notes].filter(Boolean);
       const noteRow = noteParts.length
         ? `<tr class="note"><td colspan="${cols}">${escapeHtml(noteParts.join(' · '))}</td></tr>`
         : '';

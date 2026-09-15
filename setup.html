@@ -156,14 +156,14 @@
     color: var(--yellow); padding: 10px 12px; border-radius: 4px;
     font-size: 11px; margin: 10px 0 0;
   }
-  .fuel-shorthand { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 16px; }
+  .fuel-items { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 16px; }
   .sub-title {
     font-family: 'JetBrains Mono', monospace; font-size: 9px;
     letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted);
     margin-bottom: 8px;
   }
   /* Both fueling tables have more columns than a phone is wide, and the
-     shorthand grows a column for every metric the race adds. Squeezing them to
+     item table grows a column for every metric the race adds. Squeezing them to
      fit turns "Calories" into "Calo"; scrolling sideways keeps every field
      usable, so the cells claim the width they need and the wrapper scrolls. */
   .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -208,7 +208,7 @@
   #fuel-table th:nth-child(3), #fuel-table td:nth-child(3) { width: 20%; }
   #fuel-table th:nth-child(4), #fuel-table td:nth-child(4) { width: 21%; }
   #fuel-table th:last-child,   #fuel-table td:last-child   { width: 10%; }
-  /* The shorthand grows a column per metric, so JS sets its min-width. */
+  /* The item table grows a column per metric, so JS sets its min-width. */
   #preset-table th:first-child, #preset-table td:first-child { width: 150px; }
   #preset-table th:last-child,  #preset-table td:last-child  { width: 46px; }
 
@@ -582,7 +582,7 @@
       </span>
     </div>
 
-    <div class="fuel-shorthand">
+    <div class="fuel-items">
       <div class="sub-title">Notes for the crew (optional)</div>
       <p style="margin: 0 0 10px; color: var(--text-muted); font-size:11px; line-height:1.5;">
         What the runner wants the crew to know without being asked. Allergies,
@@ -594,7 +594,7 @@
         style="width:100%; box-sizing:border-box; resize:vertical;"></textarea>
     </div>
 
-    <div class="fuel-shorthand">
+    <div class="fuel-items">
       <div class="sub-title">Hour bands (optional)</div>
       <p style="margin: 0 0 10px; color: var(--text-muted); font-size:11px; line-height:1.5;">
         When the goals should change as the race wears on. A band overrides only
@@ -612,12 +612,14 @@
       <div class="editor-warn" id="band-warn" style="display:none;"></div>
     </div>
 
-    <div class="fuel-shorthand">
-      <div class="sub-title">Shorthand (optional)</div>
+    <div class="fuel-items">
+      <div class="sub-title">One-tap items (optional)</div>
       <p style="margin: 0 0 10px; color: var(--text-muted); font-size:11px; line-height:1.5;">
-        The things you hand over by the item, not by the number. One tap on the pit
-        form adds a serving, two taps adds two, and the crew counts flasks instead
-        of doing arithmetic at an aid station. You can add these later too.
+        The things handed over by the item rather than by the number: a flask, a
+        gel, a pill. Each becomes a button on the pit board and the racer page,
+        so the crew counts flasks instead of doing arithmetic at an aid station.
+        Leave the amounts blank for something you only need to count, like a
+        medicine. You can add these later too.
       </p>
       <div class="table-scroll">
         <table class="list" id="preset-table">
@@ -625,7 +627,7 @@
           <tbody id="preset-rows"></tbody>
         </table>
       </div>
-      <button type="button" class="add-row" id="add-preset">+ Add shorthand</button>
+      <button type="button" class="add-row" id="add-preset">+ Add an item</button>
     </div>
   </section>
 
@@ -668,7 +670,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=5cea7e32"></script>
+<script src="lib/race-core.js?v=398f589a"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -1001,7 +1003,7 @@
   }
 
   // Columns follow the metrics as they stand in the editor right now, so adding
-  // Carbs immediately gives every shorthand a Carbs box to fill in.
+  // Carbs immediately gives every item a Carbs box to fill in.
   // The clock time a band begins, from the start the wizard has so far. Blank
   // until a date and time are picked, since "6:00 PM" of no particular day is
   // not worth showing.
