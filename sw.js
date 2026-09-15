@@ -9,7 +9,7 @@
 //
 //   pages      network first, cache fallback   always fresh online, still there offline
 //   race data  network first, cache fallback   the live file wins; the last one seen is the backup
-//   assets     cache first, revalidate after   instant, and ?v= bumps are new URLs so they miss and refetch
+//   assets     cache first, revalidate after   instant, and ?v= is a content hash so a change is a new URL
 //   the API    never cached                    authenticated, and a stale answer would be a lie
 //
 // A service worker is sticky: once installed it keeps serving until replaced.
@@ -26,7 +26,9 @@ const OURS = [SHELL, DATA];
 // Stable URLs only. Anything carrying a ?v= is deliberately left to runtime
 // caching: pinning a version here means this list has to be edited in lockstep
 // with every cache-bust, and the day it is forgotten the worker serves last
-// week's JavaScript.
+// week's JavaScript. The ?v= itself is a hash of the file, stamped by
+// tools/stamp-assets.mjs and checked by test/asset-version.mjs, so a changed
+// asset is always a URL nothing has cached.
 const SHELL_URLS = [
   // '/' is the marketing page; the hub it used to be now lives at '/app/'.
   // Both are precached: the first is what a stranger lands on, the second is
