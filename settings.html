@@ -973,6 +973,42 @@
     }
     if (!runners.length) { toast('At least one runner is required.', 'error'); return; }
 
+    // Nothing somebody typed is thrown away without saying so.
+    //
+    // fromRows drops a fueling row with no name and presetsFromRows drops a
+    // shorthand with no name or no amounts, both of which are right: a metric
+    // with no label has no column to be, and a shorthand with no numbers is a
+    // button on the pit board that adds nothing. What was wrong is that they
+    // did it in silence. Add a shorthand, type "Gel", press Save, and the row
+    // is gone with no message and nothing to reload, which reads as the app
+    // deleting your work, because that is what it is.
+    //
+    // A row nobody touched is still dropped in silence, and should be:
+    // pressing "+ Add" and changing your mind must not block the save.
+    const touchedFuel = (editingFuel || []).filter(r =>
+      (r.label || '').trim() || (r.unit || '').trim() || (r.short || '').trim() || +r.target);
+    const namelessFuel = touchedFuel.find(r => !(r.label || '').trim());
+    if (namelessFuel) {
+      toast('A fueling metric needs a name. Fill it in, or delete the row.', 'error');
+      return;
+    }
+
+    const touchedPresets = (editingPresets || []).filter(pre =>
+      (pre.name || '').trim() || Object.values(pre.values || {}).some(v => +v));
+    for (const pre of touchedPresets) {
+      const name = (pre.name || '').trim();
+      const amounts = Object.values(pre.values || {}).some(v => +v);
+      if (!name) {
+        toast('A shorthand needs a name. Fill it in, or delete the row.', 'error');
+        return;
+      }
+      if (!amounts) {
+        toast(`"${name}" has no amounts. A shorthand adds numbers to a leg, so ` +
+              'it needs at least one, or delete the row.', 'error');
+        return;
+      }
+    }
+
     const fuelRows = Race.fuel.fromRows(editingFuel);
     const presets = Race.fuel.presetsFromRows(editingPresets, fuelRows.metrics);
 
