@@ -80,6 +80,19 @@
 
   /* accounts list */
   .acct-list { display: flex; flex-direction: column; gap: 6px; }
+  .acct-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .acct-filters input[type="search"] { flex: 1 1 180px; min-width: 0; }
+  .acct-filters select { flex: 0 1 auto; width: auto; }
+  .acct-count {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-muted); margin-bottom: 8px;
+  }
+  /* The person, then the address. A name is what an admin is scanning for and
+     an address is how the row is identified, so both are shown rather than one
+     replacing the other. */
+  .acct-name { font-weight: 600; color: var(--text); }
+  .acct-name + .acct-email { color: var(--text-muted); }
   /* The report itself, which is the part worth reading, so it gets the room. */
   .panel-count {
     font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em;
@@ -287,6 +300,25 @@
       <h2>Accounts</h2>
       <p class="lead">Everyone with a hub account. Tap a row to see the races
         they're an editor or viewer on.</p>
+      <!-- Filtering happens here and not on the worker: the whole list is
+           already in hand, so it is instant and costs no requests. -->
+      <div class="acct-filters">
+        <input type="search" id="acct-search" placeholder="Search name or email"
+               autocomplete="off" spellcheck="false" aria-label="Search accounts" />
+        <select id="acct-role" aria-label="Filter by role">
+          <option value="">Any role</option>
+          <option value="admin">Admin</option>
+          <option value="crew">Crew</option>
+        </select>
+        <select id="acct-plan-filter" aria-label="Filter by plan">
+          <option value="">Any plan</option>
+          <option value="pro">Pro</option>
+          <option value="free">Free</option>
+          <option value="free-early">Free · early</option>
+          <option value="free-capped">Free, capped</option>
+        </select>
+      </div>
+      <div class="acct-count" id="acct-count"></div>
       <div class="acct-list" id="acct-list">Loading…</div>
       <div class="pending" id="pending-wrap" style="display:none;">
         <div class="pending-title">Pending account invites</div>
@@ -520,6 +552,10 @@
     document.getElementById('reset-gen').addEventListener('click', genReset);
     document.getElementById('reset-email').addEventListener('keydown', (e) => { if (e.key === 'Enter') genReset(); });
     loadMailStatus();
+    for (const id of ['acct-search', 'acct-role', 'acct-plan-filter']) {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', renderAccounts);
+    }
     loadAccounts();
     loadAccessRequests();
     loadFeedback();
@@ -817,11 +853,55 @@
     }
   }
 
+  // Fetched once, then filtered in the page. Split from the render so typing
+  // in the search box does not ask the worker anything: the whole list is
+  // already here, and a request per keystroke against an endpoint that reads a
+  // profile per account is a lot of work to narrow a list of thirty.
+  let allAccounts = [];
+
+  function accountMatches(a, q, role, plan) {
+    if (role && (a.role || 'crew') !== role) return false;
+    if (plan) {
+      const isFree = (a.plan || 'pro') === 'free';
+      if (plan === 'pro' && isFree) return false;
+      if (plan === 'free' && !isFree) return false;
+      // Early access is what nearly everyone signing up today has, so "free"
+      // and "free, capped" are worth telling apart: the second is the one that
+      // actually sees the limits.
+      if (plan === 'free-early' && !(isFree && a.earlyAccess)) return false;
+      if (plan === 'free-capped' && !(isFree && !a.earlyAccess)) return false;
+    }
+    if (!q) return true;
+    // Name and address both, because an admin looking for somebody has one or
+    // the other in mind and should not have to know which this list holds.
+    return (a.email + ' ' + (a.name || '')).toLowerCase().includes(q);
+  }
+
   async function loadAccounts() {
     const list = document.getElementById('acct-list');
     try {
       const r = await Race.api.accounts();
-      const accounts = r.accounts || [];
+      allAccounts = r.accounts || [];
+      renderAccounts();
+      renderPending(r.pendingInvites || []);
+    } catch (err) {
+      list.innerHTML = '<div class="err">' + esc(err.message || 'Could not load accounts.') + '</div>';
+    }
+  }
+
+  function renderAccounts() {
+    const list = document.getElementById('acct-list');
+    const q = (document.getElementById('acct-search').value || '').trim().toLowerCase();
+    const role = document.getElementById('acct-role').value;
+    const plan = document.getElementById('acct-plan-filter').value;
+    const accounts = allAccounts.filter(a => accountMatches(a, q, role, plan));
+    const count = document.getElementById('acct-count');
+    // Says the total as well when something is filtered out, so a short list
+    // reads as a filter doing its job rather than as accounts having vanished.
+    count.textContent = accounts.length === allAccounts.length
+      ? `${allAccounts.length} account${allAccounts.length === 1 ? '' : 's'}`
+      : `${accounts.length} of ${allAccounts.length} accounts`;
+    {
       const myEmail = (Race.auth.email() || '').toLowerCase();
       list.innerHTML = accounts.length
         ? accounts.map(a => {
@@ -829,6 +909,7 @@
             return `
             <div class="acct-row" data-email="${esc(a.email)}">
               <div class="acct-head">
+                ${a.name ? `<span class="acct-name">${esc(a.name)}</span>` : ''}
                 <span class="acct-email">${esc(a.email)}</span>
                 <span class="acct-tag ${a.role === 'admin' ? 'admin' : ''}">${esc(a.role)}</span>
                 <span class="acct-tag plan ${a.plan === 'free' ? 'free' : ''}">${esc(a.plan || 'pro')}${a.earlyAccess ? ' · early' : ''}</span>
@@ -842,7 +923,8 @@
               </div>
             </div>`;
           }).join('')
-        : '<div class="acct-races muted">No accounts yet.</div>';
+        : `<div class="acct-races muted">${allAccounts.length
+            ? 'No account matches that.' : 'No accounts yet.'}</div>`;
 
       list.querySelectorAll('.acct-head').forEach(h => {
         h.addEventListener('click', (e) => {
@@ -884,29 +966,31 @@
         });
       });
 
-      const pending = r.pendingInvites || [];
-      const wrap = document.getElementById('pending-wrap');
-      if (pending.length) {
-        wrap.style.display = '';
-        document.getElementById('pending-list').innerHTML = pending.map(p => `
-          <div class="pending-row">
-            <span class="who">${esc(p.email)}</span>
-            <button type="button" data-cancel="${esc(p.token)}">Cancel</button>
-          </div>`).join('');
-        document.getElementById('pending-list').querySelectorAll('[data-cancel]').forEach(b => {
-          b.addEventListener('click', async () => {
-            if (!confirm('Cancel this account invite? The link stops working.')) return;
-            b.disabled = true; b.textContent = '…';
-            try { await Race.api.shareRevoke(b.dataset.cancel); loadAccounts(); }
-            catch (err) { alert('Could not cancel: ' + err.message); b.disabled = false; b.textContent = 'Cancel'; }
-          });
-        });
-      } else {
-        wrap.style.display = 'none';
-      }
-    } catch (err) {
-      list.innerHTML = '<div class="err">' + esc(err.message || 'Could not load accounts.') + '</div>';
     }
+  }
+
+  // Deliberately not filtered alongside the accounts above. A pending invite
+  // is somebody who is not an account yet, so it has no role and no plan to
+  // filter on, and hiding it while a search is typed would make an invite look
+  // cancelled. It is a short list and it stays whole.
+  function renderPending(pending) {
+    const wrap = document.getElementById('pending-wrap');
+    if (!pending.length) { wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    const host = document.getElementById('pending-list');
+    host.innerHTML = pending.map(p => `
+      <div class="pending-row">
+        <span class="who">${esc(p.email)}</span>
+        <button type="button" data-cancel="${esc(p.token)}">Cancel</button>
+      </div>`).join('');
+    host.querySelectorAll('[data-cancel]').forEach(b => {
+      b.addEventListener('click', async () => {
+        if (!confirm('Cancel this account invite? The link stops working.')) return;
+        b.disabled = true; b.textContent = '…';
+        try { await Race.api.shareRevoke(b.dataset.cancel); loadAccounts(); }
+        catch (err) { alert('Could not cancel: ' + err.message); b.disabled = false; b.textContent = 'Cancel'; }
+      });
+    });
   }
 
   async function toggleAccount(row) {

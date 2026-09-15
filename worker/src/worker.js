@@ -32,7 +32,7 @@
 //     GET  /access?slug=...                                            → { people, editors, viewers, shareLinks, teamCanInvite }
 //     POST /access/team-invite { slug, allowed }                       → { teamCanInvite }
 //     GET  /profile[?email=&slug=]                                     → { profile, own }
-//     POST /profile          { displayName, targets, phaseTargets, notes } → { profile }
+//     POST /profile          { firstName, lastName, displayName, targets, phaseTargets, notes } → { profile }
 //         Your own by default. A teammate's only via a race you can write
 //         and they are on. Writing is always your own.
 //         Creator only. Off by default: without it, only the creator can
@@ -596,7 +596,26 @@ function overCap(cap, wanted, existing) {
 const PROFILE_NOTES_MAX = 2000;
 
 function emptyProfile(email) {
-  return { email, displayName: '', targets: {}, phaseTargets: [], notes: '', updatedAt: null };
+  return { email, firstName: '', lastName: '', displayName: '',
+           targets: {}, phaseTargets: [], notes: '', updatedAt: null };
+}
+
+// What to call somebody, given what they have filled in.
+//
+// displayName is what they chose their crew should see and wins outright: a
+// person who typed "Dupree" there means Dupree, not Jason Dupree. First and
+// last stand in when it is blank, which is what stops a roster falling back to
+// an email address for anybody who filled in their name but not a nickname.
+//
+// Returns '' when there is nothing, rather than a guess off the address. The
+// callers all already treat blank as "no name" and show the address; inventing
+// "jdupree" from an address and presenting it as a person's name is worse than
+// showing the address, which is at least visibly an address.
+function profileName(p) {
+  if (!p) return '';
+  const chosen = (p.displayName || '').trim();
+  if (chosen) return chosen;
+  return [p.firstName, p.lastName].map(v => (v || '').trim()).filter(Boolean).join(' ');
 }
 
 async function loadProfile(env, email) {
@@ -608,6 +627,8 @@ async function loadProfile(env, email) {
     const p = JSON.parse(raw);
     return {
       email,
+      firstName: typeof p.firstName === 'string' ? p.firstName : '',
+      lastName: typeof p.lastName === 'string' ? p.lastName : '',
       displayName: typeof p.displayName === 'string' ? p.displayName : '',
       targets: (p.targets && typeof p.targets === 'object' && !Array.isArray(p.targets)) ? p.targets : {},
       phaseTargets: Array.isArray(p.phaseTargets) ? p.phaseTargets : [],
@@ -1621,9 +1642,22 @@ async function handleAccounts(req, env) {
       } catch (e) {}
     }
   }
+  // Who each account belongs to, which an address only sometimes tells you.
+  // A KV read per account, on an admin-only endpoint called once per page
+  // load, for a hub whose accounts are counted in tens. If that stops being
+  // true the fix is a name column on the account record rather than a fan-out
+  // here, but inventing one before it is needed means two places to keep in
+  // step with a profile somebody edits.
+  //
+  // Blank for anybody who has not filled their profile in. The page falls back
+  // to the address, which is honest; a name guessed from an address is not.
+  const named = await Promise.all([...byEmail.values()].map(async (a) => ({
+    ...a, name: profileName(await loadProfile(env, a.email).catch(() => null))
+  })));
+
   // removable: the worker can delete a KV account; accounts baked into the
   // USERS env var can only be removed by re-running `wrangler secret put`.
-  const accounts = [...byEmail.values()]
+  const accounts = named
     .map(a => ({ ...a, inEnv: envEmails.has(a.email), removable: !envEmails.has(a.email) }))
     .sort((a, b) => a.email.localeCompare(b.email));
   return json({ accounts, pendingInvites }, {}, env, req);
@@ -3444,12 +3478,12 @@ async function handleAccessList(req, env) {
   const named = [];
   for (const p of people) {
     const prof = await loadProfile(env, p.email);
-    named.push({ ...p, displayName: prof.displayName || '' });
+    named.push({ ...p, displayName: profileName(prof) });
   }
   let creatorName = '';
   if (raceCfg.createdBy) {
     const prof = await loadProfile(env, raceCfg.createdBy);
-    creatorName = prof.displayName || '';
+    creatorName = profileName(prof);
   }
 
   return json({
@@ -3590,6 +3624,8 @@ async function handleProfileSave(req, env) {
   const email = normalizeEmail(session.email);
   const profile = {
     email,
+    firstName: typeof body.firstName === 'string' ? body.firstName.trim().slice(0, 80) : '',
+    lastName: typeof body.lastName === 'string' ? body.lastName.trim().slice(0, 80) : '',
     displayName: typeof body.displayName === 'string' ? body.displayName.trim().slice(0, 80) : '',
     targets: cleanTargets(body.targets),
     phaseTargets: cleanPhaseTargets(body.phaseTargets),
