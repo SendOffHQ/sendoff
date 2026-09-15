@@ -608,8 +608,10 @@
   </div>
   <p class="filenote" style="color: var(--so-mute); font-size: 13.5px;">
     <code><a href="../lib/race-theme.css">lib/race-theme.css</a></code> carries the app's own copy of these values in its
-    <code>:root</code>. Change one, mirror the other, and bump the <code>?v=</code> on
-    every page's stylesheet link.
+    <code>:root</code>. Change one, mirror the other, then run
+    <code>npm run stamp</code>: the <code>?v=</code> on every page's stylesheet
+    link is a hash of that file, and a stale one means browsers keep the copy
+    they already have.
   </p>
 </section>
 
