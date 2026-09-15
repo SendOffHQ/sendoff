@@ -49,6 +49,12 @@
     margin-bottom: 6px;
   }
   .panel .lead { color: var(--text-dim); font-size: 13px; line-height: 1.5; margin-bottom: 18px; }
+  /* What the worker can actually do with mail, which changes what the panel
+     below it means. Green when it sends for real, amber when the operator is
+     the transport, and nothing at all until the worker has answered. */
+  .panel .lead#mail-status:empty { display: none; }
+  .panel .lead.mail-ok { color: var(--green); }
+  .panel .lead.mail-manual { color: #d9a441; }
   .gate {
     background: var(--bg-card); border: 1px dashed var(--border-bright);
     border-radius: 6px; padding: 32px; text-align: center; color: var(--text-dim);
@@ -227,6 +233,11 @@
       <p class="lead">Generate a one-time signup link for someone you want to let
         create their own races. They open it, pick a password, and they're in.
         The link works for 14 days.</p>
+      <!-- Filled in by loadMailStatus once the worker has said whether it can
+           actually mail a stranger. Deliberately blank until then rather than
+           guessing: a line claiming invites send themselves, on a deployment
+           where they do not, is worse than no line. -->
+      <p class="lead" id="mail-status"></p>
       <label class="field">
         <span class="lbl">Their email</span>
         <input type="email" id="inv-email" placeholder="friend@example.com" autocomplete="off" spellcheck="false" />
@@ -296,13 +307,49 @@
     return '<button class="btn" type="button" data-copy="' + esc(url) + '">Copy link</button>';
   }
 
-  // Cloudflare Email Routing only delivers to addresses verified as
-  // destinations on the account, so the worker cannot mail an invite to
-  // someone who has not signed up with Cloudflare first. Until a sending
-  // service is configured these go out by hand, and this stays false. Flipping
-  // it back to true is all that is needed the day one is: the worker already
-  // takes send.
-  const AUTO_SEND_MAIL = false;
+  // What happened, in one sentence, for the three ways this ends: it was sent,
+  // it could not be sent, or nobody tried. The link is shown in all three,
+  // because a mail that has gone is still a mail that can be lost, and the
+  // operator having the link is what makes that recoverable.
+  function sentHead(r, email, what, days, then) {
+    if (r.emailed) {
+      return '<strong>Emailed</strong> the ' + what + ' to <strong>' + esc(email) +
+        '</strong>. ' + then + ' Expires in ' + days + '.';
+    }
+    if (r.emailError) {
+      return 'Could not email it: ' + esc(r.emailError) + '<br>Send this ' + what + ' to <strong>' +
+        esc(email) + '</strong> yourself. ' + then + ' Expires in ' + days + '.';
+    }
+    return 'Send this ' + what + ' to <strong>' + esc(email) + '</strong>. ' +
+      then + ' Expires in ' + days + '.';
+  }
+
+  // Whether the worker can mail somebody who has never heard of it.
+  //
+  // This was a hardcoded false, with a comment explaining that Cloudflare
+  // Email Routing only delivers to addresses verified as destinations on the
+  // account, so an invite to an actual new person could never be sent. True
+  // then, and it had to be edited and redeployed by hand the day it stopped
+  // being true. It is asked now instead, so adding the Resend secret is the
+  // whole of the change and the next page load offers to send.
+  //
+  // Starts false and stays false if the question cannot be answered. Offering
+  // to send when we do not know is how an operator gets an error banner on
+  // every invite; the compose buttons work either way.
+  let canSendMail = false;
+  async function loadMailStatus() {
+    try {
+      const r = await Race.api.mailStatus();
+      canSendMail = !!r.canSendToAnyone;
+      const note = document.getElementById('mail-status');
+      if (!note) return;
+      note.textContent = canSendMail
+        ? 'Invites and resets are emailed automatically. You can still copy the message and send it yourself.'
+        : 'No sending service is configured, so these go out by hand: copy the branded message and paste it into your mail client. ' +
+          'Set RESEND_API_KEY on the worker and they will send themselves.';
+      note.className = canSendMail ? 'lead mail-ok' : 'lead mail-manual';
+    } catch (e) { /* the copy buttons do not depend on knowing */ }
+  }
 
   // The message, ready to send. Kept close to what the worker's own mail says
   // so the two do not drift into telling people different things.
@@ -472,6 +519,7 @@
     document.getElementById('inv-email').addEventListener('keydown', (e) => { if (e.key === 'Enter') genInvite(); });
     document.getElementById('reset-gen').addEventListener('click', genReset);
     document.getElementById('reset-email').addEventListener('keydown', (e) => { if (e.key === 'Enter') genReset(); });
+    loadMailStatus();
     loadAccounts();
     loadAccessRequests();
     loadFeedback();
@@ -562,15 +610,16 @@
     const btn = document.getElementById('inv-gen');
     btn.disabled = true; btn.textContent = 'Generating…';
     try {
-      const r = await Race.api.accountInvite(email);
+      const r = await Race.api.accountInvite(email, { send: canSendMail });
       // The same four ways out the requests queue below already offers, and it
       // had them from the day it shipped while this panel had only Copy link.
       // The two generate the same invite, so an invite typed in by hand went
       // out as a bare signup URL and an invite raised from a request went out
       // branded. One of those reads like phishing to somebody who has never
       // heard of SendOff, and it was not the one with the wordmark on it.
-      out.innerHTML = '<div class="ok">Send this signup link to <strong>' + esc(email) +
-        '</strong>. They set a password and can then create their own races. Expires in 14 days.' +
+      out.innerHTML = '<div class="' + (r.emailError ? 'err' : 'ok') + '">' +
+        sentHead(r, email, 'signup link', '14 days',
+          'They set a password and can then create their own races.') +
         '<span class="url">' + esc(r.url) + '</span>' +
         composeBtns('invite', '', email, r.url) + '</div>';
       wireCompose(out, r.mail);
@@ -590,13 +639,14 @@
     const btn = document.getElementById('reset-gen');
     btn.disabled = true; btn.textContent = 'Generating…';
     try {
-      const r = await Race.api.resetLink(email);
+      const r = await Race.api.resetLink(email, { send: canSendMail });
       // Same gap as the invite panel above, and worse in one way: somebody
       // locked out of their account is already unsure, and a bare reset URL in
       // their inbox is exactly the shape of the mail they have been told their
       // whole life not to click.
-      out.innerHTML = '<div class="ok">Send this reset link to <strong>' + esc(email) +
-        '</strong>. They open it and set a new password. Expires in 2 days.' +
+      out.innerHTML = '<div class="' + (r.emailError ? 'err' : 'ok') + '">' +
+        sentHead(r, email, 'reset link', '2 days',
+          'They open it and set a new password.') +
         '<span class="url">' + esc(r.url) + '</span>' +
         composeBtns('reset', '', email, r.url) + '</div>';
       wireCompose(out, r.mail);
@@ -635,9 +685,9 @@
             const out = b.closest('.acct-row').querySelector('.areq-out');
             const isReset = row.kind === 'reset';
             const label = b.textContent;
-            b.disabled = true; b.textContent = AUTO_SEND_MAIL ? 'Sending…' : 'Composing…';
+            b.disabled = true; b.textContent = canSendMail ? 'Sending…' : 'Composing…';
             try {
-              const opts = { send: AUTO_SEND_MAIL };
+              const opts = { send: canSendMail };
               const r = isReset ? await Race.api.resetLink(row.email, opts)
                                 : await Race.api.accountInvite(row.email, opts);
               const days = isReset ? '2 days' : '14 days';

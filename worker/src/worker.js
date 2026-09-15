@@ -1408,6 +1408,34 @@ function legCountOf(data) {
   return n;
 }
 
+// Admin-only: what the worker can do with mail right now.
+//
+// Exists so the admin page stops guessing. It carried a hardcoded
+// AUTO_SEND_MAIL = false with a comment explaining that Email Routing cannot
+// reach a stranger, which was true and had to be edited and redeployed by hand
+// the day that stopped being true. Asking means adding the Resend secret is
+// the whole of the change: the next page load offers to send.
+//
+// Says what is configured, never the key itself. "resend" is a fact about this
+// deployment that an admin already has every other way of learning.
+async function handleMailStatus(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
+  const transport = mailTransport(env);
+  return json({
+    transport,
+    // The question the page actually has, answered rather than implied: the
+    // routing binding can send, just never to anybody who has not verified
+    // themselves with Cloudflare first, which for an invite is everybody.
+    canSendToAnyone: transport === 'resend',
+    from: { invite: env.NOTIFY_FROM || null, info: env.INFO_FROM || env.NOTIFY_FROM || null },
+    // Whether the operator gets told when somebody asks for an invite. Blank
+    // is not an error, it just means nobody is notified.
+    notifies: !!env.NOTIFY_EMAIL
+  }, {}, env, req);
+}
+
 async function handleD1Status(req, env) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -2581,16 +2609,95 @@ async function handleGet(req, env) {
 // Returns null on success or a reason string on failure. Deliberately not
 // throwing: some callers must not fail because mail did, and the ones that
 // tell an admin "it has been sent" need the reason to show instead.
+//
+// Two transports, and which one is in use decides what the product can do.
+//
+// Cloudflare Email Routing's send binding only delivers to addresses verified
+// as destinations on the account, which is the right shape for telling the
+// operator something happened and no shape at all for inviting somebody. It
+// cannot mail a stranger, and a stranger is who every invite goes to. That is
+// why invites went out by hand, pasted into a mail client.
+//
+// RESEND_API_KEY switches it to a real sender: any recipient, DKIM signed,
+// bounces handled by somebody whose job it is. Set the secret and the worker
+// starts sending for real on the next request, no deploy; remove it and the
+// binding takes over again, which is the whole of the rollback.
+//
+// The binding is kept rather than deleted on purpose. It costs nothing while
+// unused, it needs no third party to be up, and it is what still reaches the
+// operator's own inbox if the Resend key is ever revoked or the free tier is
+// exhausted mid-race.
+//
+// Returns null on success or a reason string on failure. Deliberately not
+// throwing: some callers must not fail because mail did, and the ones that
+// tell an admin "it has been sent" need the reason to show instead.
 async function sendMail(env, { to, from, subject, html, text }) {
   const sender = from || env.NOTIFY_FROM;
-  if (!env.EMAIL) return 'the worker has no EMAIL binding';
   if (!sender) return 'no from-address is set on the worker';
+  if (env.RESEND_API_KEY) return sendViaResend(env, { to, sender, subject, html, text });
+  if (!env.EMAIL) return 'the worker has no mail transport: set RESEND_API_KEY or bind EMAIL';
   try {
     await env.EMAIL.send({ to, from: sender, subject, html, ...(text ? { text } : {}) });
     return null;
   } catch (e) {
     return (e && e.message) ? e.message : String(e);
   }
+}
+
+// A display name, because an inbox showing "invites@sendoff.run" and an inbox
+// showing "SendOff" are not the same mail to the person deciding in half a
+// second whether this is a phishing attempt. The address is left alone if it
+// already carries one.
+function mailSenderName(env, address) {
+  if (/</.test(address)) return address;
+  return `${env.MAIL_FROM_NAME || 'SendOff'} <${address}>`;
+}
+
+async function sendViaResend(env, { to, sender, subject, html, text }) {
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: mailSenderName(env, sender),
+        to: [to],
+        subject,
+        ...(html ? { html } : {}),
+        // Sent rather than left to be generated. The plain-text part is
+        // written alongside each message and says the same thing in the same
+        // order; a machine translation of the HTML would not.
+        ...(text ? { text } : {})
+      })
+    });
+    if (res.ok) return null;
+    // The reason is shown to an operator who has to decide what to do next,
+    // so it carries the status and whatever the API said rather than "failed".
+    // Capped because it ends up in a UI, and a stack trace in a status line
+    // helps nobody.
+    let detail = '';
+    try {
+      const body = await res.json();
+      detail = (body && (body.message || body.name)) || '';
+    } catch (e) { /* not JSON; the status carries it */ }
+    return `Resend refused it (${res.status})${detail ? ': ' + String(detail).slice(0, 200) : ''}`;
+  } catch (e) {
+    // A network failure reaching Resend, which is not the same thing as Resend
+    // rejecting the mail and should not read as though it were.
+    return `Could not reach Resend: ${(e && e.message) ? e.message : String(e)}`;
+  }
+}
+
+// Whether this worker can mail somebody who has never heard of it. The admin
+// page asks before offering to send: with only the Email Routing binding every
+// invite to a real person fails, and an error banner on every invite is worse
+// than a copy button that works.
+function mailTransport(env) {
+  if (env && env.RESEND_API_KEY) return 'resend';
+  if (env && env.EMAIL) return 'routing';
+  return 'none';
 }
 
 // An invite comes from invites@, because that is what it is. Everything else,
@@ -4048,6 +4155,7 @@ async function route(request, env, ctx) {
     if (request.method === 'GET'  && path === '/account-invite-info') return handleAccountInviteInfo(request, env);
     if (request.method === 'POST' && path === '/accept-account-invite') return handleAcceptAccountInvite(request, env);
     if (request.method === 'GET'  && path === '/acl-status')      return handleAclStatus(request, env);
+    if (request.method === 'GET'  && path === '/mail-status')     return handleMailStatus(request, env);
     if (request.method === 'GET'  && path === '/d1-status')       return handleD1Status(request, env);
     if (request.method === 'POST' && path === '/d1-backfill')     return handleD1Backfill(request, env);
     if (request.method === 'GET'  && path === '/entitlements')    return handleEntitlements(request, env);
