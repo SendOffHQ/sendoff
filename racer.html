@@ -84,7 +84,7 @@
   .v.ok { color: var(--green); } .v.low { color: var(--yellow); } .v.bad { color: var(--red); }
 
   /* One tap is one serving. Nobody types a number into a phone with cold
-     hands, so the race's shorthand is the whole intake UI here. */
+     hands, so the race's one-tap items are the whole intake UI here. */
   .rchips { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
   .rchip {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -190,7 +190,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=5cea7e32"></script>
+<script src="lib/race-core.js?v=398f589a"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -368,13 +368,22 @@
     if (next.state === 'in-pit') {
       const presets = Race.fuel.presets(cfg);
       const metrics = Race.fuel.metrics(cfg);
-      const usable = presets.filter(p => metrics.some(m => +p.values[m.key]));
-      if (usable.length) {
+      // Every item, including one with no numbers on it: a medicine is logged
+      // by being tapped, not by what it adds.
+      //
+      // The index on the chip is the item's own position in the race config,
+      // because that is what tapPreset looks it up by and what the leg counts
+      // it under. This used to map over a filtered list and hand out that
+      // list's index, which agreed with the real one only for as long as
+      // nothing could ever be filtered out. The moment an item without numbers
+      // could exist, a chip would have logged the wrong thing under the wrong
+      // name.
+      if (presets.length) {
         const leg = (runner.legs || []).find(l => l.index === next.currentLegIndex) || {};
         out.push(`<div class="rblock">
           <span class="rlbl">Log what you took</span>
           <div class="rchips">
-            ${usable.map((p, i) => `<button class="rchip" type="button" data-preset="${i}">
+            ${presets.map((p, i) => `<button class="rchip" type="button" data-preset="${i}">
               <span>+ ${esc(p.name)}<span class="sub">${esc(metrics.filter(m => +p.values[m.key])
                   .map(m => Race.fuel.fmt(m, p.values[m.key]) + ' ' + (m.short || m.label)).join(' · '))}</span></span>
               <span class="cnt">${leg[`preset_${i}`] ? '\u00d7' + leg[`preset_${i}`] : ''}</span>
@@ -430,7 +439,7 @@
 
   // The race clock and the aid timer, in place. Nothing else on the readout
   // changes without a press or a poll, and redrawing it every second would
-  // pull a shorthand chip out from under a thumb that is already on it.
+  // pull an item chip out from under a thumb that is already on it.
   function tickClocks() {
     const clock = document.getElementById('rclock');
     if (clock) {
