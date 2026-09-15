@@ -269,6 +269,26 @@ const server = http.createServer((req, res) => {
     });
   }
 
+  // Enough accounts to have something to search and filter, with the shape the
+  // real endpoint returns: a name off the profile, blank for anybody who has
+  // not filled one in, and the role and plan the filters work on.
+  if (url.pathname === '/api/accounts') {
+    if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+    const mk = (email, name, role, plan, earlyAccess) => ({
+      email, name, role, plan, earlyAccess, source: 'kv', inEnv: false, removable: true
+    });
+    return send(200, JSON.stringify({
+      accounts: [
+        mk('admin@example.com', 'Ada Lovelace', 'admin', 'pro', true),
+        mk('crew@example.com', 'Casey Kim', 'crew', 'pro', true),
+        mk('jason@example.com', 'Jason Dupree', 'crew', 'free', true),
+        mk('nameless@example.com', '', 'crew', 'free', false)
+      ],
+      pendingInvites: [{ token: 'stub-pending', email: 'waiting@example.com',
+                         expiresAt: Date.now() + 14 * 24 * 3600e3 }]
+    }), 'application/json');
+  }
+
   if (url.pathname.startsWith('/api/')) return send(200, '{}', 'application/json');
 
   // --- the site ---
