@@ -1579,12 +1579,44 @@ async function handleAccounts(req, env) {
                              earlyAccess: u.earlyAccess !== false });
       } catch (e) {}
     }
+    // Pending means "this person still has no account", which is the thing an
+    // admin is actually reading this list to learn. It used to mean "a token
+    // row still exists", and those are not the same, so an invite could sit
+    // here as pending against somebody who had been using the hub for a week.
+    //
+    // Every path that accepts an invite does delete its own token, and always
+    // has. What it cannot delete is somebody else's. An account is created by
+    // two endpoints, and each clears only the key it was handed:
+    //
+    //   - accepting an account invite clears its acct: token
+    //   - accepting a race invite clears its invite: token
+    //
+    // So anybody holding both, or holding two account invites because one was
+    // generated twice, ends up with a leftover row naming somebody who has had
+    // an account for a fortnight, and there is no button that makes it go.
+    //
+    // Chasing that by having each accept scan for the other's keys would mean
+    // a KV list on the hot path of somebody signing up, to tidy a display. The
+    // display can just be right instead.
+    //
+    // KV's list being eventually consistent is a separate thing and was
+    // already handled: the get below returns null for a key that is gone, and
+    // the loop skips it. That guard stays, because it is what makes a stale
+    // listing harmless rather than a resurrection.
+    //
+    // The leftover token is harmless and is left to expire on its own rather
+    // than cleaned up here: it carries a KV expiration, and accepting it once
+    // an account exists already answers "just sign in". A listing endpoint
+    // that quietly writes is a worse thing to have than a key that ages out.
     const invites = await env.AUTH_KV.list({ prefix: 'acct:' });
     for (const k of invites.keys) {
       const raw = await env.AUTH_KV.get(k.name);
       if (!raw) continue;
       try {
         const r = JSON.parse(raw);
+        // byEmail holds every account this deployment has, from USERS and from
+        // KV both, and is complete by this point.
+        if (byEmail.has(normalizeEmail(r.email))) continue;
         pendingInvites.push({ token: k.name.slice(5), email: r.email, expiresAt: r.expiresAt || null });
       } catch (e) {}
     }
