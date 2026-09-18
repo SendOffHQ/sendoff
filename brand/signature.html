@@ -1,0 +1,161 @@
+<!-- The email signature for info@ and invites@sendoff.run.
+     A page rather than a snippet in a document, because Gmail's signature box
+     takes rendered content and not markup: there is no way to paste HTML into
+     it. So the signature is rendered here and copied off the page, which is
+     the only route that works.
+
+     Colours are the mail palette from worker/src/worker.js, not the app's:
+     MAIL_INK #121A1F, MAIL_MUTED #7A8D99, MAIL_LINK #0A8B92. A signature that
+     drifts from the invites it is attached to is worse than none.
+
+     Everything inside #sig is inline-styled and table-laid-out on purpose.
+     Gmail strips <style> blocks, classes and most modern CSS; Outlook ignores
+     padding on anything that is not a table cell. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SendOff · email signature</title>
+<link rel="icon" href="sendoff-favicon.svg" type="image/svg+xml">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="../lib/race-theme.css?v=90547f83">
+<style>
+  body { background: var(--bg); color: var(--text); margin: 0;
+         font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  h2 { font-size: 13px; letter-spacing: .14em; text-transform: uppercase;
+       color: var(--text-muted); margin: 32px 0 10px; }
+  p { font-size: 13px; line-height: 1.6; color: var(--text-dim); margin: 0 0 12px; }
+  ol { font-size: 13px; line-height: 1.7; color: var(--text-dim); padding-left: 20px; }
+  li { margin-bottom: 8px; }
+  code { background: var(--bg-elevated); border: 1px solid var(--border);
+         border-radius: 3px; padding: 1px 5px; font-size: 12px; color: var(--accent); }
+  /* The white card is not decoration: a signature is read on a white ground in
+     nearly every client, so this is where it has to be judged. */
+  .stage { background: #FFFFFF; border-radius: 6px; padding: 26px; margin-bottom: 12px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .note { font-size: 11px; color: var(--text-muted); line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Email signature</h1>
+  <p>For <code>info@sendoff.run</code> and <code>invites@sendoff.run</code>.
+     Copy it from here and paste it into Gmail: the signature box takes
+     formatted text, not HTML, so this page is the source.</p>
+
+  <div class="stage">
+    <!-- ==== the signature itself ==== -->
+    <div id="sig">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+             style="border-collapse:collapse;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+        <tr>
+          <td style="padding:0 0 10px">
+            <a href="https://sendoff.run" style="text-decoration:none;border:0">
+              <img src="https://sendoff.run/brand/wordmark-email-light.png"
+                   width="150" height="53" alt="SendOff"
+                   style="display:block;border:0;width:150px;height:auto;color:#121A1F;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:19px;font-weight:700;letter-spacing:-0.4px">
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td style="font-size:13px;line-height:1.5;color:#7A8D99;padding:0 0 10px">
+            Live crew tracking for ultras
+          </td>
+        </tr>
+        <tr>
+          <td style="border-top:1px solid #E3DED2;padding:10px 0 0;font-size:13px;line-height:1.7;color:#7A8D99">
+            <a href="mailto:info@sendoff.run" style="color:#0A8B92;text-decoration:none">info@sendoff.run</a>
+            <span style="color:#C9D1D6"> &nbsp;·&nbsp; </span>
+            <a href="https://sendoff.run" style="color:#0A8B92;text-decoration:none">sendoff.run</a>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <!-- ==== end ==== -->
+  </div>
+
+  <div class="row">
+    <button class="btn primary" type="button" id="copy">Copy the signature</button>
+    <span class="note" id="said"></span>
+  </div>
+  <p class="note" style="margin-top:10px">
+    If the button cannot reach your clipboard, select the signature above with
+    the mouse, from the logo to the last link, and copy it by hand. The result
+    is the same.
+  </p>
+  <p class="note">
+    There is no name on it, because <code>info@</code> is the company and not a
+    person. To sign as yourself, paste it into Gmail and type your name on the
+    line above the tagline, in bold. The logo already says SendOff, so a line
+    of text repeating it is the one thing worth leaving off.
+  </p>
+
+  <h2>Putting it in Gmail</h2>
+  <ol>
+    <li>Copy the signature, above.</li>
+    <li>Gmail &rarr; the gear icon &rarr; <strong>See all settings</strong> &rarr;
+        <strong>General</strong>, and scroll to <strong>Signature</strong>.</li>
+    <li><strong>Create new</strong>, and name it <code>SendOff</code>. The name is
+        only ever seen by you.</li>
+    <li>Click into the box and paste. Do not retype anything: pasting is what
+        carries the logo and the colours.</li>
+    <li>Under <strong>Signature defaults</strong>, change the address dropdown
+        from your own address to <code>info@sendoff.run</code>, then set
+        <strong>FOR NEW EMAILS USE</strong> to <code>SendOff</code>. That
+        dropdown is the whole trick: signatures are per sending address, and
+        setting one while your personal address is selected puts it on your
+        personal mail instead.</li>
+    <li>Repeat that last step for <code>invites@sendoff.run</code> if you send
+        as that too.</li>
+    <li><strong>Save Changes</strong>, at the very bottom of the page.</li>
+  </ol>
+  <p class="note">
+    On replies, consider leaving it as <em>No signature</em>. A thread that
+    repeats the logo on every message reads as a newsletter rather than as a
+    person answering.
+  </p>
+
+  <h2>Before you trust it</h2>
+  <p>Send one to yourself and open it on a phone. Two things to look for: the
+     logo loading at all, since many clients block images until asked, and the
+     whole thing sitting inside the width of the screen. The alt text is styled
+     to fall back to the word SendOff in the right weight, so a blocked image
+     costs the picture and not the name.</p>
+
+<script>
+  // Rich HTML onto the clipboard, which is the only form Gmail's signature box
+  // will take. Same two-step as the branded invite mail in admin.html: the
+  // modern clipboard API, then a selection copy for engines without it.
+  document.getElementById('copy').addEventListener('click', async () => {
+    const html = document.getElementById('sig').innerHTML;
+    const said = document.getElementById('said');
+    const done = (m) => { said.textContent = m; setTimeout(() => { said.textContent = ''; }, 4000); };
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob(['SendOff · Live crew tracking for ultras\ninfo@sendoff.run · https://sendoff.run'],
+                                 { type: 'text/plain' })
+        })]);
+        return done('Copied. Paste it into the signature box.');
+      }
+      throw new Error('no ClipboardItem');
+    } catch (e) {
+      try {
+        const range = document.createRange();
+        range.selectNodeContents(document.getElementById('sig'));
+        const sel = window.getSelection();
+        sel.removeAllRanges(); sel.addRange(range);
+        const ok = document.execCommand('copy');
+        sel.removeAllRanges();
+        done(ok ? 'Copied. Paste it into the signature box.' : 'Could not copy. Select it by hand.');
+      } catch (e2) { done('Could not copy. Select it by hand.'); }
+    }
+  });
+</script>
+</div>
+</body>
+</html>
