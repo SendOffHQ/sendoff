@@ -14,7 +14,15 @@ hand somewhere else.
 | `sendoff-ig-01..06.png` | 1080x1350 | The six-slide intro carousel, 4:5 |
 | `sendoff-story-01..06.png` | 1080x1920 | The same six as stories |
 | `sendoff-pin-1..3-of-3.png` | 1080x1350 | The wordmark split across three profile tiles |
+| `sendoff-announce-logo.png` | 1080x1350 | The wordmark on the gradient, 4:5 |
+| `sendoff-announce-card.png` | 1080x1350 | "Send them out, bring them home.", 4:5 |
 | `_strip.png`, `_pin-sheet.png` | working | The uncut strip and an assembled preview. Not for posting. |
+
+The announce pair has its own source and its own script, `announce.html` and
+`shoot-announce.js`, because `shoot.js` walks a fixed six-slide carousel and
+its story variants. They share `fonts.css`, the colour tokens and the inlined
+wordmark with `ig.html`, which is the point: they get posted alongside that
+carousel, and a lockup that is nearly the same reads as a mistake.
 
 ## Running it
 
@@ -32,19 +40,27 @@ Then:
 cd brand/social
 OUT=$PWD SRC=$PWD/ig.html node shoot.js
 python3 cut.py
+node shoot-announce.js          # the two announce images
 ```
 
 `shoot.js` reads `PLAYWRIGHT_BROWSERS_PATH` the usual way; if Chromium lives
 somewhere Playwright will not find on its own, set `CHROMIUM` to the binary.
 
-Outputs land in the same directory. The fifteen finished images are committed
+Outputs land in the same directory. The seventeen finished images are committed
 so they can be pulled from github.com or from
 `sendoff.run/brand/social/` without a local render; the working files
-(`_strip.png`, `_pin-sheet.png`, previews) are gitignored. Re-run both scripts
-and commit the result after any change to `ig.html`, or the committed images
-stop matching their source.
+(`_strip.png`, `_pin-sheet.png`, previews) are gitignored. Re-run the scripts
+and commit the result after any change to `ig.html` or `announce.html`, or the
+committed images stop matching their source.
 
-## Three things that are not obvious
+## Four things that are not obvious
+
+**Size an inlined wordmark by height, never by width alone.** The SVG carries
+`width="3059" height="1066"` attributes as well as a viewBox. Override only the
+width in CSS and the height attribute stays in force, so the element gets a box
+four times taller than its ink and everything laid out under it is pushed off
+the frame. `ig.html` sets `height` with `width:auto` throughout for this
+reason, and the announce pair does the same.
 
 **The fonts are vendored, and that is deliberate.** `fonts.css` points at
 local `.woff2` files instead of linking Google Fonts. The first build of this

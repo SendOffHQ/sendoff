@@ -1,0 +1,83 @@
+<!-- The two announce images, 4:5 for Instagram.
+     Built on the same tokens, fonts and wordmark as ig.html rather than drawn
+     separately, because these get posted alongside that carousel and a
+     lockup that is nearly the same reads as a mistake.
+
+     a1 is the wordmark on the gradient and nothing else. a2 is the line the
+     site leads with. Both 1080x1350.
+
+     Render with: cd brand/social && node shoot-announce.js
+     See README.md; the note there about vendored fonts applies here too. -->
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="fonts.css">
+<style>
+  :root{
+    --void:#0A0F14; --panel:#121820; --line:#253340;
+    --signal:#0FB8BF; --beam:#5EFDF6; --deep:#0A5F68; --deeper:#083F47;
+    --ink:#F0ECE3; --mute:#7A8D99;
+    --disp:'Barlow Condensed',sans-serif; --mono:'JetBrains Mono',monospace; --body:'IBM Plex Sans',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#000}
+  .slide{
+    width:1080px;height:1350px;position:relative;overflow:hidden;
+    background:var(--void); color:var(--ink); font-family:var(--body);
+    padding:96px 88px; margin-bottom:24px;
+  }
+  /* The carousel's ground, unchanged. */
+  .grad{background:linear-gradient(120deg, var(--deep) 0%, var(--void) 78%)}
+  .glow::before{
+    content:'';position:absolute;inset:0;
+    background:radial-gradient(ellipse 900px 620px at 18% 6%, rgba(15,184,191,.22), transparent 66%);
+    pointer-events:none;
+  }
+  .wm svg{width:auto;display:block;--wm-signal:var(--signal);--wm-letter:var(--ink)}
+
+  /* a1: the mark, centred, with room around it. Nothing else competes, so the
+     wordmark carries the whole frame and the pulse in it is the only motion. */
+  .mark{display:flex;flex-direction:column;align-items:center;justify-content:center;
+        height:100%;gap:20px;text-align:center}
+  /* Sized by height with width auto, the way ig.html does it. Overriding only
+     the width leaves the svg's own height="1066" attribute in force, which
+     gives it a box four times taller than its ink and drops everything below
+     it off the bottom of the frame. */
+  .mark .wm svg{height:286px;width:auto}
+  .mark .url{font-family:var(--mono);font-size:26px;letter-spacing:.3em;
+             text-transform:lowercase;color:var(--mute)}
+
+  /* a2: the line the site leads with, laid out like slide 1 of the carousel. */
+  .card{display:flex;flex-direction:column;justify-content:space-between;height:100%}
+  .kick{font-family:var(--mono);font-size:20px;letter-spacing:.28em;text-transform:uppercase;color:var(--signal)}
+  h1{font-family:var(--disp);font-weight:800;font-size:132px;line-height:.95;letter-spacing:.005em;text-wrap:balance}
+  h1 em{font-style:normal;color:var(--signal)}
+  p.lead{font-size:33px;line-height:1.5;color:var(--ink);opacity:.86;max-width:26ch;margin-top:36px}
+  .mid{flex:1;display:flex;flex-direction:column;justify-content:center}
+  .foot{font-family:var(--mono);font-size:21px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);
+        display:flex;justify-content:space-between;align-items:center}
+  .rule{height:1px;background:linear-gradient(90deg,var(--signal),transparent);margin-bottom:26px}
+</style></head><body>
+
+<section class="slide grad glow" id="a1">
+  <div class="mark">
+    <div class="wm"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" width="3059" height="1066" viewBox="-130 -130 3781.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 544.24 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 489.41 469.6 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></div>
+    <div class="url">sendoff.run</div>
+  </div>
+</section>
+
+<section class="slide grad glow" id="a2">
+  <div class="card">
+    <div class="wm"><svg style="height:74px" role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" width="3059" height="1066" viewBox="-130 -130 3781.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 544.24 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 489.41 469.6 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></div>
+    <div class="mid">
+      <p class="kick">Live crew tracking for ultras</p>
+      <h1>Send them out,<br><em>bring them home.</em></h1>
+      <p class="lead">Race-day crew coordination for ultrarunners. Works with no
+        signal at the aid station, live to everyone watching at home.</p>
+    </div>
+    <div>
+      <div class="rule"></div>
+      <div class="foot"><span>sendoff.run</span><span>Beta</span></div>
+    </div>
+  </div>
+</section>
+
+</body></html>
