@@ -7,7 +7,8 @@ today. Nothing here ships until it moves there.
 
 Status of every item below was checked against the codebase on 2026-09-07 and
 the storage and ordering sections again on 2026-09-08, not from memory. Where
-something is partly there, this says which part.
+something is partly there, this says which part. "Races that were made and
+never run" was added 2026-09-22 and its claims checked the same day.
 
 Sources:
 
@@ -104,6 +105,65 @@ it is a product decision, and "public" may read to a creator as "anyone with the
 link" rather than "listed on the front page". Worth a separate look before there
 are enough races for it to matter, and it does not change the commitment above:
 listed or not, a public race stays readable by anyone forever.
+
+---
+
+## Races that were made and never run — *not built*
+
+Raised 2026-09-22, from a real one. A friend set up the Jr Texas Water Safari,
+the race ran on the 19th, and on the day he did not end up using SendOff. The
+race sits on the hub as a public race with a course, a roster and no splits,
+and nothing about it says so.
+
+At four races that is something somebody notices and mentions. At four hundred
+the front page is mostly races nobody worked, and a visitor's first impression
+of the product is a list of empty ones. This is the separate look the section
+above asks for, arriving earlier than it expected to.
+
+What "never run" means has to be settled before anything can act on it, and
+the data already answers it: a race whose start time has passed and whose
+`data.json` holds no leg carrying a `startTime` or an `endTime` was never
+worked. Cheap to compute, and hard to argue with. A race with two legs logged
+and then abandoned is a different case and probably not one to touch at all.
+
+What to do about it is the open question, in rough order of how much each
+presumes:
+
+- **Drop it from the listing, leave everything else.** Once its day has passed
+  with nothing logged, it stops appearing on the hub. It keeps its link, stays
+  readable, and stops being the front page. Reversible, and it decides nothing
+  on the creator's behalf.
+- **Tell the creator.** One mail a few days after: this one never got used,
+  here is how to unlist it or delete it. Puts the decision with the person
+  whose race it is. Needs the lever below to exist first, or the mail offers
+  something that cannot be done.
+- **A dormant marker on the race itself.** Honest to a visitor who arrives by
+  link, and the most work, since it means designing how an empty race
+  introduces itself.
+
+Nothing here should delete anybody's race on its own. "Every public race stays
+readable, forever" is a promise made two sections up, and a race nobody worked
+is still somebody's race.
+
+### The lever this needs, and it does not exist — *not built*
+
+Acting on any of the above means being able to change a race's visibility
+after it was created, and nothing can. Visibility is set once, at creation, and
+every write after that pins it: `handleCommit` copies the stored value over
+whatever was submitted. That is deliberate and worth keeping as the default,
+because `visibility` is an ACL field and a file write must never move one. The
+settings page has no control for it either, so this is not an oversight in one
+place; it was simply never built.
+
+The consequence, found while trying to unlist exactly the race above: the only
+way to unlist a race today is to delete it and make it again. For a race
+nobody used that costs nothing, and for any race that was worked it is not a
+real option. Whatever moderation ends up looking like, it is built on this.
+
+Two things it has to get right, neither of them hard but both easy to miss:
+the manifest entry has to come out of `races/index.json` in the same operation,
+and an unlisted race's `course.gpx` belongs in R2 rather than in a public
+repository, which is the rule `handleCommit` already applies at creation.
 
 ---
 
