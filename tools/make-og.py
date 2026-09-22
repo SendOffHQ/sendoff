@@ -172,7 +172,12 @@ def wordmark():
                   f'<svg viewBox="{m.group(1)}" role="img" aria-label="SendOff">', svg)
 
 def esc(s):
-    return (str(s).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;'))
+    # Quotes as well as angle brackets. Every use of this sits inside a double
+    # quoted attribute in STUB, on a page served from the apex domain, and a
+    # race name is whatever somebody typed: `The "Big" Race` would close the
+    # attribute, and the character after it decides what that becomes.
+    return (str(s).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                  .replace('"', '&quot;').replace("'", '&#39;'))
 
 def pretty_date(iso):
     if not iso:
@@ -356,9 +361,33 @@ def render(html, out_path):
     im.convert('RGB').save(out_path, optimize=True)
     print(f'  {out_path.relative_to(ROOT)}  {im.size[0]}x{im.size[1]}  ({out_path.stat().st_size} bytes)')
 
+def prune(listed):
+    """Take down the share pages of races that are no longer on the hub.
+
+    A race can be unlisted long after its page was built: the settings page
+    does that now, and the worker deletes both files when it does. This is the
+    same tidy-up from this side, for anything it missed or anything unlisted
+    before there was a control to do it.
+
+    It matters more than housekeeping. races/<slug>/index.html is a static page
+    on Pages: it opens the race without the worker seeing the request, and its
+    preview tags put the race name and the runner's name into any chat window
+    the link is pasted into. test/share-pages.mjs fails while one is there.
+    """
+    races = ROOT / 'races'
+    for d in sorted(races.iterdir()):
+        if not d.is_dir() or d.name in listed:
+            continue
+        for name in ('index.html', 'og.png'):
+            f = d / name
+            if f.exists():
+                f.unlink()
+                print(f'  removed {f.relative_to(ROOT)}  (not on the hub)')
+
 def main():
     ensure_fonts()
     index = json.loads((ROOT / 'races' / 'index.json').read_text())
+    prune({r['slug'] for r in index.get('races', [])})
 
     render(card_html('Send them out', 'Bring them home',
                      'Live crew tracking for ultras · sendoff.run', 'Race hub'),

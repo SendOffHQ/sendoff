@@ -51,6 +51,15 @@ const MEDIA = [];
 // button that could only fail, which is a thing worth being able to ask for.
 let noMail = false;
 
+// Whether the roster names somebody else as the creator, for the check that
+// the creator-only sections stay hidden. And whether a visibility save is
+// refused, for the check that the page says so.
+let notCreator = false;
+let visibilityFails = false;
+// Not on the race at all, which is what a site admin is for a race somebody
+// else made: the config comes back with no role and the roster is refused.
+let notOnRace = false;
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const send = (code, body, type) => {
@@ -114,8 +123,13 @@ const server = http.createServer((req, res) => {
     // role.
     if (m[2] === 'config.json') {
       const cfg = JSON.parse(text);
+      // The role the real worker works out from createdBy and the roster, not
+      // a fixed one. It used to be 'crew' for everybody, which made the
+      // fixture's own creator a crew member on their own race and hid every
+      // creator-only section on the settings page from the tests.
+      const mine = String(cfg.createdBy || '').toLowerCase() === ME && !notCreator;
       delete cfg.people; delete cfg.createdBy;
-      cfg.myRole = signedIn ? 'crew' : null;
+      cfg.myRole = (signedIn && !notOnRace) ? (mine ? 'owner' : 'crew') : null;
       // The dry run predates the activity field; give it one here so the
       // browser check can see the label render.
       if (!cfg.activity) cfg.activity = 'trail-run';
@@ -288,6 +302,60 @@ const server = http.createServer((req, res) => {
                          expiresAt: Date.now() + 14 * 24 * 3600e3 }]
     }), 'application/json');
   }
+
+  // The roster, which is also how a page learns who made the race: the config
+  // in a public repository no longer names anybody. Manage access and the two
+  // creator-only sections beside it all hang off this answer.
+  if (url.pathname === '/api/access') {
+    if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+    const slug = url.searchParams.get('slug') || '';
+    if (!slug) return send(400, '{"error":"Missing slug"}', 'application/json');
+    // The real worker refuses the roster to anybody who cannot write the race,
+    // site admin or not: it is a list of addresses.
+    if (notOnRace) return send(403, '{"error":"Not allowed"}', 'application/json');
+    return send(200, JSON.stringify({
+      slug,
+      createdBy: notCreator ? 'someone.else@example.com' : ME,
+      createdByName: notCreator ? 'Someone Else' : 'Casey Kim',
+      teamCanInvite: false,
+      canManageAccess: true,
+      people: [{ email: ME, role: 'owner', displayName: 'Casey Kim' }],
+      editors: [], viewers: [], shareLinks: [], pendingInvites: []
+    }), 'application/json');
+  }
+  // What the page asks for when somebody who is not the creator opens it, so
+  // a test can check that the creator-only sections are not there.
+  if (url.pathname === '/api/not-creator') { notCreator = true; return send(200, '{"ok":true}'); }
+  if (url.pathname === '/api/not-on-race') { notCreator = true; notOnRace = true; return send(200, '{"ok":true}'); }
+
+  // Moving a race on or off the hub. Held in memory like a commit, so the
+  // config read that follows a save sees what the save did.
+  if (url.pathname === '/api/race/visibility') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+      let j; try { j = JSON.parse(body); } catch (e) { return send(400, '{"error":"Invalid JSON"}', 'application/json'); }
+      const want = j && j.visibility;
+      if (want !== 'public' && want !== 'private') {
+        return send(400, '{"error":"visibility must be \\"public\\" or \\"private\\""}', 'application/json');
+      }
+      if (visibilityFails) return send(403, '{"error":"Only the race creator can change who can see it"}', 'application/json');
+      const path = `races/${j.slug}/config.json`;
+      const text = fileAt(path);
+      if (text) {
+        const cfg = JSON.parse(text);
+        const changed = cfg.visibility !== want;
+        cfg.visibility = want;
+        WRITTEN.set(path, JSON.stringify(cfg, null, 2) + '\n');
+        return send(200, JSON.stringify({ slug: j.slug, visibility: want, changed,
+          manifestErr: null, courseErr: null, shareErr: null }), 'application/json');
+      }
+      send(404, '{"error":"Race not found"}', 'application/json');
+    });
+  }
+  // Makes the next visibility save fail, for the half-done path.
+  if (url.pathname === '/api/visibility-fails') { visibilityFails = true; return send(200, '{"ok":true}'); }
 
   if (url.pathname.startsWith('/api/')) return send(200, '{}', 'application/json');
 

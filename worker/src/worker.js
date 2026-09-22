@@ -42,6 +42,7 @@
 //     GET  /my-races                                                   → { races: [...] }
 //     GET  /next-race-id                                               → { id: "000042" }
 //     POST /race/delete      { slug }                                  → { ok, deleted } (creator only)
+//     POST /race/visibility  { slug, visibility }                      → { slug, visibility, changed } (creator or admin)
 //
 //   Misc
 //     GET  /health                                                     → { ok: true }
@@ -3992,6 +3993,425 @@ async function handleMyRaces(req, env) {
   return json({ races: [...annotated, ...privateAccessible] }, {}, env, req);
 }
 
+// ---------- changing who can see a race ----------
+// Visibility was settable once, at creation, and pinned by handleCommit on
+// every write afterwards. That pin is right and stays: `visibility` is an ACL
+// field, and a file write must never be able to move one. What was missing was
+// a door, so the only way to unlist a race was to delete it and make it again,
+// which for a race anybody had actually worked was no option at all.
+//
+// This is the door. It is narrow on purpose: it reads the stored config,
+// changes exactly one field, and writes it back. Nothing the caller sends ever
+// reaches the stored document, so there is no shape of request that can move a
+// second field through here.
+
+// The stored config row and the token a write has to echo. Its own read rather
+// than readFromD1, which is gated on READ_FROM_D1: what decides where a write
+// goes is WRITE_TO_GIT, and reading the wrong store here would mean writing
+// with a version token the authority has never heard of.
+async function d1ConfigRow(env, slug) {
+  if (!env.DB || !slug) return null;
+  try {
+    const r = (await env.DB.prepare(
+      'SELECT config, config_sha FROM races WHERE slug = ?').bind(slug).all()).results[0];
+    if (!r || !r.config || r.config === '{}' || !r.config_sha) return null;
+    return { text: r.config, sha: r.config_sha };
+  } catch (e) { return null; }
+}
+
+// Read, change, write, through whichever store is the authority, retrying on a
+// conflict the way every other mutator here does.
+async function mutateStoredRaceConfig(env, slug, mutate, message, actor) {
+  const path = `races/${slug}/config.json`;
+  let lastErr = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (!gitWrites(env)) {
+      const row = await d1ConfigRow(env, slug);
+      if (row) {
+        let cfg = null;
+        try { cfg = JSON.parse(row.text); } catch (e) { cfg = null; }
+        if (cfg) {
+          const next = mutate(cfg) || cfg;
+          const failed = await commitToD1(
+            env, path, JSON.stringify(next, null, 2) + '\n', actor, row.sha);
+          if (!failed) { await purgeReadCache(env, path); return next; }
+          if (failed.status !== 409) throw new Error(failed.error);
+          lastErr = new Error(failed.error);
+          continue;   // somebody else wrote between the read and the write
+        }
+      }
+      // No row: a race made before the mirror. It is in git, and git is where
+      // this has to go, flag or no flag.
+    }
+    const r = await githubGetJson(env, path);
+    if (r.missing) throw new Error(`Race not found: ${slug}`);
+    const next = mutate(r.data) || r.data;
+    try {
+      const put = await githubPutJson(env, path, next, r.sha, message, actor);
+      // The mirror, last and best-effort, exactly as handleCommit does it: git
+      // has taken the write and it is true whatever happens here. Without it a
+      // deployment that still writes git would leave the row behind, and the
+      // visibility column on that row is what the hub filters on.
+      try {
+        await mirrorToD1(env, path, JSON.stringify(next, null, 2) + '\n', actor,
+          ((put && put.content) || {}).sha || null);
+      } catch (e) { /* the admin page is what says the two disagree */ }
+      await purgeReadCache(env, path);
+      return next;
+    } catch (err) {
+      lastErr = err;
+      if (!/\b409\b/.test(err.message)) throw err;
+    }
+  }
+  throw lastErr || new Error('Too many conflicts changing that race');
+}
+
+// The course follows the visibility, because it is the one file that would
+// otherwise stay published. A GPX is a list of coordinates and the most
+// revealing file a race has; leaving it in a public repository for a race
+// somebody just took off the hub would make the unlisting a lie.
+//
+// Returns null when it is done, or a reason. A race with no course at all is
+// done: there is nothing to move and that is not a failure.
+// The two raw-file git calls the moves below need. Not githubPutJson, which
+// serializes an object; these carry a GPX and an HTML page.
+const ghUrl = (env, path) =>
+  `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURI(path)}`;
+const ghHeaders = (env) => ({
+  Authorization: `token ${env.GITHUB_TOKEN}`,
+  Accept: 'application/vnd.github.v3+json',
+  'Content-Type': 'application/json',
+  'User-Agent': 'race-dashboard-proxy'
+});
+async function gitPutRaw(env, path, text, message, sha) {
+  const body = { message: commitMessage(message), branch: env.GITHUB_BRANCH || 'main',
+                 content: utf8ToBase64(text) };
+  if (sha) body.sha = sha;
+  const res = await fetch(ghUrl(env, path),
+    { method: 'PUT', headers: ghHeaders(env), body: JSON.stringify(body) });
+  await purgeReadCache(env, path);
+  return res;
+}
+async function gitDeleteRaw(env, path, sha, message) {
+  const res = await fetch(ghUrl(env, path), {
+    method: 'DELETE', headers: ghHeaders(env),
+    body: JSON.stringify({ message: commitMessage(message), sha,
+                           branch: env.GITHUB_BRANCH || 'main' })
+  });
+  await purgeReadCache(env, path);
+  return res;
+}
+
+async function moveCourseForVisibility(env, slug, want, actor) {
+  const path = `races/${slug}/course.gpx`;
+  const key = `course/${slug}/course.gpx`;
+
+  if (want === 'private') {
+    const res = await githubGet(env, path);
+    if (res.status === 404) return null;
+    if (!res.ok) return `could not read the course (${res.status})`;
+    if (!env.MEDIA) return 'an unlisted race needs the media bucket for its course';
+    let j;
+    try { j = await res.json(); } catch (e) { return 'the course came back unreadable'; }
+    // GitHub's contents API stops inlining a blob over a megabyte: it answers
+    // with an empty body and encoding "none". A detailed GPX can be that big,
+    // and without this the copy would be an empty file and the delete below
+    // would then destroy the only real one.
+    if (j.encoding !== 'base64' || !j.content) {
+      return 'the course is too large to move automatically, so it is still in the repo';
+    }
+    await env.MEDIA.put(key, base64ToUtf8(j.content),
+      { httpMetadata: { contentType: 'application/gpx+xml' } });
+    // Only after the copy has landed. The other order loses the course
+    // outright if the bucket write fails.
+    const del = await gitDeleteRaw(env, path, j.sha,
+      `hub: unlist ${slug}, course out of the repo`);
+    // The copy is safe either way, so a failed delete is worth saying and not
+    // worth failing over: the race is unlisted and the file is a leftover.
+    return del.ok ? null : `the course is in private storage but the old copy is still in the repo`;
+  }
+
+  // Going public. The course comes back to git so a spectator with no account
+  // gets the map off Pages without a round trip through the worker.
+  if (!env.MEDIA) return null;
+  let obj = null;
+  try { obj = await env.MEDIA.get(key); } catch (e) { return 'could not read the stored course'; }
+  if (!obj) return null;
+  const text = await obj.text();
+  const res = await gitPutRaw(env, path, text, `hub: list ${slug}, course into the repo`);
+  if (!res.ok) return `could not publish the course (${res.status})`;
+  try { await env.MEDIA.delete(key); } catch (e) { /* a leftover object, not a failure */ }
+  return null;
+}
+
+// The share page, and the reason unlisting is not finished without it.
+//
+// tools/make-og.py builds one per public race: races/<slug>/index.html, which
+// carries that race's preview tags and forwards into the app, and og.png, the
+// card those tags point at. Both are static files on Pages, so they answer
+// without the worker ever seeing the request. An "unlisted" race that still
+// has an index.html is not unlisted: the address still opens, the preview card
+// still renders the race name and the runner's name in a chat window, and the
+// only thing the unlisting actually did was take it off a list.
+//
+// Listing puts the page back, because the hub links to /races/<slug>/ and a
+// race listed without one is a card that 404s. Not the card image: nothing
+// here can render a PNG. That is the share-cards workflow's job, and it is
+// already triggered by the manifest write this makes a moment earlier, so the
+// page written here is what stands for the minute or two until the real card
+// lands. test/share-pages.mjs is what says so if it never does.
+//
+// The template below is tools/make-og.py's STUB. Two copies of one page in two
+// languages is a thing that drifts, so test/share-pages.mjs holds them
+// together; change one and that test names the other.
+function sharePageHtml(env, slug, cfg) {
+  const base = (env.PUBLIC_BASE_URL || 'https://sendoff.run').replace(/\/+$/, '');
+  // Quotes as well as angle brackets. Every use below sits inside a double
+  // quoted attribute on a page served from the apex domain, and a race name is
+  // whatever somebody typed: `The "Big" Race` would close the attribute, and
+  // the character after it decides what that becomes.
+  const esc = (v) => String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const day = (iso) => {
+    const t = iso ? new Date(iso) : null;
+    if (!t || isNaN(t)) return String(iso || '').slice(0, 10);
+    return t.toLocaleDateString('en-US',
+      { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  };
+  // The slug goes into attributes and into the redirect below, so it is
+  // escaped too. The endpoint only accepts a slug of letters, digits and
+  // dashes, which is what every slug the wizard makes is, so this never has
+  // anything to do; it is here because the redirect is a JavaScript string
+  // literal and HTML escaping would not save that one on its own.
+  slug = esc(slug);
+  const names = (cfg.runners || []).map(r => r.name).filter(Boolean);
+  const meta = [day(cfg.startTime), cfg.location || '', names.join(' · ')]
+    .filter(Boolean).join(' · ');
+  const title = esc(cfg.name || slug);
+  const desc = esc(meta ? `${meta}: follow live on SendOff.` : 'Follow live on SendOff.');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${title} · SendOff</title>
+<meta name="theme-color" content="#0a0f14">
+<meta name="description" content="${desc}">
+<link rel="canonical" href="${base}/races/${slug}/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SendOff">
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${desc}">
+<meta property="og:url" content="${base}/races/${slug}/">
+<meta property="og:image" content="${base}/races/${slug}/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="${title}: follow live on SendOff">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${desc}">
+<meta name="twitter:image" content="${base}/races/${slug}/og.png">
+<link rel="icon" href="/brand/sendoff-favicon.svg" type="image/svg+xml">
+<link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="SendOff">
+<style>
+  html,body{margin:0;height:100%;background:#0A0F14;color:#F0ECE3;
+    font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif}
+  main{height:100%;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:14px;text-align:center;padding:24px}
+  a{color:#0FB8BF}
+</style>
+<script>
+  // Forward into the app, carrying any share token through untouched.
+  var q = location.search.replace(/^\?/, '');
+  location.replace('/race.html?id=${slug}' + (q ? '&' + q : '') + location.hash);
+</script>
+</head>
+<body>
+<main>
+  <p>Opening ${title}…</p>
+  <p><a href="/race.html?id=${slug}">Continue to the race &rarr;</a></p>
+</main>
+</body>
+</html>
+`;
+}
+
+// Returns null when it is done, or a reason. Like the course, a page that was
+// never built is not a failure: there is nothing to take down.
+async function moveSharePageForVisibility(env, slug, want, cfg, actor) {
+  const stub = `races/${slug}/index.html`;
+  const card = `races/${slug}/og.png`;
+
+  if (want === 'private') {
+    const left = [];
+    for (const path of [stub, card]) {
+      const res = await githubGet(env, path);
+      if (res.status === 404) continue;
+      if (!res.ok) { left.push(path); continue; }
+      let j;
+      try { j = await res.json(); } catch (e) { left.push(path); continue; }
+      const del = await gitDeleteRaw(env, path, j.sha,
+        `hub: unlist ${slug}, share page off the site`);
+      if (!del.ok) left.push(path);
+    }
+    // Named, because what is left is a page that still opens the race.
+    return left.length ? `the share page is still published (${left.join(', ')})` : null;
+  }
+
+  // Going public. Written even if one is already there: the name, the date or
+  // the roster may have changed while the race was off the hub, and the page
+  // carries all three.
+  const existing = await githubGet(env, stub);
+  let sha = null;
+  if (existing.ok) { try { sha = (await existing.json()).sha; } catch (e) { sha = null; } }
+  const res = await gitPutRaw(env, stub, sharePageHtml(env, slug, cfg),
+    `hub: list ${slug}, share page back on the site`, sha);
+  if (!res.ok) return `could not publish the share page (${res.status})`;
+  return null;
+}
+
+// What the hub lists for a public race. The same fields the wizard writes, so
+// a race listed from here is indistinguishable from one listed at creation.
+function manifestEntry(slug, cfg) {
+  const crs = cfg.course || {};
+  // Same reading as Race.course.totalDistanceMi: a loop described by its aid
+  // stations has no loopDistanceMi, and taking that at face value would list
+  // the race at zero miles.
+  const sum = (xs) => (xs || []).reduce((a, x) => a + (x.distanceMi || 0), 0);
+  const loopMi = sum(crs.loopSegments) || (crs.loopDistanceMi || 0);
+  const total = cfg.courseType === 'loops'
+    ? +((crs.loopCount || 0) * loopMi).toFixed(2)
+    : +sum(crs.segments).toFixed(2);
+  const entry = {
+    slug,
+    name: cfg.name,
+    location: cfg.location,
+    startTime: cfg.startTime,
+    courseType: cfg.courseType,
+    units: cfg.units,
+    activity: cfg.activity,
+    totalDistanceMi: total,
+    runnerNames: (cfg.runners || []).map(r => r.name),
+    cutoffHours: (cfg.cutoffs && cfg.cutoffs.totalHours) || null
+  };
+  // Absent rather than null, to match what the wizard writes.
+  for (const k of Object.keys(entry)) if (entry[k] === undefined) delete entry[k];
+  return entry;
+}
+
+async function handleRaceVisibility(req, env, ctx) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+
+  let body;
+  try { body = await req.json(); }
+  catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+
+  // The shape every slug the wizard makes has. Stricter than the path checks
+  // the other race endpoints do, because this one writes the slug into an HTML
+  // page and into a JavaScript string on it.
+  const slug = clip(body && body.slug, 200);
+  if (!slug || !/^[a-z0-9][a-z0-9-]*$/i.test(slug)) {
+    return json({ error: 'Missing or invalid slug' }, { status: 400 }, env, req);
+  }
+  const want = body && body.visibility;
+  if (want !== 'public' && want !== 'private') {
+    return json({ error: 'visibility must be "public" or "private"' }, { status: 400 }, env, req);
+  }
+
+  const raceCfg = await loadRaceConfigNow(env, slug);
+  if (!raceCfg) return json({ error: 'Race not found' }, { status: 404 }, env, req);
+
+  // The creator, or a site admin. Creator is the same bar as deleting and a
+  // stricter one than editing: an editor was invited to help run a race, not to
+  // decide who may see it.
+  //
+  // Admins are here because this is also the moderation lever. A race set up
+  // and then never run sits on the public hub forever with nothing behind it,
+  // and the person who made it has by definition stopped paying attention: if
+  // only they could take it down, nobody ever would. Deleting stays
+  // creator-only, because that destroys somebody's race and this does not.
+  const isCreator = !!raceCfg.createdBy &&
+    normalizeEmail(raceCfg.createdBy) === normalizeEmail(session.email);
+  const asAdmin = !isCreator && session.role === 'admin';
+  if (!isCreator && !asAdmin) {
+    return json({ error: 'Only the race creator can change who can see it' },
+      { status: 403 }, env, req);
+  }
+
+  const now = String(raceCfg.visibility || 'public');
+  if (now === want) {
+    return json({ slug, visibility: want, changed: false }, {}, env, req);
+  }
+
+  // The same gate creation applies, against the race owner rather than the
+  // caller. Not applied to an admin taking a race down: an owner's plan is a
+  // reason they cannot hide their own race, never a reason a dead race has to
+  // stay on the hub.
+  if (want === 'private' && !asAdmin) {
+    const ent = await raceOwnerEntitlements(env, raceCfg);
+    if (!ent.privateRaces) {
+      return json({
+        error: `Unlisted races are a Pro feature. You are on the ${PLANS[ent.plan].label} plan.`,
+        code: 'plan_limit', limit: 'privateRaces', plan: ent.plan
+      }, { status: 402 }, env, req);
+    }
+  }
+
+  // The config first. Everything below is about where a race is advertised;
+  // this is the fact the rest of the worker reads, and nothing else should
+  // move until it has.
+  try {
+    await mutateStoredRaceConfig(env, slug, (cfg) => {
+      cfg.visibility = want;
+      return cfg;
+    }, `hub: ${want === 'private' ? 'unlist' : 'list'} race ${slug}`, session.email);
+  } catch (err) {
+    return json({ error: `Could not change the race: ${err.message || err}` },
+      { status: 502 }, env, req);
+  }
+
+  // Then the manifest, which is what the hub and every share card read.
+  let manifestErr = null;
+  try {
+    await mutateJsonAt(env, 'races/index.json', (data) => {
+      const out = data && Array.isArray(data.races) ? data : { races: [] };
+      out.races = (out.races || []).filter(r => r.slug !== slug);
+      if (want === 'public') out.races.push(manifestEntry(slug, raceCfg));
+      out.lastUpdated = new Date().toISOString();
+      return out;
+    }, `hub: ${want === 'private' ? 'unregister' : 'register'} race ${slug}`,
+       session.email, 'empty');
+  } catch (e) {
+    manifestErr = e.message || String(e);
+  }
+
+  // Both of these return a reason rather than throwing, and both are wrapped
+  // anyway: a bucket or a network that fails in a way neither anticipated must
+  // not turn a config change that already landed into a 500 the caller reads
+  // as "nothing happened".
+  let courseErr = null, shareErr = null;
+  try { courseErr = await moveCourseForVisibility(env, slug, want, session.email); }
+  catch (e) { courseErr = `could not move the course: ${e.message || e}`; }
+  try { shareErr = await moveSharePageForVisibility(env, slug, want, raceCfg, session.email); }
+  catch (e) { shareErr = `could not move the share page: ${e.message || e}`; }
+
+  // Reported rather than thrown. The race has changed, and an operator being
+  // told which half did not finish can act on it; a 500 that hides a completed
+  // config write cannot be acted on at all.
+  return json({
+    slug, visibility: want, changed: true,
+    manifestErr: manifestErr || null,
+    courseErr: courseErr || null,
+    shareErr: shareErr || null
+  }, {}, env, req);
+}
+
 // ---------- race deletion ----------
 // Deleting is creator-only, deliberately stricter than editing. An editor was
 // invited to help run a race, not to destroy one; the person who made it is the
@@ -4223,6 +4643,7 @@ async function route(request, env, ctx) {
     if (request.method === 'GET'  && path === '/account-invite-info') return handleAccountInviteInfo(request, env);
     if (request.method === 'POST' && path === '/accept-account-invite') return handleAcceptAccountInvite(request, env);
     if (request.method === 'GET'  && path === '/acl-status')      return handleAclStatus(request, env);
+    if (request.method === 'POST' && path === '/race/visibility') return handleRaceVisibility(request, env, ctx);
     if (request.method === 'GET'  && path === '/mail-status')     return handleMailStatus(request, env);
     if (request.method === 'GET'  && path === '/d1-status')       return handleD1Status(request, env);
     if (request.method === 'POST' && path === '/d1-backfill')     return handleD1Backfill(request, env);

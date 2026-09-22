@@ -162,10 +162,14 @@ await page.goto(BASE + '/app/');
 await page.waitForTimeout(2000);
 ok('the service worker is in charge',
   await page.evaluate(() => !!navigator.serviceWorker.controller), true);
+// Owner rather than crew: this account made the fixture race, and the stub
+// works the role out from createdBy the way the worker does instead of handing
+// everybody 'crew'. What is being checked is that a writing role survived the
+// round trip, not which one.
 ok('and the saved config still knows the role', await page.evaluate((s) => {
   const r = JSON.parse(localStorage.getItem('so:seen:' + s + ':config.json') || 'null');
   return r && JSON.parse(r.text).myRole;
-}, SLUG), 'crew');
+}, SLUG), 'owner');
 
 // The pit board polls every ten seconds and rebuilds every card's innerHTML.
 // That used to throw away whatever was half typed, and because an empty box

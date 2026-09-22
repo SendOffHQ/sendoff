@@ -145,25 +145,37 @@ Nothing here should delete anybody's race on its own. "Every public race stays
 readable, forever" is a promise made two sections up, and a race nobody worked
 is still somebody's race.
 
-### The lever this needs, and it does not exist — *not built*
+### The lever this needs — *built 2026-09-22*
 
 Acting on any of the above means being able to change a race's visibility
-after it was created, and nothing can. Visibility is set once, at creation, and
-every write after that pins it: `handleCommit` copies the stored value over
-whatever was submitted. That is deliberate and worth keeping as the default,
-because `visibility` is an ACL field and a file write must never move one. The
-settings page has no control for it either, so this is not an oversight in one
-place; it was simply never built.
+after it was created, and until this nothing could. Visibility was set once, at
+creation, and every write after that pinned it: `handleCommit` copies the
+stored value over whatever was submitted. That is deliberate and stays the
+default, because `visibility` is an ACL field and a file write must never move
+one. So the lever is a path of its own: `POST /race/visibility`, which reads
+the stored config and changes exactly that one field, and a "Who can find this
+race" section on the settings page beside Delete.
 
-The consequence, found while trying to unlist exactly the race above: the only
-way to unlist a race today is to delete it and make it again. For a race
-nobody used that costs nothing, and for any race that was worked it is not a
-real option. Whatever moderation ends up looking like, it is built on this.
+Who may pull it: the race's creator, or a site admin. Admins are on it because
+this is the moderation lever, and the person who set up a race and never ran it
+is by definition the person who has stopped looking at it. Deleting stays
+creator-only, because that destroys somebody's race and this does not.
 
-Two things it has to get right, neither of them hard but both easy to miss:
-the manifest entry has to come out of `races/index.json` in the same operation,
-and an unlisted race's `course.gpx` belongs in R2 rather than in a public
-repository, which is the rule `handleCommit` already applies at creation.
+Three things it had to get right, the third of which was nearly missed:
+
+- the manifest entry comes out of `races/index.json` in the same operation
+- the `course.gpx` moves to R2, which is the rule `handleCommit` already
+  applies at creation: a GPX is the most revealing file a race has
+- **the share page goes too.** `races/<slug>/index.html` and its `og.png` are
+  static files on Pages. They answer without the worker seeing the request, so
+  an "unlisted" race that still has one still opens by link and still renders
+  the race name and the runner's name in any chat window the link is pasted
+  into. Unlisting it in the manifest alone would have looked done and been a
+  lie. `tools/make-og.py` now takes down stale pages from its side too.
+
+What is still not built is everything above this line: nothing detects a race
+that was never run, and nothing tells its creator. The lever exists; the hand
+on it is still a person.
 
 ---
 

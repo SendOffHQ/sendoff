@@ -60,8 +60,11 @@ jobs:
         run: python3 tools/make-og.py
 
       # Nothing to say when nothing changed, which is most runs: the manifest
-      # also moves when a race is deleted, and a delete removes a card rather
-      # than needing one drawn.
+      # also moves when a race is deleted or unlisted, and both take a card
+      # down rather than needing one drawn. The worker already removes the page
+      # and the card when it unlists a race, so make-og.py's prune usually
+      # finds nothing left to do; it is here for anything the worker missed and
+      # for races unlisted before there was a control for it.
       - name: Commit them
         id: commit
         run: |

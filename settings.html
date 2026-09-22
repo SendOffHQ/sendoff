@@ -402,6 +402,17 @@
   <div class="access-body" id="access-body"></div>
 </section>
 
+<!-- Above Delete and below Manage access, because it is the other decision
+     about the race as a public thing rather than a setting the crew adjusts.
+     Collapsed for the same reason: taking a race off the hub is deliberate. -->
+<section class="editor collapsed" id="visibility-editor" style="display:none;">
+  <div class="editor-head" id="visibility-editor-head">
+    <div class="editor-title">Who can find this race</div>
+    <span class="editor-toggle">Open</span>
+  </div>
+  <div class="editor-body" id="visibility-editor-body"></div>
+</section>
+
 <!-- Directly under Manage access, and inside the wrapper. Outside it, this ran
      the full width of the window and sat below the footer. Collapsed, because
      deleting is not an access control and it is the one thing on this page that
@@ -423,7 +434,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=398f589a"></script>
+<script src="lib/race-core.js?v=f7697260"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -607,6 +618,8 @@
   // creator, so this cannot be read off cfg. Called again from onRosterChanged
   // because the panel only knows once its own fetch has landed.
   let deleteMounted = false;
+  let visibilityMounted = false;
+  let visibilityPanel = null;
   function maybeShowDeleteSection() {
     const sec = document.getElementById('delete-editor');
     if (!sec || !cfg) return;
@@ -617,6 +630,28 @@
         slug, cfg: () => cfg, data: () => data
       });
       deleteMounted = true;
+    }
+
+    // Nearly the same gate. A site admin sees this one and not Delete, because
+    // this is the moderation lever: a race set up and never run sits on the
+    // public hub with nothing behind it, and the person who made it has
+    // stopped looking. Taking it off the hub is reversible and destroys
+    // nothing, which is what makes it theirs to do and deleting not.
+    const canMove = mine || Race.auth.isAdmin();
+    const vis = document.getElementById('visibility-editor');
+    if (vis) {
+      vis.style.display = canMove ? '' : 'none';
+      if (canMove && !visibilityMounted) {
+        visibilityPanel = Race.access.mountVisibility(
+          document.getElementById('visibility-editor-body'), {
+            slug, cfg: () => cfg
+          });
+        visibilityMounted = true;
+      } else if (canMove && visibilityPanel) {
+        // A reload after a save brings a fresh cfg; the select should show
+        // what the race now is, not what it was when the panel was built.
+        visibilityPanel.redraw();
+      }
     }
   }
 
@@ -1336,6 +1371,9 @@
 
   document.getElementById('delete-editor-head').addEventListener('click', () => {
     document.getElementById('delete-editor').classList.toggle('collapsed');
+  });
+  document.getElementById('visibility-editor-head').addEventListener('click', () => {
+    document.getElementById('visibility-editor').classList.toggle('collapsed');
   });
   document.getElementById('race-editor-head').addEventListener('click', () => {
     document.getElementById('race-editor').classList.toggle('collapsed');
