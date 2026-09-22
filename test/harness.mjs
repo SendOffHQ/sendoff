@@ -59,6 +59,9 @@ let visibilityFails = false;
 // Not on the race at all, which is what a site admin is for a race somebody
 // else made: the config comes back with no role and the roster is refused.
 let notOnRace = false;
+// An account with no Pro entitlements, for the screens that have to say so
+// before somebody presses something that cannot work.
+let freePlan = false;
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
@@ -327,6 +330,19 @@ const server = http.createServer((req, res) => {
   // a test can check that the creator-only sections are not there.
   if (url.pathname === '/api/not-creator') { notCreator = true; return send(200, '{"ok":true}'); }
   if (url.pathname === '/api/not-on-race') { notCreator = true; notOnRace = true; return send(200, '{"ok":true}'); }
+
+  // What the plan allows. The default is the generous answer, which is what
+  // every account actually gets today: DEFAULT_PLAN is pro, and early access
+  // grandfathers the two things Free does not have.
+  if (url.pathname === '/api/entitlements') {
+    if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+    return send(200, JSON.stringify(freePlan
+      ? { plan: 'free', label: 'Free', maxRunnersPerRace: 1, maxCrewPerRace: 2,
+          privateRaces: false, shareLinks: false, offlineLogging: true }
+      : { plan: 'pro', label: 'Pro', maxRunnersPerRace: null, maxCrewPerRace: null,
+          privateRaces: true, shareLinks: true, offlineLogging: true }), 'application/json');
+  }
+  if (url.pathname === '/api/free-plan') { freePlan = true; return send(200, '{"ok":true}'); }
 
   // Moving a race on or off the hub. Held in memory like a commit, so the
   // config read that follows a save sees what the save did.

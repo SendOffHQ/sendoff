@@ -136,6 +136,54 @@ await page.waitForTimeout(600);
 ok('the page says why', (await err() || '').includes('creator'), true);
 ok('and the button does not claim it saved', await btnText(), 'Save');
 
+// The refusal used to arrive at the press, as a 402 rendered in the panel.
+// Greyed out with the reason up front is better: nobody reaches for something
+// that cannot work, and the one-way door gets named before they walk through
+// it rather than after.
+//
+// Nobody is actually on this footing today. DEFAULT_PLAN is pro and early
+// access grandfathers private races, so the gate only bites an account
+// deliberately set to Free with early access off.
+console.log('\na race whose owner cannot have an unlisted one');
+await page.evaluate(base => fetch(base + '/api/free-plan'), BASE);
+await page.goto(BASE + `/settings.html?id=${SLUG}`);
+await page.waitForSelector('#visibility-editor-head', { timeout: 20000 });
+await page.click('#visibility-editor-head');
+await page.waitForFunction(() => {
+  const o = document.querySelector('#ax-vis option[value="private"]');
+  return o && o.disabled;
+}, { timeout: 10000 }).catch(() => {});
+ok('the control is still there', await shown(), true);
+ok('unlisted cannot be chosen', await page.evaluate(() =>
+  document.querySelector('#ax-vis option[value="private"]').disabled), true);
+ok('listing it is not gated', await page.evaluate(() =>
+  document.querySelector('#ax-vis option[value="public"]').disabled), false);
+const note = await page.evaluate(() => {
+  const n = [...document.querySelectorAll('#visibility-editor-body .access-help')]
+    .map(e => e.textContent.trim()).find(t => /Pro/.test(t));
+  return n || null;
+});
+ok('and the reason is up front', /Pro feature/.test(note || ''), true);
+ok('naming the plan it is on', /Free plan/.test(note || ''), true);
+
+// The other branch, and the trap the whole warning exists for: a race that is
+// already unlisted on a plan that cannot unlist one. The worker will take it
+// public and then refuse to give it back, so that has to be said before the
+// press and not after. Driven on a panel of its own, because the fixture race
+// is listed by this point in the run.
+ok('a race already unlisted is warned it is a one-way door', await page.evaluate(async () => {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  Race.access.mountVisibility(host, { slug: 'scratch', cfg: () => ({ visibility: 'private' }) });
+  for (let i = 0; i < 40 && !/Pro/.test(host.textContent); i++) {
+    await new Promise(r => setTimeout(r, 25));
+  }
+  const text = host.textContent;
+  const stillChoosable = !host.querySelector('#ax-vis option[value="private"]').disabled;
+  host.remove();
+  return [/cannot be undone/.test(text), stillChoosable];
+}), [true, true]);
+
 console.log('\nsomebody who did not make the race');
 await page.evaluate(base => fetch(base + '/api/not-creator'), BASE);
 await page.goto(BASE + `/settings.html?id=${SLUG}`);
@@ -161,6 +209,12 @@ await page.waitForTimeout(1200);
 ok('can take it off the hub', await shown(), true);
 ok('but still cannot delete it', await page.evaluate(() =>
   document.getElementById('delete-editor').style.display), 'none');
+// The free plan is still switched on from the section above, and an admin is
+// not gated by it: the owner's plan is a reason they cannot hide their own
+// race, never a reason a dead one has to stay on the hub.
+await page.click('#visibility-editor-head');
+ok('and is not held back by the owner\'s plan', await page.evaluate(() =>
+  document.querySelector('#ax-vis option[value="private"]').disabled), false);
 
 // And the shape that actually matters, because it is the one the Jr Texas
 // Water Safari is: an admin who is not on the race at all. The config comes
