@@ -2344,6 +2344,10 @@ async function handleCommit(req, env, ctx) {
       // list lives in KV now, so these are dropped rather than carried over.
       submitted.visibility = raceCfg.visibility === undefined
         ? submitted.visibility : raceCfg.visibility;
+      // Pinned for the same reason visibility is: it is a fact about what has
+      // already happened to this race, not a setting, and a client that writes
+      // a fresh object rather than the one it read would otherwise erase it.
+      if (raceCfg.everPublic) submitted.everPublic = true;
       for (const f of ACL_FIELDS) if (f !== 'visibility') delete submitted[f];
       for (const f of INJECTED_FIELDS) delete submitted[f];
       // The runner-to-account link is an address too. It is kept, in KV, and
@@ -4000,6 +4004,10 @@ async function handleMyRaces(req, env) {
       runnerNames: (cfg.runners || []).map(r => r.name),
       cutoffHours: cfg.cutoffs && cfg.cutoffs.totalHours || null,
       visibility: 'private',
+      // So the hub card can say unlisted rather than private for a race that
+      // was on the hub once. Not a person's data: it is a fact about what this
+      // race has already published, and only its own crew are sent it.
+      everPublic: !!cfg.everPublic,
       mine: normalizeEmail(cfg.createdBy) === normalizeEmail(session.email),
       myRole: roleForRace(cfg, session.email),
       role: roleForRace(cfg, session.email) || 'viewer'
@@ -4403,6 +4411,14 @@ async function handleRaceVisibility(req, env, ctx) {
   try {
     await mutateStoredRaceConfig(env, slug, (cfg) => {
       cfg.visibility = want;
+      // Remembered, because taking a race off the hub cannot take back what
+      // was published while it was on it: the hub entry, the share page, the
+      // preview card and the course file are commits in a public repository
+      // and stay in its history. Without this the race reads as plainly
+      // private the moment it flips, which is the more comfortable answer and
+      // the wrong one. Never unset: going public again makes it public, and
+      // coming back is the same one-way door a second time.
+      if (now === 'public') cfg.everPublic = true;
       return cfg;
     }, `hub: ${want === 'private' ? 'unlist' : 'list'} race ${slug}`, session.email);
   } catch (err) {

@@ -632,8 +632,17 @@ distance, the racers' names and the route. The visibility control takes them out
 of the working tree and starts checking who is asking, which is worth doing; it
 cannot take them out of the history. Splits, notes, photographs and the roster
 were never committed and are not affected. So the wizard is the only place the
-choice is fully available, and it says so now, as does the control itself while
-a race is still public.
+choice is fully available, and it says so.
+
+The first version of that warning was drawn only while a race was still public,
+which meant it vanished at the moment it stopped being a prediction and became
+a statement of fact: flip the race and it read as plainly private everywhere.
+So the transition sets `everPublic` on the config, pinned in `handleCommit` the
+way `visibility` is so an ordinary save cannot drop it, and the two words are
+kept apart everywhere a person reads them. **Private** is a race that was never
+on the hub. **Unlisted** is one that was, and it keeps that word for as long as
+it exists: on its hub card, in Manage access, in the visibility control and in
+`privacy.html`.
 
 The write side is done. The archive is what is left.
 

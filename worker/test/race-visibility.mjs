@@ -191,8 +191,20 @@ const call = (path, tok, init = {}) => worker.fetch(new Request('https://w' + pa
   headers: Object.assign({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + (tok || token) },
                          init.headers || {})
 }), env, { waitUntil: () => {} });
-const put = (path, doc, tok) => call('/commit', tok || token, { method: 'POST',
-  body: JSON.stringify({ path, content: JSON.stringify(doc, null, 2) + '\n', message: 'test' }) });
+// A write carries the version it is replacing, the way the client's mutateJson
+// does after a read. Without it the second write to a file is refused as a
+// conflict, and an assertion about what that write did would be measuring the
+// refusal instead.
+const put = (path, doc, tok) => {
+  const body = { path, content: JSON.stringify(doc, null, 2) + '\n', message: 'test' };
+  const m = path.match(/^races\/([^/]+)\/(config|data)\.json$/);
+  if (m) {
+    const row = rows.get(m[1]);
+    const sha = row ? (row[m[2] === 'config' ? 'config_sha' : 'data_sha'] || null) : null;
+    if (sha) body.sha = sha;
+  }
+  return call('/commit', tok || token, { method: 'POST', body: JSON.stringify(body) });
+};
 const flip = (slug, visibility, tok) => call('/race/visibility', tok || token,
   { method: 'POST', body: JSON.stringify({ slug, visibility }) });
 
@@ -272,6 +284,13 @@ ok('and in private storage, byte for byte', bucket.get(`course/${SLUG}/course.gp
 ok('the share page is off the site', git.has(`races/${SLUG}/index.html`), false);
 ok('and so is its preview card', git.has(`races/${SLUG}/og.png`), false);
 
+// Taking a race off the hub cannot take back what was published while it was
+// on it, so the race has to remember having been there. Without this it reads
+// as plainly private the moment it flips, which is the comfortable answer and
+// not the true one.
+console.log('\nand it remembers having been published');
+ok('the stored config says so', stored(SLUG).everPublic, true);
+
 console.log('\nthe race still works for the people on it');
 ok('the creator can still read it', (await call('/access?slug=' + SLUG, token)).status, 200);
 ok('so can the crew member', (await call('/access?slug=' + SLUG, mateToken)).status, 200);
@@ -314,6 +333,28 @@ ok('and forwarding into the app', stub.text.includes(`/race.html?id=${SLUG}`), t
 ok('the date and the racers, for the description',
   /Jun 13, 2026 · San Marcos, TX · Jason/.test(stub.text), true);
 ok('but nobody\'s address', stub.text.includes('@'), false);
+
+console.log('\nand the mark survives what would erase it');
+// An ordinary settings save writes the whole config back. A client that sends
+// a fresh object rather than the one it read must not be able to drop this,
+// the same way it cannot drop visibility.
+r = await put(`races/${SLUG}/config.json`, { ...race, name: 'Renamed By A Save' });
+ok('a config write that omits it is accepted', r.status, 200);
+ok('and the mark is still there', stored(SLUG).everPublic, true);
+ok('the rename did land, so the write was real', stored(SLUG).name, 'Renamed By A Save');
+
+console.log('\na race that was made private and never listed');
+const BORN = '000013-born-private';
+await put(`races/${BORN}/config.json`, {
+  name: 'Born Private', visibility: 'private', courseType: 'segments',
+  course: { segments: [{ name: 'A to B', distanceMi: 4 }] },
+  startTime: '2027-06-01T12:00:00.000Z', createdBy: ME, runners: [{ id: 'b', name: 'Sam' }]
+});
+ok('carries no such mark', stored(BORN).everPublic, undefined);
+// Listing it and taking it back sets it, because by then it has been on the hub.
+await flip(BORN, 'public');
+await flip(BORN, 'private');
+ok('until it has been on the hub and come back', stored(BORN).everPublic, true);
 
 console.log('\na loop course described by its aid stations, which has no loopDistanceMi');
 const LOOP = '000008-loops';

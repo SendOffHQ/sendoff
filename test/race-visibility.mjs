@@ -121,6 +121,18 @@ const panelText = (visibility) => page.evaluate((v) => {
 
 const onPublic = await panelText('public');
 const onPrivate = await panelText('private');
+// The half that took a correction. The warning used to be drawn only before
+// the press, so a race read as plainly private the moment it flipped, which is
+// exactly when it became a statement of fact rather than a prediction.
+const onFlipped = await page.evaluate(() => {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  Race.access.mountVisibility(host, { slug: 'scratch',
+    cfg: () => ({ visibility: 'private', everPublic: true }) });
+  const t = host.textContent.replace(/\s+/g, ' ');
+  host.remove();
+  return t;
+});
 ok('a public race is warned', /already been published/.test(onPublic), true);
 ok('that taking it off cannot take it back', /cannot do is take back/.test(onPublic), true);
 ok('naming what stays published',
@@ -128,8 +140,14 @@ ok('naming what stays published',
 ok('and what never was', /Splits, notes, photos and the roster were never published/.test(onPublic), true);
 ok('and saying when the choice has to be made',
   /made private when it is created/.test(onPublic), true);
-ok('a race that is already private is not warned',
-  /already been published/.test(onPrivate), false);
+ok('a race that was never listed is not warned',
+  /already been published|was on the hub before/.test(onPrivate), false);
+ok('one that was listed and is now private still is',
+  /was on the hub before/.test(onFlipped), true);
+ok('and is called unlisted rather than private',
+  /unlisted rather than fully private/.test(onFlipped), true);
+ok('naming the same things that stay published',
+  /hub entry, share card and course file/.test(onFlipped), true);
 
 console.log('\na reload landing while somebody is mid-choice');
 ok('the redraw leaves an unsaved choice alone', await page.evaluate(() => {
