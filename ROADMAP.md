@@ -583,22 +583,57 @@ Nothing needed cleaning up behind it: every race directory in the tree at the
 time was public. What was already in the history is gap two, below, and always
 was.
 
+**Gap three: the rule was a list of filenames — closed 2026-09-23.** Placed
+here rather than after gap two because it is gap one, finished. The September
+fix diverted `course.gpx` and left the sentence it was written under intact:
+`commitToD1` guarded config and data with a version column and *passed
+everything else through to git*. Diverting one more name did not change that.
+Anything under `races/<slug>/` with a fourth name still fell through the
+database, past the bucket, and into the public repository with its bytes
+unchanged, unlisted race or not.
+
+Asked directly ("would it actually be private if created as so?") and measured
+rather than read: `POST /commit` with `races/<unlisted-slug>/notes.txt`
+answered 200 and the sentence was in the repo. Nothing in the app writes a
+fourth name, so nothing had ever exercised it; what a person had was "these
+three filenames are handled", not "an unlisted race is not published".
+
+`isRacePath` is a whitelist of the three files a race is made of now, so a
+fourth name is refused at the door for every race, public ones included, where
+it was only ever junk in the repository. A whitelist and deliberately not
+another rule about visibility: hanging it on visibility would mean an unlisted
+race could not be written at all with `WRITE_TO_GIT` back on, and that flag has
+a rollback behind it.
+
 **Gap two: history.** Every private race that has ever existed is still in this
 public repository's history — 45 commits for the dry run alone, and it was
 deleted from the working tree today. Deleting a file from `main` does nothing
 about that. This is what the purge is for, and it is why the purge, not the
 write path, is where privacy actually lands.
 
-**So the honest statement today** is that a new private race keeps its data
-private and leaks its existence, and an old one is fully readable to anybody
-who clones. Until both are closed the labels stay "unlisted" everywhere a
-person can read them, which is the point of that word.
+**So the honest statement today** (2026-09-23) is that a race created unlisted
+is not published anywhere, and an old one is still fully readable to anybody
+who clones. `worker/test/private-race.mjs` creates one the way the wizard does,
+under production's flags, and asks every surface in turn: the repository, the
+manifest, the share page, the bucket, the stored config's own contents,
+`/get` for a stranger and for nobody, `/public`, `/my-races`, the Discord
+webhook, the live push, and a fourth filename. That test is the answer to this
+question from here on; reading the code to answer it is how gap three survived
+gap one.
 
-**Decided 2026-09-11: both wait until after Sangre de Cristo**, which is on the
-26th and is public, so neither gap touches it. The one thing that would change
-that is creating a *private* race before the fix lands: its route file and its
-slug would go to the public repository the way they do today. If that comes up
-before then, the GPX column is the piece to pull forward.
+Until history is purged the labels stay "unlisted" everywhere a person can read
+them, which is the point of that word. The write side is done. The archive is
+what is left.
+
+**Decided 2026-09-11: all of this waits until after Sangre de Cristo**, which
+is on the 26th and is public, so none of it touches that race.
+
+That decision came with a caveat which has since been overtaken and is kept
+here so nobody acts on the old version of it: making a private race before the
+fix landed would have published its route file and its slug. Both gaps on the
+write side closed before the race rather than after, on the 13th and the 23rd,
+so a race created unlisted today is safe to create. What still waits is the
+purge, and the purge is about races that already exist.
 
 ### Deleting a race should be one commit — *not built*
 
