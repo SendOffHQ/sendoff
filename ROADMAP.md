@@ -9,9 +9,10 @@ Status of every item below was checked against the codebase on 2026-09-07 and
 the storage and ordering sections again on 2026-09-08, not from memory. Where
 something is partly there, this says which part. "Races that were made and
 never run" was added 2026-09-22 and its claims checked the same day. Its
-decision about what may happen automatically, and "An admin view of every
-race", were added 2026-09-23, with the schema behind that section's query read
-rather than remembered.
+decision about what may happen automatically, "An admin view of every race"
+and "Load a course after the race is created" were added 2026-09-23, with the
+schema behind the first one's query, and the helpers the last one would use,
+read rather than remembered.
 
 Sources:
 
@@ -1205,6 +1206,47 @@ rather than one that happens to overlay.
 ---
 
 ## 2. Planning & history
+
+### Load a course after the race is created — *not built*
+
+Asked 2026-09-23 and checked the same day: there is no way to. The only file
+input in the app is the wizard's (`setup.html:647`); `settings.html` does not
+mention GPX at all. A race set up without a course, or one whose course turns
+out to be the wrong file or last year's route, cannot be given a new one
+without being recreated, which for a race that has already been worked is not
+an option.
+
+Everything it needs is already here, which is what makes this small rather
+than a feature:
+
+| | |
+|---|---|
+| Reading the trace | `Race.gpx.parse`, `totalDistanceMi`, `totalElevation` |
+| Per-segment climb | `Race.course.fillSegmentElevation` |
+| Replacing a file | `gh.getFile` returns `{sha, content}`, `gh.putFile` takes that sha |
+| Where it goes | `handleCommit` already routes it: git for a public race, R2 for a private one |
+
+So it is a collapsed section on the settings page beside the others: a file
+input, the wizard's own status line, and a Save. No worker change, which
+means it ships with a Pages deploy.
+
+**Two things to decide before building, not while.**
+
+*Does uploading re-derive the segments' climb?* The wizard does that at
+creation. On a race that already exists those numbers may have been typed in
+from the race's own website, and a published figure beats arithmetic over a
+trace. `fillSegmentElevation` already refuses to overwrite a number that is
+there, which is the right default; the question is whether to offer
+"recalculate from this trace" beside it, and it probably is, as a separate
+press.
+
+*Replacing one mid-race.* The course drives the map and the elevation profile
+the crew are reading at an aid station. Swapping it while people are out on
+it is either something to guard the way other consequential edits are, or
+something to refuse outright while a race is live. Worth picking on purpose.
+
+Related: **Race-to-race transfer** below lists `course.gpx` as same-race-only
+material, and would want this same upload path rather than a second one.
 
 ### Race-to-race transfer — *not built*
 Raised while building. Copy a setup from one race into another with options
