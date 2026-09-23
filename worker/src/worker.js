@@ -852,8 +852,24 @@ async function mutateRaceConfig(env, slug, mutate, message, actor) {
 }
 
 // ---------- path / ACL helpers ----------
+// The three files a race is made of, and nothing else.
+//
+// This used to accept any name under races/<slug>/, and that is how an unlisted
+// race could still be published. config.json and data.json go to the database,
+// course.gpx of a non-public race goes to the bucket, and a file with a fourth
+// name fell through all three of those into the public repository with its
+// bytes intact. Nothing in the app writes one, so this takes nothing away from
+// anybody; what it changes is that "an unlisted race is not published" is now a
+// property of the race rather than a list of filenames that happened to be
+// handled one by one.
+//
+// A whitelist and not a rule about visibility, deliberately. Hanging it on
+// visibility would mean an unlisted race could not be written at all with
+// WRITE_TO_GIT back on, and that flag has a rollback behind it.
+const RACE_FILES = new Set(['config.json', 'data.json', 'course.gpx']);
 function isRacePath(path) {
-  return /^races\/[^/]+\/[^/]+$/.test(path);
+  const m = /^races\/[^/]+\/([^/]+)$/.exec(path);
+  return !!m && RACE_FILES.has(m[1]);
 }
 function racePathSlug(path) {
   const m = /^races\/([^/]+)\//.exec(path);

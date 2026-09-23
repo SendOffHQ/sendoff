@@ -16,6 +16,9 @@ on:
       - 'sw.js'
       - '*.html'
       - 'package.json'
+      - 'worker/src/**'
+      - 'worker/test/**'
+      - 'worker/package.json'
       - '.github/workflows/test.yml'
   pull_request:
   workflow_dispatch:
@@ -31,6 +34,13 @@ jobs:
         with:
           node-version: '22'
       - run: npm test
+
+      # The worker's own suite, which nothing ran until now. It needs no
+      # install: every test drives worker.js directly with stand-ins for KV, D1,
+      # R2 and git, so it is plain node and costs seconds. Several of these are
+      # the only check on a promise made to somebody about their own race, which
+      # is not a thing to leave to whoever remembers to run it by hand.
+      - run: npm --prefix worker test
 
       # The same paths again, but in a real browser with a real service worker.
       # The bug this covers only appeared as an interaction between the page,
