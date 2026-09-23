@@ -1230,20 +1230,31 @@ So it is a collapsed section on the settings page beside the others: a file
 input, the wizard's own status line, and a Save. No worker change, which
 means it ships with a Pages deploy.
 
-**Two things to decide before building, not while.**
+**Both open questions were settled on 2026-09-23. Build to these.**
 
-*Does uploading re-derive the segments' climb?* The wizard does that at
-creation. On a race that already exists those numbers may have been typed in
-from the race's own website, and a published figure beats arithmetic over a
-trace. `fillSegmentElevation` already refuses to overwrite a number that is
-there, which is the right default; the question is whether to offer
-"recalculate from this trace" beside it, and it probably is, as a separate
-press.
+*The climb comes across as a checkbox, ticked by the person uploading.* Not
+automatic and not absent. The wizard re-derives at creation because there is
+nothing to lose then; on a race that already exists those numbers may have
+been typed in from the race's own website, and a published figure beats
+arithmetic over a trace. `fillSegmentElevation` already refuses to overwrite
+a number that is there, so the checkbox has to mean *recalculate*, clearing
+what is stored first, rather than *fill in the gaps*. Say which it is on the
+label, next to the box, and default it off: an upload that silently rewrote a
+race director's published climbs would be the worse failure of the two.
 
-*Replacing one mid-race.* The course drives the map and the elevation profile
-the crew are reading at an aid station. Swapping it while people are out on
-it is either something to guard the way other consequential edits are, or
-something to refuse outright while a race is live. Worth picking on purpose.
+*It locks once the race has started.* The course drives the map and the
+elevation profile a crew is reading at an aid station, and a runner is
+somewhere on it. Refused outright rather than guarded by a confirmation:
+there is no version of "are you sure" that makes swapping the route under a
+runner a good idea, and a confirmation is a thing people press. `raceState`
+already answers this — `upcoming` may upload, `live` and `finished` may not —
+and the section is drawn disabled with the reason rather than hidden, so
+somebody looking for it at mile forty finds out why instead of wondering
+where it went.
+
+Which leaves one thing genuinely undecided: whether a `finished` race should
+be uploadable again, for somebody fixing the record afterwards. Leaning yes,
+since nobody is out on it, but it is not the case this was asked for.
 
 Related: **Race-to-race transfer** below lists `course.gpx` as same-race-only
 material, and would want this same upload path rather than a second one.
