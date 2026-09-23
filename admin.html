@@ -328,7 +328,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=201c8f87"></script>
+<script src="lib/race-core.js?v=8b617b62"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -1008,7 +1008,7 @@
         ? races.map(rc => `
             <div class="race-row">
               <a href="race.html?id=${encodeURIComponent(rc.slug)}">${esc(rc.name || rc.slug)}</a>
-              <span class="role ${esc(rc.role)}">${rc.isCreator ? 'creator' : esc(rc.role)}${rc.visibility === 'private' ? ' &middot; unlisted' : ''}</span>
+              <span class="role ${esc(rc.role)}">${rc.isCreator ? 'creator' : esc(rc.role)}${rc.visibility === 'private' ? ' &middot; private' : ''}</span>
             </div>`).join('')
         : '<span class="muted">Not on any races.</span>';
     } catch (err) {

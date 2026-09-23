@@ -95,7 +95,7 @@
 </header>
 
 <main class="legal">
-<p class="updated">Last updated 22 September 2026</p>
+<p class="updated">Last updated 23 September 2026</p>
 <h2>The short version</h2>
 <p>SendOff stores what you type into it: your email address, your race, and what your crew logs.
   There is no analytics, no advertising, no third-party trackers, no cookies, and nothing is sold
@@ -149,32 +149,51 @@
   <tr><td>Your own browser</td><td>your session, a copy of the races you have opened so they still work with no signal, and any feedback waiting to send</td></tr>
 </table>
 
-<h2 id="public">The repository is public</h2>
+<h2 id="public">Private races, and a public repository</h2>
 <div class="callout">
-  <p>SendOff's race data is currently kept in a public GitHub repository, which is also what serves
-    the pages people watch. That has consequences which are not obvious from using the app:</p>
+  <p>A <strong>private</strong> race is kept off the hub and out of search engines, and only the
+    people you put on it can open it. That is enforced when the page asks for the race, not by the
+    address being hard to guess: SendOff checks who you are on every read, and answers somebody
+    who is not on the race exactly as it answers a race that does not exist.</p>
+  <p>Its data is not published anywhere. The race, the splits, the course file and the photographs
+    are kept in Cloudflare's database and storage, the roster of who is on it is kept separately
+    again, and none of it is written to a public host. A private race is never listed on the hub,
+    never given a share page or a preview card, never announced anywhere, and its address carries
+    a random suffix so it cannot be guessed either. </p>
+  <p><strong>A public race can be unlisted, but it cannot be made private.</strong> While a race is
+    public its hub entry, its share page, its preview card and its course file are committed to a
+    public GitHub repository. Those carry the race's name, its location, its date, its distance and
+    the names of its racers, and the course file is the route itself. Taking the race off the hub
+    deletes them from the current files and starts checking who is asking, which is worth doing.
+    What it cannot do is remove them from that repository's history, where they stay. Splits,
+    notes, photographs and the roster of addresses were never in there and are not affected. If a
+    race needs to be private, make it private when you create it.</p>
+  <p>Four things that are true anyway, and are worth saying plainly:</p>
   <ul>
-    <li>A race marked <strong>unlisted</strong> is not sealed. The box below says exactly
-      what that means.</li>
-    <li>Every change made through SendOff creates a public commit. Commit messages made before
-      9 September 2026 contain the email address of whoever made the change, and they remain in
-      the repository's history. Messages made after that date carry no address: what was done is
-      recorded publicly, who did it is recorded in the database.</li>
-    <li>Email addresses that were once stored inside the race files themselves were removed in
-      September 2026. They remain in the repository's history.</li>
+    <li><strong>Cloudflare holds it.</strong> Nothing here is end-to-end encrypted. Cloudflare
+      stores the data and can read it, and so can anybody who gets into SendOff's account there.</li>
+    <li><strong>A view link is a key.</strong> Any link you create from Manage access lets whoever
+      holds it watch that race without an account, for as long as it lasts. Revoke it there.</li>
+    <li><strong>SendOff's own admin page</strong> can list the races any one account is on, by
+      name and address, private ones included, so that accounts can be supported and races that
+      were set up and then abandoned can be taken off the hub. It does not open those races: it
+      does not show their splits, their roster, their photographs or their course.</li>
+    <li><strong>Public races are public, deliberately.</strong> A public race's files are served
+      from a public GitHub repository, which is also what serves the pages people watch. Every
+      change to one is a public commit.</li>
   </ul>
   <div class="conspicuous">
-    <p>Unlisted does not mean sealed, encrypted or access controlled. An unlisted race is kept
-      off the public list and out of search engines, but the file behind it sits on a public host
-      and can be read by anybody who has its address. A race created unlisted is given a random
-      suffix on its address so it cannot be guessed. A race that was public and is unlisted
-      afterwards keeps the address it already had, and that address was public: unlisting hides it
-      from then on rather than taking back what was already shared. Do not put anything in a race
-      that you would mind a stranger reading. SendOff called this setting private until
-      9 September 2026, and stopped because unlisted is what it actually does.</p>
+    <p>This changed on 23 September 2026, and it is not retroactive. Until 11 September 2026 every
+      race's files were written to that public repository whatever its setting, so a race
+      <strong>created before then</strong> has its old files in the repository's history, where
+      deleting them does not remove them. Commit messages made before 9 September 2026 carry the
+      email address of whoever made the change, and those are in the history too. Removing both
+      means rewriting that history, which has not been done yet. If you set up a race before
+      September 2026 and its contents matter, treat them as public and make a new race.</p>
   </div>
-  <p>Moving off this is in progress and is the next piece of work after the September 2026 race.
-    Until it is finished, treat a race page as something a stranger could read.</p>
+  <p>SendOff called this setting <em>unlisted</em> from 9 September 2026 until 23 September 2026,
+    because during that time off-the-list was all it really was. It is called private again
+    because the app now keeps that promise for any race you make.</p>
 </div>
 
 <h2>Who else sees something</h2>
@@ -293,6 +312,6 @@
     <span aria-hidden="true"> &middot; </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=201c8f87"></script>
+<script src="lib/race-core.js?v=8b617b62"></script>
 </body>
 </html>

@@ -75,11 +75,11 @@ ok('and opens', await page.evaluate(() =>
 console.log('\nwhat it offers');
 ok('two choices', await page.evaluate(() =>
   [...document.querySelectorAll('#ax-vis option')].map(o => o.value)), ['public','private']);
-ok('showing what the race is now, which is unlisted',
+ok('showing what the race is now, which is private',
   await page.evaluate(() => document.getElementById('ax-vis').value), 'private');
 ok('worded for a person, not a database', await page.evaluate(() =>
   [...document.querySelectorAll('#ax-vis option')].map(o => o.textContent)),
-  ['Listed on the hub', 'Unlisted']);
+  ['Listed on the hub', 'Private']);
 
 console.log('\nsaving it as listed');
 await page.selectOption('#ax-vis', 'public');
@@ -102,6 +102,35 @@ ok('the race comes back listed',
 // somebody was part way through making, and wipe the confirmation off the
 // button a moment after it appeared. Driven on a panel of its own rather than
 // by waiting out thirty seconds, because it is the panel's rule being checked.
+// The thing somebody pressing this cannot see and needs to know. A public race
+// has already had its hub entry, share card and course file committed to a
+// public repository; taking it off the hub cannot take those out of that
+// repository's history. So it can be unlisted and it cannot be made private,
+// and the panel has to say so while the race is still public.
+console.log('\nthe warning a public race carries, and a private one does not');
+// Driven on panels of their own, so the answer does not depend on what the
+// fixture race happens to be by this point in the run.
+const panelText = (visibility) => page.evaluate((v) => {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  Race.access.mountVisibility(host, { slug: 'scratch', cfg: () => ({ visibility: v }) });
+  const t = host.textContent.replace(/\s+/g, ' ');
+  host.remove();
+  return t;
+}, visibility);
+
+const onPublic = await panelText('public');
+const onPrivate = await panelText('private');
+ok('a public race is warned', /already been published/.test(onPublic), true);
+ok('that taking it off cannot take it back', /cannot do is take back/.test(onPublic), true);
+ok('naming what stays published',
+  /hub entry, share card and course file/.test(onPublic), true);
+ok('and what never was', /Splits, notes, photos and the roster were never published/.test(onPublic), true);
+ok('and saying when the choice has to be made',
+  /made private when it is created/.test(onPublic), true);
+ok('a race that is already private is not warned',
+  /already been published/.test(onPrivate), false);
+
 console.log('\na reload landing while somebody is mid-choice');
 ok('the redraw leaves an unsaved choice alone', await page.evaluate(() => {
   const host = document.createElement('div');
