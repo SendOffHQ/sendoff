@@ -239,7 +239,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=709a73c1"></script>
+<script src="lib/race-core.js?v=201c8f87"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -1007,7 +1007,15 @@
     // Last in this block on purpose. Everything above is what the board needs
     // in order to work; this only makes it quicker, and a fault in here should
     // cost the push rather than the clock.
-    Race.live(slug, () => poller.now());
+    Race.live(slug, (msg) => {
+      // The push now carries which file moved. A config change is the one that
+      // needs saying: the splits are re-read on every poll anyway, while the
+      // config is trusted for a minute, so without this a settings edit still
+      // waited out that minute after being told about it. Dropping the stamp is
+      // what makes the load below go and get it.
+      if (msg && msg.file === 'config.json') cfgFetchedAt = 0;
+      poller.now();
+    });
   })();
 </script>
 

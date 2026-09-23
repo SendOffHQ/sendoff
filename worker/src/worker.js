@@ -115,14 +115,32 @@ async function publishChange(env, path) {
   if (!liveEnabled(env)) return;
   try {
     const slug = racePathSlug(path);
-    if (!slug || !path.endsWith('/data.json')) return;
+    // config.json as well as data.json, and this used to be data.json alone.
+    //
+    // A split woke every open page at once and a settings change woke nothing,
+    // which made an edit take up to two minutes to appear: the pages re-read
+    // the config at most once a minute, and that check only runs when a poll
+    // happens to fire, which for a race that has not started yet is every
+    // thirty seconds. Somebody setting drop bags the week of a race and
+    // telling their crew to look had no way to know it had worked.
+    //
+    // Cheap to add, because the reason the config is cached at all is that it
+    // changes when somebody edits the race rather than when somebody presses a
+    // button. Rare writes are exactly the ones worth pushing.
+    const file = path.endsWith('/data.json') ? 'data.json'
+               : path.endsWith('/config.json') ? 'config.json'
+               : null;
+    if (!slug || !file) return;
     const cfg = await loadRaceConfigNow(env, slug);
     if (!cfg || cfg.visibility !== 'public') return;
-    // Deliberately says nothing about what changed. The page already knows how
-    // to read a race; this only tells it that reading again is worth doing.
+    // Which file, and nothing about what in it changed. The page already knows
+    // how to read a race; this tells it that reading again is worth doing, and
+    // which of the two reads is the one that matters. A client that predates
+    // the field ignores it and re-reads on its own schedule, which is what it
+    // did before.
     await raceHub(env, slug).fetch('https://race-hub/publish', {
       method: 'POST',
-      body: JSON.stringify({ type: 'changed', slug, at: new Date().toISOString() })
+      body: JSON.stringify({ type: 'changed', slug, file, at: new Date().toISOString() })
     });
   } catch (e) {
     // A watcher who misses a nudge falls back to the poll that is still
