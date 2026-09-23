@@ -8,7 +8,10 @@ today. Nothing here ships until it moves there.
 Status of every item below was checked against the codebase on 2026-09-07 and
 the storage and ordering sections again on 2026-09-08, not from memory. Where
 something is partly there, this says which part. "Races that were made and
-never run" was added 2026-09-22 and its claims checked the same day.
+never run" was added 2026-09-22 and its claims checked the same day. Its
+decision about what may happen automatically, and "An admin view of every
+race", were added 2026-09-23, with the schema behind that section's query read
+rather than remembered.
 
 Sources:
 
@@ -144,6 +147,73 @@ presumes:
 Nothing here should delete anybody's race on its own. "Every public race stays
 readable, forever" is a promise made two sections up, and a race nobody worked
 is still somebody's race.
+
+**Decided 2026-09-23: nothing unlists itself either, and the reason is new.**
+Until this week, unlisting a race was cosmetic: the files were on a public host
+and the address was the only thing protecting them, so dropping a race from the
+hub took nothing away from anybody. That stopped being true. Unlisting now
+*closes* a race: `/public` answers 404, every read is checked against the
+roster, and somebody who had the link and no account loses it. Doing that to a
+race automatically would silently break every spectator link to it.
+
+For a race that genuinely was never worked nobody is watching, so the harm is
+nil. The problem is the ones the detector gets wrong, and it will: a crew that
+logged on paper, a race set up only for its course map, a `data.json` write
+that failed. In those cases somebody loses access to their own race and is not
+told, which is a worse failure than an empty card on the hub.
+
+So the two decisions are separated, and the separation is the whole answer:
+
+- **"Should this be on the hub's front page" is a listing question.** It costs
+  nothing when it is wrong, so it can be fully automatic: a never-run race
+  drops out of the hub's default view and sits behind a filter, keeping its
+  link, its access and its readability. This is the first bullet above, and it
+  is the only part that should ever happen by itself.
+- **"Who may open this" is an access question.** It takes a person: the
+  creator, or an admin with a reason. That is the lever below, pulled by hand.
+
+Which leaves the second bullet, telling the creator, as the piece worth
+building next. It now has the lever it needs.
+
+### An admin view of every race — *not built*
+
+Raised 2026-09-23. There is no such view: `/account-races` answers for one
+email at a time, which is enough to support an account and no use at all for
+"what is on this service". Finding a race means knowing whose it is first.
+
+What it wants is the accounts page's own shape, which already exists and
+already works: a list, a search box, and filters. Search by name, slug or
+creator; filter by visibility, by state (upcoming, live, finished, never run)
+and by plan; the visibility lever on each row; a link through to the race.
+
+**Back it with one query, not a walk.** The instinct is to list the slugs and
+load every config, which is what `/account-races` does and what `/my-races`
+does, and it is a config parse per race on every page load. It does not need
+to be: `races` already has name, location, `start_time`, `visibility`,
+`created_by` and `updated_at` as columns, and `legs` has a row per leg with
+`start_time` and `end_time` on it. So the whole listing, including the thing
+that is otherwise expensive to know, is one statement:
+
+```sql
+SELECT r.slug, r.name, r.start_time, r.visibility, r.created_by, r.updated_at,
+       (SELECT COUNT(*) FROM legs l
+          WHERE l.slug = r.slug
+            AND (l.start_time IS NOT NULL OR l.end_time IS NOT NULL)) AS worked
+  FROM races r
+ ORDER BY r.start_time DESC
+```
+
+`worked = 0` on a race whose start time has passed is the never-run test from
+the section above, computed for every race at once rather than by fetching
+every `data.json`. The same query is what a nightly job would read to decide
+what drops out of the hub's default view, so the panel and the automatic part
+share it rather than each growing their own idea of what "never run" means.
+
+**Admins can unlist and cannot delete, and that is deliberate.** Unlisting is
+reversible and destroys nothing, which is what makes it an admin's to do;
+deleting destroys somebody's race and stays with the person whose race it is.
+An admin panel is exactly where that distinction gets "fixed" by somebody who
+finds it inconsistent, so it is written down here.
 
 ### The lever this needs — *built 2026-09-22*
 
