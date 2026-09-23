@@ -587,7 +587,7 @@
      Esri's and will be missing offline; the map is useful without them. -->
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=81ff34ca"></script>
-<script src="lib/race-core.js?v=709a73c1"></script>
+<script src="lib/race-core.js?v=201c8f87"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -1702,7 +1702,15 @@
   const poller = Race.poll(load, {
     interval: () => (pushed.connected ? 60000 : Race.POLL_MS[Race.raceState(cfg, data)])
   });
-  pushed = Race.live(slug, () => poller.now());
+  pushed = Race.live(slug, (msg) => {
+    // The push now carries which file moved. A config change is the one that
+    // needs saying: the splits are re-read on every poll anyway, while the
+    // config is trusted for a minute, so without this a settings edit still
+    // waited out that minute after being told about it. Dropping the stamp is
+    // what makes the load below go and get it.
+    if (msg && msg.file === 'config.json') cfgFetchedAt = 0;
+    poller.now();
+  });
 </script>
 
 </body>

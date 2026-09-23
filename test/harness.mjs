@@ -59,6 +59,10 @@ let visibilityFails = false;
 // Not on the race at all, which is what a site admin is for a race somebody
 // else made: the config comes back with no role and the roster is refused.
 let notOnRace = false;
+
+// Whether hub.json advertises the live push. Off by default: a page that
+// believes in it opens a websocket, and this server does not speak one.
+let livePush = false;
 // An account with no Pro entitlements, for the screens that have to say so
 // before somebody presses something that cannot work.
 let freePlan = false;
@@ -74,11 +78,16 @@ const server = http.createServer((req, res) => {
   };
   if (req.method === 'OPTIONS') return send(204, '');
 
-  // hub.json points the site at the stub worker.
+  // hub.json points the site at the stub worker. `live` stays off unless a
+  // test asks for it: with it on, every page opens a websocket, and only the
+  // one test that stands in for that socket has anything to connect to.
   if (url.pathname === '/hub.json') {
-    return send(200, JSON.stringify({ auth: { proxyUrl: `http://localhost:${PORT}/api` } }),
-                'application/json');
+    return send(200, JSON.stringify({
+      auth: { proxyUrl: `http://localhost:${PORT}/api` },
+      ...(livePush ? { live: true } : {})
+    }), 'application/json');
   }
+  if (url.pathname === '/live-on') { livePush = true; return send(200, '{"ok":true}', 'application/json'); }
 
   // --- the stub worker ---
   // A write. Held in memory, so the read that follows it sees it.
