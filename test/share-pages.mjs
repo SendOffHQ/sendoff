@@ -56,7 +56,7 @@ ok('nothing unlisted has a public share page', leaked, []);
 // say so. This says so.
 console.log('\nand the two copies of that page still agree');
 const pyStub = fs.readFileSync(path.join(ROOT, 'tools/make-og.py'), 'utf8')
-  .match(/^STUB = """([\s\S]*?)"""$/m);
+  .match(/^STUB = r?"""([\s\S]*?)"""$/m);
 const jsStub = fs.readFileSync(path.join(ROOT, 'worker/src/worker.js'), 'utf8')
   .match(/return `(<!DOCTYPE html>[\s\S]*?)`;\n}/);
 ok('both templates are where this expects them', [!!pyStub, !!jsStub], [true, true]);

@@ -41,7 +41,11 @@ FONTS = {
     'jb-500.woff2':   'JetBrains+Mono:wght@500',
 }
 
-STUB = """<!DOCTYPE html>
+# Raw, for the one backslash in it: the redirect's /^\?/ is a JavaScript regex
+# and has to reach the browser as it is written. Python does not recognise \?
+# as an escape, so it passed it through and warned on every run, which is noise
+# in a log somebody only ever reads when something has gone wrong.
+STUB = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
