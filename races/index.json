@@ -45,7 +45,24 @@
       ],
       "cutoffHours": 38,
       "activity": "trail-run"
+    },
+    {
+      "slug": "000003-2026-hennepin-100",
+      "name": "2026 Hennepin 100",
+      "location": "Sterling, IL",
+      "startTime": "2026-10-03T07:00:00-05:00",
+      "courseType": "segments",
+      "units": {
+        "distance": "mi",
+        "elevation": "ft"
+      },
+      "activity": "trail-run",
+      "totalDistanceMi": 100,
+      "runnerNames": [
+        "Ronnie Reineke"
+      ],
+      "cutoffHours": 30
     }
   ],
-  "lastUpdated": "2026-09-22T14:58:11.868Z"
+  "lastUpdated": "2026-09-23T22:41:48.629Z"
 }
