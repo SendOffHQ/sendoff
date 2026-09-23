@@ -1242,19 +1242,31 @@ what is stored first, rather than *fill in the gaps*. Say which it is on the
 label, next to the box, and default it off: an upload that silently rewrote a
 race director's published climbs would be the worse failure of the two.
 
-*It locks once the race has started.* The course drives the map and the
-elevation profile a crew is reading at an aid station, and a runner is
-somewhere on it. Refused outright rather than guarded by a confirmation:
-there is no version of "are you sure" that makes swapping the route under a
-runner a good idea, and a confirmation is a thing people press. `raceState`
-already answers this — `upcoming` may upload, `live` and `finished` may not —
-and the section is drawn disabled with the reason rather than hidden, so
-somebody looking for it at mile forty finds out why instead of wondering
-where it went.
+*It locks while the race is being run, and only then.* The course drives the
+map and the elevation profile a crew is reading at an aid station, and a
+runner is somewhere on it. Refused outright rather than guarded by a
+confirmation: there is no version of "are you sure" that makes swapping the
+route under a runner a good idea, and a confirmation is a thing people press.
 
-Which leaves one thing genuinely undecided: whether a `finished` race should
-be uploadable again, for somebody fixing the record afterwards. Leaning yes,
-since nobody is out on it, but it is not the case this was asked for.
+`raceState` already answers it, and the answer is one state and not two:
+
+| `raceState` | upload |
+|---|---|
+| `upcoming` | yes, nobody is out there yet |
+| `live` | **no** |
+| `finished` | yes, for fixing the record afterwards |
+
+`finished` is deliberate and was asked about on its own: nobody is on the
+course, and a race whose route was recorded wrong is exactly the one somebody
+wants to correct once they are home. Note that `raceState` calls a race
+`finished` when every runner is done *or* the cutoff has passed, so a race
+that blew its cutoff with somebody still out unlocks. That is the one edge
+worth a second look when this is built, and the answer is probably to lean on
+the runners rather than the clock.
+
+The section draws disabled with the reason rather than hidden, so somebody
+looking for it at mile forty finds out why instead of wondering where it
+went.
 
 Related: **Race-to-race transfer** below lists `course.gpx` as same-race-only
 material, and would want this same upload path rather than a second one.
