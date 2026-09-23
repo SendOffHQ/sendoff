@@ -2413,7 +2413,7 @@ async function handleCommit(req, env, ctx) {
   if (isRacePath(path) && path.endsWith('/course.gpx') &&
       String((liveCfg && liveCfg.visibility) || 'public') !== 'public') {
     if (!env.MEDIA) {
-      return json({ error: 'An unlisted race needs the media bucket for its course.' },
+      return json({ error: 'A private race needs the media bucket for its course.' },
         { status: 503 }, env, req);
     }
     await env.MEDIA.put(`course/${racePathSlug(path)}/course.gpx`, content, {
@@ -4144,7 +4144,7 @@ async function moveCourseForVisibility(env, slug, want, actor) {
     const res = await githubGet(env, path);
     if (res.status === 404) return null;
     if (!res.ok) return `could not read the course (${res.status})`;
-    if (!env.MEDIA) return 'an unlisted race needs the media bucket for its course';
+    if (!env.MEDIA) return 'a private race needs the media bucket for its course';
     let j;
     try { j = await res.json(); } catch (e) { return 'the course came back unreadable'; }
     // GitHub's contents API stops inlining a blob over a megabyte: it answers
@@ -4391,7 +4391,7 @@ async function handleRaceVisibility(req, env, ctx) {
     const ent = await raceOwnerEntitlements(env, raceCfg);
     if (!ent.privateRaces) {
       return json({
-        error: `Unlisted races are a Pro feature. You are on the ${PLANS[ent.plan].label} plan.`,
+        error: `Private races are a Pro feature. You are on the ${PLANS[ent.plan].label} plan.`,
         code: 'plan_limit', limit: 'privateRaces', plan: ent.plan
       }, { status: 402 }, env, req);
     }

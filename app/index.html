@@ -308,7 +308,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=201c8f87"></script>
+<script src="lib/race-core.js?v=8b617b62"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
@@ -418,7 +418,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     const roleName = r.role ? Race.roles.label(r.role === 'editor' ? 'crew' : r.role) : '';
     if (r.visibility === 'private') {
       const cls = r.role === 'viewer' ? 'viewer' : '';
-      badge = `<span class="card-badge ${cls}">Unlisted${roleName ? ' · ' + roleName : ''}</span>`;
+      badge = `<span class="card-badge ${cls}">Private${roleName ? ' · ' + roleName : ''}</span>`;
     } else if (roleName && r.role !== 'viewer') {
       badge = `<span class="card-badge">${roleName}</span>`;
     }
@@ -512,7 +512,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
               ? "Set up your first race with the wizard. You'll be its only editor; you can invite crew and generate share links from the race page after creation."
               : "Set up your first race with the wizard: it'll handle the GitHub commits for you, then you'll have a live dashboard and pit board ready for race day."}</p>
             <a class="cta" href="setup.html">Set up a race →</a>
-            ${isProxy && !isAuthed ? `<p style="margin-top: 18px; font-size: 12px;"><a href="setup.html" style="color: var(--accent);">Sign in</a> to see unlisted races you've been invited to.</p>` : ''}
+            ${isProxy && !isAuthed ? `<p style="margin-top: 18px; font-size: 12px;"><a href="setup.html" style="color: var(--accent);">Sign in</a> to see private races you've been invited to.</p>` : ''}
           </div>
         `;
       } else {
@@ -534,7 +534,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
               </label>
             </div>
           </div>
-          ${myErr ? `<div class="error-banner" style="display:block; margin-bottom: 16px;">Could not load unlisted races: ${escapeHtml(myErr.message)}</div>` : ''}
+          ${myErr ? `<div class="error-banner" style="display:block; margin-bottom: 16px;">Could not load private races: ${escapeHtml(myErr.message)}</div>` : ''}
           <div class="cards" id="cards"></div>
         `;
         const sel = document.getElementById('sort-mode');
@@ -607,11 +607,11 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
             looks wrong on race day, the pit board keeps working with no signal and sends
             what you logged once you have bars again.
             <button type="button" class="intro-link intro-note-link" data-feedback>Tell us what breaks</button>.</p>
-        <p class="intro-beta-warn">One thing worth knowing before you put a race in: a race
-            marked unlisted is not sealed. It stays off the public list and out of search, but
-            the files behind it are still served from a public host, so somebody who knew the
-            address could read it. Sealing that is the next piece of work. Until it lands,
-            treat a race page as something you would not mind a stranger seeing.
+        <p class="intro-beta-warn">One thing worth knowing before you put a race in: a race you
+            mark private is kept off the hub and out of search, and SendOff checks who is asking
+            on every read, so somebody who knew the address still gets nothing. What it is not is
+            end-to-end encrypted, and a race made before September 2026 has older copies of its
+            files in a public repository, where deleting them does not remove them.
             <a class="intro-note-link" href="privacy.html">What is stored, and who can see it</a>.</p>
         <p class="intro-note">Watching needs no account and no app: anyone with the link can follow
             along, and every public race stays readable here afterwards, forever, by anybody.

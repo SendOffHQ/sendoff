@@ -621,9 +621,21 @@ webhook, the live push, and a fourth filename. That test is the answer to this
 question from here on; reading the code to answer it is how gap three survived
 gap one.
 
-Until history is purged the labels stay "unlisted" everywhere a person can read
-them, which is the point of that word. The write side is done. The archive is
-what is left.
+The labels say **private** again as of 2026-09-23, because for a race made from
+here on the app keeps that promise. `privacy.html` and `terms.html` carry the
+carve-out, and it is a real one:
+
+**A public race can be unlisted and cannot be made private.** While a race is
+public its hub entry, its share page, its preview card and its `course.gpx` are
+committed to this repository, and those carry the name, the place, the date, the
+distance, the racers' names and the route. The visibility control takes them out
+of the working tree and starts checking who is asking, which is worth doing; it
+cannot take them out of the history. Splits, notes, photographs and the roster
+were never committed and are not affected. So the wizard is the only place the
+choice is fully available, and it says so now, as does the control itself while
+a race is still public.
+
+The write side is done. The archive is what is left.
 
 **Decided 2026-09-11: all of this waits until after Sangre de Cristo**, which
 is on the 26th and is public, so none of it touches that race.

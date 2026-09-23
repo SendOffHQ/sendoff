@@ -365,16 +365,26 @@
         <label>
           <input type="radio" name="vis" value="private" />
           <div class="radio-content">
-            <span class="title">Unlisted</span>
+            <span class="title">Private</span>
             <span class="desc">Kept off the hub and out of search, with an address that cannot be guessed.
-              Not sealed: the file is on a public host, so anybody who has the address can read it.
-              Crew and viewers you invite get access; share links let people view without an account.
-              <a href="/privacy.html#public" target="_blank" rel="noopener">What unlisted means</a>.</span>
+              Only the crew and viewers you invite can open it: SendOff checks who is asking on every
+              read, so the address on its own gets a stranger nothing. Share links let somebody view
+              without an account. Not end-to-end encrypted.
+              <a href="/privacy.html#public" target="_blank" rel="noopener">What private means</a>.</span>
           </div>
         </label>
       </div>
       <p class="hint" style="margin-top:8px; color: var(--text-muted); font-size:11px;" id="vis-note">
         You'll be set as the creator and only editor. Add more crew from the race page after creation.
+      </p>
+      <!-- The one thing about this choice that cannot be undone, at the only
+           moment it can still be made. A public race can be taken off the hub
+           later, but its hub entry, share card and course file have been
+           committed to a public repository by then and stay in its history. -->
+      <p class="hint" style="margin-top:6px; color: var(--text-muted); font-size:11px;">
+        This one is worth getting right now: a public race can be taken off the hub later, but it
+        cannot be made private afterwards. Its hub entry, share card and course file are published
+        while it is public, and those stay in a public repository's history.
       </p>
     </div>
     <label class="field">
@@ -670,7 +680,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=201c8f87"></script>
+<script src="lib/race-core.js?v=8b617b62"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -1490,7 +1500,7 @@
           return out;
         }, `hub: register race ${slug}`);
       } else {
-        progressLine(`Unlisted race: skipping public manifest.`);
+        progressLine(`Private race: skipping public manifest.`);
       }
 
       progressLine(`Done. Redirecting…`, 'ok');
@@ -1549,8 +1559,8 @@
       // Recompute slug preview since private races get the random suffix.
       updateSlug();
       document.getElementById('vis-note').textContent = state.visibility === 'private'
-        ? "Unlisted: kept off the hub, and the address gets a random suffix so it can't be guessed. It is not sealed, so treat the address as the thing protecting it. You'll be the only editor at first; add crew + share links from the race page after creation."
-        : "Public: anyone with the hub URL can find and view live. You'll be the only editor at first; add more crew from the race page.";
+        ? "Private: kept off the hub, and the address gets a random suffix so it can't be guessed. Only people you put on the race can open it, and SendOff checks that on every read. You'll be the only editor at first; add crew + share links from the race page after creation."
+        : "Public: anyone with the hub URL can find and view live. It can be taken off the hub later, but not made private: its hub entry, share card and course are published while it is public. You'll be the only editor at first; add more crew from the race page.";
     });
   });
 
