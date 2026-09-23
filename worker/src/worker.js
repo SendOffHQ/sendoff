@@ -3987,8 +3987,25 @@ async function handleMyRaces(req, env) {
     if (seen.has(slug)) continue;
     let cfg = null;
     try { cfg = await loadRaceConfigNow(env, slug); } catch (e) { continue; }
-    if (!cfg || cfg.visibility !== 'private') continue;
+    if (!cfg) continue;
+    // A race you are on belongs on your hub because you are on it, not because
+    // a public file happens to mention it. This used to require the config to
+    // say `private`, which meant a public race missing from the manifest was
+    // listed for nobody at all: not on the hub, because the hub reads the
+    // manifest, and not here either. Its own crew could still open it by link
+    // and had no way to find the link.
+    //
+    // Found on 2026-09-23 with a race in exactly that state. The manifest
+    // entry had been removed by hand while the stored config still said
+    // public, which is not something the app does to itself: the visibility
+    // endpoint writes the config first and the manifest second, so a manifest
+    // write that fails leaves a race that is already private and is found
+    // below. It stranded a real race anyway, and the fix is to stop the
+    // listing depending on the manifest at all.
     if (!canViewRace(cfg, session.email)) continue;
+    // Somebody with no role on a public race can view it, which is what makes
+    // it public; that is not a reason to put it on their own list.
+    if (cfg.visibility !== 'private' && !roleForRace(cfg, session.email)) continue;
     privateAccessible.push({
       slug,
       name: cfg.name,
@@ -4003,7 +4020,7 @@ async function handleMyRaces(req, env) {
         : 0,
       runnerNames: (cfg.runners || []).map(r => r.name),
       cutoffHours: cfg.cutoffs && cfg.cutoffs.totalHours || null,
-      visibility: 'private',
+      visibility: cfg.visibility === 'private' ? 'private' : 'public',
       // So the hub card can say unlisted rather than private for a race that
       // was on the hub once. Not a person's data: it is a fact about what this
       // race has already published, and only its own crew are sent it.

@@ -437,6 +437,44 @@ ok('and it says the course did not move', /too large/.test(j.courseErr || ''), t
 ok('leaving the real one where it is', git.has(`races/${BIG}/course.gpx`), true);
 ok('rather than an empty file in its place', bucket.has(`course/${BIG}/course.gpx`), false);
 
+// A race stranded between the two lists. The hub reads the public manifest;
+// /my-races used to read the manifest, plus any race whose config said
+// private. A public race missing from the manifest was in neither, so its own
+// crew could open it by link and had no way to find the link.
+//
+// Not something the app does to itself, because the visibility endpoint writes
+// the config before the manifest. It happened to a real race on 2026-09-23,
+// when the manifest entry was taken out by hand and the stored config was left
+// saying public, and the race went missing from its owner's hub.
+console.log('\na public race that is not in the manifest');
+const LOST = '000014-stranded';
+await put(`races/${LOST}/config.json`, {
+  name: 'Stranded', visibility: 'public', courseType: 'segments',
+  course: { segments: [{ name: 'A to B', distanceMi: 6 }] },
+  startTime: '2027-07-01T12:00:00.000Z', createdBy: ME,
+  people: [{ email: MATE, role: 'crew' }],
+  runners: [{ id: 's', name: 'Sam' }]
+});
+// Straight out of the manifest, leaving the config alone: the exact state.
+await call('/commit', token, { method: 'POST', body: JSON.stringify({
+  path: 'races/index.json',
+  content: JSON.stringify({ races: JSON.parse(git.get('races/index.json').text).races
+    .filter(x => x.slug !== LOST) }, null, 2) + '\n', message: 'test' }) });
+ok('it is off the hub', listed(LOST), false);
+ok('and its config still says public', stored(LOST).visibility, 'public');
+
+r = await call('/my-races', token);
+j = await r.json();
+const mine = (j.races || []).find(x => x.slug === LOST);
+ok('the creator can still find it', !!mine, true);
+ok('listed as the public race it still is', mine && mine.visibility, 'public');
+r = await call('/my-races', mateToken);
+ok('so can the crew member',
+  ((await r.json()).races || []).some(x => x.slug === LOST), true);
+r = await call('/my-races', bossToken);
+ok('somebody with no role on it does not get it on their own list',
+  ((await r.json()).races || []).some(x => x.slug === LOST), false);
+
 console.log('\na race with no course at all');
 const BARE = '000010-no-course';
 await put(`races/${BARE}/config.json`, {
