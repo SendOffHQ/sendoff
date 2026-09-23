@@ -86,6 +86,19 @@
   /* One tap is one serving. Nobody types a number into a phone with cold
      hands, so the race's one-tap items are the whole intake UI here. */
   .rchips { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+  /* The chip and its take-back are siblings rather than nested, because a
+     button inside a button is not a thing, and because the click handler finds
+     the add by closest('[data-preset]'): inside, every undo would also be an
+     add. */
+  .rchip-row { display: flex; align-items: stretch; gap: 8px; }
+  .rchip-row .rchip { flex: 1; }
+  .rchip-undo {
+    flex: 0 0 58px; min-height: 58px;
+    background: var(--bg-card); color: var(--text-muted);
+    border: 1px solid var(--border-bright); border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 20px; line-height: 1; cursor: pointer;
+  }
+  .rchip-undo:hover { color: var(--red); border-color: var(--red); }
   .rchip {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
     width: 100%; min-height: 58px; padding: 10px 16px; text-align: left;
@@ -363,9 +376,22 @@
 
     out.push(fuelRows(runner));
 
-    // Logging what you took belongs at the aid station, where you are standing
-    // still. On the move there is nothing here to press by mistake.
-    if (next.state === 'in-pit') {
+    // On the move as well as at the aid station. This used to be pit-only, on
+    // the reasoning that logging belongs where you are standing still and that
+    // nothing should be pressable by mistake on the move. The first half is
+    // wrong for what the items are actually for: a gel or a dose is taken
+    // between aid stations, and logged at the next one it is logged from
+    // memory, which is the thing the one-tap items exist to avoid. Medicines
+    // were the whole reason an item with no numbers on it can exist at all.
+    //
+    // The second half was a real concern and is answered directly rather than
+    // by hiding the buttons: every chip that has been pressed carries a
+    // take-back beside it. A mistaken tap costs one press to undo, on this
+    // page, without going to the pit board.
+    //
+    // Still nothing before the race starts or after it ends: idle has no leg
+    // to count against, and a finished race is not being fuelled.
+    if (next.state === 'in-pit' || next.state === 'on-course') {
       const presets = Race.fuel.presets(cfg);
       const metrics = Race.fuel.metrics(cfg);
       // Every item, including one with no numbers on it: a medicine is logged
@@ -383,11 +409,18 @@
         out.push(`<div class="rblock">
           <span class="rlbl">Log what you took</span>
           <div class="rchips">
-            ${presets.map((p, i) => `<button class="rchip" type="button" data-preset="${i}">
-              <span>+ ${esc(p.name)}<span class="sub">${esc(metrics.filter(m => +p.values[m.key])
-                  .map(m => Race.fuel.fmt(m, p.values[m.key]) + ' ' + (m.short || m.label)).join(' · '))}</span></span>
-              <span class="cnt">${leg[`preset_${i}`] ? '\u00d7' + leg[`preset_${i}`] : ''}</span>
-            </button>`).join('')}
+            ${presets.map((p, i) => {
+              const n = +leg[`preset_${i}`] || 0;
+              return `<div class="rchip-row">
+              <button class="rchip" type="button" data-preset="${i}">
+                <span>+ ${esc(p.name)}<span class="sub">${esc(metrics.filter(m => +p.values[m.key])
+                    .map(m => Race.fuel.fmt(m, p.values[m.key]) + ' ' + (m.short || m.label)).join(' · '))}</span></span>
+                <span class="cnt">${n ? '\u00d7' + n : ''}</span>
+              </button>
+              ${n ? `<button class="rchip-undo" type="button" data-preset-undo="${i}"
+                aria-label="Take back one ${esc(p.name)}" title="Take back one ${esc(p.name)}">\u2212</button>` : ''}
+            </div>`;
+            }).join('')}
           </div>
         </div>`);
       }
@@ -526,10 +559,21 @@
   // One tap is one serving, added to what the leg already carries. The count on
   // the chip is kept alongside so a second tap reads as two rather than as a
   // number nobody can check.
-  async function tapPreset(i) {
+  // Adding and taking back are one function on purpose. Two would be two
+  // chances to disagree about which leg is being written, how a value rounds,
+  // or what the count does, and the take-back has to land on exactly the leg
+  // the press did.
+  //
+  // `dir` is +1 or -1. Nothing goes below zero: a count cannot, and neither
+  // can a metric, which matters because the crew can also type into these from
+  // the pit board and a blind subtraction would take their number negative.
+  async function tapPreset(i, dir) {
+    dir = dir === -1 ? -1 : 1;
     const runner = merged();
     const next = Race.compute.nextActionFor(runner, cfg);
-    if (next.state !== 'in-pit') return;
+    // A leg has to be underway or just ended. Idle has no leg to count
+    // against; a finished race is not being fuelled.
+    if (next.state !== 'in-pit' && next.state !== 'on-course') return;
     const legIndex = next.currentLegIndex;
     const preset = Race.fuel.presets(cfg)[i];
     if (!preset) return;
@@ -537,24 +581,34 @@
     let leg = (dr.legs || []).find(l => l.index === legIndex);
     if (!leg) return;
 
+    const had = +leg[`preset_${i}`] || 0;
+    // Nothing to take back. Not an error, just a press on a button that should
+    // not have been drawn.
+    if (dir === -1 && had < 1) return;
+
     const fields = {};
     for (const m of Race.fuel.metrics(cfg)) {
-      const add = +preset.values[m.key];
-      if (!add) continue;
-      fields[m.key] = Race.fuel.round(m, (parseFloat(leg[m.key]) || 0) + add);
+      const step = +preset.values[m.key];
+      if (!step) continue;
+      fields[m.key] = Math.max(0, Race.fuel.round(m, (parseFloat(leg[m.key]) || 0) + step * dir));
     }
-    fields[`preset_${i}`] = (+leg[`preset_${i}`] || 0) + 1;
+    fields[`preset_${i}`] = Math.max(0, had + dir);
     Object.assign(leg, fields);
     render();
     try {
       await Race.queue.write(DATA_PATH, 'setLegFields', { runnerId: meId, legIndex, fields },
-        `racer: ${preset.name} leg ${legIndex}`);
+        `racer: ${dir === -1 ? 'took back ' : ''}${preset.name} leg ${legIndex}`);
     } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
   }
 
   document.getElementById('readout').addEventListener('click', (e) => {
+    // The take-back first: it is a sibling of the chip rather than inside it,
+    // but checking the other way round invites somebody to nest them later and
+    // turn every undo into an add.
+    const undo = e.target.closest('[data-preset-undo]');
+    if (undo) { tapPreset(+undo.dataset.presetUndo, -1); return; }
     const chip = e.target.closest('[data-preset]');
-    if (chip) tapPreset(+chip.dataset.preset);
+    if (chip) tapPreset(+chip.dataset.preset, 1);
   });
 
   // ---------- which runner ----------

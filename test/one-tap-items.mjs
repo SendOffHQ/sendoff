@@ -128,6 +128,103 @@ await page.waitForTimeout(2000);
 const onPrint = await page.evaluate(() => document.body.textContent);
 ok('and on the printout', /Ibuprofen ×2/.test(onPrint), true);
 
+// The racer's own page, which is where a solo runner logs from.
+//
+// The chips used to appear only while a racer was stopped at an aid station,
+// on the reasoning that logging belongs where you are standing still. That is
+// wrong for what these are for: a gel or a dose is taken between aid stations,
+// and logged at the next one it is logged from memory, which is the thing
+// one-tap items exist to avoid. Medicines are the whole reason an item with no
+// numbers can exist at all.
+//
+// So they are drawn while a leg is underway too, and the concern that answered
+// is met head on instead: a chip that has been pressed carries a take-back
+// beside it, so a mistaken tap costs one press to undo without leaving the
+// page.
+console.log('\nthe racer page, with a leg underway');
+const setLegs = (legs) => page.evaluate(async ([slug, legs]) => {
+  await fetch('/api/commit', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer stub' },
+    body: JSON.stringify({ path: `races/${slug}/data.json`,
+      content: JSON.stringify({ runners: [{ id: 'jason', legs }] }, null, 2) + '\n',
+      message: 'test' }) });
+}, [SLUG, legs]);
+const openRacer = async () => {
+  await page.goto(BASE + `/racer.html?id=${SLUG}`);
+  await page.waitForTimeout(2600);
+};
+const racerChips = () => page.evaluate(() => {
+  const ro = document.getElementById('readout');
+  return {
+    chips: ro.querySelectorAll('.rchip').length,
+    undos: ro.querySelectorAll('.rchip-undo').length,
+    counts: [...ro.querySelectorAll('.rchip .cnt')].map(e => e.textContent.trim())
+  };
+});
+const storedLeg = () => page.evaluate(async (slug) => {
+  const r = await fetch(`/api/get?path=races/${slug}/data.json`, { headers: { Authorization: 'Bearer stub' } });
+  const d = JSON.parse(atob((await r.json()).content));
+  return ((d.runners[0] || {}).legs || [])[0] || null;
+}, SLUG);
+
+const OUT = { index: 1, startTime: '2026-09-08T01:00:00.000Z' };
+
+await setLegs([]);
+await openRacer();
+ok('nothing to press before the race starts', (await racerChips()).chips, 0);
+
+await setLegs([OUT]);
+await openRacer();
+ok('but on the move the items are there', (await racerChips()).chips, 2);
+ok('with nothing to take back yet', (await racerChips()).undos, 0);
+
+await page.click('.rchip-row:nth-child(2) .rchip');
+await page.waitForTimeout(900);
+ok('a dose logs from the trail', (await racerChips()).counts[1], '×1');
+ok('and a take-back appears beside it', (await racerChips()).undos, 1);
+await page.click('.rchip-row:nth-child(2) .rchip');
+await page.waitForTimeout(900);
+ok('a second one counts up', (await racerChips()).counts[1], '×2');
+
+console.log('\nand a mistaken tap costs one press to undo');
+await page.click('.rchip-row:nth-child(2) .rchip-undo');
+await page.waitForTimeout(900);
+ok('one comes back off', (await racerChips()).counts[1], '×1');
+await page.click('.rchip-row:nth-child(2) .rchip-undo');
+await page.waitForTimeout(900);
+ok('and the last one clears it', (await racerChips()).counts[1], '');
+ok('the take-back goes with it', (await racerChips()).undos, 0);
+ok('and the leg is back to none, not below it',
+  (await storedLeg() || {}).preset_1, 0);
+
+// A numbered item takes its amounts back too, and stops at zero: the crew can
+// type into these from the pit board, and a blind subtraction would take
+// somebody else's number negative.
+console.log('\nand a numbered item gives its amounts back');
+await page.click('.rchip-row:nth-child(1) .rchip');
+await page.waitForTimeout(900);
+ok('the flask\u2019s fluid went on the leg', (await storedLeg() || {}).fluidOz, 17);
+await page.click('.rchip-row:nth-child(1) .rchip-undo');
+await page.waitForTimeout(900);
+const back = await storedLeg() || {};
+ok('and comes back off', back.fluidOz, 0);
+ok('leaving the count at none', back.preset_0, 0);
+
+// The case the floor is actually for, and it is reachable: the racer taps a
+// flask, the crew then corrects the leg's fluid to zero from the pit board,
+// and the racer takes the flask back. A blind subtraction would put somebody
+// else's number at minus seventeen.
+console.log('\neven when the crew has already corrected the number');
+await setLegs([{ ...OUT, preset_0: 1, fluidOz: 0, sodiumMg: 0 }]);
+await openRacer();
+ok('the tap is still on the chip', (await racerChips()).counts[0], '×1');
+await page.click('.rchip-row:nth-child(1) .rchip-undo');
+await page.waitForTimeout(900);
+const floored = await storedLeg() || {};
+ok('taking it back does not go below zero',
+  [floored.fluidOz, floored.sodiumMg], [0, 0]);
+ok('and the count still clears', floored.preset_0, 0);
+
 ok('nothing threw', errs, []);
 await b.close();
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
