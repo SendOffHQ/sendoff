@@ -308,7 +308,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=8b617b62"></script>
+<script src="lib/race-core.js?v=bc0ccaca"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
@@ -418,7 +418,11 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     const roleName = r.role ? Race.roles.label(r.role === 'editor' ? 'crew' : r.role) : '';
     if (r.visibility === 'private') {
       const cls = r.role === 'viewer' ? 'viewer' : '';
-      badge = `<span class="card-badge ${cls}">Private${roleName ? ' · ' + roleName : ''}</span>`;
+      // Unlisted, not private, for a race that has been on the hub: what it
+      // published while it was listed is still in a public repository's
+      // history, and the card is the only place most people will look.
+      const word = r.everPublic ? 'Unlisted' : 'Private';
+      badge = `<span class="card-badge ${cls}">${word}${roleName ? ' · ' + roleName : ''}</span>`;
     } else if (roleName && r.role !== 'viewer') {
       badge = `<span class="card-badge">${roleName}</span>`;
     }
