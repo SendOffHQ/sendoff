@@ -56,6 +56,30 @@ jobs:
             exit 1
           }
 
+      # The other half of what make-og.py needs, and the reason this workflow
+      # had never once finished: it crops the screenshot with Pillow, which the
+      # runner image does not ship and nothing here installed. Every run since
+      # the workflow was added died on `ModuleNotFoundError: No module named
+      # 'PIL'`, after the browser check had passed, so the failure mail said
+      # only that all jobs had failed.
+      #
+      # Its own Python rather than the runner's, because the system one is
+      # externally managed and a plain pip install into it is refused. The
+      # version range is deliberate: a card is an image this project publishes,
+      # and a major Pillow release changing how one is encoded should be a
+      # thing somebody chooses, not something that arrives on a Tuesday.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Pillow
+        run: |
+          python3 -m pip install "Pillow>=11,<13"
+          # Named here rather than found three steps later in a traceback, the
+          # same reason the browser is checked above. The version goes in the
+          # log too, so a card that renders differently one day has somewhere
+          # to be traced back to.
+          python3 -c "import PIL; print('Pillow', PIL.__version__)"
+
       - name: Build the cards
         run: python3 tools/make-og.py
 
