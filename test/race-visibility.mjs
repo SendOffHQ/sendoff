@@ -31,7 +31,7 @@ const ok=(l,g,w)=>{const q=JSON.stringify(g)===JSON.stringify(w); if(!q)bad++;
   console.log(`  ${q?'ok  ':'FAIL'} ${l.padEnd(52)} ${JSON.stringify(g)}${q?'':' want '+JSON.stringify(w)}`)};
 
 const ctx = await b.newContext({ viewport:{width:900,height:1000}, serviceWorkers:'block' });
-const page = await ctx.newPage();
+let page = await ctx.newPage();
 const errs = [];
 page.on('pageerror', e => errs.push(e.message));
 await page.goto(BASE + '/index.html');
@@ -264,20 +264,82 @@ ok('and is not held back by the owner\'s plan', await page.evaluate(() =>
   document.querySelector('#ax-vis option[value="private"]').disabled), false);
 
 // And the shape that actually matters, because it is the one the Jr Texas
-// Water Safari is: an admin who is not on the race at all. The config comes
-// back with no role and the roster is refused, which is right, and the control
-// still has to be there or the moderation lever cannot be reached.
-console.log('\nan admin who is not on the race at all');
-await page.evaluate(base => fetch(base + '/api/not-on-race'), BASE);
+// Water Safari is: an admin who is not on the race at all, and the race is
+// private. That last half is what this check was missing. It ran against the
+// fixture while it was public, so the published copy was there to read and the
+// page came up; a private race has no published copy and the worker refuses
+// the read, so the settings page cannot open it at all. The control that moves
+// a race lived only on that page, which made taking a race off the hub a
+// one-way door: the admin lost the page in the same press.
+console.log('\nan admin who is not on the race, and the race is private');
+await page.evaluate(async base => {
+  await fetch(base + '/api/visibility-works');
+  await fetch(base + '/api/race/visibility', {
+    method: 'POST', headers: { Authorization: 'Bearer stub', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug: 'zz-fixture-unlisted', visibility: 'private' })
+  });
+  await fetch(base + '/api/not-on-race');
+}, BASE);
+// A window that has not already read this race while it was public. The tab
+// that took it off the hub has the old copy written down and goes on showing
+// it, which is its own kind of lie; this is the admin coming back to it, or
+// opening it on the phone, which is when there is nothing left to show.
+const ctx2 = await b.newContext({ viewport: { width: 900, height: 1000 }, serviceWorkers: 'block' });
+page = await ctx2.newPage();
+page.on('pageerror', e => errs.push(e.message));
+await page.goto(BASE + '/index.html');
+await page.evaluate(base => localStorage.setItem('race-hub-session-v1', JSON.stringify({
+  session: 'stub', proxyUrl: base + '/api', email: 'admin@example.com', role: 'admin',
+  expiresAt: Date.now() + 7 * 24 * 3600e3 })), BASE);
 await page.goto(BASE + `/settings.html?id=${SLUG}`);
-await page.waitForSelector('#runner-editor-head', { timeout: 20000 });
-await page.waitForTimeout(1500);
-ok('has no role on it', await page.evaluate(() =>
+await page.waitForTimeout(2000);
+ok('cannot open the race at all', await page.evaluate(() =>
+  document.getElementById('error').style.display), 'block');
+ok('and is told why, not that the race is missing', await page.evaluate(() =>
+  /not on this race/.test(document.getElementById('error').textContent)), true);
+ok('and pointed at the page that can still move it', await page.evaluate(() =>
+  !!document.querySelector('#error a[href="/admin"]')), true);
+// The form is the part that lied. Every save on it would be refused for the
+// same reason the read was, so leaving it on screen is an invitation to fill
+// in a page of settings and get nothing back.
+ok('with no editor left to fill in', await page.evaluate(() =>
+  [...document.querySelectorAll('section.editor')].filter(s => s.style.display !== 'none').length), 0);
+ok('and no roster either', await page.evaluate(() =>
   document.getElementById('access').style.display), 'none');
-ok('and can still take it off the hub', await shown(), true);
-await page.click('#visibility-editor-head');
-ok('with the control drawn', await page.evaluate(() =>
-  !!document.getElementById('ax-vis')), true);
+
+// Where the lever lives instead. It needs nothing out of the race, so it works
+// on a race an admin may not read, which is the whole point of putting it
+// here: the admin page already lists the races an account is on and already
+// says which are private.
+console.log('\nthe hub lever on the admin page');
+await page.goto(BASE + '/admin');
+await page.waitForTimeout(1500);
+await page.click('[data-email="crew@example.com"] .acct-head');
+await page.waitForTimeout(800);
+const leverRow = () => page.evaluate(() => {
+  const r = document.querySelector(`.race-row[data-slug="zz-fixture-unlisted"]`);
+  if (!r) return null;
+  const b = r.querySelector('.vis-btn');
+  return { role: r.querySelector('.role').textContent.trim(),
+           label: b ? b.textContent.trim() : null,
+           want: b ? b.dataset.want : null };
+});
+ok('the race is listed against the account that made it',
+  await page.evaluate(() => !!document.querySelector('.race-row[data-slug="zz-fixture-unlisted"]')), true);
+ok('shown as private, and offering to put it back',
+  await leverRow(), { role: 'creator · private', label: 'Put on the hub', want: 'public' });
+
+page.once('dialog', d => d.accept());
+await page.click('.race-row[data-slug="zz-fixture-unlisted"] .vis-btn');
+await page.waitForTimeout(1200);
+ok('pressing it moves the race, and the row says so',
+  await leverRow(), { role: 'creator', label: 'Take off the hub', want: 'private' });
+ok('and the race really did move', await page.evaluate(async base => {
+  const r = await fetch(base + '/api/get?path=races/zz-fixture-unlisted/config.json',
+    { headers: { Authorization: 'Bearer stub' } });
+  const j = await r.json();
+  return JSON.parse(atob(j.content)).visibility;
+}, BASE), 'public');
 
 ok('no page errors', errs, []);
 await b.close(); srv.kill('SIGKILL');

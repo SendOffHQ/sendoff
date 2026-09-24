@@ -187,6 +187,16 @@ already works: a list, a search box, and filters. Search by name, slug or
 creator; filter by visibility, by state (upcoming, live, finished, never run)
 and by plan; the visibility lever on each row; a link through to the race.
 
+**The lever went in early, on 2026-09-24, on the per-account rows that already
+exist.** Not as a down payment on this: to close a one-way door. The control
+lived only on a race's settings page, and that page cannot open a race an
+admin is not on, because a private race has no published copy and the worker
+refuses the read. So an admin who took a race off the hub lost the page that
+did it in the same press and could never put it back. The lever needs nothing
+out of the race, so it belongs somewhere that does not have to read one. What
+is still missing is the finding: `/account-races` answers for one email, so
+reaching a race still means knowing whose it is.
+
 **Back it with one query, not a walk.** The instinct is to list the slugs and
 load every config, which is what `/account-races` does and what `/my-races`
 does, and it is a config parse per race on every page load. It does not need

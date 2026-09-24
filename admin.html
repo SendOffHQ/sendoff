@@ -179,6 +179,15 @@
   .acct-races .role.editor { color: var(--accent); }
   .acct-races .role.viewer { color: var(--blue); }
   .acct-races .muted { color: var(--text-muted); font-style: italic; }
+  .acct-races .row-end { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+  .acct-races .vis-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-muted);
+    font-family: inherit; font-size: 9px; padding: 2px 7px; border-radius: 3px;
+    letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+  }
+  .acct-races .vis-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+  .acct-races .vis-btn:disabled { opacity: 0.5; cursor: default; }
+  .acct-races .vis-err { color: var(--red); padding: 2px 0 6px; white-space: normal; }
   .pending {
     margin-top: 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
   }
@@ -328,7 +337,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=bc0ccaca"></script>
+<script src="lib/race-core.js?v=22b4094f"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -993,6 +1002,78 @@
     });
   }
 
+  // The hub lever, and the only thing this page does to a race.
+  //
+  // It is here rather than on the race's own settings page because that page
+  // cannot open a race an admin is not on: a private race has no published
+  // copy and the worker refuses the read, which is the promise this site makes
+  // about private races and is worth keeping. Taking a race off the hub does
+  // not need to read the race, so it can live where an admin can always reach
+  // it. Before this, an admin who took a race off the hub from its settings
+  // page lost that page in the same moment and could never put it back.
+  function visLabel(visibility) {
+    return visibility === 'private' ? 'Put on the hub' : 'Take off the hub';
+  }
+
+  function raceRows(races) {
+    if (!races.length) return '<span class="muted">Not on any races.</span>';
+    return races.map(rc => `
+      <div class="race-row" data-slug="${esc(rc.slug)}">
+        <a href="race.html?id=${encodeURIComponent(rc.slug)}">${esc(rc.name || rc.slug)}</a>
+        <span class="row-end">
+          <span class="role ${esc(rc.role)}">${rc.isCreator ? 'creator' : esc(rc.role)}${rc.visibility === 'private' ? ' &middot; private' : ''}</span>
+          <button type="button" class="vis-btn" data-vis="${esc(rc.slug)}"
+            data-want="${rc.visibility === 'private' ? 'public' : 'private'}">${visLabel(rc.visibility)}</button>
+        </span>
+      </div>`).join('');
+  }
+
+  function wireVisButtons(box) {
+    box.querySelectorAll('[data-vis]').forEach(b => {
+      b.addEventListener('click', async () => {
+        const slug = b.dataset.vis, want = b.dataset.want;
+        // Said plainly, because neither direction is tidy. Off the hub cannot
+        // take back what was published while the race was on it; back on the
+        // hub publishes a race that may never have been public before.
+        const ask = want === 'private'
+          ? `Take ${slug} off the hub?\n\nIt stops being listed and only the people on it can open it. Anything already published while it was public stays in the public repository's history.`
+          : `Put ${slug} back on the hub?\n\nIts name, date, location, racers and course become public.`;
+        if (!confirm(ask)) return;
+        const row = b.closest('.race-row');
+        const was = b.textContent;
+        b.disabled = true; b.textContent = '…';
+        row.querySelectorAll('.vis-err').forEach(e => e.remove());
+        try {
+          const r = await Race.api.setVisibility(slug, want);
+          b.dataset.want = want === 'private' ? 'public' : 'private';
+          b.textContent = visLabel(want);
+          b.disabled = false;
+          const role = row.querySelector('.role');
+          if (role) {
+            role.textContent = role.textContent.replace(/\s*·\s*private$/, '')
+              + (want === 'private' ? ' · private' : '');
+          }
+          // The config is the fact and the rest follows it, so a change can
+          // land and still leave the race listed. An admin who is not told
+          // that has no reason to look.
+          const trouble = [r.manifestErr, r.courseErr, r.shareErr].filter(Boolean);
+          if (trouble.length) {
+            const e = document.createElement('div');
+            e.className = 'vis-err';
+            e.textContent = 'Changed, but: ' + trouble.join('; ');
+            row.appendChild(e);
+          }
+        } catch (err) {
+          b.disabled = false; b.textContent = was;
+          const e = document.createElement('div');
+          e.className = 'vis-err';
+          e.textContent = err.message;
+          row.appendChild(e);
+        }
+      });
+    });
+  }
+
   async function toggleAccount(row) {
     const open = row.querySelector('.acct-races');
     if (open) { open.remove(); row.querySelector('.acct-caret').innerHTML = '&#9654;'; return; }
@@ -1003,14 +1084,8 @@
     row.appendChild(box);
     try {
       const r = await Race.api.accountRaces(row.dataset.email);
-      const races = r.races || [];
-      box.innerHTML = races.length
-        ? races.map(rc => `
-            <div class="race-row">
-              <a href="race.html?id=${encodeURIComponent(rc.slug)}">${esc(rc.name || rc.slug)}</a>
-              <span class="role ${esc(rc.role)}">${rc.isCreator ? 'creator' : esc(rc.role)}${rc.visibility === 'private' ? ' &middot; private' : ''}</span>
-            </div>`).join('')
-        : '<span class="muted">Not on any races.</span>';
+      box.innerHTML = raceRows(r.races || []);
+      wireVisButtons(box);
     } catch (err) {
       box.innerHTML = '<span class="err">' + esc(err.message) + '</span>';
     }
