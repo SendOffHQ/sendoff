@@ -67,10 +67,13 @@ const setRace = (startsInHours, legsDone) => page.evaluate(async ([base, slug, h
     const r = await fetch(`${base}/api/get?path=races/${slug}/${file}`, { headers: { Authorization: 'Bearer stub' } });
     return JSON.parse(atob((await r.json()).content));
   };
-  const write = async (file, doc) => fetch(base + '/api/commit', {
-    method: 'POST', headers: { Authorization: 'Bearer stub', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path: `races/${slug}/${file}`, content: JSON.stringify(doc, null, 2), message: 'test' })
-  });
+  const write = async (file, doc) => {
+    const r = await fetch(base + '/api/commit', {
+      method: 'POST', headers: { Authorization: 'Bearer stub', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: `races/${slug}/${file}`, content: JSON.stringify(doc, null, 2), message: 'test' })
+    });
+    if (!r.ok) throw new Error(`setRace could not write ${file}: ${r.status}`);
+  };
   const cfg = await read('config.json');
   cfg.startTime = new Date(Date.now() + h * 3600e3).toISOString();
   await write('config.json', cfg);
@@ -177,6 +180,45 @@ ok('raceState calls it finished', await page.evaluate(async ([base, slug]) => {
 }, [BASE, SLUG]), 'finished');
 ok('the course stays locked anyway', await sec(),
   { locked: true, warned: true, fileDisabled: true, saveDisabled: true });
+
+// The other way this section can be offered to somebody who cannot use it, and
+// the one that actually happened: the race is readable, the page draws the
+// whole editor, and /commit refuses the write after the file has been uploaded.
+// Nothing about the race says no; the person does.
+console.log('\nsomebody who can read this race but not write it');
+// The race is set up first and the caller loses their role afterwards: once
+// they have lost it the stub refuses these writes too, exactly as the worker
+// would. Starting in two days, so the clock is not the reason for anything
+// below.
+await setRace(48, 0);
+await page.evaluate(async base => {
+  await fetch(base + '/api/race/visibility', {
+    method: 'POST', headers: { Authorization: 'Bearer stub', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug: 'zz-fixture-unlisted', visibility: 'public' })
+  });
+  await fetch(base + '/api/not-on-race');
+}, BASE);
+await open();
+ok('the clock says the section should be open', await page.evaluate(async ([base, slug]) => {
+  const g = async f => JSON.parse(atob((await (await fetch(`${base}/api/get?path=races/${slug}/${f}`,
+    { headers: { Authorization: 'Bearer stub' } })).json()).content));
+  return Race.raceState(await g('config.json'), await g('data.json'));
+}, [BASE, SLUG]), 'upcoming');
+ok('the section is disabled', await page.evaluate(() => {
+  const s = document.getElementById('course-editor');
+  return { locked: s.classList.contains('locked'),
+           fileDisabled: document.getElementById('course-file').disabled,
+           saveDisabled: document.getElementById('course-save').disabled };
+}), { locked: true, fileDisabled: true, saveDisabled: true });
+ok('and says whose race it is, not that the clock is wrong',
+  await page.evaluate(() => document.getElementById('course-warn').textContent.trim()),
+  'You are not on this race as crew, so its course is not yours to change. Ask whoever set it up to add you from Manage access.');
+// The rest of the page saves through the same endpoint and is refused the same
+// way, so it says so once at the top rather than at the end of each attempt.
+ok('the page says it up front', await page.evaluate(() => {
+  const el = document.getElementById('read-only');
+  return el.style.display !== 'none' && /not change it/.test(el.textContent);
+}), true);
 
 ok('no page errors', errs, []);
 await b.close(); srv.kill('SIGKILL');
