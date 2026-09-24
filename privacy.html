@@ -172,7 +172,7 @@
     wherever else it describes it, and keeps calling it that for as long as it exists. The two
     words mean different things here and the app does not blur them: private is a race that was
     never on the hub, unlisted is one that was.</p>
-  <p>Four things that are true anyway, and are worth saying plainly:</p>
+  <p>Five things that are true anyway, and are worth saying plainly:</p>
   <ul>
     <li><strong>Cloudflare holds it.</strong> Nothing here is end-to-end encrypted. Cloudflare
       stores the data and can read it, and so can anybody who gets into SendOff's account there.</li>
@@ -180,8 +180,14 @@
       holds it watch that race without an account, for as long as it lasts. Revoke it there.</li>
     <li><strong>SendOff's own admin page</strong> can list the races any one account is on, by
       name and address, private ones included, so that accounts can be supported and races that
-      were set up and then abandoned can be taken off the hub. It does not open those races: it
-      does not show their splits, their roster, their photographs or their course.</li>
+      were set up and then abandoned can be taken off the hub.</li>
+    <li><strong>A site admin can open and change any race, including a private one.</strong> This
+      is the plainest thing on this page and it is worth reading twice. It is not a role you grant
+      and it is not one you can take away: somebody running SendOff can read your splits, your
+      roster, your photographs and your course, and can edit them, and you are not told when they
+      do. It exists because the alternative was worse in practice, which is that nobody could be
+      helped with a race they could not reach, including their own. Today that is one person. If
+      you would not hand a race to a stranger who runs a website, do not put it here.</li>
     <li><strong>Public races are public, deliberately.</strong> A public race's files are served
       from a public GitHub repository, which is also what serves the pages people watch. Every
       change to one is a public commit.</li>
@@ -316,6 +322,6 @@
     <span aria-hidden="true"> &middot; </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=c5d41ab7"></script>
+<script src="lib/race-core.js?v=7d3aadf0"></script>
 </body>
 </html>

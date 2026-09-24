@@ -176,6 +176,23 @@ So the two decisions are separated, and the separation is the whole answer:
 Which leaves the second bullet, telling the creator, as the piece worth
 building next. It now has the lever it needs.
 
+### Log an admin opening a race that is not theirs — *not built*
+
+Raised 2026-09-24, the night the admin override went in. An admin can now read
+and edit any race, its owner is not told, and nothing anywhere records that it
+happened. The settings page says it to the admin's face while they do it,
+which stops it being used by accident, and that is all it does.
+
+What is missing is the record: who opened which race, when, and whether they
+changed anything. It wants somewhere that is not a public repository and not
+the race's own files, so D1, and it wants to be written on the read as well as
+on the write, because reading somebody's roster is the part they would care
+about. It also wants an answer to who gets to read that log, which is the same
+question one level up.
+
+Until it exists, `ADMIN_RACE_ACCESS="false"` in `worker/wrangler.toml` is the
+only control, and it is all or nothing.
+
 ### An admin view of every race — *not built*
 
 Raised 2026-09-23. There is no such view: `/account-races` answers for one

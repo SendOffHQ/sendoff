@@ -337,7 +337,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=c5d41ab7"></script>
+<script src="lib/race-core.js?v=7d3aadf0"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -1036,7 +1036,7 @@
         // take back what was published while the race was on it; back on the
         // hub publishes a race that may never have been public before.
         const ask = want === 'private'
-          ? `Take ${slug} off the hub?\n\nIt stops being listed and only the people on it can open it. Anything already published while it was public stays in the public repository's history.`
+          ? `Take ${slug} off the hub?\n\nIt stops being listed and only the people on it, and site admins, can open it. Anything already published while it was public stays in the public repository's history.`
           : `Put ${slug} back on the hub?\n\nIts name, date, location, racers and course become public.`;
         if (!confirm(ask)) return;
         const row = b.closest('.race-row');

@@ -915,10 +915,21 @@ function aclFromConfig(cfg) {
   };
 }
 
+// null means KV holds no access list for this race. A throw means KV could not
+// be asked, and the two must never be confused: "no access list" is read by
+// everything above as "this race has no owner and no crew", which is a silent,
+// total lockout of a race that is perfectly fine. KV has a daily allowance, and
+// the day it runs out is the day nobody can write their own race.
 async function readAcl(env, slug) {
   if (!env.AUTH_KV) return null;
+  let raw;
   try {
-    const raw = await env.AUTH_KV.get(ACL_KEY(slug));
+    raw = await env.AUTH_KV.get(ACL_KEY(slug));
+  } catch (e) {
+    throw Object.assign(new Error(`Could not read the access list: ${e && e.message || e}`),
+      { aclUnavailable: true });
+  }
+  try {
     if (!raw) return null;
     const a = JSON.parse(raw);
     return {
@@ -932,7 +943,38 @@ async function readAcl(env, slug) {
       teamCanInvite: !!a.teamCanInvite,
       runnerEmails: (a.runnerEmails && typeof a.runnerEmails === 'object') ? a.runnerEmails : {}
     };
-  } catch (e) { return null; }
+  } catch (e) {
+    // Stored and unparseable. Unlike the read failing, this will not fix
+    // itself, and treating it as a read failure would wedge the race forever.
+    return null;
+  }
+}
+
+// The same access list, out of the mirror. race_people and races.created_by are
+// written from the KV copy on every config write, so this is a real second copy
+// rather than a guess, and it is the answer when KV cannot be asked.
+//
+// It does not carry runnerEmails: those live only in KV, and a runner's account
+// link going missing for one request costs a picker its options, which is a
+// long way from locking the crew out of the race.
+async function aclFromD1(env, slug) {
+  if (!env.DB || !slug) return null;
+  const race = (await env.DB.prepare('SELECT created_by FROM races WHERE slug = ?')
+    .bind(slug).all()).results[0];
+  if (!race) return null;
+  const people = (await env.DB.prepare('SELECT email, role FROM race_people WHERE slug = ?')
+    .bind(slug).all()).results || [];
+  const createdBy = normalizeEmail(race.created_by) || null;
+  if (!createdBy && !people.length) return null;
+  return {
+    createdBy,
+    people: people.filter(p => p && p.email).map(p => ({
+      email: normalizeEmail(p.email),
+      role: RACE_ROLES.includes(p.role) ? p.role : 'viewer'
+    })),
+    teamCanInvite: false,
+    runnerEmails: {}
+  };
 }
 
 async function writeAcl(env, slug, acl) {
@@ -966,7 +1008,21 @@ function withAcl(cfg, acl) {
 // KV, so the migration happens by being used.
 async function attachAcl(env, slug, cfg) {
   if (!cfg) return cfg;
-  const stored = await readAcl(env, slug);
+  let stored = null;
+  try {
+    stored = await readAcl(env, slug);
+  } catch (err) {
+    // KV could not be asked. The file cannot answer either: a config stored
+    // since the roster moved has had createdBy taken out of it, so falling
+    // through to it would say this race belongs to nobody and refuse its own
+    // crew. The mirror holds the same roster, so it answers instead.
+    const mirrored = await aclFromD1(env, slug).catch(() => null);
+    if (mirrored) return withAcl(cfg, mirrored);
+    // Nothing can say who is on this race. Refusing the request is the only
+    // honest answer left; pretending the roster is empty locks everybody out
+    // and looks exactly like a permission decision.
+    throw err;
+  }
   if (stored) return withAcl(cfg, stored);
   const fromFile = aclFromConfig(cfg);
   if (env.AUTH_KV && (fromFile.createdBy || fromFile.people.length)) {
@@ -1140,6 +1196,28 @@ function roleForRace(raceCfg, email) {
 
 function canEditRace(raceCfg, email) {
   return WRITING_ROLES.has(roleForRace(raceCfg, email));
+}
+
+// A site admin may read and work any race, whether or not they are on it.
+//
+// Asked for on 2026-09-24, and it is a real widening rather than a convenience:
+// before this, support meant asking somebody to add you to their own race, so
+// a person who could not reach their race could not be helped at all, and an
+// admin who took a race off the hub lost it. It is deliberately not a role on
+// the race: it is never granted, never appears in a roster, and the race's
+// owner cannot revoke it.
+//
+// Off with ADMIN_RACE_ACCESS="false", which is the whole of switching it back.
+// Default on, because the deployment that wants it is the one running today and
+// a flag nobody has set should not be the reason support does not work.
+//
+// The privacy page says this in as many words. If that stops being true, that
+// page is the thing to fix first.
+function adminRaceAccess(env) {
+  return String(env.ADMIN_RACE_ACCESS || '').toLowerCase() !== 'false';
+}
+function asSiteAdmin(env, session) {
+  return !!session && session.role === 'admin' && adminRaceAccess(env);
 }
 function canViewRace(raceCfg, email) {
   if (!raceCfg) return false;
@@ -2320,7 +2398,7 @@ async function handleCommit(req, env, ctx) {
           }, { status: 402 }, env, req);
         }
       }
-    } else if (!canEditRace(raceCfg, session.email)) {
+    } else if (!canEditRace(raceCfg, session.email) && !asSiteAdmin(env, session)) {
       return json({ error: 'Forbidden, no write access on this race' }, { status: 403 }, env, req);
     } else if (path.endsWith('/config.json')) {
       let submitted;
@@ -2635,6 +2713,7 @@ async function handleGet(req, env) {
     if (!raceCfg) return json({ error: 'Not found' }, { status: 404 }, env, req);
     let allowed = false;
     if (sessionEmail && canViewRace(raceCfg, sessionEmail)) allowed = true;
+    if (!allowed && asSiteAdmin(env, session)) allowed = true;
     if (!allowed && shareToken && env.AUTH_KV) {
       const raw = await env.AUTH_KV.get('share:' + shareToken);
       if (raw) {
@@ -2690,12 +2769,16 @@ async function handleGet(req, env) {
       const env0 = JSON.parse(text);
       const cfg = JSON.parse(base64ToUtf8(env0.content));
       cfg.myRole = sessionEmail ? roleForRace(aclCfg || cfg, sessionEmail) : null;
+      // Not 'owner'. An admin may work this race and is still not the person
+      // whose race it is: deleting it, and handing out access to it, stay with
+      // them. The client reads this as a writing role and nothing more.
+      if (cfg.myRole === null && asSiteAdmin(env, session)) cfg.myRole = 'admin';
       // Runner-to-account links come back only for somebody who works the
       // race. Crew need them to load a runner's goals and racer mode needs
       // them to know whose splits it is showing. A viewer does not, and an
       // anonymous reader certainly does not, so for them the addresses stay
       // where they now live, which is out of sight.
-      if (aclCfg && WRITING_ROLES.has(cfg.myRole)) cfg.runners = aclCfg.runners;
+      if (aclCfg && (WRITING_ROLES.has(cfg.myRole) || cfg.myRole === 'admin')) cfg.runners = aclCfg.runners;
       env0.content = utf8ToBase64(JSON.stringify(cfg, null, 2) + '\n');
       text = JSON.stringify(env0);
     } catch (e) { /* hand back exactly what GitHub gave us */ }
@@ -3419,10 +3502,12 @@ function publicBaseUrl(env, req) {
 
 // Anyone who can write the race. Enough to read the roster and see who else is
 // on it, which the whole team has a reason to do.
-async function requireRaceWriter(env, slug, sessionEmail) {
+// `session` is optional and is only ever read for the admin override, so a
+// caller that has only an address still gets exactly the old behaviour.
+async function requireRaceWriter(env, slug, sessionEmail, session) {
   const raceCfg = await loadRaceConfigNow(env, slug);
   if (!raceCfg) throw Object.assign(new Error('Race not found'), { status: 404 });
-  if (!canEditRace(raceCfg, sessionEmail)) {
+  if (!canEditRace(raceCfg, sessionEmail) && !asSiteAdmin(env, session)) {
     throw Object.assign(new Error('Forbidden, no write access on this race'), { status: 403 });
   }
   return raceCfg;
@@ -3437,10 +3522,10 @@ function canManageAccess(raceCfg, email) {
   return !!(raceCfg && raceCfg.teamCanInvite) && canEditRace(raceCfg, email);
 }
 
-async function requireAccessManager(env, slug, sessionEmail) {
+async function requireAccessManager(env, slug, sessionEmail, session) {
   const raceCfg = await loadRaceConfigNow(env, slug);
   if (!raceCfg) throw Object.assign(new Error('Race not found'), { status: 404 });
-  if (!canManageAccess(raceCfg, sessionEmail)) {
+  if (!canManageAccess(raceCfg, sessionEmail) && !asSiteAdmin(env, session)) {
     throw Object.assign(new Error(
       canEditRace(raceCfg, sessionEmail)
         ? 'Forbidden, only the race creator can change who has access'
@@ -3456,7 +3541,7 @@ async function handleAccessList(req, env) {
   const slug = url.searchParams.get('slug');
   if (!slug) return json({ error: 'Missing slug' }, { status: 400 }, env, req);
   let raceCfg;
-  try { raceCfg = await requireRaceWriter(env, slug, session.email); }
+  try { raceCfg = await requireRaceWriter(env, slug, session.email, session); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
 
   // Share links and pending invites are best-effort, and the roster is not.
@@ -3557,7 +3642,7 @@ async function handleAccessAdd(req, env) {
     return json({ error: `slug, email, role (${RACE_ROLES.join('|')}) required` }, { status: 400 }, env, req);
   }
   let raceCfg;
-  try { raceCfg = await requireAccessManager(env, slug, session.email); }
+  try { raceCfg = await requireAccessManager(env, slug, session.email, session); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
 
   // The cap belongs to whoever owns the race, and it counts the people who can
@@ -3599,7 +3684,7 @@ async function handleAccessRemove(req, env) {
     return json({ error: 'slug and email required' }, { status: 400 }, env, req);
   }
   let raceCfg;
-  try { raceCfg = await requireAccessManager(env, slug, session.email); }
+  try { raceCfg = await requireAccessManager(env, slug, session.email, session); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
   if (normalizeEmail(raceCfg.createdBy) === email) {
     return json({ error: 'Cannot remove the creator' }, { status: 400 }, env, req);
@@ -3715,7 +3800,7 @@ async function handleInvite(req, env) {
   if (!slug || !email || !RACE_ROLES.includes(wanted)) {
     return json({ error: `slug, email, role (${RACE_ROLES.join('|')}) required` }, { status: 400 }, env, req);
   }
-  try { await requireAccessManager(env, slug, session.email); }
+  try { await requireAccessManager(env, slug, session.email, session); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
 
   const token = randomToken(24);
@@ -3831,7 +3916,7 @@ async function handleShareLink(req, env) {
     return json({ error: 'Edit share links are not supported: invite an account instead' }, { status: 400 }, env, req);
   }
   let shareCfg;
-  try { shareCfg = await requireAccessManager(env, slug, session.email); }
+  try { shareCfg = await requireAccessManager(env, slug, session.email, session); }
   catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
 
   const shareEnt = await raceOwnerEntitlements(env, shareCfg);
@@ -3881,7 +3966,7 @@ async function handleShareRevoke(req, env) {
     // Account invites aren't race-scoped: gate on the hub admin role.
     if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
   } else {
-    try { await requireAccessManager(env, rec.slug, session.email); }
+    try { await requireAccessManager(env, rec.slug, session.email, session); }
     catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
   }
   await env.AUTH_KV.delete(kvKey);
@@ -4655,6 +4740,14 @@ export default {
       // in one, and the alternative is a person staring at "Failed to fetch"
       // with nothing to tell anybody.
       const msg = (err && err.message) ? err.message : String(err);
+      // A roster that could not be read is not a bug in here and it is not a
+      // permission decision, it is a store that is briefly unreachable. 503
+      // says so, and the client's queue already holds a press on a 503 and
+      // retries it, which for somebody standing at an aid station is the
+      // difference between a lost split and a slow one.
+      if (err && err.aclUnavailable) {
+        return json({ error: msg, retryable: true }, { status: 503 }, env, request);
+      }
       return json({ error: msg, unhandled: true }, { status: 500 }, env, request);
     }
   }
