@@ -15,8 +15,16 @@ uses to render them.
 | `sendoff-icon-light-bg.svg` | Mark in deep teal, for light grounds |
 | `sendoff-icon-tile.svg` | Mark on a rounded dark tile: app icon, social avatar |
 | `sendoff-favicon.svg` | Tile with tighter padding, for the browser tab |
+| `sendoff-logo-dark-bg-{400,800,1600}.png` | Full lockup as PNG, transparent, for dark grounds |
+| `sendoff-logo-light-bg-{400,800,1600}.png` | Full lockup as PNG, transparent, for light grounds |
 | `tokens.css` | Colour + type tokens, ground presets, wordmark component styles |
 | `index.html` | **Brand reference**: logo, grounds, scale, colour, type, voice, tokens |
+
+The PNGs are for anywhere that will not take an SVG: a flyer, a sponsor deck,
+a newsletter. Both are transparent, so the name says which ground each is for
+rather than what is behind it: cream letters vanish on white and near-black ones
+vanish on black. They are rendered from the two source SVGs, clear space
+included, by `node tools/make-logo-pngs.mjs`; change the artwork, rerun that.
 
 The icons are cut from the lockup's own geometry: the ring is
 `circle(2356, 350) r294 stroke112` and the dot `circle(2370, 350) r80`, both
