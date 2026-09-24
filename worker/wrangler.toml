@@ -35,6 +35,19 @@ READ_FROM_D1 = "true"
 # course.gpx and races/index.json still go to git either way: one is written
 # once at setup, the other is the public manifest the signed-out hub reads.
 WRITE_TO_GIT = "false"
+# Whether a site admin may open and change a race they are not on.
+#
+# On unless this says "false", and that one word is the whole of turning it
+# off. It is a real widening and privacy.html says so in as many words: an
+# admin can read and edit anybody's race, including a private one, and its
+# owner is not told. It is on because without it support does not work at all:
+# helping somebody with a race meant asking them to add you to it, which the
+# person locked out of their own race cannot do.
+#
+# If this is ever set to "false", privacy.html is the thing to fix in the same
+# change. A promise that is quietly too generous is the survivable direction;
+# one that is quietly too narrow is not.
+ADMIN_RACE_ACCESS = "true"
 # If you mount the worker at a subpath (e.g. on a route like
 # api.example.com/race-dashboard/*), set MOUNT_PATH to that prefix.
 # Leave empty if the worker is at the root of its hostname.

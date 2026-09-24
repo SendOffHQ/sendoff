@@ -471,7 +471,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=c5d41ab7"></script>
+<script src="lib/race-core.js?v=7d3aadf0"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -628,7 +628,18 @@
   function renderWriteAccess() {
     const el = document.getElementById('read-only');
     if (!el || !cfg) return;
-    const canEdit = Race.roles.canEdit(cfg, Race.auth.email());
+    const role = Race.roles.of(cfg, Race.auth.email());
+    // Working somebody else's race on an admin's say-so. Said out loud, every
+    // time, because the whole risk of that power is using it without noticing:
+    // nothing else on this page looks any different, and the person whose race
+    // it is did not invite you and cannot take it back.
+    if (role === 'admin') {
+      el.style.display = '';
+      el.textContent = 'This is not your race. You are editing it as a site admin, and ' +
+        'whoever set it up has not been told and cannot revoke it.';
+      return;
+    }
+    const canEdit = Race.roles.canWrite(role);
     el.style.display = canEdit ? 'none' : '';
     if (!canEdit) {
       el.textContent = 'You can read this race but not change it, so anything saved here will be ' +
