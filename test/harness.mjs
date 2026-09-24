@@ -101,6 +101,12 @@ const server = http.createServer((req, res) => {
       if (!j || !j.path || typeof j.content !== 'string') {
         return send(400, '{"error":"Missing path or content"}', 'application/json');
       }
+      // What the worker does with a writer who has no role on the race. The
+      // stub used to take any write from anybody with a token, which meant a
+      // page could say "Saved" here and be refused in production.
+      if (notOnRace && /^races\/[^/]+\//.test(j.path)) {
+        return send(403, '{"error":"Forbidden, no write access on this race"}', 'application/json');
+      }
       WRITTEN.set(j.path, j.content);
       send(200, JSON.stringify({ content: { path: j.path, sha: 'stub-sha-' + WRITTEN.size } }),
            'application/json');
@@ -130,6 +136,15 @@ const server = http.createServer((req, res) => {
     if (!signedIn && !tokenOk) return send(401, '{"error":"Unauthorized"}', 'application/json');
     let text = raceFile(m[1], m[2]);
     if (text == null) return send(404, '{"message":"Not Found"}', 'application/json');
+    // A race nobody but its people can see. The worker answers a caller with
+    // no role on it with a 403, whatever else that caller is allowed to do.
+    if (notOnRace && !tokenOk) {
+      let vis = null;
+      try { vis = JSON.parse(raceFile(m[1], 'config.json') || 'null').visibility; } catch (e) {}
+      if (vis !== 'public') {
+        return send(403, '{"error":"Forbidden, not invited to this race"}', 'application/json');
+      }
+    }
     // What the real worker does: injects the caller's role, and the published
     // file names nobody. A token holder is nobody: it grants reading, not a
     // role.
@@ -353,6 +368,21 @@ const server = http.createServer((req, res) => {
   }
   if (url.pathname === '/api/free-plan') { freePlan = true; return send(200, '{"ok":true}'); }
 
+  // Which races an account is on, which is the whole of what the admin page
+  // shows about a race: no splits, no roster, no course. The hub lever beside
+  // each row reads its visibility from here.
+  if (url.pathname === '/api/account-races') {
+    if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+    const email = (url.searchParams.get('email') || '').toLowerCase();
+    const cfg = JSON.parse(raceFile(SLUG, 'config.json') || '{}');
+    const owner = String(cfg.createdBy || '').toLowerCase();
+    const races = email === owner
+      ? [{ slug: SLUG, name: cfg.name, visibility: cfg.visibility || 'public',
+           role: 'owner', isCreator: true }]
+      : [];
+    return send(200, JSON.stringify({ email, races }), 'application/json');
+  }
+
   // Moving a race on or off the hub. Held in memory like a commit, so the
   // config read that follows a save sees what the save did.
   if (url.pathname === '/api/race/visibility') {
@@ -379,8 +409,12 @@ const server = http.createServer((req, res) => {
       send(404, '{"error":"Race not found"}', 'application/json');
     });
   }
-  // Makes the next visibility save fail, for the half-done path.
+  // Makes visibility saves fail, for the half-done path, until they are turned
+  // back on. A run that needs a race actually moved after using this has to say
+  // so: the flag used to be set once and stay set, which silently turned a
+  // later save into a 403 nothing was looking at.
   if (url.pathname === '/api/visibility-fails') { visibilityFails = true; return send(200, '{"ok":true}'); }
+  if (url.pathname === '/api/visibility-works') { visibilityFails = false; return send(200, '{"ok":true}'); }
 
   if (url.pathname.startsWith('/api/')) return send(200, '{}', 'application/json');
 
@@ -404,6 +438,15 @@ const server = http.createServer((req, res) => {
   if (fx && !fs.existsSync(full)) {
     const alt = path.join(FIXTURES, fx[1], fx[2]);
     if (fs.existsSync(alt)) full = alt;
+  }
+  // A private race has no published copy. The host answers its files with the
+  // 404 page, and the fallback chain in readRaceFile depends on that: a
+  // harness that serves them anyway hands every page a copy of a race the
+  // worker has just refused, and hides what a person actually sees.
+  if (fx && /^(config|data)\.json$|^course\.gpx$/.test(fx[2])) {
+    let vis = null;
+    try { vis = JSON.parse(raceFile(fx[1], 'config.json') || 'null').visibility; } catch (e) {}
+    if (vis && vis !== 'public') full = path.join(ROOT, '__no_such_file__');
   }
   if (!fs.existsSync(full) && fs.existsSync(full + '.html')) full += '.html';
   if (full.startsWith(ROOT) && fs.existsSync(full) && fs.statSync(full).isDirectory()) {

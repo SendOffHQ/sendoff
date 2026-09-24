@@ -434,7 +434,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=bc0ccaca"></script>
+<script src="lib/race-core.js?v=22b4094f"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -1327,7 +1327,23 @@
     } catch (err) {
       const e = document.getElementById('error');
       e.style.display = 'block';
-      e.textContent = `Error: ${err.message}`;
+      // A race you may not read is not a race that is missing, and a form that
+      // cannot load one cannot save one either: the worker refuses the write
+      // for the same reason it refused the read. Leaving the editors on screen
+      // is how somebody spends ten minutes filling one in and gets nothing
+      // back, so they go, and the banner says the true thing instead.
+      if (err && err.status === 403) {
+        document.querySelectorAll('section.editor, #access').forEach(sec => { sec.style.display = 'none'; });
+        document.getElementById('race-title').textContent = 'Not your race';
+        document.title = 'Settings';
+        e.innerHTML = 'You are not on this race, so its settings cannot be opened. ' +
+          'Ask whoever set it up to add you from Manage access.' +
+          (Race.auth.isAdmin()
+            ? ' As an admin you can still take it off the hub, or put it back, from <a href="/admin">the admin page</a>.'
+            : '');
+      } else {
+        e.textContent = `Error: ${err.message}`;
+      }
     }
   }
 
