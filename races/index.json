@@ -57,12 +57,12 @@
         "elevation": "ft"
       },
       "activity": "trail-run",
-      "totalDistanceMi": 100,
+      "totalDistanceMi": 100.1,
       "runnerNames": [
         "Ronnie Reineke"
       ],
       "cutoffHours": 30
     }
   ],
-  "lastUpdated": "2026-09-24T01:51:13.776Z"
+  "lastUpdated": "2026-09-24T02:12:35.424Z"
 }
