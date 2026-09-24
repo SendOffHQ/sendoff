@@ -77,6 +77,11 @@
     color: var(--yellow); padding: 10px 12px; border-radius: 4px;
     font-size: 11px; margin-bottom: 12px;
   }
+  .course-hint { color: var(--text-muted); font-size: 11px; margin: 8px 0 0; }
+  .course-hint.good { color: var(--green); }
+  .course-hint.bad { color: var(--red); }
+  #course-editor input[type="file"] { font-size: 11px; color: var(--text-dim); }
+  #course-editor.locked input, #course-editor.locked .btn { opacity: 0.5; }
   table.aid-list {
     width: 100%; border-collapse: collapse;
   }
@@ -294,6 +299,37 @@
   </div>
 </section>
 
+<!-- The course trace. Its own section rather than part of Aid stations: the
+     mileages above are the race's own measure and this is a file, and swapping
+     one has consequences the other does not. -->
+<section class="editor collapsed" id="course-editor">
+  <div class="editor-head" id="course-editor-head">
+    <div class="editor-title">Course file</div>
+    <span class="editor-toggle">Edit</span>
+  </div>
+  <div class="editor-body">
+    <div class="editor-warn" id="course-warn" style="display:none;"></div>
+    <p class="course-hint" id="course-current">Checking what this race has…</p>
+    <input type="file" id="course-file" accept=".gpx,application/gpx+xml,text/xml" />
+    <p class="course-hint" id="course-status">
+      Drives the course map, the elevation profile, and each segment's climb.
+    </p>
+    <label class="aid-chip" id="course-recalc-chip" style="margin-top: 12px;">
+      <input type="checkbox" id="course-recalc" />
+      <span>Recalculate every segment's climb from this file</span>
+    </label>
+    <p class="course-hint" id="course-recalc-hint">
+      Off, every climb already stored is kept and only the blanks are filled. On,
+      the stored figures are thrown away and worked out again from this trace.
+      Leave it off if those numbers came from the race's own website: a published
+      figure beats arithmetic over a GPX.
+    </p>
+    <div style="margin-top: 14px; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;">
+      <button class="btn primary" id="course-save" disabled>Save course</button>
+    </div>
+  </div>
+</section>
+
 <section class="editor collapsed" id="runner-editor">
   <div class="editor-head" id="runner-editor-head">
     <div class="editor-title">Racers &amp; fueling</div>
@@ -434,7 +470,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=22b4094f"></script>
+<script src="lib/race-core.js?v=c5d41ab7"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -577,6 +613,187 @@
     maybeShowAccessPanel();
     if (!accountPeople.length) loadAccountPeople();
     updateLastUpdatedLabel();
+    renderCourseEditor();
+  }
+
+  // ---------- the course file ----------
+  // Replacing the trace on a race that already exists. The wizard could always
+  // take one; nothing else could, so a race set up without a course, or with
+  // last year's, had to be rebuilt to get a new one.
+  //
+  // GitHub's contents API stops inlining a blob over a megabyte, and that is
+  // where a course lives for a public race. Over that and the worker can still
+  // write the file but can never read it back, and moving the race off the hub
+  // later cannot copy it. Both failures are silent, so the size is checked here
+  // rather than discovered on race morning. A trace this big is nearly always
+  // carrying per-point timestamps it does not need.
+  const COURSE_MAX_BYTES = 1024 * 1024;
+  const COURSE_PATH = `races/${slug}/course.gpx`;
+  const COURSE_HINT = "Drives the course map, the elevation profile, and each segment's climb.";
+  let pickedCourse = null;     // { name, text, pts } once a file parses
+  let courseOnFile = null;     // what the race has now, or null if it has none
+
+  // Why the course cannot be replaced right now, or null when it can.
+  //
+  // Only while the race is being run. The course is the map and the profile a
+  // crew is reading at an aid station and a runner is somewhere on it, so there
+  // is no version of "are you sure" that makes swapping it a good idea.
+  // Deliberately not raceState: that calls a race finished once the cutoff has
+  // passed, and a race that blew its cutoff with somebody still walking it in
+  // is exactly the race this must not unlock for.
+  function courseLockedBecause() {
+    if (!cfg) return null;
+    if (Race.raceState(cfg, data) === 'upcoming') return null;
+    if (Race.everyRunnerDone(cfg, data)) return null;
+    return 'The race is under way, so the course is fixed until every racer is in. ' +
+           'It is the map and the profile your crew are reading right now.';
+  }
+
+  function courseHint(el, text, kind) {
+    el.className = 'course-hint' + (kind ? ' ' + kind : '');
+    el.textContent = text;
+  }
+
+  // One description of a trace, so the file you picked and the file on the race
+  // are described in the same words and can be compared at a glance.
+  function courseSummary(pts) {
+    const u = cfg || {};
+    const dist = Race.gpx.totalDistanceMi(pts);
+    const elev = Race.gpx.totalElevation(pts);
+    return `${pts.length.toLocaleString()} pts · ${Race.units.distance(dist, u)} · ` +
+      `+${Math.round(Race.units.elevationVal(elev.gainFt, u)).toLocaleString()} / ` +
+      `-${Math.round(Race.units.elevationVal(elev.lossFt, u)).toLocaleString()} ` +
+      `${Race.units.elevationLabel(u)} (est.)`;
+  }
+
+  function renderCourseEditor() {
+    const sec = document.getElementById('course-editor');
+    if (!sec) return;
+    const warn = document.getElementById('course-warn');
+    const why = courseLockedBecause();
+    // Drawn disabled with the reason rather than hidden, so somebody looking
+    // for it at mile forty finds out why instead of wondering where it went.
+    sec.classList.toggle('locked', !!why);
+    warn.style.display = why ? '' : 'none';
+    warn.textContent = why || '';
+    document.getElementById('course-file').disabled = !!why;
+    document.getElementById('course-recalc').disabled = !!why;
+    document.getElementById('course-save').disabled = !!why || !pickedCourse;
+    if (courseOnFile === null) readCourseOnFile();
+  }
+
+  // What the race has now, read once. A course is not part of config.json, so
+  // nothing else on this page has already fetched it.
+  async function readCourseOnFile() {
+    courseOnFile = 'loading';
+    const el = document.getElementById('course-current');
+    try {
+      const text = await Race.gh.readRaceText(slug, 'course.gpx', Race.auth.has());
+      if (!text) { courseOnFile = false; courseHint(el, 'This race has no course file yet.'); return; }
+      courseOnFile = true;
+      courseHint(el, `On the race now: ${courseSummary(Race.gpx.parse(text))}. Saving replaces it.`);
+    } catch (err) {
+      courseOnFile = false;
+      courseHint(el, `Could not read the course this race has: ${err.message}`, 'bad');
+    }
+  }
+
+  document.getElementById('course-editor-head').addEventListener('click', () => {
+    document.getElementById('course-editor').classList.toggle('collapsed');
+  });
+
+  document.getElementById('course-file').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    const status = document.getElementById('course-status');
+    const save = document.getElementById('course-save');
+    pickedCourse = null;
+    save.disabled = true;
+    if (!file) { courseHint(status, COURSE_HINT); return; }
+    if (file.size > COURSE_MAX_BYTES) {
+      courseHint(status, `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MB. ` +
+        `The limit is 1 MB, because a bigger file can be written but never read back. ` +
+        `Most of that is usually a timestamp on every point: drop those and it fits.`, 'bad');
+      return;
+    }
+    try {
+      const text = await file.text();
+      const pts = Race.gpx.parse(text);
+      pickedCourse = { name: file.name, text, pts };
+      courseHint(status, `${file.name} · ${courseSummary(pts)}`, 'good');
+      save.disabled = !!courseLockedBecause();
+    } catch (err) {
+      courseHint(status, `Could not parse GPX: ${err.message}`, 'bad');
+    }
+  });
+
+  document.getElementById('course-save').addEventListener('click', saveCourse);
+
+  async function saveCourse() {
+    if (!pickedCourse) return;
+    // Checked again here and not only at the press: a page left open through a
+    // start is a page whose buttons were drawn before the race began.
+    const why = courseLockedBecause();
+    if (why) { renderCourseEditor(); toast(why, 'error'); return; }
+
+    const recalc = document.getElementById('course-recalc').checked;
+    if (recalc && !confirm(
+        'Throw away every climb figure stored for this race and work them out again ' +
+        'from this file? Anything typed in from the race\'s own website is lost.')) return;
+
+    const btn = document.getElementById('course-save');
+    Race.saveBtn.busy(btn);
+    try {
+      // The file first. The config below describes it, and a config that
+      // describes a trace nobody stored is the worse of the two half-states.
+      let sha = null;
+      try {
+        const cur = await Race.gh.getFile(Race.auth.cfg(), COURSE_PATH);
+        if (!cur.missing) sha = cur.sha;
+      } catch (e) { /* no current file, or unreadable: write a fresh one */ }
+      await Race.gh.putFile(Race.auth.cfg(), COURSE_PATH, pickedCourse.text, sha,
+        `pit: new course for ${slug}`);
+
+      // Then the segments. fillSegmentElevation refuses to overwrite a figure
+      // that is there, so recalculating means clearing them first.
+      //
+      // Skipped entirely for a race with no segments to fill: a lap-only loop
+      // has a distance and no legs, and writing its config back unchanged
+      // would put a commit in a public repository that says nothing happened.
+      const hasSegments = ['segments', 'loopSegments']
+        .some(k => ((cfg.course || {})[k] || []).length);
+      const writtenCfg = !hasSegments ? cfg : await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
+        const course = remote.course || {};
+        for (const key of ['segments', 'loopSegments']) {
+          const segs = course[key];
+          if (!segs || !segs.length) continue;
+          if (recalc) for (const seg of segs) { delete seg.elevationGainFt; delete seg.elevationLossFt; }
+          // An official total is per race, so a single lap's segments are
+          // scaled against their share of it, the way the wizard does.
+          const laps = key === 'loopSegments' ? (course.loopCount || 1) : 1;
+          const official = course.elevationGainFt != null ? course.elevationGainFt / laps : null;
+          Race.course.fillSegmentElevation(segs, pickedCourse.pts, official);
+        }
+        return remote;
+      }, `pit: segment climb from the new course for ${slug}`);
+
+      // What we just wrote, rather than a read of it. course.gpx for a public
+      // race goes to git, and GitHub's contents API can hand back the version
+      // from before the write for a while afterwards: re-reading here is how
+      // "Saved" is followed by the old file's numbers.
+      courseOnFile = true;
+      courseHint(document.getElementById('course-current'),
+        `On the race now: ${courseSummary(pickedCourse.pts)}. Saving replaces it.`);
+      pickedCourse = null;
+      document.getElementById('course-file').value = '';
+      document.getElementById('course-recalc').checked = false;
+      courseHint(document.getElementById('course-status'), COURSE_HINT);
+      adoptConfig(writtenCfg);
+      await load();
+      Race.saveBtn.done(btn);
+    } catch (err) {
+      Race.saveBtn.fail(btn);
+      toast(`Save failed: ${err.message}`, 'error');
+    }
   }
 
   // ---------- manage access ----------

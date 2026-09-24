@@ -1217,14 +1217,33 @@ rather than one that happens to overlay.
 
 ## 2. Planning & history
 
-### Load a course after the race is created — *not built*
+### Load a course after the race is created — *built 2026-09-24*
 
-Asked 2026-09-23 and checked the same day: there is no way to. The only file
-input in the app is the wizard's (`setup.html:647`); `settings.html` does not
-mention GPX at all. A race set up without a course, or one whose course turns
-out to be the wrong file or last year's route, cannot be given a new one
+Asked 2026-09-23 and checked the same day: there was no way to. The only file
+input in the app was the wizard's (`setup.html:647`); `settings.html` did not
+mention GPX at all. A race set up without a course, or one whose course turned
+out to be the wrong file or last year's route, could not be given a new one
 without being recreated, which for a race that has already been worked is not
 an option.
+
+Built as specified below, as **Course file** on the settings page. Two things
+came out in the building that the spec had not asked about:
+
+- **A megabyte is the limit, checked before the upload.** GitHub's contents
+  API stops inlining a blob over that, and that is where a course lives for a
+  public race. Past it the worker can write the file and can never read it
+  back, and taking the race off the hub later cannot copy it out; both fail
+  silently, so a size that would fail is refused at the file picker with the
+  number and the usual cause, which is a timestamp on every point.
+- **The line saying what the race has now is not re-read after a save.**
+  course.gpx for a public race goes to git, which is not read-after-write
+  consistent, so reading it back is how "Saved" gets followed by the old
+  file's numbers. It says what was written instead.
+
+The `finished` edge below was settled the way the note predicted: the lock
+reads a new `Race.everyRunnerDone`, not `raceState`, so a race that blew its
+cutoff with somebody still walking it in stays locked. `raceState` now calls
+that same helper, which is where its runner test used to be inline.
 
 Everything it needs is already here, which is what makes this small rather
 than a feature:
@@ -1240,7 +1259,7 @@ So it is a collapsed section on the settings page beside the others: a file
 input, the wizard's own status line, and a Save. No worker change, which
 means it ships with a Pages deploy.
 
-**Both open questions were settled on 2026-09-23. Build to these.**
+**Both open questions were settled on 2026-09-23, and built to.**
 
 *The climb comes across as a checkbox, ticked by the person uploading.* Not
 automatic and not absent. The wizard re-derives at creation because there is
@@ -1272,7 +1291,8 @@ wants to correct once they are home. Note that `raceState` calls a race
 `finished` when every runner is done *or* the cutoff has passed, so a race
 that blew its cutoff with somebody still out unlocks. That is the one edge
 worth a second look when this is built, and the answer is probably to lean on
-the runners rather than the clock.
+the runners rather than the clock. *(Built that way: the lock reads
+`Race.everyRunnerDone`, which is the runner half on its own.)*
 
 The section draws disabled with the reason rather than hidden, so somebody
 looking for it at mile forty finds out why instead of wondering where it
