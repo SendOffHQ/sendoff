@@ -235,6 +235,7 @@
 </header>
 
 <div id="error" class="error-banner" style="display:none;"></div>
+<div id="read-only" class="editor-warn" style="display:none; margin: 0 0 14px;"></div>
 
 <!-- Where the first-visit tutorial goes. See Race.tutorial. -->
 <div id="tut-host"></div>
@@ -614,6 +615,25 @@
     if (!accountPeople.length) loadAccountPeople();
     updateLastUpdatedLabel();
     renderCourseEditor();
+    renderWriteAccess();
+  }
+
+  // One line at the top for somebody who can read this race and not change it.
+  //
+  // Every editor below saves through /commit, which refuses a writer with no
+  // role on the race. Without this the page looks exactly like an editable one
+  // until the moment somebody has finished filling it in, which is the worst
+  // moment to find out. The sections are left on screen deliberately: a viewer
+  // has a real reason to look at the aid stations and the fuel plan.
+  function renderWriteAccess() {
+    const el = document.getElementById('read-only');
+    if (!el || !cfg) return;
+    const canEdit = Race.roles.canEdit(cfg, Race.auth.email());
+    el.style.display = canEdit ? 'none' : '';
+    if (!canEdit) {
+      el.textContent = 'You can read this race but not change it, so anything saved here will be ' +
+        'refused. Ask whoever set it up to add you as crew from Manage access.';
+    }
   }
 
   // ---------- the course file ----------
@@ -643,6 +663,14 @@
   // is exactly the race this must not unlock for.
   function courseLockedBecause() {
     if (!cfg) return null;
+    // Not yours to change. Checked before the clock, because it is the answer
+    // that does not depend on when you ask. A page that takes the file, uploads
+    // it and then hands back the worker's refusal has wasted the upload and
+    // told somebody nothing they can act on.
+    if (!Race.roles.canEdit(cfg, Race.auth.email())) {
+      return 'You are not on this race as crew, so its course is not yours to change. ' +
+             'Ask whoever set it up to add you from Manage access.';
+    }
     if (Race.raceState(cfg, data) === 'upcoming') return null;
     if (Race.everyRunnerDone(cfg, data)) return null;
     return 'The race is under way, so the course is fixed until every racer is in. ' +
