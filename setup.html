@@ -374,10 +374,9 @@
           </div>
         </label>
       </div>
-      <p class="hint" style="margin-top:8px; color: var(--text-muted); font-size:11px;" id="vis-note">
-        You'll be set as the creator and only editor. Add more crew from the race page after creation.
-      </p>
-      <!-- For us, not for the page: this choice cannot be fully undone. A
+      <!-- No note under the choice. There was one, and it restated the option
+           it sat under, which the option's own description already says.
+           For us, not for the page: this choice cannot be fully undone. A
            public race can be taken off the hub later, but its hub entry, share
            card and course file have been committed to a public repository by
            then and stay in its history. privacy.html says so for anybody who
@@ -1554,9 +1553,6 @@
       state.visibility = e.target.value;
       // Recompute slug preview since private races get the random suffix.
       updateSlug();
-      document.getElementById('vis-note').textContent = state.visibility === 'private'
-        ? "Private: kept off the hub, and the address gets a random suffix so it can't be guessed. Only people you put on the race can open it, and SendOff checks that on every read. You'll be the only editor at first; add crew + share links from the race page after creation."
-        : "Public: anyone with the hub URL can find and view live. It can be taken off the hub later, but not made private: its hub entry, share card and course are published while it is public. You'll be the only editor at first; add more crew from the race page.";
     });
   });
 
