@@ -247,6 +247,9 @@ ok('a bike race reads as speed', Race.activities.isSpeed({ activity: 'road-bike'
 ok('a trail race does not', Race.activities.isSpeed({ activity: 'trail-run' }), false);
 ok('running distances are their own family',
    Race.activities.family({ activity: 'hike' }), 'foot');
+ok('an obstacle course is on the list, and not compared with a run',
+   [Race.activities.label({ activity: 'ocr' }), Race.activities.family({ activity: 'ocr' }),
+    Race.activities.isSpeed({ activity: 'ocr' })], ['Obstacle course', 'obstacle', false]);
 // The archive compares like with like, and a race with no answer is not the
 // same as a race whose answer is "other".
 ok('a race made before the field has no label', Race.activities.label({}), null);
