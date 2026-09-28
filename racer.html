@@ -336,15 +336,9 @@
     const c = Race.compute.runner(runner, cfg);
     const out = [];
 
-    const elapsed = next.state === 'idle' ? 0 : (c.completedRaceSec || 0) + (() => {
-      // The clock keeps running through the leg in progress, which is the only
-      // version of it a runner recognises.
-      const since = next.lastTs ? (Date.now() - new Date(next.lastTs).getTime()) / 1000 : 0;
-      return Math.max(0, since);
-    })();
     out.push(`<div class="rblock">
       <span class="rlbl">Race time</span>
-      <span class="rclock" id="rclock">${Race.fmt.duration(elapsed)}</span>
+      <span class="rclock" id="rclock">${Race.fmt.duration(raceClockSec(next, c))}</span>
       ${marginLine()}
     </div>`);
 
@@ -470,6 +464,23 @@
     renderPhotos();
   }
 
+  // The race clock, in seconds. One function for the draw and the tick,
+  // because they were two copies and only the tick had been taught that a
+  // finished race has stopped: the draw went on adding time since the finish,
+  // so every load and every poll showed the finish time plus the days since,
+  // for the second until the tick put it right.
+  //
+  // The clock runs through the leg in progress, which is the only version of
+  // it a runner recognises, and through time in an aid station. Once they are
+  // done lastTs is the finish, and nothing after it counts.
+  function raceClockSec(next, c) {
+    if (next.state === 'idle') return 0;
+    const running = next.state !== 'finished' && next.lastTs;
+    const since = running
+      ? Math.max(0, (Date.now() - new Date(next.lastTs).getTime()) / 1000) : 0;
+    return (c.completedRaceSec || 0) + since;
+  }
+
   // The race clock and the aid timer, in place. Nothing else on the readout
   // changes without a press or a poll, and redrawing it every second would
   // pull an item chip out from under a thumb that is already on it.
@@ -478,14 +489,7 @@
     if (clock) {
       const runner = merged();
       const next = Race.compute.nextActionFor(runner, cfg);
-      const c = Race.compute.runner(runner, cfg);
-      // Nothing is still running once they are done. lastTs is the finish, so
-      // adding time since it made the race clock keep climbing for days after
-      // the race was over.
-      const running = next.state !== 'idle' && next.state !== 'finished' && next.lastTs;
-      const since = running
-        ? Math.max(0, (Date.now() - new Date(next.lastTs).getTime()) / 1000) : 0;
-      clock.textContent = Race.fmt.duration(next.state === 'idle' ? 0 : (c.completedRaceSec || 0) + since);
+      clock.textContent = Race.fmt.duration(raceClockSec(next, Race.compute.runner(runner, cfg)));
     }
     const aid = document.getElementById('raid-timer');
     if (aid && aid.dataset.since) {

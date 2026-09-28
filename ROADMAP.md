@@ -1230,6 +1230,63 @@ The charts already draw every runner on shared axes and the dashboard
 already stacks runner cards. What is missing is a view built for comparing
 rather than one that happens to overlay.
 
+### Your AI as crew — *not built, Pro*
+
+Raised 2026-09-28, after the Sangre de Cristo 100, from how the race was
+actually logged. Racing it alone, the founder dictated each aid station to an
+assistant in plain words ("Colony Creek, half a ham and cheese quesadilla,
+drank 35 oz from the bladder") and got calories and sodium back. The assistant
+could not put any of it into the race: it had no login and should not have
+had one. So the numbers lived in a chat, the stops were labelled "Stop 2
+(name?)" because the assistant could not see where the runner was, and the
+logging stopped partway through. With a stomach going wrong, eating the right
+thing mattered more than recording it, and the recording was the part a crew
+is supposed to take off a runner's hands.
+
+A racer with no crew is exactly who the app serves worst today, and a voice
+they already carry is the crew member they have. So the AI is invited the way
+a person is: from Manage access, as crew on one race, and taken off the same
+way.
+
+**What it needs, and what it should not get:**
+
+- **A credential of its own, per race, revocable.** Never the runner's
+  password. The share tokens are the pattern (a KV record naming one slug,
+  checked on every call), but for writing rather than reading. It shows in
+  the roster as what it is, so nobody mistakes it for a person.
+- **Intake on legs first, and nothing else.** Fuel, fluid, notes and one-tap
+  items onto the leg the runner is on. Not the course, not the roster, not
+  visibility. Splits ("leaving Colony Creek now") are the obvious second step,
+  and they want their own decision: a mistaken split moves every ETA a crew
+  is driving to, and a mistaken 280 calories moves nothing.
+- **The race's state, read back to it.** Which leg the runner is on, what the
+  next station is called, what the plan says per hour and how far off it they
+  are. That is what turns "Stop 2 (name?)" into the aid station's real name,
+  and it is what lets it answer "am I behind on sodium", which is the
+  question worth asking at mile sixty.
+- **Estimates marked as estimates.** Half a quesadilla is roughly 280
+  calories, not exactly. Store them flagged, show them with a "~", and let a
+  number typed by a person win, the same rule the climb figures follow.
+
+**The shape of it.** An MCP server in front of the worker, since that is how
+an assistant is given tools now, speaking to the same /get and /commit paths
+with the scoped credential. The worker changes are the credential and a
+narrower write path for intake; the rest is already there.
+
+**Before it ships, the privacy page.** Inviting an AI sends that race's data
+to whoever runs the AI. That has to be said at the point of inviting it, not
+only on a page nobody reads mid-race.
+
+**Pro.** An `aiCrew` entitlement beside `privateRaces` in `PLANS`, checked
+against the race owner the way the crew cap is. It also carries the cost:
+every call is a worker request against the same daily allowance a race's
+spectators draw on, and an assistant asked "how am I doing" every five
+minutes for thirty hours is a lot of them.
+
+**What it does not fix:** signal. The assistant needs a connection, just as
+the pit board does, and a mountain course has long stretches without one.
+The offline queue holds a press on the phone; nothing yet holds a sentence.
+
 ---
 
 ## 2. Planning & history
