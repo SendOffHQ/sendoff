@@ -137,6 +137,26 @@
   .rjot-list div { padding: 3px 0; overflow-wrap: anywhere; }
   .rlogged { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--yellow); margin: 2px 0 8px; }
 
+  /* Reordering the items from here. The switch sits on the heading's row; the
+     grips only exist while it is on, on the left, away from the right edge
+     where a thumb scrolls and from the take-back beside each chip. */
+  .rlbl-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .rreorder {
+    background: none; border: 1px solid var(--border-bright); border-radius: 4px;
+    color: var(--text-muted); padding: 5px 10px; min-height: 30px; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .rreorder.on { color: var(--accent); border-color: var(--accent); }
+  .rgrip {
+    flex: 0 0 44px; min-height: 58px; background: none; cursor: grab; touch-action: none;
+    border: 1px dashed var(--border-bright); border-radius: 6px;
+    color: var(--text-dim); font-size: 18px; letter-spacing: -0.2em;
+  }
+  .rchips.reordering .rchip:disabled { opacity: 1; cursor: default; }
+  .rchip-row.dragging { opacity: 0.55; }
+  .rchip-row.dragging .rgrip { cursor: grabbing; }
+
   .rnote {
     font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--yellow);
     border: 1px dashed rgba(255,176,122,0.35); border-radius: 4px; padding: 7px 10px; margin-top: 12px;
@@ -252,13 +272,14 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=9bcd94f3"></script>
+<script src="lib/race-core.js?v=6efdf350"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
   Race.nav.setRace(slug, 'racer', false);
 
   const DATA_PATH = `races/${slug}/data.json`;
+  const CONFIG_PATH = `races/${slug}/config.json`;
   // Which board this device wants for this race. Set by choosing one; the
   // pit board reads it too, so choosing the crew board there is remembered.
   const MODE_KEY = `sendoff-mode-${slug}`;
@@ -441,7 +462,18 @@
     return next.currentLegIndex || null;
   }
 
+  // Putting the items in order from here, for a runner with no crew who
+  // should not have to go into settings mid-race to get the one they keep
+  // pressing to the top. Behind a switch, so the grips are only there when
+  // asked for: without it a thumb scrolling the list is a thumb dragging it,
+  // and while it is on the items do not log, so arranging them cannot count
+  // a gel nobody took.
+  let reordering = false;
+  let draggingChips = false;
+
   function renderIntake() {
+    // Never mid-drag: the row under the finger would be thrown away by a poll.
+    if (draggingChips) return;
     const runner = merged();
     const next = Race.compute.nextActionFor(runner, cfg);
     const sec = document.getElementById('intake');
@@ -479,17 +511,23 @@
     const metrics = Race.fuel.metrics(cfg);
     if (items.length) {
       chips.push(`<div class="rblock">
-        <span class="rlbl">Log what you took</span>
-        <div class="rchips">
+        <div class="rlbl-row">
+          <span class="rlbl">${reordering ? 'Drag to reorder' : 'Log what you took'}</span>
+          ${items.length > 1 ? `<button type="button" class="rreorder${reordering ? ' on' : ''}" id="reorder-toggle"
+            aria-pressed="${reordering}">${reordering ? 'Done' : 'Reorder'}</button>` : ''}
+        </div>
+        <div class="rchips${reordering ? ' reordering' : ''}" id="rchips">
           ${items.map(({ p, i }) => {
             const n = +leg[`preset_${i}`] || 0;
-            return `<div class="rchip-row">
-            <button class="rchip" type="button" data-preset="${i}">
+            return `<div class="rchip-row" data-row="${i}">
+            ${reordering ? `<button type="button" class="rgrip" data-grip="${i}"
+              aria-label="Move ${esc(p.name)}: drag, or use the arrow keys">\u22ee\u22ee</button>` : ''}
+            <button class="rchip" type="button" data-preset="${i}"${reordering ? ' disabled' : ''}>
               <span>+ ${esc(p.name)}<span class="sub">${esc(metrics.filter(m => +p.values[m.key])
                   .map(m => Race.fuel.fmt(m, p.values[m.key]) + ' ' + (m.short || m.label)).join(' · '))}</span></span>
               <span class="cnt">${n ? '×' + n : ''}</span>
             </button>
-            ${n ? `<button class="rchip-undo" type="button" data-preset-undo="${i}"
+            ${n && !reordering ? `<button class="rchip-undo" type="button" data-preset-undo="${i}"
               aria-label="Take back one ${esc(p.name)}" title="Take back one ${esc(p.name)}">−</button>` : ''}
           </div>`;
           }).join('')}
@@ -688,7 +726,85 @@
     } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
   }
 
+  // The order as it now stands on screen, saved like a press: through the
+  // queue, so with no signal it is held on the phone and sent later. Only the
+  // order is written, never the list: a leg counts an item under its position.
+  async function saveChipOrder(order) {
+    const plain = order.every((n, k) => n === k);
+    if (plain) delete cfg.presetOrder; else cfg.presetOrder = order.slice();
+    renderIntake();
+    try {
+      await Race.queue.write(CONFIG_PATH, 'setPresetOrder', { order },
+        'racer: reorder one-tap items');
+    } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
+  }
+  const chipOrder = () => Race.fuel.presetsInOrder(cfg).map(x => x.i);
+
+  document.getElementById('intake-chips').addEventListener('pointerdown', (e) => {
+    const grip = e.target.closest('[data-grip]');
+    if (!grip || !reordering) return;
+    e.preventDefault();
+    const box = document.getElementById('rchips');
+    const row = grip.closest('.rchip-row');
+    const before = chipOrder().join(',');
+    draggingChips = true;
+    row.classList.add('dragging');
+    const move = (ev) => {
+      // Near the top or bottom of the screen the page scrolls with the drag.
+      const edge = 56;
+      if (ev.clientY < edge) window.scrollBy(0, -Math.ceil((edge - ev.clientY) / 4));
+      else if (ev.clientY > window.innerHeight - edge) {
+        window.scrollBy(0, Math.ceil((ev.clientY - (window.innerHeight - edge)) / 4));
+      }
+      const others = [...box.children].filter(r => r !== row);
+      const next = others.find(r => {
+        const b = r.getBoundingClientRect();
+        return ev.clientY < b.top + b.height / 2;
+      });
+      if ((next || null) !== row.nextElementSibling) box.insertBefore(row, next || null);
+    };
+    // On the window, for the reason the settings page found out: moving the
+    // row releases a pointer capture, and a drag of more than one place would
+    // stop after the first.
+    const end = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      row.classList.remove('dragging');
+      draggingChips = false;
+      const order = [...box.children].map(r => +r.dataset.row);
+      if (order.join(',') !== before) saveChipOrder(order); else renderIntake();
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  });
+
+  document.getElementById('intake-chips').addEventListener('keydown', (e) => {
+    const grip = e.target.closest('[data-grip]');
+    if (!grip || !reordering || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault();
+    const i = +grip.dataset.grip;
+    const order = chipOrder();
+    const at = order.indexOf(i);
+    const to = at + (e.key === 'ArrowUp' ? -1 : 1);
+    if (at < 0 || to < 0 || to >= order.length) return;
+    order.splice(at, 1);
+    order.splice(to, 0, i);
+    saveChipOrder(order).then(() => {});
+    const again = document.querySelector(`#intake-chips [data-grip="${i}"]`);
+    if (again) again.focus();
+  });
+
   document.getElementById('intake-chips').addEventListener('click', (e) => {
+    if (e.target.closest('#reorder-toggle')) {
+      reordering = !reordering;
+      renderIntake();
+      return;
+    }
+    // Arranging the list never logs anything, even if a chip were somehow
+    // pressed rather than dragged.
+    if (reordering) return;
     // The take-back first: it is a sibling of the chip rather than inside it,
     // but checking the other way round invites somebody to nest them later and
     // turn every undo into an add.
@@ -772,7 +888,10 @@
         Race.gh.readRaceJson(slug, 'data.json', true)
       ]);
       if (stale) cfgFetchedAt = Date.now();
-      cfg = c;
+      // A reorder made on this phone with no signal is held in the queue like
+      // a press, and replayed over every config read until it lands, or the
+      // next read would put the old order straight back.
+      cfg = Race.queue.applyTo(CONFIG_PATH, c);
       data = Race.queue.applyTo(DATA_PATH, d);
       Race.nav.setRace(slug, 'racer', () => Race.roles.canEdit(cfg, Race.auth.email()));
       document.title = `Racer · ${cfg.name}`;

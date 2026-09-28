@@ -145,6 +145,38 @@ await page.waitForTimeout(800);
 const leg2 = (await read('data.json')).runners[0].legs.find(l => l.index === 2);
 ok('a tap on the moved item counts that item', [leg2.preset_7, leg2.preset_0], [1, 2]);
 
+// A runner with no crew should not have to go into settings mid-race to get
+// the item they keep pressing to the top. Behind a switch, so a thumb
+// scrolling the list is never a thumb dragging it.
+console.log('\nputting them in order from the racer page');
+ok('no grips until asked for', await page.locator('#intake [data-grip]').count(), 0);
+await page.click('#reorder-toggle');
+ok('the switch brings them, one per item', await page.locator('#intake [data-grip]').count(), 8);
+ok('on the left of each chip', await page.evaluate(() =>
+  [...document.querySelectorAll('#rchips .rchip-row')].every(r => r.firstElementChild.matches('[data-grip]'))), true);
+ok('and the items do not log while it is on', await page.evaluate(() =>
+  [...document.querySelectorAll('#rchips .rchip')].every(c => c.disabled)), true);
+await page.evaluate(() => document.getElementById('rchips').scrollIntoView({ block: 'center' }));
+const dragChip = async (from, toRow) => {
+  const h = await page.locator(`#rchips .rchip-row:nth-child(${from}) [data-grip]`).boundingBox();
+  const t = await page.locator(`#rchips .rchip-row:nth-child(${toRow})`).boundingBox();
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x + h.width / 2, t.y + 2, { steps: 14 });
+  await page.mouse.up();
+};
+await dragChip(8, 1);
+await page.waitForTimeout(800);
+ok('a drag moves it to the top', (await chips()).slice(0, 3).map(c => c.name), ['Chips', 'Tums', 'Salt pill']);
+ok('and the race keeps that order', (await read('config.json')).presetOrder, [6, 7, 1, 0, 2, 3, 4, 5]);
+ok('without the list itself moving', (await read('config.json')).fuelPresets.map(p => p.name),
+  ['Gel', 'Salt pill', 'Flask', 'Ibuprofen', 'Broth', 'Coke', 'Chips', 'Tums']);
+await page.click('#reorder-toggle');
+ok('done puts the grips away', await page.locator('#intake [data-grip]').count(), 0);
+await page.click('#intake .rchip >> text=Gel');
+await page.waitForTimeout(800);
+ok('and a gel is still a gel', (await read('data.json')).runners[0].legs.find(l => l.index === 2).preset_0, 3);
+
 console.log('\nthe page, top to bottom');
 ok('photos above the items, the button after everything', await page.evaluate(() => {
   const at = id => document.getElementById(id);
@@ -196,6 +228,15 @@ await page.waitForTimeout(600);
 ok('it still shows as written', await page.evaluate(() =>
   [...document.querySelectorAll('#jot-list div')].some(d => /blister on left heel$/.test(d.textContent))), true);
 ok('and is held on the phone', await page.evaluate(() => Race.queue.pending().length > 0), true);
+// A reorder with no signal is held the same way.
+await page.click('#reorder-toggle');
+await page.focus('#rchips .rchip-row:nth-child(4) [data-grip]');
+await page.keyboard.press('ArrowUp');
+await page.click('#reorder-toggle');
+ok('a reorder with no signal still shows', (await chips()).slice(0, 4).map(c => c.name),
+  ['Chips', 'Tums', 'Gel', 'Salt pill']);
+ok('and is held with it', await page.evaluate(() =>
+  Race.queue.pending().some(e => e.op === 'setPresetOrder')), true);
 srv = spawn('node', [HARNESS], { stdio: 'ignore' });
 await waitFor(true);
 // The restarted server has only the fixture, so what lands is the held write
@@ -212,6 +253,12 @@ for (let i = 0; i < 80 && !landed; i++) {
   } catch (e) { /* not up yet */ }
 }
 ok('and sent when the signal comes back', landed, true);
+let order = null;
+for (let i = 0; i < 40 && JSON.stringify(order) !== '[6,7,0,1,2,3,4,5]'; i++) {
+  await page.waitForTimeout(500);
+  try { order = (await read('config.json')).presetOrder; } catch (e) { /* not up yet */ }
+}
+ok('the held reorder lands too', order, [6, 7, 0, 1, 2, 3, 4, 5]);
 
 console.log('\nwhen the logging stops');
 // Restored after the restart, which forgot everything written before it.
