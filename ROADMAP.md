@@ -1385,6 +1385,60 @@ The offline queue holds a press on the phone; nothing yet holds a sentence.
 Item 3 of "Racing without a crew" above now does: the write-in holds a line
 on the phone like a press, and this reads it when the signal comes back.
 
+### Time-based races — *not built*
+
+Raised 2026-09-28, the day Obstacle course went on the discipline list. Every
+race SendOff can hold today is a fixed distance: a set of aid stations, or a
+loop run a known number of times. Some of the races most in need of a crew are
+the other kind, where the clock is fixed and the distance is the result:
+
+- **24-hour obstacle races,** World's Toughest Mudder being the one named: a
+  lap of a few miles with obstacles, as many laps as you can in 24 hours, a
+  pit at the end of every lap and a crew working it all night.
+- **Backyard ultras:** 4.167 miles, started on the hour, every hour, until one
+  runner is left. Whatever of the hour the lap did not use is time in the pit,
+  and the crew's whole job is that gap.
+- **Fixed-time track and loop races,** 6, 12, 24 hours, which are the same
+  shape without the obstacles.
+
+**Why it does not fit now.** A loop race has a `loopCount`, and everything
+counts off it: `course.legCount` is laps times legs per lap, the racer page
+decides "finished" by every leg being logged, and the ETAs project towards a
+last lap that is known in advance. In a timed race the last lap is not known
+until it happens. Setting a loop count of 99 would get it through the wizard
+and then say "finished" never, or "on course" after the runner has stopped.
+
+**What a time mode needs:**
+
+- **A course with no end.** A lap, or a lap made of segments for a race with
+  aid inside it, and a duration instead of a count. The number of laps is what
+  the race produces, like a finish time is for a distance race.
+- **Its own idea of finished.** A runner is done when they say they are
+  stopping, when the clock runs out, or, for a backyard, when they fail to
+  start a lap on the hour or finish it inside the hour. Each wants a button or
+  a rule, not an inferred state: a crew member tapping "stopped" is the fact.
+- **The clock that matters.** The racer page's big number is time elapsed.
+  Here it wants time *left*: until the race ends, or for a backyard until the
+  next bell, which is the number a runner sitting in a chair actually needs.
+  The per-lap split and the lap count go beside it.
+- **Backyard rules as their own shape,** not options on the 24-hour one:
+  laps start on the hour whatever the runner is doing, a lap over the hour is
+  out, and the leaderboard is laps completed with the last one standing
+  marked as the winner, which may mean the one who completed one lap alone.
+- **Whether the lap in progress counts at the horn.** Rules differ between
+  events, so it is a setting rather than an assumption.
+- **Pace in laps, not miles.** Laps per hour and the recent lap times, since
+  nobody running a 5-mile loop all night thinks in minutes per mile. The fuel
+  goals already work per hour, so those carry over as they are.
+
+**It sits with the discipline, not in place of it.** Obstacle course, trail
+run and track are what a race is; distance or time is how it is scored. A
+24-hour obstacle race and a 24-hour track race are both time mode.
+
+The pit board is the part that already fits: check in at the end of a lap,
+check out at the start of the next, one-tap items, notes and photos, all
+unchanged. What changes is everything that counts the race.
+
 ---
 
 ## 2. Planning & history
