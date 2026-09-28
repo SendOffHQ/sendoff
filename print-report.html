@@ -318,7 +318,7 @@
   <div>Auto-generated · race-dashboard hub</div>
 </footer>
 
-<script src="lib/race-core.js?v=7d3aadf0"></script>
+<script src="lib/race-core.js?v=268b9088"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -370,7 +370,10 @@
       // with no numbers leaves, and a medicine is the thing somebody
       // reads this line looking for.
       const noteParts = [...Race.fuel.itemsTaken(cfg, l),
-                         l.gearChanges, l.meds, l.issues, l.notes].filter(Boolean);
+                         l.gearChanges, l.meds, l.issues,
+                         // A note written in from the racer page is a line per
+                         // entry; on one line here they read as separate entries.
+                         l.notes && String(l.notes).trim().replace(/\s*\n\s*/g, ' \u00b7 ')].filter(Boolean);
       const noteRow = noteParts.length
         ? `<tr class="note"><td colspan="${cols}">${escapeHtml(noteParts.join(' · '))}</td></tr>`
         : '';

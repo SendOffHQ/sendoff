@@ -276,7 +276,7 @@ ok('and it landed on the leg it was taken on',
 // differs is the leg it opens on, and it is the whole reason the pit board
 // keeps a defaultLeg of its own: a crew member photographs whoever is in front
 // of them, and a racer photographs where they are.
-console.log('\nthe racer page has the same panel, below what they press');
+console.log('\nthe racer page has the same panel, above the items, with the button pinned');
 const racer = await b.newContext({ viewport:{width:390,height:844}, serviceWorkers:'block' });
 const rp = await racer.newPage();
 const rerrs = [];
@@ -289,16 +289,36 @@ await rp.goto(BASE + '/racer.html?id=' + SLUG);
 await rp.waitForTimeout(2200);
 ok('the panel is there', await rp.locator('#photos').isVisible(), true);
 ok('shut, like the other one', await rp.locator('[data-ph-body]').isVisible(), false);
-// Below the button, never above it. Somebody halfway through a hundred miles
-// came here to press one thing.
-ok('and below what they came to press', await rp.evaluate(() => {
-  const act = document.getElementById('act');
-  const ph = document.getElementById('photos');
-  return !!(act && ph) && (act.compareDocumentPosition(ph) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-}), true);
+// Above the items, and the button never moves. It used to sit below the
+// button, which put it past every item on the list and past the button itself,
+// and the button only stayed put until its own place in the page scrolled by:
+// reported after the Sangre de Cristo 100. The rule it was protecting still
+// holds, it is just kept a better way. The button is last in the page and
+// sticks to the bottom of the screen, so nothing ever goes between a runner and
+// it, however far down they have scrolled.
+const order = () => rp.evaluate(() => {
+  const at = id => document.getElementById(id);
+  const follows = (a, b) => (at(a).compareDocumentPosition(at(b)) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+  return { photosAboveItems: follows('photos', 'intake'), buttonLast: follows('intake', 'act') &&
+    !at('act').nextElementSibling };
+});
+ok('above the items, with the button after everything', await order(),
+  { photosAboveItems: true, buttonLast: true });
 await rp.click('[data-ph-toggle]');
 await rp.waitForTimeout(250);
 ok('it opens', await rp.locator('[data-ph-body]').isVisible(), true);
+// Opened, the page is taller than the screen, which is exactly when the button
+// used to scroll away. Scrolled to the very bottom and to the photos, it is
+// still on screen, at the bottom of it.
+const buttonOnScreen = () => rp.evaluate(() => {
+  const r = document.getElementById('act').getBoundingClientRect();
+  return r.top >= 0 && Math.round(r.bottom) <= window.innerHeight + 1 &&
+    window.innerHeight - r.bottom < 2;
+});
+await rp.evaluate(() => document.getElementById('photos').scrollIntoView({ block: 'start' }));
+ok('the button stays at the bottom of the screen at the photos', await buttonOnScreen(), true);
+await rp.evaluate(() => window.scrollTo(0, 0));
+ok('and at the top of the page', await buttonOnScreen(), true);
 ok('with the camera on it', await rp.locator('[data-ph-camera]').count(), 1);
 ok('nothing threw', rerrs, []);
 await racer.close();

@@ -587,7 +587,7 @@
      Esri's and will be missing offline; the map is useful without them. -->
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=81ff34ca"></script>
-<script src="lib/race-core.js?v=7d3aadf0"></script>
+<script src="lib/race-core.js?v=268b9088"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -881,7 +881,10 @@
       // with no numbers leaves, and a medicine is the thing somebody
       // reads this line looking for.
       const noteParts = [...Race.fuel.itemsTaken(cfg, l),
-                         l.gearChanges, l.meds, l.issues, l.notes].filter(Boolean);
+                         l.gearChanges, l.meds, l.issues,
+                         // A note written in from the racer page is a line per
+                         // entry; on one line here they read as separate entries.
+                         l.notes && String(l.notes).trim().replace(/\s*\n\s*/g, ' \u00b7 ')].filter(Boolean);
       const isOld = (arr.length - 1 - i) >= 2;
       const oldCls = isOld ? ' leg-old' : '';
       const noteOldCls = isOld ? ' note-old' : '';

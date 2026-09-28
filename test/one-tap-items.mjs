@@ -154,7 +154,7 @@ const openRacer = async () => {
   await page.waitForTimeout(2600);
 };
 const racerChips = () => page.evaluate(() => {
-  const ro = document.getElementById('readout');
+  const ro = document.getElementById('intake');
   return {
     chips: ro.querySelectorAll('.rchip').length,
     undos: ro.querySelectorAll('.rchip-undo').length,

@@ -45,7 +45,9 @@
 
   header.site { margin-bottom: 12px; }
 
-  .racer-readout { flex: 1; }
+  /* Takes up whatever height the page does not, so a short page still has the
+     action bar at the bottom of the screen rather than under the last block. */
+  .racer-spacer { flex: 1; }
   .rblock { padding: 14px 0; border-bottom: 1px solid var(--border); }
   .rblock:first-child { padding-top: 4px; }
   .rlbl {
@@ -110,6 +112,30 @@
   .rchip:disabled { opacity: 0.5; cursor: default; }
   .rchip .sub { display: block; font-size: 10px; color: var(--text-muted); margin-top: 2px; }
   .rchip .cnt { font-size: 13px; color: var(--accent); min-width: 26px; text-align: right; }
+
+  /* The write-in. For whatever has no chip: the thing the aid station had that
+     nobody expected, a gear change, a blister. One line and a button beside it,
+     the same weight as a chip, and it keeps what was typed through a poll. */
+  .rjot { padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .rjot-row { display: flex; gap: 8px; margin-top: 6px; }
+  .rjot-row input {
+    flex: 1; min-width: 0; min-height: 58px; padding: 10px 14px;
+    background: var(--bg-card); color: var(--text);
+    border: 1px solid var(--border-bright); border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 14px;
+  }
+  .rjot-row input:focus { outline: none; border-color: var(--accent); }
+  .rjot-btn {
+    flex: 0 0 76px; min-height: 58px;
+    background: rgba(15,184,191,0.13); color: var(--accent);
+    border: 1px solid rgba(15,184,191,0.5); border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer;
+  }
+  .rjot-btn:disabled { opacity: 0.5; cursor: default; }
+  .rjot-list { margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-dim); }
+  .rjot-list div { padding: 3px 0; overflow-wrap: anywhere; }
+  .rlogged { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--yellow); margin: 2px 0 8px; }
 
   .rnote {
     font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--yellow);
@@ -191,19 +217,42 @@
 <div id="tut-host"></div>
 
 <section class="racer-readout" id="readout"></section>
-<div class="ract" id="act"></div>
 
-<!-- Photos, below everything a runner presses. Race.media.mountPanel builds
-     it; the pit board has the same one. Below and not above on purpose: the
-     big button is what somebody halfway through a hundred miles came here
-     for, and nothing goes between them and it. -->
+<!-- Photos, above the items. They used to sit below the action bar, where
+     reaching them meant scrolling past every item on the list, and past the
+     bar itself, which only stayed put until its own place in the page scrolled
+     by. Race.media.mountPanel builds it; the pit board has the same one. -->
 <section id="photos" class="photo-bar" style="display:none;"></section>
+
+<!-- What was taken, and anything else worth writing down. Its own section so
+     the write-in's input is drawn once and never redrawn under a thumb: the
+     readout above is rebuilt on every poll, and anything typed into it would
+     be gone five seconds later. -->
+<section class="racer-intake" id="intake" style="display:none;">
+  <div id="intake-chips"></div>
+  <form class="rjot" id="jot-form" autocomplete="off">
+    <span class="rlbl">Anything else</span>
+    <div class="rjot-row">
+      <input type="text" id="jot" maxlength="240" enterkeyhint="send"
+             placeholder="Half a quesadilla, new socks…" aria-label="Write in anything else" />
+      <button type="submit" class="rjot-btn" id="jot-send">Log</button>
+    </div>
+    <div class="rjot-list" id="jot-list"></div>
+  </form>
+</section>
+
+<div class="racer-spacer"></div>
+
+<!-- Last in the page, so that sticking to the bottom holds all the way down:
+     whatever is above it grows, scrolls or opens, the button stays under the
+     thumb. -->
+<div class="ract" id="act"></div>
 
 </div>
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=7d3aadf0"></script>
+<script src="lib/race-core.js?v=268b9088"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -312,8 +361,17 @@
     if (!goals.length) return '';
     const band = Race.fuel.bandAt(plan, raceHours);
     const banded = Race.fuel.bands(plan).length > 0;
+    // Once logging stops, the rate is taken over the legs that were logged,
+    // and says so. Otherwise a runner who stopped writing things down is told
+    // hour after hour that they are falling further behind on everything,
+    // which is the one thing this page cannot know.
+    const logged = Race.compute.loggedIntake(runner, cfg);
+    const through = logged.throughLeg;
+    const throughDef = through ? Race.course.legAt(cfg, through) : null;
     const rows = goals.map(m => {
-      const per = (c.intake[m.key] && c.intake[m.key].perHour) || 0;
+      const per = through
+        ? (logged.perHour[m.key] || 0)
+        : ((c.intake[m.key] && c.intake[m.key].perHour) || 0);
       const goal = m.expectedPerHour;
       const pct = Math.max(0, Math.min(100, (per / goal) * 100));
       const cls = pct >= 90 ? 'ok' : pct >= 70 ? 'low' : 'bad';
@@ -325,6 +383,8 @@
     }).join('');
     return `<div class="rblock">
       <span class="rlbl">Per hour so far</span>
+      ${through ? `<div class="rlogged">Logged through leg ${through}${throughDef && throughDef.toAid
+          ? ' (' + esc(throughDef.toAid) + ')' : ''}. Nothing since, so the rate stops there.</div>` : ''}
       ${banded && band ? `<div class="rband">${esc(band.label || `from hour ${band.fromHour}`)}</div>` : '<div style="height:6px"></div>'}
       ${rows}
     </div>`;
@@ -370,6 +430,27 @@
 
     out.push(fuelRows(runner));
 
+    document.getElementById('readout').innerHTML = out.join('');
+  }
+
+  // The leg a tap or a write-in lands on: the one underway, or the one just
+  // finished while standing in its aid station. Null when there is no leg to
+  // put anything against.
+  function intakeLeg(next) {
+    if (next.state !== 'in-pit' && next.state !== 'on-course') return null;
+    return next.currentLegIndex || null;
+  }
+
+  function renderIntake() {
+    const runner = merged();
+    const next = Race.compute.nextActionFor(runner, cfg);
+    const sec = document.getElementById('intake');
+    const legIndex = intakeLeg(next);
+    sec.style.display = legIndex ? '' : 'none';
+    if (!legIndex) return;
+    const leg = (runner.legs || []).find(l => l.index === legIndex) || {};
+    const chips = [];
+
     // On the move as well as at the aid station. This used to be pit-only, on
     // the reasoning that logging belongs where you are standing still and that
     // nothing should be pressable by mistake on the move. The first half is
@@ -385,42 +466,43 @@
     //
     // Still nothing before the race starts or after it ends: idle has no leg
     // to count against, and a finished race is not being fuelled.
-    if (next.state === 'in-pit' || next.state === 'on-course') {
-      const presets = Race.fuel.presets(cfg);
-      const metrics = Race.fuel.metrics(cfg);
-      // Every item, including one with no numbers on it: a medicine is logged
-      // by being tapped, not by what it adds.
-      //
-      // The index on the chip is the item's own position in the race config,
-      // because that is what tapPreset looks it up by and what the leg counts
-      // it under. This used to map over a filtered list and hand out that
-      // list's index, which agreed with the real one only for as long as
-      // nothing could ever be filtered out. The moment an item without numbers
-      // could exist, a chip would have logged the wrong thing under the wrong
-      // name.
-      if (presets.length) {
-        const leg = (runner.legs || []).find(l => l.index === next.currentLegIndex) || {};
-        out.push(`<div class="rblock">
-          <span class="rlbl">Log what you took</span>
-          <div class="rchips">
-            ${presets.map((p, i) => {
-              const n = +leg[`preset_${i}`] || 0;
-              return `<div class="rchip-row">
-              <button class="rchip" type="button" data-preset="${i}">
-                <span>+ ${esc(p.name)}<span class="sub">${esc(metrics.filter(m => +p.values[m.key])
-                    .map(m => Race.fuel.fmt(m, p.values[m.key]) + ' ' + (m.short || m.label)).join(' · '))}</span></span>
-                <span class="cnt">${n ? '\u00d7' + n : ''}</span>
-              </button>
-              ${n ? `<button class="rchip-undo" type="button" data-preset-undo="${i}"
-                aria-label="Take back one ${esc(p.name)}" title="Take back one ${esc(p.name)}">\u2212</button>` : ''}
-            </div>`;
-            }).join('')}
-          </div>
-        </div>`);
-      }
+    //
+    // Every item, including one with no numbers on it: a medicine is logged by
+    // being tapped, not by what it adds. In the order they were dragged into
+    // on the settings page, so the ones pressed most can be at the top.
+    //
+    // The index on the chip is the item's own stored position, not its place
+    // in the list, because that is what tapPreset looks it up by and what the
+    // leg counts it under. Handing out the list's index instead is the mistake
+    // this has made once already: the two agree only until something moves.
+    const items = Race.fuel.presetsInOrder(cfg);
+    const metrics = Race.fuel.metrics(cfg);
+    if (items.length) {
+      chips.push(`<div class="rblock">
+        <span class="rlbl">Log what you took</span>
+        <div class="rchips">
+          ${items.map(({ p, i }) => {
+            const n = +leg[`preset_${i}`] || 0;
+            return `<div class="rchip-row">
+            <button class="rchip" type="button" data-preset="${i}">
+              <span>+ ${esc(p.name)}<span class="sub">${esc(metrics.filter(m => +p.values[m.key])
+                  .map(m => Race.fuel.fmt(m, p.values[m.key]) + ' ' + (m.short || m.label)).join(' · '))}</span></span>
+              <span class="cnt">${n ? '×' + n : ''}</span>
+            </button>
+            ${n ? `<button class="rchip-undo" type="button" data-preset-undo="${i}"
+              aria-label="Take back one ${esc(p.name)}" title="Take back one ${esc(p.name)}">−</button>` : ''}
+          </div>`;
+          }).join('')}
+        </div>
+      </div>`);
     }
+    document.getElementById('intake-chips').innerHTML = chips.join('');
 
-    document.getElementById('readout').innerHTML = out.join('');
+    // What has been written in on this leg so far, under the box, so a note
+    // made with no signal can be seen to have been kept. The input itself is
+    // never touched here.
+    const lines = String(leg.notes || '').split('\n').map(s => s.trim()).filter(Boolean);
+    document.getElementById('jot-list').innerHTML = lines.map(s => `<div>${esc(s)}</div>`).join('');
   }
 
   function renderAct() {
@@ -460,8 +542,9 @@
   function render() {
     if (!cfg || !data || !meId) return;
     renderReadout();
-    renderAct();
     renderPhotos();
+    renderIntake();
+    renderAct();
   }
 
   // The race clock, in seconds. One function for the draw and the tick,
@@ -605,7 +688,7 @@
     } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
   }
 
-  document.getElementById('readout').addEventListener('click', (e) => {
+  document.getElementById('intake-chips').addEventListener('click', (e) => {
     // The take-back first: it is a sibling of the chip rather than inside it,
     // but checking the other way round invites somebody to nest them later and
     // turn every undo into an add.
@@ -613,6 +696,40 @@
     if (undo) { tapPreset(+undo.dataset.presetUndo, -1); return; }
     const chip = e.target.closest('[data-preset]');
     if (chip) tapPreset(+chip.dataset.preset, 1);
+  });
+
+  // ---------- the write-in ----------
+  // Anything the chips do not cover, as a line on the leg: the food nobody
+  // expected, a gear change, a blister. Raised after the Sangre de Cristo 100,
+  // run with no crew, where everything that was not a chip either went unlogged
+  // or was dictated into a chat that could not put it anywhere.
+  //
+  // It goes into the leg's notes, one line per entry with the time it was
+  // written, because notes are already shown by the pit board, the race page
+  // and the printout, and read by whoever turns them into numbers later, an
+  // AI crew included. Through the same queue as a tap, so with no signal it is
+  // held on the phone and sent when there is some.
+  document.getElementById('jot-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('jot');
+    const text = input.value.replace(/\s+/g, ' ').trim();
+    if (!text) return;
+    const next = Race.compute.nextActionFor(merged(), cfg);
+    const legIndex = intakeLeg(next);
+    if (!legIndex) return;
+    const dr = (data.runners || []).find(r => r.id === meId);
+    const leg = dr && (dr.legs || []).find(l => l.index === legIndex);
+    if (!leg) return;
+    const at = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const notes = [String(leg.notes || '').trim(), `${at}: ${text}`].filter(Boolean).join('\n');
+    leg.notes = notes;
+    input.value = '';
+    input.blur();
+    render();
+    try {
+      await Race.queue.write(DATA_PATH, 'setLegFields', { runnerId: meId, legIndex, fields: { notes } },
+        `racer: note on leg ${legIndex}`);
+    } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
   });
 
   // ---------- which runner ----------

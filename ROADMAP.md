@@ -1271,35 +1271,56 @@ hours it said the runner was falling further behind on everything. It cannot
 tell not eating from not logging, and it says the first when the truth is the
 second.
 
-**What to build, in this order.** The first three work with no signal and no
-AI, which is most of a mountain course.
+**What came of it, decided 2026-09-28.** Two of the five turned out to be
+setup rather than code, two were built the same day, and one is the AI crew.
 
-1. **Log the refill, not the drinking.** What a bladder gave up on a leg is
-   what it takes to top it up at the next station, and the refill is the one
-   moment the runner is looking at it anyway. That is exactly how the Colony
-   Creek figure was arrived at: "checked my bladder and had drank 35oz". So a
-   bladder is set up once with its capacity, and the aid station gets one
-   press, "Refilled bladder", with four answers for how full it was: nearly
-   empty, a quarter, half, three quarters. The drunk figure is worked out
-   from that. Flasks already work this way and were used on every other leg.
-2. **Aid-station food as items, with portions.** A starter list the runner
-   never has to build, for what aid stations actually put out: quesadilla,
-   potato, bacon, pizza, cola, watermelon, broth, noodles, PB&J, pickles. Tap
-   it, pick ¼, ½ or 1, and the calories and sodium come with it, marked as
-   estimates so a number typed by a person still wins. The estimates made by
-   hand during this race are the first draft of that table.
-3. **Say it now, sort it later.** One press on the leg that records a
-   sentence, "half a hummus wrap and three strips of bacon", and holds it on
-   the phone like a check-in until there is signal. Somebody, or something,
-   turns it into numbers afterwards. That is the gap the AI-crew entry below
-   ends on: the offline queue holds a press and nothing yet holds a sentence.
-   This makes it hold one.
-4. **The AI as crew,** below. With (3) in place it has two jobs rather than
-   one: answer live when there is signal, and turn the held sentences into
-   numbers when signal comes back.
-5. **Say what was logged, not what was eaten.** Once a leg goes by with no
-   intake at all, the per-hour readout says "logged through leg 11" rather
-   than counting the unlogged hours as nothing eaten.
+1. **Log the refill, not the drinking.** *Setup, nothing to build.* What a
+   bladder gave up on a leg is what it takes to top it up at the next station,
+   and the refill is the one moment the runner is looking at it anyway: that is
+   how the Colony Creek figure was arrived at, "checked my bladder and had drank
+   35oz". A few one-tap items do it with what exists, set up once by the runner
+   or their crew: "Bladder refill, ¼" at a quarter of its capacity, "½", "¾",
+   "full". A tap lands on the leg the runner is on, or the one just finished
+   while standing in its aid station. So a skipped refill lumps two legs of
+   drinking into the second one: the race total and the per-hour rate are
+   right, and that one leg reads high while the one before reads dry.
+2. **Aid-station food as items, with portions.** *Setup, nothing to build.*
+   Nobody can know for sure what a station will have, and something unexpected
+   gets eaten every time, so a shipped list would always be wrong somewhere.
+   The runner makes items for what they expect, and the write-in below takes
+   everything else.
+3. **Say it now, sort it later.** *Built 2026-09-28.* A write-in box under the
+   one-tap items with a Log button beside it, for anything without a chip:
+   unexpected food, gear changes, a blister. Each entry is a line in the leg's
+   notes with the time it was written, which the pit board, the race page and
+   the printout already show. It goes through the same queue as a tap, so with
+   no signal it is held on the phone and sent when there is some, and what is
+   typed survives the page redrawing on a poll. Free, with no AI connected,
+   which is who it is for.
+4. **The AI as crew,** below. It reads those write-ins as they arrive, or when
+   asked ("check my notes"), and turns them into numbers. Two jobs rather than
+   one: answer live when there is signal, and turn the held lines into numbers
+   when signal comes back.
+5. **Say what was logged, not what was eaten.** *Built 2026-09-28.* Once a
+   finished leg goes by with nothing on it after the last one that had
+   something, the per-hour rate is taken over the legs up to that one and the
+   racer page says "Logged through leg 11 (Venable 2). Nothing since, so the
+   rate stops there." Logging anything again puts it back to the whole race.
+
+Two changes to the racer page came out of the same review, also built that
+day:
+
+- **The one-tap items can be put in order,** by a handle on the left of each
+  row on the settings page (drag it, or use the arrow keys on it), so the ones
+  pressed most sit at the top of the racer page and the pit board. The order is
+  kept beside the list, in `presetOrder`, and the list itself never moves: a
+  leg counts an item under its position, so reordering the list would have
+  handed every count already logged to whichever item took its place.
+- **Photos moved above the items, and the check-in button stays at the bottom
+  of the screen.** The list of items had grown long enough that reaching the
+  photos meant scrolling through all of it, and the button only stayed put
+  until its own place in the page scrolled by. It is now the last thing on the
+  page, so it is pinned however far down the page has been scrolled or opened.
 
 The race also found the racer-page clock bug, fixed the same day: the
 screenshot sent from the finish reads 51:27:47, which is the time since the
@@ -1361,9 +1382,8 @@ minutes for thirty hours is a lot of them.
 **What it does not fix:** signal. The assistant needs a connection, just as
 the pit board does, and a mountain course has long stretches without one.
 The offline queue holds a press on the phone; nothing yet holds a sentence.
-Item 3 of "Racing without a crew" above is what fixes that, and it is worth
-building first: it works on its own, and it gives this something to do when
-the signal comes back.
+Item 3 of "Racing without a crew" above now does: the write-in holds a line
+on the phone like a press, and this reads it when the signal comes back.
 
 ---
 

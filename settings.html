@@ -82,6 +82,16 @@
   .course-hint.bad { color: var(--red); }
   #course-editor input[type="file"] { font-size: 11px; color: var(--text-dim); }
   #course-editor.locked input, #course-editor.locked .btn { opacity: 0.5; }
+  /* The grip on a one-tap item's row. touch-action none, or on a phone the
+     drag is taken by the page as a scroll and the row never moves. */
+  .drag-cell { width: 34px; }
+  .drag-handle {
+    background: none; border: 0; padding: 6px 4px; cursor: grab; touch-action: none;
+    color: var(--text-muted); font-size: 16px; line-height: 1; letter-spacing: -0.2em;
+  }
+  .drag-handle:hover, .drag-handle:focus-visible { color: var(--accent); }
+  tr.dragging { opacity: 0.55; }
+  tr.dragging .drag-handle { cursor: grabbing; }
   table.aid-list {
     width: 100%; border-collapse: collapse;
   }
@@ -471,7 +481,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=7d3aadf0"></script>
+<script src="lib/race-core.js?v=268b9088"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -488,6 +498,11 @@
   let editingRunners = null;
   let editingFuel = null;
   let editingPresets = null;
+  // The order the items are shown in, as positions in editingPresets. Kept
+  // apart from the list itself: a leg counts an item under its position, so
+  // reordering the list would hand every count already logged to whichever
+  // item moved into that slot. See Race.fuel.presetsInOrder.
+  let editingPresetOrder = null;
   // Hour bands pulled from a profile, waiting on the next Save changes.
   let editingBands = null;
   let editingNotes = null;
@@ -603,6 +618,7 @@
       planKey = editingRunners.length ? editingRunners[0].key : null;
       editingFuel = Race.fuel.toRows(cfg);
       editingPresets = Race.fuel.presets(cfg).map(pre => ({ name: pre.name, values: { ...pre.values } }));
+      editingPresetOrder = Race.fuel.presetsInOrder(cfg).map(x => x.i);
       loadPlan();
       renderPlanPicker();
       renderFuelRows();
@@ -985,16 +1001,19 @@
     const metrics = Race.fuel.fromRows(editingFuel).metrics;
     // 150 for the name, 46 for the delete button, 92 per metric: enough that a
     // four-digit sodium amount is not clipped, and the wrapper scrolls past it.
-    document.getElementById('preset-table').style.minWidth = (196 + 92 * metrics.length) + 'px';
+    document.getElementById('preset-table').style.minWidth = (236 + 92 * metrics.length) + 'px';
     document.getElementById('preset-head').innerHTML =
-      '<th>Name</th>' + metrics.map(m => `<th>${Race.fuel.colHead(m, escapeHtml)}</th>`).join('') + '<th></th>';
+      '<th></th><th>Name</th>' + metrics.map(m => `<th>${Race.fuel.colHead(m, escapeHtml)}</th>`).join('') + '<th></th>';
     return metrics;
   }
 
   function renderPresetRows() {
     const metrics = renderPresetHead();
-    document.getElementById('preset-rows').innerHTML = editingPresets.map((pre, i) => `
-      <tr>
+    document.getElementById('preset-rows').innerHTML = editingPresetOrder.map(i => [editingPresets[i], i]).map(([pre, i]) => `
+      <tr data-row="${i}">
+        <td class="drag-cell"><button type="button" class="drag-handle" data-drag="${i}"
+          aria-label="Move ${escapeAttr(pre.name || 'this item')}: drag, or use the arrow keys"
+          title="Drag to reorder">\u22ee\u22ee</button></td>
         <td><input type="text" data-preset="${i}" data-k="name" value="${escapeAttr(pre.name)}" placeholder="e.g. Tailwind flask, or Ibuprofen" /></td>
         ${metrics.map(m => `<td><input type="number" data-preset="${i}" data-mk="${escapeAttr(m.key)}"
              min="0" step="${m.step || 1}" value="${escapeAttr(pre.values[m.key] ?? '')}" placeholder="0" /></td>`).join('')}
@@ -1300,6 +1319,16 @@
 
     const fuelRows = Race.fuel.fromRows(editingFuel);
     const presets = Race.fuel.presetsFromRows(editingPresets, fuelRows.metrics);
+    // presetsFromRows drops rows with no name, which moves every row after
+    // one, so the order is translated into the positions that survived. Left
+    // out altogether when it is just the list as stored, which is what every
+    // race that never reordered anything already has.
+    const survived = new Map();
+    (editingPresets || []).forEach((pre, k) => {
+      if ((pre.name || '').trim()) survived.set(k, survived.size);
+    });
+    const presetOrder = (editingPresetOrder || []).filter(k => survived.has(k)).map(k => survived.get(k));
+    const plainOrder = presetOrder.every((pos, n) => pos === n);
 
     // Every runner's plan is trimmed to the metrics that survived this same
     // save, so dropping Fluid does not leave a goal or a band carrying an
@@ -1339,6 +1368,7 @@
         remote.runners = runners;
         remote.fuelMetrics = fuelRows.metrics;
         remote.fuelPresets = presets;
+        if (plainOrder) delete remote.presetOrder; else remote.presetOrder = presetOrder;
         // The race-level three are left exactly as they were. They are the
         // fallback a runner without a plan of their own reads, which is how a
         // race written before this keeps working, and nothing reads them once
@@ -1368,6 +1398,7 @@
       editingFuel = null;
       editingBands = null;
       editingPresets = null;
+      editingPresetOrder = null;
       editingNotes = null;
       editingPlans = null;
       planKey = null;
@@ -1788,6 +1819,7 @@
 
   document.getElementById('add-preset').addEventListener('click', () => {
     editingPresets.push({ name: '', values: {} });
+    editingPresetOrder.push(editingPresets.length - 1);
     renderPresetRows();
   });
   document.getElementById('preset-rows').addEventListener('input', (e) => {
@@ -1804,12 +1836,84 @@
   document.getElementById('preset-rows').addEventListener('click', (e) => {
     const del = e.target.dataset.delPreset;
     if (del == null) return;
-    editingPresets.splice(+del, 1);
+    const d = +del;
+    editingPresets.splice(d, 1);
+    editingPresetOrder = editingPresetOrder.filter(k => k !== d).map(k => (k > d ? k - 1 : k));
     renderPresetRows();
   });
 
+  // ---------- putting the items in order ----------
+  // A handle on the left of each row: hold it and drag, so the items pressed
+  // most can sit at the top of the racer page and the pit board. The arrow keys
+  // on the same handle do the same one row at a time, for anybody without a
+  // pointer to drag with.
+  //
+  // The row itself is moved while dragging rather than the table redrawn, so
+  // the handle under the finger is never replaced mid-drag and anything typed
+  // into the row moves with it. The order is read back off the rows at the end.
+  function readPresetOrder() {
+    editingPresetOrder = [...document.getElementById('preset-rows').children]
+      .map(r => +r.dataset.row);
+  }
+
+  document.getElementById('preset-rows').addEventListener('pointerdown', (e) => {
+    const handle = e.target.closest('[data-drag]');
+    if (!handle) return;
+    e.preventDefault();
+    const tbody = document.getElementById('preset-rows');
+    const row = handle.closest('tr');
+    row.classList.add('dragging');
+    const move = (ev) => {
+      // Near the top or bottom of the screen the page scrolls with the drag,
+      // so a long list on a phone can still be dragged end to end.
+      const edge = 56;
+      if (ev.clientY < edge) window.scrollBy(0, -Math.ceil((edge - ev.clientY) / 4));
+      else if (ev.clientY > window.innerHeight - edge) {
+        window.scrollBy(0, Math.ceil((ev.clientY - (window.innerHeight - edge)) / 4));
+      }
+      const others = [...tbody.children].filter(r => r !== row);
+      const before = others.find(r => {
+        const b = r.getBoundingClientRect();
+        return ev.clientY < b.top + b.height / 2;
+      });
+      if ((before || null) !== row.nextElementSibling) tbody.insertBefore(row, before || null);
+    };
+    const end = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      row.classList.remove('dragging');
+      readPresetOrder();
+    };
+    // On the window, not the handle, and without pointer capture: moving the
+    // row takes it out of the page and puts it back, which releases a capture,
+    // and from then on every move and the release went to whatever was under
+    // the finger instead. A drag of one place worked and a drag of seven
+    // stopped after the first.
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  });
+
+  document.getElementById('preset-rows').addEventListener('keydown', (e) => {
+    const handle = e.target.closest('[data-drag]');
+    if (!handle || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault();
+    const i = +handle.dataset.drag;
+    const at = editingPresetOrder.indexOf(i);
+    const to = at + (e.key === 'ArrowUp' ? -1 : 1);
+    if (at < 0 || to < 0 || to >= editingPresetOrder.length) return;
+    editingPresetOrder.splice(at, 1);
+    editingPresetOrder.splice(to, 0, i);
+    renderPresetRows();
+    // Focus stays on the handle that moved, or moving a row three places
+    // means finding it again three times.
+    const again = document.querySelector(`#preset-rows [data-drag="${i}"]`);
+    if (again) again.focus();
+  });
+
   document.getElementById('runner-reload').addEventListener('click', () => {
-    editingRunners = null; editingFuel = null; editingBands = null; editingPresets = null;
+    editingRunners = null; editingFuel = null; editingBands = null; editingPresets = null; editingPresetOrder = null;
     editingNotes = null; editingPlans = null; planKey = null; render();
   });
   document.getElementById('crew-notes').addEventListener('input', (e) => {
