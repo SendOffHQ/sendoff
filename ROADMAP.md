@@ -1230,6 +1230,81 @@ The charts already draw every runner on shared axes and the dashboard
 already stacks runner cards. What is missing is a view built for comparing
 rather than one that happens to overlay.
 
+### Racing without a crew — *evaluated 2026-09-28*
+
+The Sangre de Cristo 100 was run self-crewed, logged from the racer page by
+the runner and nobody else, and the race archived itself when it finished, so
+what follows is read out of `races/000001-sangre-de-cristo-100/data.json`
+rather than remembered. 35:41:15 from the first press, 16 legs.
+
+**What held up, all the way to the finish:**
+
+| | |
+|---|---|
+| Check in, check out | 32 presses of 32. Not one leg missed, including the last five, at 30+ hours. |
+| One-tap items | 46 presses across 11 legs: salt pills, gels, the LMNT flask, ibuprofen, broth. |
+| Photos | Used, and said to be one of the good parts. |
+
+**What did not:** everything that had to be typed. Intake stopped entirely
+after leg 11, 22:46 into the race, with 12:55 and five legs still to go. Not
+just the typed part: the one-tap items stopped too, although they had been
+pressed on every leg before it. Once the expensive half of logging was
+abandoned, opening that part of the page at all went with it.
+
+Fluid is where it broke first. Seven legs carry a fluid figure, and four of
+those are exactly 17 oz, which is the LMNT flask's one-tap. What came out of
+the bladder was typed in on three legs of eleven (35, 67 and a 75 folded into
+leg 8's 92). The reason given is the right one: a bladder cannot be read
+without taking it out of the pack, and nobody does that to fill in a form.
+Aid-station food was the other half: a quarter of a quesadilla, three strips
+of bacon, a slice of pizza have no preset and no numbers, so each one meant
+estimating calories and sodium on a phone while eating it.
+
+And the decision that ended it was a good one. With a stomach going wrong,
+getting the right food in mattered more than recording it. The app should
+never be the thing a runner has to choose against their own race, and here
+it was.
+
+**A problem the numbers hide.** From leg 12 on, the racer page's "per hour
+so far" went on dividing a fixed intake by a growing clock, so for thirteen
+hours it said the runner was falling further behind on everything. It cannot
+tell not eating from not logging, and it says the first when the truth is the
+second.
+
+**What to build, in this order.** The first three work with no signal and no
+AI, which is most of a mountain course.
+
+1. **Log the refill, not the drinking.** What a bladder gave up on a leg is
+   what it takes to top it up at the next station, and the refill is the one
+   moment the runner is looking at it anyway. That is exactly how the Colony
+   Creek figure was arrived at: "checked my bladder and had drank 35oz". So a
+   bladder is set up once with its capacity, and the aid station gets one
+   press, "Refilled bladder", with four answers for how full it was: nearly
+   empty, a quarter, half, three quarters. The drunk figure is worked out
+   from that. Flasks already work this way and were used on every other leg.
+2. **Aid-station food as items, with portions.** A starter list the runner
+   never has to build, for what aid stations actually put out: quesadilla,
+   potato, bacon, pizza, cola, watermelon, broth, noodles, PB&J, pickles. Tap
+   it, pick ¼, ½ or 1, and the calories and sodium come with it, marked as
+   estimates so a number typed by a person still wins. The estimates made by
+   hand during this race are the first draft of that table.
+3. **Say it now, sort it later.** One press on the leg that records a
+   sentence, "half a hummus wrap and three strips of bacon", and holds it on
+   the phone like a check-in until there is signal. Somebody, or something,
+   turns it into numbers afterwards. That is the gap the AI-crew entry below
+   ends on: the offline queue holds a press and nothing yet holds a sentence.
+   This makes it hold one.
+4. **The AI as crew,** below. With (3) in place it has two jobs rather than
+   one: answer live when there is signal, and turn the held sentences into
+   numbers when signal comes back.
+5. **Say what was logged, not what was eaten.** Once a leg goes by with no
+   intake at all, the per-hour readout says "logged through leg 11" rather
+   than counting the unlogged hours as nothing eaten.
+
+The race also found the racer-page clock bug, fixed the same day: the
+screenshot sent from the finish reads 51:27:47, which is the time since the
+start at the moment it was taken, not the 35:41:15 the runner actually ran.
+
 ### Your AI as crew — *not built, Pro*
 
 Raised 2026-09-28, after the Sangre de Cristo 100, from how the race was
@@ -1286,6 +1361,9 @@ minutes for thirty hours is a lot of them.
 **What it does not fix:** signal. The assistant needs a connection, just as
 the pit board does, and a mountain course has long stretches without one.
 The offline queue holds a press on the phone; nothing yet holds a sentence.
+Item 3 of "Racing without a crew" above is what fixes that, and it is worth
+building first: it works on its own, and it gives this something to do when
+the signal comes back.
 
 ---
 
