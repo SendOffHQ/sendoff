@@ -184,7 +184,11 @@
   #fuel-table th:nth-child(4), #fuel-table td:nth-child(4) { width: 21%; }
   #fuel-table th:last-child,   #fuel-table td:last-child   { width: 10%; }
   /* The item table grows a column per metric, so JS sets its min-width. */
-  #preset-table th:first-child, #preset-table td:first-child { width: 150px; }
+  /* The drag handle is the first column and the name the second. This said
+     first-child for the name, from before there was a handle, and gave the
+     handle the name's 150px. */
+  #preset-table th:first-child, #preset-table td:first-child { width: 34px; }
+  #preset-table th:nth-child(2), #preset-table td:nth-child(2) { width: 150px; }
   #preset-table th:last-child,  #preset-table td:last-child  { width: 46px; }
 
   .toast {
