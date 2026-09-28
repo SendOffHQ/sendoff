@@ -82,6 +82,11 @@ cfg.fuelPresets = ['Gel', 'Salt pill', 'Flask', 'Ibuprofen', 'Broth', 'Coke', 'C
   .map((name, n) => ({ name, values: n === 0 ? { calories: 100 } : {} }));
 delete cfg.presetOrder;
 cfg.runners = cfg.runners.map(r => ({ ...r, targets: { caloriesPerHour: 250 } }));
+// Started six hours ago, so it is live by the clock and the pages poll every
+// five seconds. The fixture's own start is weeks back, which reads as a
+// finished race polled every two minutes, and a test of what a poll does to
+// the page would then run without a single poll in it.
+cfg.startTime = new Date(Date.now() - 6 * HOUR).toISOString();
 await write('config.json', cfg);
 
 console.log('\nputting the items in order');
@@ -176,6 +181,28 @@ ok('done puts the grips away', await page.locator('#intake [data-grip]').count()
 await page.click('#intake .rchip >> text=Gel');
 await page.waitForTimeout(800);
 ok('and a gel is still a gel', (await read('data.json')).runners[0].legs.find(l => l.index === 2).preset_0, 3);
+
+// The menu, left open, through the polls. Every race page calls nav.setRace
+// from inside its poll, and that used to redraw the whole menu every five
+// seconds, closed, so it snapped shut under somebody still reading it.
+console.log('\nthe menu stays open through the polls');
+const menuOpenThroughPolls = async () => {
+  await page.click('.account-menu-btn');
+  const open = () => page.evaluate(() => {
+    const m = document.querySelector('.account-menu');
+    return !!m && !m.hidden;
+  });
+  const before = await open();
+  await page.waitForTimeout(12000);
+  const after = await open();
+  await page.keyboard.press('Escape');
+  return [before, after];
+};
+ok('on the racer page', await menuOpenThroughPolls(), [true, true]);
+await page.goto(BASE + `/pit.html?id=${SLUG}`);
+await page.waitForTimeout(2500);
+ok('and on the pit board', await menuOpenThroughPolls(), [true, true]);
+await openRacer();
 
 console.log('\nthe page, top to bottom');
 ok('photos above the items, the button after everything', await page.evaluate(() => {
