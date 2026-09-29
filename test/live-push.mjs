@@ -145,6 +145,27 @@ await page.waitForTimeout(500);
 ok('the page is still standing', await page.evaluate(() =>
   document.querySelectorAll('.seg-row').length > 0), true);
 
+// A photo. Asked on 2026-09-29 whether people watching see a picture as soon
+// as it goes up: they saw it within the minute, on a timer that cost a request
+// a minute per open page whether anyone posted or not. The push now carries
+// photos too, so the page re-reads the list when told and the timer falls back
+// to a slow check. What must not happen is a photo dragging a splits read
+// along with it, because a photo changes nothing in data.json.
+console.log('\na photo goes up');
+const reads = [];
+const onReq = (r) => { const u = new URL(r.url());
+  if (u.pathname === '/api/media' && r.method() === 'GET') reads.push('media');
+  if (u.pathname === '/api/get' && /data\.json/.test(u.searchParams.get('path') || '')) reads.push('data'); };
+page.on('request', onReq);
+await page.waitForTimeout(300);
+reads.length = 0;
+await page.evaluate(() => window.__push({ type: 'changed', slug: 'x', file: 'media',
+                                          at: new Date().toISOString() }));
+await page.waitForTimeout(1500);
+page.off('request', onReq);
+ok('the page re-reads the photos', reads.includes('media'), true);
+ok('and not the splits', reads.includes('data'), false);
+
 // The bug underneath the bug. live() used to read hub.json's answer on the
 // spot and give up when it was still null, with no retry. pit.html and
 // racer.html call it from inside an async function, after awaits, so theirs

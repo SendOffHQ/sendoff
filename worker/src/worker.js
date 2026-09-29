@@ -131,21 +131,36 @@ async function publishChange(env, path) {
                : path.endsWith('/config.json') ? 'config.json'
                : null;
     if (!slug || !file) return;
-    const cfg = await loadRaceConfigNow(env, slug);
-    if (!cfg || cfg.visibility !== 'public') return;
-    // Which file, and nothing about what in it changed. The page already knows
-    // how to read a race; this tells it that reading again is worth doing, and
-    // which of the two reads is the one that matters. A client that predates
-    // the field ignores it and re-reads on its own schedule, which is what it
-    // did before.
-    await raceHub(env, slug).fetch('https://race-hub/publish', {
-      method: 'POST',
-      body: JSON.stringify({ type: 'changed', slug, file, at: new Date().toISOString() })
-    });
+    await publishToRace(env, slug, file);
   } catch (e) {
     // A watcher who misses a nudge falls back to the poll that is still
     // running underneath. Never worth failing a write over.
   }
+}
+
+// The nudge itself, for anything a race's open pages should go and re-read:
+// data.json, config.json, or 'media' when a photo is added or taken away.
+//
+// Photos were on a timer of their own, every open race page asking for the
+// list once a minute whether anything had changed or not. Told instead, a page
+// asks once per photo, which for any crew that is not uploading a photo a
+// minute is fewer requests as well as a faster photo. The pages keep a slow
+// timer underneath, for a socket that has quietly died.
+//
+// Which file, and nothing about what in it changed. The page already knows
+// how to read a race; this tells it that reading again is worth doing, and
+// which read is the one that matters. A client that predates the field
+// re-reads its splits instead, which is what it did before.
+async function publishToRace(env, slug, file) {
+  if (!liveEnabled(env) || !slug) return;
+  try {
+    const cfg = await loadRaceConfigNow(env, slug);
+    if (!cfg || cfg.visibility !== 'public') return;
+    await raceHub(env, slug).fetch('https://race-hub/publish', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'changed', slug, file, at: new Date().toISOString() })
+    });
+  } catch (e) { /* the timer underneath covers a missed nudge */ }
 }
 
 // ---------- CORS ----------
@@ -2117,7 +2132,7 @@ async function mediaViewer(req, env, slug, shareToken) {
 // Body is the image itself. Not multipart: the client has already resized and
 // re-encoded it, there is exactly one part, and a form parser here would be
 // machinery in the path of a crew member with one bar of signal.
-async function handleMediaUpload(req, env) {
+async function handleMediaUpload(req, env, ctx) {
   if (!mediaEnabled(env)) {
     return json({ error: 'Photos are not configured on this deployment.' }, { status: 503 }, env, req);
   }
@@ -2193,6 +2208,8 @@ async function handleMediaUpload(req, env) {
     try { await env.MEDIA.delete(key); } catch (e2) {}
     return json({ error: 'Could not record that photo: ' + (e.message || e) }, { status: 503 }, env, req);
   }
+  // After the answer, where a slow push cannot hold up the phone that sent it.
+  if (ctx && ctx.waitUntil) ctx.waitUntil(publishToRace(env, slug, 'media'));
   return json({ media: mediaRow(env, row) }, { status: 200 }, env, req);
 }
 
@@ -2219,7 +2236,7 @@ async function handleMediaList(req, env) {
 }
 
 // POST /media/delete  { id, slug }
-async function handleMediaDelete(req, env) {
+async function handleMediaDelete(req, env, ctx) {
   if (!mediaEnabled(env)) return json({ error: 'Photos are not configured.' }, { status: 503 }, env, req);
   const session = await requireAuth(req, env);
   if (!session) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -2237,6 +2254,8 @@ async function handleMediaDelete(req, env) {
   // penny; an orphaned row is a broken image on the race page.
   await env.DB.prepare('DELETE FROM media WHERE id = ?').bind(id).run();
   try { await env.MEDIA.delete(row.r2_key); } catch (e) {}
+  // A photo taken down should leave the race pages as quickly as it arrived.
+  if (ctx && ctx.waitUntil) ctx.waitUntil(publishToRace(env, row.slug, 'media'));
   return json({ ok: true }, { status: 200 }, env, req);
 }
 
@@ -4783,9 +4802,9 @@ async function route(request, env, ctx) {
     if (request.method === 'GET'  && path === '/get')             return handleGet(request, env);
     if (request.method === 'GET'  && path === '/public')          return handlePublicRead(request, env);
     if (request.method === 'POST' && path === '/archive')         return handleArchive(request, env);
-    if (request.method === 'POST' && path === '/media')           return handleMediaUpload(request, env);
+    if (request.method === 'POST' && path === '/media')           return handleMediaUpload(request, env, ctx);
     if (request.method === 'GET'  && path === '/media')           return handleMediaList(request, env);
-    if (request.method === 'POST' && path === '/media/delete')    return handleMediaDelete(request, env);
+    if (request.method === 'POST' && path === '/media/delete')    return handleMediaDelete(request, env, ctx);
     if (request.method === 'GET'  && path === '/media-file')      return handleMediaFile(request, env);
     if (request.method === 'POST' && path === '/invite')          return handleInvite(request, env);
     if (request.method === 'POST' && path === '/share-link')      return handleShareLink(request, env);

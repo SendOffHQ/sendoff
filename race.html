@@ -587,7 +587,7 @@
      Esri's and will be missing offline; the map is useful without them. -->
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=81ff34ca"></script>
-<script src="lib/race-core.js?v=c9e7af1d"></script>
+<script src="lib/race-core.js?v=67a24322"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -1203,7 +1203,13 @@
       // The same moment the nav learns whether to offer the pit board is the
       // moment the tutorial can say so. Guarded inside: this runs on every poll.
       registerTutorial();
-      if (lastPhotoCount < 0) { lastPhotoCount = 0; loadPhotos(); setInterval(loadPhotos, 60000); }
+      if (lastPhotoCount < 0) {
+        lastPhotoCount = 0;
+        loadPhotos();
+        // Told by the push when a photo arrives; this is the fallback. See
+        // Race.media.keepFresh for the pace.
+        Race.media.keepFresh(loadPhotos, () => pushed.connected);
+      }
       updateLastUpdated();
       tick();
       initCourseVisuals();
@@ -1706,6 +1712,9 @@
     interval: () => (pushed.connected ? 60000 : Race.POLL_MS[Race.raceState(cfg, data)])
   });
   pushed = Race.live(slug, (msg) => {
+      // A photo added or taken down: the photos, and nothing else. Re-reading
+      // the splits for it would be a request per photo per page for nothing.
+      if (msg && msg.file === 'media') { loadPhotos(); return; }
     // The push now carries which file moved. A config change is the one that
     // needs saying: the splits are re-read on every poll anyway, while the
     // config is trusted for a minute, so without this a settings edit still

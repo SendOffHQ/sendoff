@@ -54,6 +54,8 @@ globalThis.fetch = async (url, opts = {}) => {
 };
 
 const rows = new Map();
+// Photos, as far as the upload and delete paths ask about them.
+const mediaRows = new Map();
 const DB = {
   prepare(sql) {
     return {
@@ -79,6 +81,10 @@ const DB = {
           const r = rows.get(this.args[0]);
           return { results: r ? [r] : [] };
         }
+        if (/SELECT \* FROM media WHERE id/.test(this.sql)) {
+          const m = mediaRows.get(this.args[0]);
+          return { results: m ? [m] : [] };
+        }
         return { results: [] };
       },
       async run() {
@@ -94,6 +100,12 @@ const DB = {
         const set = this.sql.match(/^UPDATE races SET (config_sha|data_sha) = \? WHERE slug = \?$/);
         if (set) { const r = rows.get(this.args[1]); if (r) r[set[1]] = this.args[0] ?? null; return { meta: { changes: 1 } }; }
         if (/INSERT INTO races/.test(this.sql)) { applyInsert(this.sql, this.args); return { meta: { changes: 1 } }; }
+        if (/INSERT INTO media/.test(this.sql)) {
+          const [id, slug, , , r2_key] = this.args;
+          mediaRows.set(id, { id, slug, r2_key });
+          return { meta: { changes: 1 } };
+        }
+        if (/DELETE FROM media WHERE id/.test(this.sql)) { mediaRows.delete(this.args[0]); return { meta: { changes: 1 } }; }
         return { meta: { changes: 1 } };
       }
     };
@@ -143,6 +155,7 @@ async function cred(pw) {
 const env = {
   GITHUB_OWNER:'o', GITHUB_REPO:'r', GITHUB_TOKEN:'t', GITHUB_BRANCH:'main',
   AUTH_KV: KV, DB, RACE_HUB, ALLOWED_ORIGINS:'*', JWT_SECRET:'s',
+  MEDIA: { async put() {}, async get() { return null; }, async delete() {} },
   PUBLIC_BASE_URL: 'https://sendoff.run',
   READ_FROM_D1: 'true', WRITE_TO_GIT: 'false',
   USERS: JSON.stringify([{ email: ME, ...await cred('pw') }]),
@@ -243,6 +256,33 @@ r = await put('races/index.json', { races: [] });
 ok('the manifest write was taken', r.status, 200);
 ok('and nor does that', drain().length, 0);
 
+// A photo used to reach the race page on that page's own once-a-minute timer,
+// every open page asking whether anything had changed. Told instead, each page
+// asks once per photo. Added 2026-09-29.
+console.log('\na photo, added and taken down');
+const photo = async (slug, e) => {
+  const r = await worker.fetch(new Request(`https://w/media?id=${slug}&leg=1`, {
+    method: 'POST', headers: { 'Content-Type': 'image/jpeg', Authorization: 'Bearer ' + token },
+    body: new Uint8Array([0xff, 0xd8, 0xff])
+  }), e || env, ctx);
+  await settle();
+  return r;
+};
+drain();
+r = await photo(SLUG);
+ok('the upload was taken', r.status, 200);
+let pushedFor = drain();
+ok('and pushed, once', pushedFor.length, 1);
+ok('naming photos as what moved, to that race', [pushedFor[0].body.file, pushedFor[0].to], ['media', SLUG]);
+const photoId = (await r.json()).media.id;
+r = await worker.fetch(new Request('https://w/media/delete', {
+  method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+  body: JSON.stringify({ id: photoId })
+}), env, ctx);
+await settle();
+ok('taking it down was taken', r.status, 200);
+ok('and is pushed the same way', drain().map(p => p.body.file), ['media']);
+
 console.log('\nan unlisted race, whose watchers are not a public set');
 const HIDDEN = '000022-hidden';
 await put(`races/${HIDDEN}/config.json`, { ...race, name: 'Hidden', visibility: 'private' });
@@ -251,6 +291,9 @@ drain();
 r = await put(`races/${HIDDEN}/config.json`, { ...race, name: 'Hidden Renamed', visibility: 'private' });
 ok('the write was taken', r.status, 200);
 ok('but it is not pushed about', drain().length, 0);
+r = await photo(HIDDEN);
+ok('a photo on it is taken', r.status, 200);
+ok('and not pushed about either', drain().length, 0);
 
 console.log('\na deployment with no Durable Object bound');
 const envNoHub = { ...env, RACE_HUB: undefined };
