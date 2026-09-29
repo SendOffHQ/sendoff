@@ -42,7 +42,8 @@ After the race, in this order:
    and is purged from history, at which point private becomes the honest word
    again. It also makes everything after it cheaper, because the
    published copy stops being a second source of truth to reason about.
-2. **The race archive.** The cheapest real feature here, because the logic
+2. **The race archive, as a racer profile page** (stats and post-race
+   results, section 2). The cheapest real feature here, because the logic
    already ships: `Race.archive` in `lib/race-core.js` has the distance
    buckets, `resultFor`, `records` and `sort`, and no page uses any of it. It
    needs a page and a hub link. It also lands at the first moment there is a
@@ -1567,19 +1568,81 @@ same outcome.
 Per-runner goals, hour bands and crew notes exist and travel via profiles.
 A named, reusable playbook that is not tied to one person does not.
 
-### Race archive + PR tracking — *logic built, no page*
-The hub lists races. Nothing tracks a personal record across them yet.
+### Racer profile page: stats and post-race results — *logic built, no page*
+Asked for on 2026-09-29, after the Sangre de Cristo 100. This is the race
+archive with a person at the top of it: one page per racer, their races
+newest first, what they add up to, and the result of each one written down
+properly once it is over.
+
+Today a profile is a modal off the account menu holding a name, crew notes
+and fuel targets, and nobody but the racer and their crew ever sees it. A
+racer is a name on one race at a time. Nothing adds a season up.
+
+**What the page shows**
+
+- **Totals.** Races started, races finished, miles, climb, time on course.
+  All of it from races already logged here, nothing typed twice.
+- **Personal bests** by distance (50K, 50 mile, 100K, 100 mile), plus
+  furthest, most climb and longest day. Finished races only: a DNF is a day
+  worth keeping, not a record.
+- **Every race**, as a card: name, date, distance, climb, finish time or how
+  far they got, a link to the race page and the finish card.
+- **What SendOff alone knows**, which is the reason to keep a history here
+  rather than on a results site: calories and sodium per hour from the fuel
+  log, time spent in aid stations, and how the second half compared with the
+  first. Sangre came in at 35:41:15 with the intake log going quiet in the
+  back half, and that is the kind of pattern a profile should make visible
+  across races.
+
+**Post-race results**
+
+SendOff's clock is the racer's clock, which is not the official one. After a
+race the racer can add:
+
+- the **official finish time**, and it wins over the logged one wherever the
+  two disagree,
+- **place**: overall, gender, age group, and out of how many,
+- a **link to the official results**,
+- a **short race report** in their own words, and a line for what they would
+  change next time, which feeds straight into the next race's setup,
+- **DNF, and where**, stated plainly rather than left as a race that stops
+  partway.
+
+Also worth allowing: **a result for a race that was never tracked on
+SendOff.** Name, date, distance, time, place. Without it a profile starts
+empty for anybody who raced before they found this, and a history with the
+best races missing is not a history. These count toward totals and records
+but are marked as entered by hand.
+
+**Already built**
+
+`Race.archive` in `lib/race-core.js` does the arithmetic: `bucketFor`,
+`resultFor`, `records` and `sort`. No page calls any of it.
+`compute.loggedIntake` gives the fuel numbers. What is missing is the page,
+the post-race form, the hand-entered result, and a link from the hub and the
+account menu.
+
+**Decisions before building**
+
+- **Public or not.** The profile becomes a public identity for a racer, which
+  "Follow a runner" in section 3 is waiting on. The default should be
+  private, with the racer choosing to make it public, and a private race
+  never shows on a public profile even as a count.
+- **Records by discipline.** The buckets are running distances. A 100 mile
+  paddle next to a 100 mile run is a meaningless personal best. Each activity
+  already has a `family` for exactly this (foot, obstacle, bike, paddle, and
+  so on) and nothing reads it yet. Records group by family first.
+- **Whose race it is.** `resultFor` finds the racer by the email on the
+  runner record. A race whose runner was never linked to an account shows up
+  nowhere. Existing races, Sangre included, need checking for that link
+  before the first profile has anything in it.
+- **Free or paid.** Per "Every race, forever", the page, the race list and
+  the results are free and stay free. If anything here is ever sold it is
+  the deeper analysis, comparison across races and trends, never the history
+  itself.
 
 The pricing draft capped the free tier at the last three races. **That is
-withdrawn**; see "Every race, forever" below. The archive is a view over all of
-them for everybody, and if any part of it is ever sold, it is the analysis and
-never the history.
-
-The arithmetic is already written and already shipping: `Race.archive` in
-`lib/race-core.js` carries the distance buckets a race is filed under, along
-with `bucketFor`, `resultFor`, `records` and `sort`. No page calls any of it.
-What is missing is a page and a link from the hub, which is why this is the
-cheapest item on the list rather than a new feature.
+withdrawn**; see "Every race, forever" above.
 
 ### Data export, CSV / JSON / GPX — *not built*
 No export UI. The underlying files are JSON in a repo, which is not the same
@@ -1615,8 +1678,8 @@ runner's own screen. The racer screen stays one button.
 Person-level rather than race-level: their next race appears in your feed,
 and you are told when it starts. Needs something that does not exist yet, a
 public identity for a runner, since a runner today is a name on one race.
-Pairs with the account link already built for racer mode, and with the race
-archive in section 2.
+Pairs with the account link already built for racer mode, and with the racer
+profile page in section 2, which is that public identity.
 
 ### Follow a race — *not built*
 The same, for an event rather than a person. Cheap once following exists.
