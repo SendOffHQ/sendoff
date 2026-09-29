@@ -1622,7 +1622,7 @@ but are marked as entered by hand.
 the post-race form, the hand-entered result, and a link from the hub and the
 account menu.
 
-**Decisions before building**
+**Decided 2026-09-29**, all four as written:
 
 - **Public or not.** The profile becomes a public identity for a racer, which
   "Follow a runner" in section 3 is waiting on. The default should be
