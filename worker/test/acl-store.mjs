@@ -6,6 +6,7 @@
 //
 //   node worker/test/acl-store.mjs
 import worker from '../src/worker.js';
+import { fakeD1 } from './fake-d1.mjs';
 
 const OWNER = 'owner@example.com', CREW = 'crew@example.com', OUT = 'stranger@example.com';
 const SLUG = 'r1';
@@ -28,13 +29,16 @@ async function cred(pw){
 }
 const creds = { [OWNER]: await cred('pw'), [CREW]: await cred('pw'), [OUT]: await cred('pw') };
 const env = {
+  DB: fakeD1(),
   GITHUB_OWNER:'o', GITHUB_REPO:'r', GITHUB_TOKEN:'t', GITHUB_BRANCH:'main',
   AUTH_KV: KV, ALLOWED_ORIGINS:'*', JWT_SECRET:'s',
   USERS: JSON.stringify(Object.entries(creds).map(([email,c])=>({email,...c}))),
 };
+// A race from before the database: its config is in git and it has no row.
 function reset(cfg = legacyCfg) {
   repo = new Map([[`races/${SLUG}/config.json`, JSON.stringify(cfg, null, 2)+'\n']]);
   kv = new Map();
+  if (typeof env !== 'undefined') for (const s of [...env.DB.races.keys()]) env.DB.races.delete(s);
 }
 globalThis.fetch = async (url, opts = {}) => {
   const m = String(url).match(/contents\/(.+?)(\?|$)/);
@@ -58,7 +62,8 @@ const myRole = async (token) => {
   const j = await r.json();
   return JSON.parse(Buffer.from(j.content,'base64').toString('utf8')).myRole;
 };
-const storedCfg = () => JSON.parse(repo.get(`races/${SLUG}/config.json`));
+// What a save stored: the database row, which is where a config write lands.
+const storedCfg = (slug = SLUG) => JSON.parse(env.DB.races.get(slug).config);
 
 let bad=0;
 const ok=(l,g,w)=>{const p=JSON.stringify(g)===JSON.stringify(w); if(!p)bad++;
@@ -105,7 +110,7 @@ const t2 = await login(CREW);
 await call('/commit', { token: t2, body: { path: 'races/new1/config.json',
   content: JSON.stringify({ name:'New', visibility:'private', createdBy: CREW,
                             people:[{email:OUT,role:'viewer'}], runners:[] }), message:'create' } });
-const madeCfg = JSON.parse(repo.get('races/new1/config.json'));
+const madeCfg = storedCfg('new1');
 ok('the new file names nobody', [madeCfg.createdBy, madeCfg.people], [undefined, undefined]);
 ok('but the creator owns it', JSON.parse(kv.get('acl:new1')).createdBy, CREW);
 ok('and the invitee is on it', JSON.parse(kv.get('acl:new1')).people, [{email:OUT,role:'viewer'}]);
@@ -121,7 +126,7 @@ await call('/commit', { token: t3, body: { path: `races/${SLUG}/config.json`,
   content: JSON.stringify({ ...legacyCfg, name:'Saved',
     runners:[{ id:'a', name:'A', email: OWNER }, { id:'b', name:'B', email: CREW }] }), message:'save' } });
 const onDisk = storedCfg();
-ok('no address in the committed file', onDisk.runners.map(r => r.email), [undefined, undefined]);
+ok('no address in the stored file', onDisk.runners.map(r => r.email), [undefined, undefined]);
 ok('the runners survive', onDisk.runners.map(r => r.id), ['a','b']);
 ok('both links are in KV', JSON.parse(kv.get('acl:'+SLUG)).runnerEmails, { a: OWNER, b: CREW });
 const after2 = await call('/get?path='+encodeURIComponent(`races/${SLUG}/config.json`), { token: t3 });

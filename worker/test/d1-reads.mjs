@@ -1,9 +1,11 @@
-// Reads served from the mirror instead of from git.
+// Reads served from D1, which is where every race write lands.
 //
 // The thing being tested is not "does it return something" but "does it return
-// the same thing". A read that comes back subtly different from the git one
-// breaks a write, because the client hands the sha it was given straight back
-// as its concurrency guard.
+// the same thing": the bytes written, and a version the next write will
+// accept, because the client hands the sha it was given straight back as its
+// concurrency guard. Before 2026-09-30 this compared D1 against git, when git
+// took the writes and D1 was the copy; git now holds only archives, so the
+// comparison is against what was written.
 import worker from '../src/worker.js';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
@@ -18,7 +20,8 @@ for (const f of ['0001_initial.sql', '0002_leg_shape.sql', '0003_documents.sql']
 const mkStmt = (sql) => ({
   _sql: sql, _args: [],
   bind(...a) { this._args = a; return this; },
-  async run() { return db.prepare(this._sql).run(...this._args); },
+  // D1's shape: { meta: { changes } }, which the version guard reads.
+  async run() { const r = db.prepare(this._sql).run(...this._args); return { meta: r, success: true }; },
   async all() { return { results: db.prepare(this._sql).all(...this._args) }; },
 });
 const DB = {
@@ -52,8 +55,7 @@ const base = {
   USERS: JSON.stringify([{ email:OWNER, ...await cred('pw'), role:'admin' },
                          { email:CREW,  ...await cred('pw') }]),
 };
-const gitEnv = { ...base, READ_FROM_D1: 'false' };
-const d1Env  = { ...base, READ_FROM_D1: 'true' };
+const env = base;
 
 let n = 0;
 globalThis.fetch = async (url, opts = {}) => {
@@ -70,17 +72,17 @@ globalThis.fetch = async (url, opts = {}) => {
   repo.set(path, text);
   const sha = 'sha' + (++n);
   shas.set(path, sha);
-  // GitHub names the blob it just made; the worker takes the sha from here.
   return new Response(JSON.stringify({ content: { sha } }), { status: 200 });
 };
 const call = (env, p, o={}) => worker.fetch(new Request('https://w'+p, {
   method: o.method || (o.body ? 'POST' : 'GET'),
   headers: { 'Content-Type':'application/json', ...(o.token?{Authorization:'Bearer '+o.token}:{}) },
   ...(o.body?{body:JSON.stringify(o.body)}:{}) }), env);
-async function login(e){ const j=await (await call(gitEnv,'/login',{email:e,body:{email:e,password:'pw'}})).json(); return j.token; }
-const write = (token, path, text, sha) => call(gitEnv, '/commit', { token,
+async function login(e){ const j=await (await call(env,'/login',{body:{email:e,password:'pw'}})).json(); return j.token; }
+const write = (token, path, text, sha, e = env) => call(e, '/commit', { token,
   body: { path, content: text, sha: sha || null, message: 'test' } });
-const get = (env, token, path) => call(env, '/get?path=' + encodeURIComponent(path), { token });
+const get = (e, token, path) => call(e, '/get?path=' + encodeURIComponent(path), { token });
+const text = (j) => Buffer.from(j.content, 'base64').toString('utf8');
 
 let bad=0;
 const ok=(l,g,w)=>{const p=JSON.stringify(g)===JSON.stringify(w); if(!p)bad++;
@@ -95,117 +97,69 @@ const dataText = JSON.stringify({ lastUpdated:'2026-09-26T14:03:00Z',
 await write(t, `races/${SLUG}/config.json`, cfgText);
 await write(t, `races/${SLUG}/data.json`, dataText);
 
-console.log('\nthe mirror gives back what git gives back');
-const fromGit = await (await get(gitEnv, t, `races/${SLUG}/data.json`)).json();
-const fromD1  = await (await get(d1Env,  t, `races/${SLUG}/data.json`)).json();
-ok('same sha', fromD1.sha, fromGit.sha);
-ok('same bytes', fromD1.content, fromGit.content);
-ok('and the bytes are the file, unchanged',
-   Buffer.from(fromD1.content, 'base64').toString('utf8'), dataText);
-ok('lastUpdated survived the round trip',
-   JSON.parse(Buffer.from(fromD1.content,'base64').toString('utf8')).lastUpdated,
-   '2026-09-26T14:03:00Z');
+console.log('\na read gives back exactly what was written');
+const first = await (await get(env, t, `races/${SLUG}/data.json`)).json();
+ok('the bytes are the file, unchanged', text(first), dataText);
+ok('lastUpdated survived the round trip', JSON.parse(text(first)).lastUpdated, '2026-09-26T14:03:00Z');
+ok('with a version of the database\'s own', /^d1-/.test(first.sha), true);
+ok('and git was never asked to hold it', repo.has(`races/${SLUG}/data.json`), false);
 
-console.log('\nthe sha it hands back is one git will still accept');
-const guard = fromD1.sha;
-const r = await write(t, `races/${SLUG}/data.json`, dataText.replace('ok','better'), guard);
+console.log('\nthe version it hands back is one a write will accept');
+const r = await write(t, `races/${SLUG}/data.json`, dataText.replace('ok','better'), first.sha);
 ok('a write using it succeeds', r.status, 200);
-ok('and the mirror moved with it',
-   Buffer.from((await (await get(d1Env, t, `races/${SLUG}/data.json`)).json()).content,'base64')
-     .toString('utf8').includes('better'), true);
+ok('and the next read has it', text(await (await get(env, t, `races/${SLUG}/data.json`)).json()).includes('better'), true);
 
 console.log('\na config read still says who you are');
-const cfgD1 = JSON.parse(Buffer.from(
-  (await (await get(d1Env, t, `races/${SLUG}/config.json`)).json()).content, 'base64').toString('utf8'));
-ok('myRole is injected the same way', cfgD1.myRole, 'owner');
-ok('and the roster is still not in the stored copy',
+const cfgD1 = JSON.parse(text(await (await get(env, t, `races/${SLUG}/config.json`)).json()));
+ok('myRole is injected', cfgD1.myRole, 'owner');
+ok('and the roster is not in the stored copy',
    JSON.parse(db.prepare('select config from races where slug=?').get(SLUG).config).people, undefined);
 
-console.log('\na race the mirror has not seen is served by git anyway');
+console.log('\na race the database has not seen is served by git anyway');
+// An archived race from before the database, with no row. Every race on the
+// site was this until the backfill.
 repo.set('races/r9/config.json', '{"name":"Untouched","visibility":"public"}');
 shas.set('races/r9/config.json', 'sha-r9');
 kv.set('acl:r9', JSON.stringify({ createdBy: OWNER, people:[], teamCanInvite:false, runnerEmails:{} }));
-const miss = await (await get(d1Env, t, 'races/r9/config.json')).json();
+const miss = await (await get(env, t, 'races/r9/config.json')).json();
 ok('it reads, rather than 404s', miss.sha, 'sha-r9');
-ok('with the name from the file',
-   JSON.parse(Buffer.from(miss.content,'base64').toString('utf8')).name, 'Untouched');
+ok('with the name from the file', JSON.parse(text(miss)).name, 'Untouched');
 
-console.log('\nthe flag is what decides, and it is off unless it says true');
-ghReads = 0;
-await get(d1Env, t, `races/${SLUG}/config.json`);
-await get(d1Env, t, `races/${SLUG}/data.json`);
-ok('on: git is not asked at all', ghReads, 0);
-ok('and a whole poll costs git nothing', ghReads, 0);
-ghReads = 0;
-await get(gitEnv, t, `races/${SLUG}/config.json`);
-await get(gitEnv, t, `races/${SLUG}/data.json`);
-// Two per file: the access check reads the config, then the file itself is
-// read. The live worker's 3s cache folds some of these together; the point
-// here is the shape, which is that every read is a trip to GitHub.
-ok('off: the same poll is four trips to GitHub', ghReads, 4);
-ghReads = 0;
-await get({ ...base }, t, `races/${SLUG}/data.json`);
-ok('absent means off', ghReads > 0, true);
-ghReads = 0;
-await get({ ...base, READ_FROM_D1: 'yes' }, t, `races/${SLUG}/data.json`);
-ok('and only the word true turns it on', ghReads > 0, true);
+console.log('\nwith a database bound, a poll costs git nothing, whatever is set');
+// READ_FROM_D1 used to decide this, and the default was git. Writes only go
+// to D1 now, so a read that skipped it would show a running race frozen at
+// whatever git last held. No setting is consulted any more.
+for (const [label, extra] of [['as deployed', {}], ['with the old switch off', { READ_FROM_D1: 'false' }]]) {
+  ghReads = 0;
+  await get({ ...base, ...extra }, t, `races/${SLUG}/config.json`);
+  await get({ ...base, ...extra }, t, `races/${SLUG}/data.json`);
+  ok(label, ghReads, 0);
+}
 
-console.log('\nand the mirror never serves a read it cannot stand behind');
-db.prepare('update races set data_sha = null where slug = ?').run(SLUG);
-ghReads = 0;
-const noSha = await (await get(d1Env, t, `races/${SLUG}/data.json`)).json();
-ok('a row with no sha falls through to git', ghReads > 0, true);
-ok('and git answers with a real one', typeof noSha.sha, 'string');
-
-// The failure the flag creates. git takes the write, the mirror does not, and
-// a read served from the mirror would show the old splits to a crew who have
-// just been told theirs landed.
-console.log('\na mirror that falls behind stops answering');
-let breakMirror = false;
-const flaky = { ...d1Env, DB: {
+console.log('\na press the database cannot store is refused, and reads keep the last that landed');
+let breakDb = false;
+const flaky = { ...base, DB: {
   prepare: (sql) => {
     const st = mkStmt(sql);
-    // The stand-down itself must still work; it is the whole recovery.
-    if (breakMirror && /INSERT INTO/i.test(sql)) st.run = async () => { throw new Error('D1 write failed'); };
+    if (breakDb && /INSERT INTO/i.test(sql)) st.run = async () => { throw new Error('D1 write failed'); };
     return st;
   },
   async batch(stmts) {
-    if (breakMirror) throw new Error('D1 write failed');
+    if (breakDb) throw new Error('D1 write failed');
     return DB.batch(stmts);
   },
 } };
-// The section above nulled the sha by hand; put the mirror back first, so
-// what follows is testing the stand-down and not that leftover.
-const cur = await (await get(gitEnv, t, `races/${SLUG}/data.json`)).json();
-await write(t, `races/${SLUG}/data.json`, dataText, cur.sha);
-ghReads = 0;
-const before = await (await get(d1Env, t, `races/${SLUG}/data.json`)).json();
-ok('the mirror is answering to begin with', ghReads, 0);
-
-breakMirror = true;
-const stale = dataText.replace('ok', 'newest split');
-const w = await worker.fetch(new Request('https://w/commit', { method:'POST',
-  headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+t },
-  body: JSON.stringify({ path:`races/${SLUG}/data.json`, content: stale,
-                         sha: before.sha, message:'x' }) }), flaky);
-ok('the write still succeeds, because git took it', w.status, 200);
-breakMirror = false;
-
-ghReads = 0;
-const after = await (await get(d1Env, t, `races/${SLUG}/data.json`)).json();
-ok('the next read goes to git rather than the stale mirror', ghReads > 0, true);
-ok('and shows the split that actually landed',
-   Buffer.from(after.content,'base64').toString('utf8').includes('newest split'), true);
-ok('the row stood itself down',
-   db.prepare('select data_sha from races where slug=?').get(SLUG).data_sha, null);
-
-// And it comes back on its own, without anybody pressing anything.
-await write(t, `races/${SLUG}/data.json`, stale.replace('newest split', 'later still'), after.sha);
-ghReads = 0;
-const healed = await (await get(d1Env, t, `races/${SLUG}/data.json`)).json();
-ok('a later write heals it', ghReads, 0);
-ok('and the mirror is current again',
-   Buffer.from(healed.content,'base64').toString('utf8').includes('later still'), true);
+const before = await (await get(env, t, `races/${SLUG}/data.json`)).json();
+breakDb = true;
+const w = await write(t, `races/${SLUG}/data.json`, dataText.replace('ok', 'lost split'), before.sha, flaky);
+breakDb = false;
+ok('the crew is told to try again', w.status, 503);
+const after = await (await get(env, t, `races/${SLUG}/data.json`)).json();
+ok('the read shows the last press that landed', text(after), text(before));
+ok('with the version it had, so the retry is taken', after.sha, before.sha);
+const retry = await write(t, `races/${SLUG}/data.json`, dataText.replace('ok', 'lost split'), after.sha);
+ok('and the retry lands', [retry.status,
+  text(await (await get(env, t, `races/${SLUG}/data.json`)).json()).includes('lost split')], [200, true]);
 
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

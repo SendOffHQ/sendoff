@@ -3,6 +3,7 @@
 //
 //   node worker/test/my-role.mjs
 import worker from '../src/worker.js';
+import { fakeD1 } from './fake-d1.mjs';
 
 const OWNER = 'owner@example.com', CREW = 'crew@example.com', OUT = 'stranger@example.com';
 const SLUG = 'r1';
@@ -23,6 +24,7 @@ async function cred(pw){
   return { hash:b(new Uint8Array(bits)), salt:b(salt), iterations:100000 };
 }
 const env = {
+  DB: fakeD1(),
   GITHUB_OWNER:'o', GITHUB_REPO:'r', GITHUB_TOKEN:'t', GITHUB_BRANCH:'main',
   AUTH_KV: KV, ALLOWED_ORIGINS:'*', JWT_SECRET:'s',
   USERS: JSON.stringify([{ email:OWNER, ...await cred('pw') }, { email:CREW, ...await cred('pw') }, { email:OUT, ...await cred('pw') }]),
@@ -66,7 +68,8 @@ const round = await readCfg(t);
 round.name = 'Renamed';                       // a client round-tripping the config
 await call('/commit', { token: t, body: {
   path: `races/${SLUG}/config.json`, content: JSON.stringify(round, null, 2)+'\n', message: 'rename' } });
-const stored = JSON.parse(repo.get(`races/${SLUG}/config.json`));
+// What the save stored, in the database where a config write lands.
+const stored = JSON.parse(env.DB.races.get(SLUG).config);
 ok('the rename landed', stored.name, 'Renamed');
 ok('myRole is not in the stored file', stored.myRole, undefined);
 // The roster no longer lives in the file at all; acl-store.mjs covers where it
@@ -77,7 +80,7 @@ console.log('\nnor on the write that creates a race');
 const t2 = await login(CREW);
 await call('/commit', { token: t2, body: { path: 'races/r2/config.json',
   content: JSON.stringify({ name:'New', visibility:'public', createdBy: CREW, myRole:'owner', runners:[] }), message:'create' } });
-ok('myRole is not in a new race', JSON.parse(repo.get('races/r2/config.json')).myRole, undefined);
+ok('myRole is not in a new race', JSON.parse(env.DB.races.get('r2').config).myRole, undefined);
 
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

@@ -8,8 +8,13 @@
 // miss. The stub below models exactly that, so the test fails against a worker
 // without the creation grant and passes with it.
 //
+// Config and data go to D1 now, which is read-after-write consistent, so the
+// cached miss can only bite the course file, still committed for a public
+// race. The sequence is kept whole because the wizard's is.
+//
 //   node worker/test/creation-grant.mjs
 import worker from '../src/worker.js';
+import { fakeD1 } from './fake-d1.mjs';
 
 const SLUG = '000002-test-race-z9ruhk';
 const ME = 'owner@example.com', OTHER = 'someone@else.com';
@@ -35,6 +40,7 @@ async function cred(pw) {
 const env = {
   GITHUB_OWNER: 'o', GITHUB_REPO: 'r', GITHUB_TOKEN: 't', GITHUB_BRANCH: 'main',
   AUTH_KV: KV, ALLOWED_ORIGINS: '*', JWT_SECRET: 'test-secret',
+  DB: fakeD1(), READ_FROM_D1: 'true',
   USERS: JSON.stringify([{ email: ME, ...await cred('pw') }, { email: OTHER, ...await cred('pw') }]),
 };
 
@@ -79,7 +85,7 @@ function expect(label, got, want) {
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${label.padEnd(48)} ${got}${ok ? '' : ` (expected ${want})`}`);
 }
 
-const cfgJson = JSON.stringify({ name: 'Test Race', visibility: 'private', createdBy: ME, people: [] });
+const cfgJson = JSON.stringify({ name: 'Test Race', visibility: 'public', createdBy: ME, people: [] });
 const mine = await login(ME);
 const theirs = await login(OTHER);
 
@@ -90,16 +96,23 @@ expect('PUT data.json', (await commit(mine, `races/${SLUG}/data.json`, '{"runner
 expect('PUT course.gpx', (await commit(mine, `races/${SLUG}/course.gpx`, '<gpx/>')).status, 200);
 
 console.log('\nthe grant must not become a way in');
-expect('another account writes that slug', (await commit(theirs, `races/${SLUG}/data.json`, '{}')).status, 404);
+// 403, not the 404 this once was: that 404 was GitHub's cached miss hiding the
+// race. The database answers straight, so the race is found and refused.
+expect('another account writes that slug', (await commit(theirs, `races/${SLUG}/data.json`, '{}')).status, 403);
 expect('a slug nobody created', (await commit(mine, 'races/000003-never-made/data.json', '{}')).status, 404);
 
-console.log('\na creation GitHub rejected must leave no grant');
+console.log('\na creation the database rejected must leave no grant');
 const FAIL = '000004-put-fails';
-globalThis.fetch = async (url, opts = {}) =>
-  (opts.method === 'PUT' && String(url).includes(FAIL))
-    ? new Response('{"message":"boom"}', { status: 500 })
-    : realFetch(url, opts);
-expect('PUT config.json fails upstream', (await commit(mine, `races/${FAIL}/config.json`, cfgJson)).status, 500);
+const realPrepare = env.DB.prepare;
+env.DB.prepare = (sql) => {
+  const st = realPrepare(sql);
+  const bind = st.bind;
+  return { ...st, bind: (...a) => {
+    const b = bind(...a);
+    return a.includes(FAIL) && /^INSERT/.test(b.sql) ? { ...b, run: async () => { throw new Error('boom'); } } : b;
+  } };
+};
+expect('PUT config.json fails upstream', (await commit(mine, `races/${FAIL}/config.json`, cfgJson)).status, 503);
 expect('PUT data.json after that failure', (await commit(mine, `races/${FAIL}/data.json`, '{}')).status, 404);
 
 console.log(failures ? `\n${failures} failed\n` : '\nall passed\n');

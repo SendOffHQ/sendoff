@@ -8,7 +8,7 @@
 // makes the other six irrelevant.
 //
 // So this creates one the way the wizard does, with production's flags
-// (WRITE_TO_GIT off, D1 bound), and then asks every surface in turn.
+// (D1 bound, race writes going to it), and then asks every surface in turn.
 //
 // One of them was open when this was written. /commit took any filename under
 // races/<slug>/: config.json and data.json go to the database and course.gpx

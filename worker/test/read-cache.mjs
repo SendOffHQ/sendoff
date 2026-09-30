@@ -6,8 +6,13 @@
 // polls a minute over two files that is 1,440 an hour per open dashboard,
 // against a GitHub ceiling of 5,000. This test pins the shape of that.
 //
+// Reads come from D1 now, and git only for a race the database has never
+// seen, so this is the cost of that fallback. It is still worth pinning: an
+// archived race with no row would otherwise cost two GitHub calls a poll.
+//
 //   node worker/test/read-cache.mjs
 import worker from '../src/worker.js';
+import { fakeD1 } from './fake-d1.mjs';
 
 const SLUG = '000001-sangre-de-cristo-100';
 const ME = 'owner@example.com';
@@ -95,9 +100,16 @@ for (let i = 0; i < 10; i++) await poll();
 expect('GitHub calls for all ten', ghCalls, 2);
 
 console.log('\na press must not wait for the cache to expire');
-ghCalls = 0;
-await write(`races/${SLUG}/data.json`, JSON.stringify({ runners: [{ id: 'jason', legs: [1] }] }));
-const after = await read(`races/${SLUG}/data.json`);
+// Presses go to D1, so this runs where they land: a race in the database,
+// read straight after a write, with the git cache still warm from above.
+const envD1 = { ...env, DB: fakeD1() };
+const writeD1 = (p, c) => worker.fetch(new Request('https://w/commit', {
+  method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+  body: JSON.stringify({ path: p, content: c, message: 'press' }) }), envD1);
+await writeD1(`races/${SLUG}/config.json`, repo.get(`races/${SLUG}/config.json`));
+await writeD1(`races/${SLUG}/data.json`, JSON.stringify({ runners: [{ id: 'jason', legs: [1] }] }));
+const after = await worker.fetch(new Request('https://w/get?path=' + encodeURIComponent(`races/${SLUG}/data.json`),
+  { headers: { Authorization: 'Bearer ' + token } }), envD1);
 const body = JSON.parse(Buffer.from((await after.json()).content, 'base64').toString('utf8'));
 expect('the next read sees the write', JSON.stringify(body.runners.length), '1');
 

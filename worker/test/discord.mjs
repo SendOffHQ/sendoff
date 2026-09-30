@@ -8,6 +8,7 @@
 //
 //   node worker/test/discord.mjs
 import worker from '../src/worker.js';
+import { fakeD1 } from './fake-d1.mjs';
 
 const ME = 'owner@example.com';
 const repo = new Map();
@@ -58,6 +59,7 @@ async function cred(pw) {
   return { hash: b(new Uint8Array(bits)), salt: b(salt), iterations: 100000 };
 }
 const base = {
+  DB: fakeD1(),
   GITHUB_OWNER:'o', GITHUB_REPO:'r', GITHUB_TOKEN:'t', GITHUB_BRANCH:'main',
   AUTH_KV: KV, ALLOWED_ORIGINS:'*', JWT_SECRET:'s', PUBLIC_BASE_URL: 'https://sendoff.run',
   USERS: JSON.stringify([{ email: ME, ...await cred('pw') }]),
@@ -77,12 +79,18 @@ const token = await (async () => {
   return (await r.json()).token;
 })();
 
+// The version the database handed out for this file, which a save sends back.
+const versionOf = (e, path) => {
+  const m = /^races\/([^/]+)\/(config|data)\.json$/.exec(path);
+  const r = m && e.DB && e.DB.races.get(m[1]);
+  return (r && r[m[2] + '_sha']) || undefined;
+};
 const commit = async (path, doc, e = env) => {
   const r = await worker.fetch(new Request('https://w/commit', {
     method:'POST',
     headers:{ 'Content-Type':'application/json', Authorization: 'Bearer ' + token },
     body: JSON.stringify({ path, content: JSON.stringify(doc, null, 2) + '\n',
-                           message: 'test', sha: repo.has(path) ? 'sha-' + path : undefined })
+                           message: 'test', sha: versionOf(e, path) })
   }), e, ctx);
   await settle();
   return r;

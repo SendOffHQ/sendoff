@@ -8,33 +8,16 @@ compatibility_date = "2026-05-01"
 GITHUB_OWNER = "SendOffHQ"
 GITHUB_REPO = "sendoff"
 GITHUB_BRANCH = "main"
-# Serve race reads from D1 instead of the GitHub API. "false" (or absent) keeps
-# git as the read path. A race the mirror has not seen still falls back to git
-# either way, so flipping this on cannot make a race unreadable; flipping it
-# back is a one-line change and a deploy, with no data to undo.
-READ_FROM_D1 = "true"
-# Race writes go to git, and D1 follows. "false" makes D1 the authority for
-# races/<slug>/config.json and data.json, and leaves git for the archive.
-# Flipped to "false" on 2026-09-10. Setting it back to "true" and deploying is
-# the whole rollback: every race is in the mirror, and a race the mirror has
-# not seen still falls back to git on the read side either way.
-#
-# The archive commit that this depends on is in: once a race is finished, the
-# worker commits its config and data to git, and again on any correction filed
-# afterwards. Finished means every runner through every leg, or the clock past
-# the cutoff, because a race somebody dropped out of never satisfies the first
-# and is exactly the race whose data you want kept. POST /archive forces it for
-# anything the rules miss.
-#
-# What it does change when it is on, and what to check if it misbehaves: the
-# concurrency guard stops being GitHub's blob sha and becomes the config_sha /
-# data_sha columns, which a read hands out and a write sends back. A stale one
-# is a 409, which is what stops two crew members at the same aid station
-# overwriting each other. worker/test/d1-writes.mjs holds that.
-#
-# course.gpx and races/index.json still go to git either way: one is written
-# once at setup, the other is the public manifest the signed-out hub reads.
-WRITE_TO_GIT = "false"
+# Race reads come from D1 whenever D1 is bound, with git as the fallback for a
+# race the mirror has never seen. This was a READ_FROM_D1 switch until
+# 2026-09-30, removed with the write one below: writes only go to D1, so a
+# read that skipped it would find nothing current.
+# Race writes go to D1, always. This was a WRITE_TO_GIT switch from 2026-09-10
+# to 2026-09-30, and it is gone: its default committed every press to the
+# public repository, so losing this one line would have started publishing
+# private races' splits with nothing to say so. Git keeps the archive of a
+# finished public race, course.gpx for a public race, and races/index.json.
+# worker/test/d1-writes.mjs holds that no setting brings git writes back.
 # Whether a site admin may open and change a race they are not on.
 #
 # On unless this says "false", and that one word is the whole of turning it

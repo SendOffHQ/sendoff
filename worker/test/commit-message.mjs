@@ -8,7 +8,12 @@
 // The check is at the chokepoint rather than at each call site, and this test
 // exercises it through the real endpoints for that reason: a caller composing a
 // message with an address in it must not be able to publish one.
+//
+// A race's presses go to the database and make no commit at all now. What
+// still reaches git is the hub manifest, a public race's course and the
+// archive of a finished race, so those are what carry the messages here.
 import worker from '../src/worker.js';
+import { fakeD1 } from './fake-d1.mjs';
 
 const ME = 'crew@example.com', SLUG = 'r1';
 const repo = new Map();
@@ -27,6 +32,7 @@ async function cred(pw){
   return { hash:b(new Uint8Array(bits)), salt:b(salt), iterations:100000 };
 }
 const env = {
+  DB: fakeD1(),
   GITHUB_OWNER:'o', GITHUB_REPO:'r', GITHUB_TOKEN:'t', GITHUB_BRANCH:'main',
   AUTH_KV: KV, ALLOWED_ORIGINS:'*', JWT_SECRET:'s',
   USERS: JSON.stringify([{ email: ME, ...await cred('pw') }]),
@@ -71,21 +77,27 @@ console.log('\na normal write says what happened and not who');
 await call('/commit', { token: t, body: { path: `races/${SLUG}/config.json`,
   content: JSON.stringify({ name:'A race', visibility:'public', createdBy: ME, people:[], runners:[] }),
   message: 'hub: create race r1 (config)' } });
-await call('/commit', { token: t, body: { path: `races/${SLUG}/data.json`,
-  content: '{"runners":[]}', message: 'pit: jason sign-in leg 3' } });
-ok('the message survives', messages.includes('pit: jason sign-in leg 3'), true);
-ok('with nothing appended to it', messages.at(-1), 'pit: jason sign-in leg 3');
+await call('/commit', { token: t, body: { path: `races/${SLUG}/course.gpx`,
+  content: '<gpx/>', message: 'setup: course for r1' } });
+ok('the message survives', messages.includes('setup: course for r1'), true);
+ok('with nothing appended to it', messages.at(-1), 'setup: course for r1');
 
 console.log('\nand a caller cannot publish an address even on purpose');
 // The invite-accept path used to compose exactly this shape by itself.
-await call('/commit', { token: t, body: { path: `races/${SLUG}/data.json`,
-  content: '{"runners":[]}', message: `hub: accept invite for ${ME} on ${SLUG}` } });
+await call('/commit', { token: t, body: { path: 'races/index.json',
+  content: '{"races":[]}\n', message: `hub: accept invite for ${ME} on ${SLUG}` } });
 ok('it is redacted rather than sent', messages.at(-1), 'hub: accept invite for [redacted] on r1');
 ok('and the rest of the message is intact', /accept invite for .* on r1/.test(messages.at(-1)), true);
 
+console.log('\nnor does a press, which makes no commit to carry one');
+const before = messages.length;
+await call('/commit', { token: t, body: { path: `races/${SLUG}/data.json`,
+  content: '{"runners":[]}', message: `pit: ${ME} sign-in leg 3` } });
+ok('no commit at all', messages.length, before);
+
 console.log('\nacross every message this worker has sent');
 ok('none of them contains an address', messages.filter(m => EMAILISH.test(m)), []);
-ok('and there were some to check', messages.length > 2, true);
+ok('and there were some to check', messages.length >= 2, true);
 
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

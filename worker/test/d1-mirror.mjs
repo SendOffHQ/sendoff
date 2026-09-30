@@ -1,4 +1,4 @@
-// Every write that lands in git also lands in D1.
+// Every race write lands in D1, and so does every roster change.
 //
 // Backed by a real SQLite database rather than a stub, because the point of
 // this test is the SQL: an upsert that is wrong, or a delete that removes the
@@ -19,7 +19,10 @@ for (const f of ['0001_initial.sql', '0002_leg_shape.sql', '0003_documents.sql']
 const mkStmt = (sql) => ({
   _sql: sql, _args: [],
   bind(...a) { this._args = a; return this; },
-  async run() { return db.prepare(this._sql).run(...this._args); },
+  // D1 answers a run with { meta: { changes } }, which the version guard in
+  // commitToD1 reads. node:sqlite puts changes at the top level, so it is
+  // wrapped into the shape the worker actually gets.
+  async run() { const r = db.prepare(this._sql).run(...this._args); return { meta: r, success: true }; },
   async all() { return { results: db.prepare(this._sql).all(...this._args) }; },
 });
 const DB = {
@@ -81,8 +84,14 @@ const call = (p, o={}) => worker.fetch(new Request('https://w'+p, {
   headers: { 'Content-Type':'application/json', ...(o.token?{Authorization:'Bearer '+o.token}:{}) },
   ...(o.body?{body:JSON.stringify(o.body)}:{}) }), env);
 async function login(e){ const j=await (await call('/login',{body:{email:e,password:'pw'}})).json(); return j.token; }
+// A save sends back the version the database handed out, as the app does.
+const versionOf = (path) => {
+  const m = /^races\/([^/]+)\/(config|data)\.json$/.exec(path);
+  const r = m && db.prepare(`select ${m[2]}_sha v from races where slug=?`).get(m[1]);
+  return (r && r.v) || undefined;
+};
 const write = (token, path, obj) => call('/commit', { token,
-  body: { path, content: JSON.stringify(obj, null, 2), message: 'test' } });
+  body: { path, content: JSON.stringify(obj, null, 2), message: 'test', sha: versionOf(path) } });
 
 let bad=0;
 const ok=(l,g,w)=>{const p=JSON.stringify(g)===JSON.stringify(w); if(!p)bad++;
@@ -137,13 +146,17 @@ ok('three legs across two runners',
    rows(db.prepare('select runner_id, count(*) c from legs where slug=? group by runner_id order by runner_id').all(SLUG)),
    [{runner_id:'jason',c:1},{runner_id:'sam',c:2}]);
 
-console.log('\nthe mirror never fails the write');
+console.log('\na press the database cannot take is not reported as landed');
+// This used to be 200, because git had taken the write and the mirror was a
+// copy. D1 is the only place a press goes now, so telling the crew it landed
+// would be telling them something untrue. 503 is what the phone's queue holds
+// and retries, the same as a lost signal.
 const broken = { ...env, DB: { prepare(){ throw new Error('D1 is down'); }, async batch(){ throw new Error('D1 is down'); } } };
 const r = await worker.fetch(new Request('https://w/commit', { method:'POST',
   headers:{'Content-Type':'application/json', Authorization:'Bearer '+t},
   body: JSON.stringify({ path:`races/${SLUG}/data.json`, content:'{"runners":[]}', message:'x' }) }), broken);
-ok('the caller is still told it worked', r.status, 200);
-ok('and git has it', JSON.parse(repo.get(`races/${SLUG}/data.json`)).runners, []);
+ok('the caller is told to try again', r.status, 503);
+ok('and git is not written in its place', repo.has(`races/${SLUG}/data.json`), false);
 
 
 // A race that predates the mirror: in git, with an access list in KV, but
@@ -161,10 +174,8 @@ const status = () => call('/d1-status', { token: t }).then(r => r.json());
 const before = (await status()).races.find(r => r.slug === OLD);
 ok('the older race is missing before', [before.inD1, before.legs, before.gitLegs], [false, 0, 2]);
 ok('and the check says so', (await status()).allMatch, false);
-// The write above went to git with D1 down, so r1's legs are now stale. The
-// check has to notice a drift like that too, not just a missing race: after
-// reads move over it is the only thing standing between a quiet divergence
-// and a race day run off the wrong numbers.
+// r1's legs are in D1 and git has no copy of a running race at all. The check
+// has to report a difference like that, not just a missing race.
 const drifted = (await status()).races.find(r => r.slug === SLUG);
 ok('a leg count that has drifted is caught',
    [drifted.inD1, drifted.legs, drifted.gitLegs, drifted.matches], [true, 3, 0, false]);
@@ -175,7 +186,7 @@ ok('the backfill reports no failures', [fill.ok, fill.failed], [true, []]);
 const filled = (await status()).races.find(r => r.slug === OLD);
 ok('now it is there, with its roster and its legs',
    [filled.inD1, filled.createdBy, filled.people, filled.legs, filled.gitLegs], [true, true, 1, 2, 2]);
-ok('every race agrees with its files', (await status()).allMatch, true);
+ok('and it agrees with its files', (await status()).races.find(r => r.slug === OLD).matches, true);
 ok('the creator came from KV, not the file',
    row(db.prepare('select created_by from races where slug=?').get(OLD)).created_by, OWNER);
 ok('a backfilled leg has no actor, because nobody pressed it',
@@ -185,12 +196,24 @@ ok('a backfilled leg has no actor, because nobody pressed it',
 await call('/d1-backfill', { token: t, method:'POST' });
 ok('and the backfill makes it servable, document and sha both',
    (await status()).races.every(r => r.servable), true);
-ok('but reads are not coming from it yet', (await status()).readingFromD1, false);
+ok('and reads come from it, with a database bound', (await status()).readingFromD1, true);
 
 ok('running it again changes nothing',
-   [(await status()).allMatch,
+   [(await status()).races.find(r => r.slug === OLD).matches,
     db.prepare('select count(*) c from legs where slug=?').get(OLD).c,
     db.prepare('select count(*) c from race_people where slug=?').get(OLD).c], [true, 2, 1]);
+
+// The backfill's copy of a race in git is an archive at best, and the
+// database has what the crew filed since. It must fill a gap and never
+// overwrite: pressing the button again after a correction would otherwise
+// put the older archive back over it.
+console.log('\nthe backfill never overwrites what the database has');
+repo.set(`races/${OLD}/data.json`, JSON.stringify({ runners:[{ id:'pat', legs:[leg(1)] }] }));
+const again2 = await (await call('/d1-backfill', { token: t, method:'POST' })).json();
+ok('it reports the race as already there',
+   again2.races.find(r => r.slug === OLD)['data.json'], { skipped: 'already in the database' });
+ok('and the database keeps its two legs',
+   db.prepare('select count(*) c from legs where slug=?').get(OLD).c, 2);
 
 // The failure that actually happened: the migrations never applied, so every
 // query threw and the panel rendered four races with nothing in them, which

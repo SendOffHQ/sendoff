@@ -878,9 +878,8 @@ async function mutateRaceConfig(env, slug, mutate, message, actor) {
 // property of the race rather than a list of filenames that happened to be
 // handled one by one.
 //
-// A whitelist and not a rule about visibility, deliberately. Hanging it on
-// visibility would mean an unlisted race could not be written at all with
-// WRITE_TO_GIT back on, and that flag has a rollback behind it.
+// A whitelist and not a rule about visibility, deliberately: what a race is
+// made of is the same whoever can see it.
 const RACE_FILES = new Set(['config.json', 'data.json', 'course.gpx']);
 function isRacePath(path) {
   const m = /^races\/[^/]+\/([^/]+)$/.exec(path);
@@ -994,13 +993,46 @@ async function aclFromD1(env, slug) {
 
 async function writeAcl(env, slug, acl) {
   if (!env.AUTH_KV) throw new Error('Access control requires AUTH_KV');
-  await env.AUTH_KV.put(ACL_KEY(slug), JSON.stringify({
+  const stored = {
     createdBy: normalizeEmail(acl.createdBy) || null,
     people: (acl.people || []).map(p => ({ email: normalizeEmail(p.email), role: p.role })),
     teamCanInvite: !!acl.teamCanInvite,
     runnerEmails: acl.runnerEmails || {},
     updatedAt: new Date().toISOString()
-  }));
+  };
+  await env.AUTH_KV.put(ACL_KEY(slug), JSON.stringify(stored));
+  await mirrorAclToD1(env, slug, stored);
+}
+
+// The roster's copy in D1, which aclFromD1 reads when KV cannot answer. Kept
+// in step here, at the one place every roster change goes through.
+//
+// It used to be refreshed only as a side effect of a config write, reading
+// the roster out of KV at that moment. Once race writes went to D1 that came
+// out wrong twice over: a new race's config is stored before its roster
+// reaches KV, so its row said nobody created it and nobody was on it; and an
+// invite or a role change touches KV and no config at all, so the copy went
+// stale from the first change. Either way the fallback that exists for a KV
+// outage would have answered with the wrong people, or with none.
+//
+// Best effort, after KV has taken the write: KV is the authority and the
+// change is true whatever happens here. A race with no row yet (one from
+// before the mirror) gets its people and no creator, which aclFromD1 treats
+// as nothing, exactly as before.
+async function mirrorAclToD1(env, slug, acl) {
+  if (!env.DB || !slug) return;
+  try {
+    const stmts = [
+      env.DB.prepare('UPDATE races SET created_by = ? WHERE slug = ?').bind(acl.createdBy || '', slug),
+      env.DB.prepare('DELETE FROM race_people WHERE slug = ?').bind(slug)
+    ];
+    for (const person of (acl.people || [])) {
+      if (!person || !person.email) continue;
+      stmts.push(env.DB.prepare('INSERT INTO race_people (slug, email, role) VALUES (?, ?, ?)')
+        .bind(slug, person.email, person.role));
+    }
+    await env.DB.batch(stmts);
+  } catch (e) { /* the admin page is what says the two disagree */ }
 }
 
 // Put the access list back onto the config, so every caller below reads the
@@ -1092,14 +1124,12 @@ async function mirroredConfig(env, slug, force) {
 // says "for a write" and the git-only loader below it is for callers that
 // genuinely mean the archive.
 //
-// Forced past d1Enabled on purpose. WRITE_TO_GIT="false" with READ_FROM_D1
-// unset is an incoherent pair, but the failure it would cause here is bad
-// enough to be worth not depending on somebody setting both.
+// Forced past d1Enabled on purpose. D1 is where race writes go whatever
+// READ_FROM_D1 says, and reading a stale config from git here would mean
+// checking a write against a roster or visibility that has since changed.
 async function loadRaceConfigNow(env, slug) {
-  if (!gitWrites(env)) {
-    const m = await mirroredConfig(env, slug, true);
-    if (m) return attachAcl(env, slug, m);
-  }
+  const m = await mirroredConfig(env, slug, true);
+  if (m) return attachAcl(env, slug, m);
   return loadRaceConfig(env, slug);
 }
 
@@ -1658,8 +1688,14 @@ async function handleD1Status(req, env) {
 }
 
 // Replays every race through the same mirror the live writes use, rather than
-// through a second copy of the SQL that could disagree with it. Upserts, so
-// running it twice is not different from running it once.
+// through a second copy of the SQL that could disagree with it.
+//
+// Fills gaps and never overwrites. It was written when git held every race and
+// D1 was the copy, so it upserted git over whatever D1 had. D1 is the
+// authority now and git holds at most the archive of a finished public race,
+// so the same upsert could replace a correction filed after the finish with
+// the older archive. A file D1 already serves is left alone, which also makes
+// running it twice the same as running it once.
 async function handleD1Backfill(req, env) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -1675,6 +1711,15 @@ async function handleD1Backfill(req, env) {
     // Config first: a legs row references its race.
     for (const file of ['config.json', 'data.json']) {
       const path = `races/${slug}/${file}`;
+      const col = file === 'config.json' ? 'config' : 'data';
+      try {
+        const have = (await env.DB.prepare(
+          'SELECT config, config_sha, data, data_sha FROM races WHERE slug = ?').bind(slug).all()).results[0];
+        if (have && have[col] && have[col] !== '{}' && have[col + '_sha']) {
+          row[file] = { skipped: 'already in the database' };
+          continue;
+        }
+      } catch (e) { row[file] = { error: e && e.message ? e.message : String(e) }; continue; }
       let r;
       try { r = await githubGetJson(env, path); }
       catch (e) { row[file] = { error: e && e.message ? e.message : String(e) }; continue; }
@@ -1846,25 +1891,24 @@ async function handleAccountRaces(req, env) {
 }
 
 // ---------- writing without git ----------
-// Off by default, and the default is the behaviour that shipped: every race
-// write goes to GitHub and D1 follows it. WRITE_TO_GIT="false" makes D1 the
-// authority for races/<slug>/* and leaves git for the archive.
+// D1 is the authority for races/<slug>/config.json and data.json, and git
+// keeps the archive of a finished public race and nothing live.
 //
-// The reason this is not just "skip the PUT" is concurrency. Today two crew
-// members cannot clobber each other because GitHub refuses a write whose sha
-// has moved: the client reads a file, gets a sha, and sends it back. The
-// config_sha and data_sha columns only mirror git's blob sha, so taking git
-// out of the write path takes the guard with it, and the failure it prevents
-// is two people at the same aid station overwriting each other's splits.
+// This was a switch, WRITE_TO_GIT, from 2026-09-10 until 2026-09-30. Its
+// default was the behaviour that shipped first, every press committed to the
+// public repository, and production turned it off. That left one line in
+// wrangler.toml between a private race and a public commit of its splits, and
+// nothing to say so if the line went missing. Sangre de Cristo ran its 36
+// hours on D1 alone, so the switch went. worker/test/d1-writes.mjs holds that
+// no setting brings it back.
 //
-// So those columns become the version token instead of a copy of git's. A read
-// hands one out, a write sends it back, and the write only lands if it still
-// matches. Same contract, different authority, and the client needs no change
-// at all: mutateJson already re-reads and retries on a 409.
-function gitWrites(env) {
-  return String(env && env.WRITE_TO_GIT !== undefined ? env.WRITE_TO_GIT : 'true')
-    .toLowerCase() !== 'false';
-}
+// The reason this is not just "skip the PUT" is concurrency. Two crew members
+// could not clobber each other under git because GitHub refuses a write whose
+// sha has moved: the client reads a file, gets a sha, and sends it back.
+// So the config_sha and data_sha columns are the version token instead of a
+// copy of git's. A read hands one out, a write sends it back, and the write
+// only lands if it still matches. Same contract, different authority, and the
+// client needed no change at all: mutateJson re-reads and retries on a 409.
 
 // A token that is not a git sha and cannot be mistaken for one, so a row can
 // always say which regime wrote it.
@@ -1880,6 +1924,14 @@ function d1Token() {
 // followed by a hopeful write. Content goes in after, under the token this
 // write just claimed.
 async function commitToD1(env, path, content, actor, expected) {
+  // Anything the database throws is a press that did not land, and the phone
+  // has to hear 503, which its queue holds and retries like a lost signal. A
+  // 500 from an uncaught throw said "broken" to the crew and was not retried.
+  try { return await commitToD1Inner(env, path, content, actor, expected); }
+  catch (e) { return { status: 503, error: `Could not store that press: ${e && e.message ? e.message : e}` }; }
+}
+
+async function commitToD1Inner(env, path, content, actor, expected) {
   if (!env.DB) return { status: 503, error: 'No DB bound' };
   const slug = racePathSlug(path);
   if (!slug) return { status: 403, error: 'Forbidden path' };
@@ -1989,9 +2041,9 @@ async function gitPut(env, path, content, sha, message) {
 }
 
 // Put the race into git, once it is over. This is the half that makes
-// "GitHub only for archive" true rather than half true: with WRITE_TO_GIT off
-// nothing else commits race data at all, so without this a day's splits would
-// live in exactly one place.
+// "GitHub only for archive" true rather than half true: nothing else commits
+// race data at all, so without this a day's splits would live in exactly one
+// place.
 //
 // Idempotent by comparing bytes rather than by a marker. A marker would have
 // to be cleared for every correction filed after the finish, and forgetting to
@@ -2042,7 +2094,7 @@ async function archiveRace(env, slug) {
 // write that triggered this.
 async function archiveIfDone(env, slug) {
   try {
-    if (!slug || gitWrites(env)) return;
+    if (!slug) return;
     const cfgRaw = await readFromD1(env, `races/${slug}/config.json`);
     const dataRaw = await readFromD1(env, `races/${slug}/data.json`);
     if (!cfgRaw || !dataRaw) return;
@@ -2462,11 +2514,10 @@ async function handleCommit(req, env, ctx) {
     return json({ error: 'Forbidden path' }, { status: 403 }, env, req);
   }
 
-  // D1 as the authority, when the flag says so and this is a race file with a
-  // version column to guard. Everything after this point that matters, the
+  // D1 as the authority, for a race file with a version column to guard. Everything after this point that matters, the
   // creation grant, the access list, the Discord post and the live push, runs
   // exactly the same way: only where the bytes landed has changed.
-  if (!gitWrites(env) && isRacePath(path)) {
+  if (isRacePath(path)) {
     const failed = await commitToD1(env, path, content, session.email, sha);
     if (failed && !failed.passthrough) {
       return json({ error: failed.error }, { status: failed.status }, env, req);
@@ -2506,11 +2557,9 @@ async function handleCommit(req, env, ctx) {
   // the static path costs the worker nothing, and a spectator with no account
   // gets the map without a round trip.
   //
-  // Outside the WRITE_TO_GIT block above, and that is the point. Where a
-  // race's JSON is written is a migration question with a flag on it and a
-  // rollback behind it; whether an unlisted race's coordinates go into a
-  // public repository is not, and hanging this off that flag would mean a
-  // rollback quietly started publishing them again.
+  // Hung on visibility, not on where the race's JSON goes: whether an
+  // unlisted race's coordinates go into a public repository is its own
+  // question, and worker/test/course-privacy.mjs holds it on its own.
   if (isRacePath(path) && path.endsWith('/course.gpx') &&
       String((liveCfg && liveCfg.visibility) || 'public') !== 'public') {
     if (!env.MEDIA) {
@@ -2582,19 +2631,18 @@ async function handleCommit(req, env, ctx) {
 }
 
 // ---------- serving a read from the mirror ----------
-// Off by default. READ_FROM_D1 turns it on, and setting it back turns it off
-// again without a deploy, which is the only reason it is a variable and not
-// just the way reads work.
+// D1 first whenever there is a D1, git on a miss, never an error: a race the
+// mirror has not seen is served the way it always was rather than 404ing at a
+// crew member who is standing at an aid station.
 //
-// D1 first, git on a miss, never an error: a race the mirror has not seen is
-// served the way it always was rather than 404ing at a crew member who is
-// standing at an aid station. That is also what makes the flag safe to flip.
-// It is worth being plain about what this buys, because it is not the typed
-// tables: those are for later. It is that a read comes back from a database
-// that has already accepted the write, instead of from an API that may need
-// another minute to admit the write happened.
+// This was a READ_FROM_D1 switch until 2026-09-30. Once writes went to D1 and
+// nowhere else, a read that skipped D1 could only find git's copy, which for a
+// running race is nothing and for a finished one is the archive: a missing
+// line in wrangler.toml would have frozen every race page at whatever git
+// last held, while crew presses kept landing where nobody was reading. Reads
+// and writes now agree without anybody having to set both.
 function d1Enabled(env) {
-  return String(env.READ_FROM_D1 || '').toLowerCase() === 'true';
+  return !!(env && env.DB);
 }
 
 // The Contents API envelope the client already knows how to read. Same shape
@@ -4078,7 +4126,7 @@ async function handleMyRaces(req, env) {
   // Public races are already listed; we add private races the user has access
   // to. Those are deliberately absent from the manifest, so they have to be
   // enumerated, and listRaceSlugs asks both stores: an unlisted race made
-  // after WRITE_TO_GIT went false is in the mirror and nowhere else, and a
+  // since race writes moved to D1 is in the mirror and nowhere else, and a
   // tree listing alone would leave its own creator's hub without it.
   const slugs = await listRaceSlugs(env);
   if (!slugs) {
@@ -4169,9 +4217,9 @@ async function handleMyRaces(req, env) {
 // second field through here.
 
 // The stored config row and the token a write has to echo. Its own read rather
-// than readFromD1, which is gated on READ_FROM_D1: what decides where a write
-// goes is WRITE_TO_GIT, and reading the wrong store here would mean writing
-// with a version token the authority has never heard of.
+// than readFromD1, which is gated on READ_FROM_D1: writes go to D1 regardless,
+// and reading the wrong store here would mean writing with a version token the
+// authority has never heard of.
 async function d1ConfigRow(env, slug) {
   if (!env.DB || !slug) return null;
   try {
@@ -4188,7 +4236,7 @@ async function mutateStoredRaceConfig(env, slug, mutate, message, actor) {
   const path = `races/${slug}/config.json`;
   let lastErr = null;
   for (let attempt = 0; attempt < 4; attempt++) {
-    if (!gitWrites(env)) {
+    {
       const row = await d1ConfigRow(env, slug);
       if (row) {
         let cfg = null;
@@ -4204,7 +4252,7 @@ async function mutateStoredRaceConfig(env, slug, mutate, message, actor) {
         }
       }
       // No row: a race made before the mirror. It is in git, and git is where
-      // this has to go, flag or no flag.
+      // this has to go.
     }
     const r = await githubGetJson(env, path);
     if (r.missing) throw new Error(`Race not found: ${slug}`);
@@ -4600,9 +4648,9 @@ async function handleRaceDelete(req, env) {
     return json({ error: 'Missing or invalid slug' }, { status: 400 }, env, req);
   }
 
-  // Through the mirror when the mirror is the authority, or a race created
-  // after WRITE_TO_GIT went false has no config in git and cannot be deleted
-  // at all: the lookup 404s at its own creator.
+  // Through the mirror, which is the authority, or a race created since race
+  // writes moved to D1 has no config in git and cannot be deleted at all: the
+  // lookup 404s at its own creator.
   const raceCfg = await loadRaceConfigNow(env, slug);
   if (!raceCfg) return json({ error: 'Race not found' }, { status: 404 }, env, req);
 

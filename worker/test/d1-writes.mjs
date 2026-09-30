@@ -1,4 +1,4 @@
-// Writing race data with git out of the path, behind WRITE_TO_GIT="false".
+// Writing race data with git out of the path, which is the only way now.
 //
 // The property this file exists for is the one git used to provide for free.
 // Two crew members at the same aid station read the same file, and the second
@@ -197,7 +197,7 @@ ok('the hub manifest still goes to git', gitPuts, ['races/index.json']);
 
 // ---------- the archive ----------
 // The half that makes "git only for archive" true rather than half true.
-// Nothing else commits race data with WRITE_TO_GIT off, so if this never
+// Nothing else commits race data, so if this never
 // fires the day's splits live in one place only.
 const waits = [];
 const wctx = { waitUntil: (p) => waits.push(p) };
@@ -348,6 +348,28 @@ ok('and so did the Discord state', kvStore.has('dsc:fin:goner'), false);
 ok('and a read finds nothing',
   (await worker.fetch(new Request('https://w/public?path=' +
     encodeURIComponent('races/goner/data.json')), env, { waitUntil: () => {} })).status, 404);
+
+// There used to be a switch, WRITE_TO_GIT, and its default was to commit every
+// press to the public repository. Production ran with it off, which is fine
+// until the one line in wrangler.toml goes missing and a private race's splits
+// start landing in git with nothing to say so. The switch is gone; these are
+// the two ways it could have been set wrong, and neither may publish anything.
+console.log('\nno setting can put live race data back in git');
+for (const [label, setting] of [['with the old setting missing', undefined], ['or set back on', 'true']]) {
+  const env2 = { ...env };
+  if (setting === undefined) delete env2.WRITE_TO_GIT; else env2.WRITE_TO_GIT = setting;
+  const slug = 'nogit-' + (setting || 'unset');
+  const send = (path, doc, sha) => worker.fetch(new Request('https://w/commit', {
+    method:'POST', headers:{ 'Content-Type':'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ path, content: JSON.stringify(doc, null, 2) + '\n', message: 'test', sha })
+  }), env2, { waitUntil: () => {} });
+  gitPuts = [];
+  const a = await send(`races/${slug}/config.json`, { ...race, visibility: 'private', createdBy: ME });
+  const b = await send(`races/${slug}/data.json`, { runners: [{ id:'jd', legs: [{ index:1, startTime:'2026-10-03T13:00:00Z' }] }] });
+  ok(`${label}: both writes land`, [a.status, b.status], [200, 200]);
+  ok(`${label}: and git is never asked`, gitPuts, []);
+  ok(`${label}: they are in the database`, !!(rows.get(slug) || {}).data, true);
+}
 
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

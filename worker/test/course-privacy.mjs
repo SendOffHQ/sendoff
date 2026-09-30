@@ -14,6 +14,7 @@
 //
 //   node worker/test/course-privacy.mjs
 import worker from '../src/worker.js';
+import { fakeD1 } from './fake-d1.mjs';
 
 const ME = 'owner@example.com';
 const OUTSIDER = 'nobody@example.com';
@@ -60,6 +61,7 @@ async function cred(pw) {
   return { hash: b(new Uint8Array(bits)), salt: b(salt), iterations: 100000 };
 }
 const env = {
+  DB: fakeD1(),
   GITHUB_OWNER:'o', GITHUB_REPO:'r', GITHUB_TOKEN:'t', GITHUB_BRANCH:'main',
   AUTH_KV: KV, MEDIA, ALLOWED_ORIGINS:'*', JWT_SECRET:'s',
   PUBLIC_BASE_URL: 'https://sendoff.run',

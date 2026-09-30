@@ -3,6 +3,7 @@
 //
 //   node worker/test/entitlements.mjs
 import worker from '../src/worker.js';
+import { fakeD1 } from './fake-d1.mjs';
 
 const ADMIN = 'admin@example.com', PRO = 'pro@example.com', FREE = 'free@example.com';
 const repo = new Map();
@@ -24,6 +25,7 @@ async function cred(pw) {
   return { hash: b(new Uint8Array(bits)), salt: b(salt), iterations: 100000 };
 }
 const env = {
+  DB: fakeD1(),
   GITHUB_OWNER:'o', GITHUB_REPO:'r', GITHUB_TOKEN:'t', GITHUB_BRANCH:'main',
   AUTH_KV: KV, ALLOWED_ORIGINS:'*', JWT_SECRET:'test-secret',
   USERS: JSON.stringify([{ email: ADMIN, role: 'admin', ...await cred('pw') }]),
@@ -84,8 +86,15 @@ expect('two crew', e2.maxCrewPerRace, 2);
 expect('no private races', e2.privateRaces, false);
 
 console.log('\nthe caps hold on the way in');
-const mk = (slug, body) => call('/commit', { token: freeTok,
-  body: { path: `races/${slug}/config.json`, content: JSON.stringify(body), message: 'create' } });
+// A save sends back the version its read handed out, as the app does. A
+// creation has none to send.
+const shaOf = async (slug) => {
+  const r = await call(`/get?path=${encodeURIComponent(`races/${slug}/config.json`)}`, { token: freeTok });
+  return r.status === 200 ? (await r.json()).sha : undefined;
+};
+const mk = async (slug, body) => call('/commit', { token: freeTok,
+  body: { path: `races/${slug}/config.json`, content: JSON.stringify(body), message: 'create',
+          sha: await shaOf(slug) } });
 expect('free: a public race with one runner',
   (await mk('r1', { name:'A', visibility:'public', createdBy: FREE, runners:[{id:'a'}] })).status, 200);
 expect('free: a private race is refused',
@@ -104,8 +113,9 @@ expect('pro: a private race with four runners',
 
 console.log('\nthe promises that must survive the gate');
 // A race already over its cap keeps working. Nothing is bricked retroactively.
-repo.set('races/r1/config.json', JSON.stringify({
-  name:'A', visibility:'public', createdBy: FREE, runners:[{id:'a'},{id:'b'},{id:'c'}], people:[] }));
+// Seeded in the database, which is where a race's config is stored.
+env.DB.races.get('r1').config = JSON.stringify({
+  name:'A', visibility:'public', createdBy: FREE, runners:[{id:'a'},{id:'b'},{id:'c'}], people:[] });
 expect('an over-cap race can still be saved',
   (await mk('r1', { name:'A renamed', visibility:'public', createdBy: FREE,
                     runners:[{id:'a'},{id:'b'},{id:'c'}] })).status, 200);
