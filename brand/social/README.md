@@ -16,7 +16,7 @@ hand somewhere else.
 | `sendoff-pin-1..3-of-3.png` | 1080x1350 | The wordmark split across three profile tiles |
 | `sendoff-announce-logo.png` | 1080x1350 | The wordmark on the gradient, 4:5 |
 | `sendoff-announce-card.png` | 1080x1350 | "Send them out, bring them home.", 4:5 |
-| `sendoff-feature-*.png` | 1080x1350 | Eighteen posts, one per feature, 4:5, from `features.html` |
+| `sendoff-feature-*.png` | 1080x1350 | Eighteen posts, one per feature, 4:5, from `features.html`. Captions in `captions.md` |
 | `_strip.png`, `_pin-sheet.png` | working | The uncut strip and an assembled preview. Not for posting. |
 
 The announce pair has its own source and its own script, `announce.html` and
