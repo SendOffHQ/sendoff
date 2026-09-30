@@ -36,12 +36,11 @@ the only step with no race-day workaround.
 
 After the race, in this order:
 
-1. **Finish the storage move** (steps 3 and 4 below). Not a feature, but now a
-   promise: the setting is called unlisted rather than private, and the intro
-   screen says it is not sealed. Both stay until `races/**` stops being written
-   and is purged from history, at which point private becomes the honest word
-   again. It also makes everything after it cheaper, because the
-   published copy stops being a second source of truth to reason about.
+1. **Finish the storage move.** *Done 2026-09-30 except the purge.* Race
+   data goes to D1 and nowhere else, with no setting left that can say
+   otherwise (step 3 below). What remains is the history purge, which is a
+   decision for the owner of the repository rather than code: see "What is
+   left" under "Doing it without a big bang".
 2. **The race archive, as a racer profile page** (stats and post-race
    results, section 2). The cheapest real feature here, because the logic
    already ships: `Race.archive` in `lib/race-core.js` has the distance
@@ -564,7 +563,26 @@ before promising an event in another hemisphere.
    the fallback.~~ **Done 2026-09-07**, behind `READ_FROM_D1` in
    `worker/wrangler.toml`, which is on. A race the mirror has not seen still
    falls back to git, so setting it back to `"false"` is the whole rollback.
-3. New races stop writing to GitHub except the archive commit at finish.
+3. ~~New races stop writing to GitHub except the archive commit at finish.~~
+   **Done 2026-09-30.** Both switches are gone: `WRITE_TO_GIT`, whose default
+   committed every press to the public repository, and `READ_FROM_D1`, whose
+   default read from git. Losing either line from `wrangler.toml` would have
+   quietly published private races' splits or frozen every race page, and
+   Sangre de Cristo ran its 36 hours on D1 alone, so the rollback they kept was
+   no longer worth it. `worker/test/d1-writes.mjs` and `d1-reads.mjs` hold that
+   no setting brings either back while a database is bound.
+
+   Three things turned up doing it. A new race's creator and roster never
+   reached D1, because the config was stored before the roster reached KV and
+   roster changes touched only KV, so the D1 fallback for a KV outage would
+   have found nobody; `writeAcl` now keeps D1 in step. A database error during
+   a press was a 500 and is now a 503, which the phone holds and retries. And
+   the admin backfill upserted git over D1, which could have put an older
+   archive over a correction; it fills gaps only.
+
+   The rest of this entry is the history of the half-done state, kept because
+   the reasoning still holds.
+
    **Half done, 2026-09-10.** The write path exists and is off:
    `WRITE_TO_GIT="false"` in `worker/wrangler.toml` makes D1 the authority for
    `races/<slug>/config.json` and `data.json`. This is the one that makes the
@@ -620,15 +638,40 @@ before promising an event in another hemisphere.
    the labels back, and update the box in `privacy.html` that explains what
    unlisted means, which is the only place that also needs its argument
    rewritten rather than its noun swapped.
-4. ~~Backfill the existing races~~ **done 2026-09-08**, and delete the
-   dual-write. **Not done**, and it waits for 3.
+4. ~~Backfill the existing races~~ **done 2026-09-08**, ~~and delete the
+   dual-write~~ **done 2026-09-30**, with step 3.
 
 Stopping after step 1 leaves the app exactly as it is today, which is the
 property that made it safe to start.
 
-What is left after the race, in the order it has to happen: stop writing race
-data to git, purge `races/**` from history, then remove the client's fallback
-to the published copy. Privacy lands at the second of those, not the first: a
+What is left, as of 2026-09-30: ~~stop writing race data to git~~ (done),
+then purge `races/**` from history. That is all.
+
+**The client's fallback to the published copy stays**, which reverses what
+this entry used to say. Once the history is purged, the published copy can
+only be a file that is meant to be public: a public race's course, its share
+page, and the archive of a finished public race. That fallback is what shows
+a finished race when the worker cannot be reached, and what a spectator's
+phone has cached for no signal. Removing it would cost that and protect
+nothing.
+
+**The purge, measured 2026-09-30.** Fourteen race directories are in the
+history of `main`; four are in the tree today, all public (Sangre de Cristo,
+Hennepin, Highball to Thurmond, Six-0). The other ten are test races, the
+private dry run, the hosting test, and races deleted since. Commit messages
+hold four personal addresses: 149, 23, 18 and 2 messages. Nothing outside
+`races/` has ever held one, and commit author and committer fields are
+GitHub no-reply addresses and bot identities only.
+
+The shape of it: drop `races/` from every commit, put today's public race
+files back in one commit, and redact personal addresses from messages
+(keeping the Claude attribution line, `@sendoff.run` and `@example.com`). It
+rewrites `main` and every branch and needs a force push, which an automated
+session is not allowed to do on its own, and should not be: it cannot be
+undone. Three things it cannot reach on its own: GitHub keeps pull request
+refs (26 of them) and cached views, which GitHub Support removes on request;
+forks and existing clones keep the old history; and old Cloudflare Pages
+deployments keep serving the files they were built with until deleted. Privacy lands at the second of those, not the first: a
 file deleted from `main` is still readable in the history of a public
 repository.
 
