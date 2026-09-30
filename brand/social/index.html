@@ -57,6 +57,12 @@
   figcaption{font-family:var(--so-font-mono);font-size:11px;color:var(--so-mute)}
   figcaption a{text-decoration:none}
   figcaption a:hover{text-decoration:underline}
+  /* The feature posts' caption links copy the Instagram caption rather than
+     download the image, so they look like the links beside them. */
+  figcaption button.copy{all:unset;cursor:pointer;color:var(--so-signal-on-dark)}
+  figcaption button.copy:hover{text-decoration:underline}
+  figcaption button.copy:focus-visible{outline:2px solid var(--so-signal-on-dark);outline-offset:2px}
+  figcaption button.copy[disabled]{color:var(--so-mute);cursor:default;text-decoration:none}
 
   /* The triptych is one picture cut in three, so show it joined. */
   .trip{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;
@@ -118,6 +124,9 @@
   real screenshots of the app on the Sangre de Cristo 100, with the clock wound
   back to a moment during the race. Rebuild with
   <code>node capture-race.mjs</code>, then <code>node shoot-features.js</code>.</p>
+  <p class="note">Tap the name under a post to copy its Instagram caption,
+  from <a href="captions.md">captions.md</a>. Tap the image for the full-size
+  file.</p>
   <div class="grid" id="features"></div>
 </section>
 
@@ -152,14 +161,72 @@
     [`sendoff-${prefix}-${n(i + 1)}.png`, `${i + 1} of 6`]);
 
   fill('carousel', six('ig'));
-  fill('features', [
+  // The feature posts. The link under each copies that post's caption from
+  // captions.md, which is the one place the captions live: editing the
+  // markdown is enough, and nothing here holds a second copy to drift.
+  const FEATURES = [
     ['live-race', 'Live race page'], ['map', 'Course map'], ['photos', 'Race photos'],
     ['share', 'Share link'], ['pit', 'Pit board'], ['fuel-plan', 'Fuel plan'],
     ['offline', 'No signal'], ['access', 'Your crew'], ['reorder', 'One-tap items'],
     ['write-in', 'Write-in notes'], ['per-hour', 'Hourly intake'], ['finish-card', 'Finish card'],
     ['charts', 'Charts'], ['report', 'Race report'], ['forever', 'Every race, forever'],
     ['gpx', 'GPX upload'], ['disciplines', 'Disciplines'], ['private', 'Private races']
-  ].map(([id, cap]) => [`sendoff-feature-${id}.png`, cap]));
+  ];
+  document.getElementById('features').innerHTML = FEATURES.map(([id, cap]) => {
+    const file = `sendoff-feature-${id}.png`;
+    return `<figure>
+        <a href="${file}"><img src="${file}" alt="${cap}" loading="lazy"></a>
+        <figcaption><button type="button" class="copy" data-file="${file}" disabled
+          title="Copy the Instagram caption">${cap}</button></figcaption>
+      </figure>`;
+  }).join('');
+
+  // Each caption is the text between its "## ... (`file`)" heading and the
+  // next "---" rule, trimmed. That is exactly what gets pasted into Instagram.
+  function parseCaptions(md) {
+    const out = {};
+    for (const block of md.split(/^---\s*$/m)) {
+      const m = block.match(/^##\s.*\(`([^`]+)`\)\s*$/m);
+      if (!m) continue;
+      out[m[1]] = block.slice(block.indexOf(m[0]) + m[0].length).trim();
+    }
+    return out;
+  }
+
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
+    // Older browsers, and a page opened from disk.
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+    return ok;
+  }
+
+  fetch('captions.md', { cache: 'no-cache' })
+    .then(r => r.ok ? r.text() : Promise.reject(new Error(r.status)))
+    .then(md => {
+      const captions = parseCaptions(md);
+      document.querySelectorAll('#features button.copy').forEach(btn => {
+        const text = captions[btn.dataset.file];
+        if (!text) { btn.title = 'No caption for this post in captions.md'; return; }
+        btn.disabled = false;
+        const label = btn.textContent;
+        btn.addEventListener('click', async () => {
+          const ok = await copyText(text);
+          btn.textContent = ok ? 'Caption copied' : 'Could not copy';
+          setTimeout(() => { btn.textContent = label; }, 1600);
+        });
+      });
+    })
+    .catch(() => {
+      document.querySelectorAll('#features button.copy').forEach(btn => {
+        btn.title = 'Captions could not be loaded';
+      });
+    });
   fill('stories', six('story'));
   fill('triplinks', [1, 2, 3].map(i =>
     [`sendoff-pin-${i}-of-3.png`, `Tile ${i}`]));
