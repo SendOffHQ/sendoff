@@ -1,0 +1,121 @@
+{
+  "name": "Six-0 Trail Marathon",
+  "location": "Cleburne, TX",
+  "startTime": "2026-09-05T07:30:00-05:00",
+  "courseType": "loops",
+  "units": {
+    "distance": "mi",
+    "elevation": "ft"
+  },
+  "visibility": "public",
+  "cutoffs": {
+    "totalHours": 8.5
+  },
+  "course": {
+    "loopCount": 2,
+    "loopSegments": [
+      {
+        "name": "Start → Lakeside",
+        "fromAid": "Start",
+        "toAid": "Lakeside",
+        "distanceMi": 4.4,
+        "elevationGainFt": 329,
+        "elevationLossFt": 369,
+        "arriveCutoffHours": null
+      },
+      {
+        "name": "Lakeside → Lakeside (around lake)",
+        "fromAid": "Lakeside",
+        "toAid": "Lakeside (around lake)",
+        "distanceMi": 1.9,
+        "elevationGainFt": 78,
+        "elevationLossFt": 59,
+        "arriveCutoffHours": null
+      },
+      {
+        "name": "Lakeside (around lake) → Mountainside",
+        "fromAid": "Lakeside (around lake)",
+        "toAid": "Mountainside",
+        "distanceMi": 2.9,
+        "elevationGainFt": 217,
+        "elevationLossFt": 124,
+        "arriveCutoffHours": null
+      },
+      {
+        "name": "Mountainside → Mountainside (loop)",
+        "fromAid": "Mountainside",
+        "toAid": "Mountainside (loop)",
+        "distanceMi": 0.5,
+        "elevationGainFt": 92,
+        "elevationLossFt": 30,
+        "arriveCutoffHours": null
+      },
+      {
+        "name": "Mountainside (loop) → Pit/Finish",
+        "fromAid": "Mountainside (loop)",
+        "toAid": "Pit/Finish",
+        "distanceMi": 3.6,
+        "elevationGainFt": 170,
+        "elevationLossFt": 335,
+        "arriveCutoffHours": null
+      }
+    ],
+    "loopDistanceMi": 13.3
+  },
+  "runners": [
+    {
+      "id": "jason",
+      "name": "Jason Dupree",
+      "bib": "128",
+      "color": "#1bc318",
+      "targets": {
+        "caloriesPerHour": 275,
+        "fluidOzPerHour": 32,
+        "sodiumMgPerHour": 1200
+      },
+      "phaseTargets": [],
+      "crewNotes": ""
+    }
+  ],
+  "targets": {
+    "caloriesPerHour": 275,
+    "fluidOzPerHour": 32,
+    "sodiumMgPerHour": 1200
+  },
+  "fuelMetrics": [
+    {
+      "key": "calories",
+      "label": "Calories",
+      "unit": "cal",
+      "short": "Cal",
+      "decimals": 0,
+      "step": 10
+    },
+    {
+      "key": "fluidOz",
+      "label": "Fluid",
+      "unit": "oz",
+      "short": "Fluid",
+      "decimals": 1,
+      "step": 1
+    },
+    {
+      "key": "sodiumMg",
+      "label": "Sodium",
+      "unit": "mg",
+      "short": "Na",
+      "decimals": 0,
+      "step": 50
+    }
+  ],
+  "activity": "trail-run",
+  "fuelPresets": [
+    {
+      "name": "LMNT Flask",
+      "values": {
+        "sodiumMg": 1000,
+        "fluidOz": 17
+      }
+    }
+  ]
+}

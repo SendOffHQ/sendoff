@@ -1,0 +1,148 @@
+{
+  "runners": [
+    {
+      "id": "jason",
+      "legs": [
+        {
+          "index": 1,
+          "startTime": "2026-09-26T10:02:48.035Z",
+          "calories": 200,
+          "sodiumMg": 400,
+          "preset_1": 2,
+          "preset_7": 1,
+          "endTime": "2026-09-26T11:25:27.362Z"
+        },
+        {
+          "index": 2,
+          "startTime": "2026-09-26T11:25:27.362Z",
+          "sodiumMg": 1495,
+          "preset_7": 1,
+          "calories": 100,
+          "preset_1": 1,
+          "fluidOz": 17,
+          "preset_0": 1,
+          "endTime": "2026-09-26T12:17:01.330Z"
+        },
+        {
+          "index": 3,
+          "startTime": "2026-09-26T12:21:42.040Z",
+          "calories": 1100,
+          "preset_2": 2,
+          "sodiumMg": 995,
+          "preset_7": 1,
+          "preset_1": 1,
+          "endTime": "2026-09-26T14:03:34.999Z",
+          "fluidOz": 35
+        },
+        {
+          "index": 4,
+          "startTime": "2026-09-26T14:08:43.895Z",
+          "calories": 410,
+          "sodiumMg": 2245,
+          "preset_1": 1,
+          "fluidOz": 17,
+          "preset_0": 1,
+          "endTime": "2026-09-26T16:23:25.277Z",
+          "preset_3": 2
+        },
+        {
+          "index": 5,
+          "startTime": "2026-09-26T16:36:12.218Z",
+          "calories": 340,
+          "sodiumMg": 1185,
+          "preset_1": 1,
+          "preset_7": 2,
+          "endTime": "2026-09-26T18:07:03.812Z",
+          "fluidOz": 67
+        },
+        {
+          "index": 6,
+          "startTime": "2026-09-26T18:12:49.034Z",
+          "fluidOz": 17,
+          "sodiumMg": 1230,
+          "preset_0": 1,
+          "endTime": "2026-09-26T19:45:26.303Z",
+          "calories": 145
+        },
+        {
+          "index": 7,
+          "startTime": "2026-09-26T19:54:42.968Z",
+          "sodiumMg": 1810,
+          "preset_7": 4,
+          "calories": 1317,
+          "preset_1": 2,
+          "preset_2": 1,
+          "endTime": "2026-09-26T22:36:17.078Z"
+        },
+        {
+          "index": 8,
+          "startTime": "2026-09-26T22:41:41.245Z",
+          "sodiumMg": 1580,
+          "preset_7": 2,
+          "fluidOz": 92,
+          "preset_0": 1,
+          "endTime": "2026-09-27T00:18:31.753Z",
+          "calories": 80
+        },
+        {
+          "index": 9,
+          "startTime": "2026-09-27T00:33:41.715Z",
+          "sodiumMg": 485,
+          "preset_7": 2,
+          "calories": 100,
+          "preset_1": 1,
+          "preset_3": 4,
+          "notes": "110 mg of caffeine",
+          "endTime": "2026-09-27T02:43:13.699Z"
+        },
+        {
+          "index": 10,
+          "startTime": "2026-09-27T02:48:31.243Z",
+          "calories": 560,
+          "sodiumMg": 2170,
+          "preset_1": 2,
+          "preset_7": 4,
+          "preset_2": 1,
+          "fluidOz": 17,
+          "preset_0": 1,
+          "endTime": "2026-09-27T05:42:23.261Z"
+        },
+        {
+          "index": 11,
+          "startTime": "2026-09-27T06:07:06.116Z",
+          "calories": 30,
+          "sodiumMg": 1230,
+          "preset_6": 1,
+          "preset_7": 2,
+          "endTime": "2026-09-27T08:48:49.935Z"
+        },
+        {
+          "index": 12,
+          "startTime": "2026-09-27T09:33:15.989Z",
+          "endTime": "2026-09-27T11:24:44.933Z"
+        },
+        {
+          "index": 13,
+          "startTime": "2026-09-27T11:48:08.605Z",
+          "endTime": "2026-09-27T15:30:41.000Z"
+        },
+        {
+          "index": 14,
+          "startTime": "2026-09-27T15:38:06.116Z",
+          "endTime": "2026-09-27T17:52:43.822Z"
+        },
+        {
+          "index": 15,
+          "startTime": "2026-09-27T18:04:34.924Z",
+          "endTime": "2026-09-27T20:11:31.982Z"
+        },
+        {
+          "index": 16,
+          "startTime": "2026-09-27T20:11:31.982Z",
+          "endTime": "2026-09-27T21:44:03.096Z"
+        }
+      ]
+    }
+  ],
+  "lastUpdated": "2026-09-27T21:44:03.469Z"
+}
