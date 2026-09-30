@@ -47,7 +47,7 @@ const raceFile = (slug, file) => fileAt(path.posix.join('races', slug, file));
 const MEDIA = [];
 // What the profile page has written down, for this run only.
 const RESULTS = { bySlug: {}, manual: [], notMine: [] };
-let googleOn = false;
+let googleOn = false, facebookOn = false;
 
 // Whether an invite comes back with a rendered message beside the link. An
 // older worker does not send one, and the page has to cope by not offering a
@@ -209,8 +209,30 @@ const server = http.createServer((req, res) => {
   // GOOGLE_CLIENT_ID leaves it off. The worker's checks on the token are
   // tested against the worker; here a credential is just a word.
   if (url.pathname === '/api/google-on') { googleOn = true; return send(200, '{"ok":true}', 'application/json'); }
+  if (url.pathname === '/api/facebook-on') { facebookOn = true; return send(200, '{"ok":true}', 'application/json'); }
   if (url.pathname === '/api/auth-providers') {
-    return send(200, JSON.stringify({ google: googleOn ? 'test-client.apps.googleusercontent.com' : null }), 'application/json');
+    return send(200, JSON.stringify({ google: googleOn ? 'test-client.apps.googleusercontent.com' : null,
+      facebook: facebookOn ? '123456789' : null }), 'application/json');
+  }
+  // Sign in with Facebook, the same way: an access token is just a word here.
+  if (url.pathname === '/api/login/facebook') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      if (!facebookOn) return send(404, '{"error":"Facebook sign-in is not set up"}', 'application/json');
+      const { accessToken } = JSON.parse(body || '{}');
+      if (accessToken === 'good') {
+        return send(200, JSON.stringify({ token: 'stub', email: ME, username: ME, role: 'owner',
+          expiresAt: Date.now() + 7 * 24 * 3600e3, via: 'facebook' }), 'application/json');
+      }
+      if (accessToken === 'noemail') {
+        return send(403, JSON.stringify({ error: 'Facebook did not share an email address, so SendOff cannot tell which account is yours. Sign in with your password instead.', code: 'no_email' }), 'application/json');
+      }
+      if (accessToken === 'nobody') {
+        return send(403, JSON.stringify({ error: 'There is no SendOff account for stranger@example.com yet. SendOff is invite only while it is in beta: request one, or accept your invite first.', code: 'no_account' }), 'application/json');
+      }
+      send(401, '{"error":"Facebook sign-in could not be checked"}', 'application/json');
+    });
   }
   if (url.pathname === '/api/login/google') {
     let body = '';

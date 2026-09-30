@@ -29,7 +29,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=7425c83e">
+<link rel="stylesheet" href="lib/race-theme.css?v=4576cd9b">
 <style>
   /* A reading column. Legal text that runs the width of a desktop screen does
      not get read, and this is text somebody should actually be able to read. */
@@ -116,6 +116,16 @@
   calendar or anything in your Google account. Google knows that you signed in to SendOff, under
   <a href="https://policies.google.com/privacy">Google's own privacy policy</a>. Signing in with Google
   does not create an account; you still need one first.</p>
+
+<h3>If you sign in with Facebook</h3>
+<p>Facebook tells SendOff your email address and an identifier Facebook makes for your account on
+  SendOff alone, and SendOff keeps that identifier, linked to your SendOff account, so that only that
+  Facebook account can sign in as you. SendOff asks for nothing else: not your friends, your posts,
+  your photos or your name. Facebook knows that you signed in to SendOff, under
+  <a href="https://www.facebook.com/privacy/policy/">Meta's own privacy policy</a>. If you choose not to
+  share your email address with SendOff, there is no way to tell which account is yours, so the
+  sign-in is refused and nothing is kept. Signing in with Facebook does not create an account; you
+  still need one first. To remove the link, see <a href="/data-deletion">deleting your data</a>.</p>
 
 <h3>Your profile, if you fill one in</h3>
 <p>A display name, fueling goals, hour bands, and the notes you want a crew to have.</p>
@@ -231,6 +241,10 @@
   <dt>Google Fonts</dt>
   <dd>Serves the typefaces. Loading any SendOff page sends your IP address and browser details to
     Google.</dd>
+  <dt>Google and Facebook sign-in</dt>
+  <dd>Only when you open the sign-in box, and only for the ones switched on, their sign-in scripts
+    load from Google and from Facebook, which sends them your IP address and browser details. No
+    other page loads them.</dd>
   <dt>Esri</dt>
   <dd>Serves the map tiles behind a course map. Opening a race page that draws a map sends your IP
     address and the map coordinates to Esri, which reveals roughly where the race is.</dd>
@@ -257,8 +271,8 @@
   cannot tell whether a note is about a shoe or a stomach. It is stored like the rest of the race
   and it is readable by everyone the race is readable by.</p>
 <p>None of it is sold, shared for advertising, or used to build a profile of anybody. If you would
-  rather it were not in a public file, keep it out of the fields, or wait for the storage move
-  described above.</p>
+  rather it were not in a public file, keep it out of the fields, or make the race private, whose
+  data is never written to a public file.</p>
 
 <h2>On your device</h2>
 <p>Signing in stores a session that lasts seven days. Opening a race stores a copy of it so the
@@ -280,8 +294,9 @@
 
 <h2>Your rights: getting a copy, a correction, or a deletion</h2>
 <p>Write to <a href="mailto:info@sendoff.run">info@sendoff.run</a>. Your account, your profile, your
-  results, a Google sign-in link and your races can be deleted on request. Results you entered can also be cleared or
-  deleted yourself, from your profile page.</p>
+  results, a Google or Facebook sign-in link and your races can be deleted on request. Results you entered can also be cleared or
+  deleted yourself, from your profile page. <a href="/data-deletion">Deleting your data</a> sets out
+  what goes with an account and how to ask.</p>
 <p>You can ask to see what is held about you, to get a copy of it in a portable form, to have it
   corrected, or to have it deleted. Ask at <a href="mailto:info@sendoff.run">info@sendoff.run</a>
   from the address on the account, or say which account you mean. Every request is answered within
@@ -323,8 +338,7 @@
   there are none.</p>
 
 <h2>Changes</h2>
-<p>This will change, and most of all when the storage move above is finished. The date at the top
-  says when it last did.</p>
+<p>This will change as SendOff does. The date at the top says when it last did.</p>
 
 <h2>Contact</h2>
 <p><a href="mailto:info@sendoff.run">info@sendoff.run</a></p>
@@ -338,6 +352,6 @@
     <span aria-hidden="true"> &middot; </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=79bd87dd"></script>
+<script src="lib/race-core.js?v=8ba96872"></script>
 </body>
 </html>

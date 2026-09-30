@@ -1359,7 +1359,8 @@ async function verifyGoogleIdToken(env, token) {
 }
 
 async function handleAuthProviders(req, env) {
-  return json({ google: env.GOOGLE_CLIENT_ID || null }, {}, env, req);
+  return json({ google: env.GOOGLE_CLIENT_ID || null,
+                facebook: facebookOn(env) ? String(env.FACEBOOK_APP_ID) : null }, {}, env, req);
 }
 
 async function handleLoginGoogle(req, env) {
@@ -1392,6 +1393,91 @@ async function handleLoginGoogle(req, env) {
   const exp = Date.now() + SESSION_HOURS * 3600 * 1000;
   const token = await signJwt({ sub: email, email, role: user.role, exp }, env.JWT_SECRET);
   return json({ token, email, username: email, role: user.role, expiresAt: exp, via: 'google' }, {}, env, req);
+}
+
+// ---------- sign in with Facebook ----------
+// The same idea as Google above: another way to prove an address, never a way
+// to make an account. The page gets a user access token from Facebook's SDK;
+// this asks Facebook whether that token is valid and was issued to SendOff's
+// app, then asks for the address on it, and issues the usual session.
+//
+// Unlike Google's, a Facebook token cannot be checked from public keys: the
+// question "was this issued to my app" is answered by debug_token, which needs
+// an app token, which needs the app secret. So:
+//   FACEBOOK_APP_ID      wrangler.toml, public (the page's SDK needs it)
+//   FACEBOOK_APP_SECRET  a worker secret, set with `wrangler secret put`
+// Either missing, this is off and the button is not drawn.
+//
+// Facebook does not always have an address to give: an account made with a
+// phone number, or somebody who declines the email permission. Those are told
+// to use their password rather than matched on anything weaker.
+// The link lives under fblink:<email>, for the reason Google's does.
+const FB_GRAPH = (env) => `https://graph.facebook.com/${env.FACEBOOK_GRAPH_VERSION || 'v23.0'}`;
+const facebookOn = (env) => !!(env.FACEBOOK_APP_ID && env.FACEBOOK_APP_SECRET);
+
+async function hmacHex(key, message) {
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(key),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(message));
+  return [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// { id, email } for a token Facebook says is valid and was issued to this
+// app. Anything else throws. The app secret goes to Facebook and nowhere else.
+async function verifyFacebookToken(env, userToken) {
+  if (typeof userToken !== 'string' || !/^[A-Za-z0-9]{20,1000}$/.test(userToken)) {
+    throw new Error('Not a Facebook sign-in token');
+  }
+  const appToken = `${env.FACEBOOK_APP_ID}|${env.FACEBOOK_APP_SECRET}`;
+  let dbg;
+  try {
+    const r = await fetch(`${FB_GRAPH(env)}/debug_token?` + new URLSearchParams({ input_token: userToken, access_token: appToken }));
+    dbg = ((await r.json()) || {}).data || {};
+  } catch (e) { throw new Error('Could not reach Facebook to check the sign-in'); }
+  if (!dbg.is_valid) throw new Error('That Facebook sign-in is not valid. Try again.');
+  if (String(dbg.app_id) !== String(env.FACEBOOK_APP_ID)) throw new Error('That sign-in was for a different site');
+  if (dbg.expires_at && dbg.expires_at * 1000 < Date.now()) throw new Error('That Facebook sign-in has expired. Try again.');
+  if (!dbg.user_id) throw new Error('Facebook sign-in could not be checked');
+  let me;
+  try {
+    const r = await fetch(`${FB_GRAPH(env)}/me?` + new URLSearchParams({
+      fields: 'id,email', access_token: userToken, appsecret_proof: await hmacHex(env.FACEBOOK_APP_SECRET, userToken) }));
+    me = await r.json();
+  } catch (e) { throw new Error('Could not reach Facebook to check the sign-in'); }
+  if (!me || String(me.id) !== String(dbg.user_id)) throw new Error('Facebook sign-in could not be checked');
+  return { id: String(me.id), email: me.email || null };
+}
+
+async function handleLoginFacebook(req, env) {
+  if (!facebookOn(env)) return json({ error: 'Facebook sign-in is not set up' }, { status: 404 }, env, req);
+  let body;
+  try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  let who;
+  try { who = await verifyFacebookToken(env, body && body.accessToken); }
+  catch (e) { return json({ error: e.message || 'Facebook sign-in could not be checked' }, { status: 401 }, env, req); }
+  if (!who.email) {
+    return json({ error: 'Facebook did not share an email address, so there is no account to match it to. Sign in with your password.',
+                  code: 'no_email' }, { status: 403 }, env, req);
+  }
+  const email = normalizeEmail(who.email);
+  const user = await lookupUser(env, email);
+  if (!user) {
+    return json({ error: `There is no SendOff account for ${email} yet. SendOff is invite only while it is in beta: request one, or accept your invite first.`,
+                  code: 'no_account', email }, { status: 403 }, env, req);
+  }
+  if (env.AUTH_KV) {
+    const raw = await env.AUTH_KV.get('fblink:' + email);
+    let link = null;
+    try { link = raw ? JSON.parse(raw) : null; } catch (e) { link = null; }
+    if (link && link.id && link.id !== who.id) {
+      return json({ error: `A different Facebook account is already linked to ${email}. Sign in with your password.` },
+        { status: 403 }, env, req);
+    }
+    if (!link) await env.AUTH_KV.put('fblink:' + email, JSON.stringify({ id: who.id, linkedAt: new Date().toISOString() }));
+  }
+  const exp = Date.now() + SESSION_HOURS * 3600 * 1000;
+  const token = await signJwt({ sub: email, email, role: user.role, exp }, env.JWT_SECRET);
+  return json({ token, email, username: email, role: user.role, expiresAt: exp, via: 'facebook' }, {}, env, req);
 }
 
 // Changes the signed-in user's password. The new hash is written to KV, which
@@ -1959,9 +2045,10 @@ async function handleAccountDelete(req, env) {
   await env.AUTH_KV.delete('user:' + email);
   await env.AUTH_KV.delete('profile:' + email);
   // Everything else kept per account goes with it: the results and reports
-  // from the profile page, and a Google sign-in link.
+  // from the profile page, and Google and Facebook sign-in links.
   await env.AUTH_KV.delete(RESULTS_KEY(email));
   await env.AUTH_KV.delete('glink:' + email);
+  await env.AUTH_KV.delete('fblink:' + email);
   return json({ ok: true }, {}, env, req);
 }
 
@@ -5162,6 +5249,7 @@ async function route(request, env, ctx) {
     if (request.method === 'POST' && path === '/access-request/delete') return handleAccessRequestDelete(request, env);
     if (request.method === 'POST' && path === '/login')           return handleLogin(request, env);
     if (request.method === 'POST' && path === '/login/google')    return handleLoginGoogle(request, env);
+    if (request.method === 'POST' && path === '/login/facebook')  return handleLoginFacebook(request, env);
     if (request.method === 'GET'  && path === '/auth-providers')  return handleAuthProviders(request, env);
     if (request.method === 'POST' && path === '/accept-invite')   return handleAcceptInvite(request, env);
     if (request.method === 'POST' && path === '/change-password') return handleChangePassword(request, env);

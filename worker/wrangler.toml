@@ -36,6 +36,11 @@ ADMIN_RACE_ACCESS = "true"
 # sign-in off and the button is not drawn. See worker/src/worker.js,
 # "sign in with Google".
 GOOGLE_CLIENT_ID = ""
+# Sign in with Facebook: the Meta app's id. Public (the page's SDK needs it).
+# Facebook sign-in also needs FACEBOOK_APP_SECRET, which is a secret and set
+# with `wrangler secret put FACEBOOK_APP_SECRET`, never here. Either missing
+# turns it off and the button is not drawn.
+FACEBOOK_APP_ID = ""
 # If you mount the worker at a subpath (e.g. on a route like
 # api.example.com/race-dashboard/*), set MOUNT_PATH to that prefix.
 # Leave empty if the worker is at the root of its hostname.

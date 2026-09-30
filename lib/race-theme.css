@@ -682,9 +682,17 @@ label.field > .hint {
 .share-row button.copy:hover { color: var(--accent); border-color: var(--accent); }
 .share-row button.revoke:hover { color: var(--red); border-color: var(--red); }
 
-/* Sign in with Google, above the password fields. Hidden until the worker
-   says Google is on, so a deployment without it shows no gap. */
-.signin-google[hidden] { display: none; }
+/* Sign in with Google or Facebook, above the password fields. Hidden until
+   the worker says one is on, so a deployment without either shows no gap. */
+.signin-social[hidden], .signin-google[hidden], .signin-fb[hidden] { display: none; }
+.signin-fb {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; max-width: 312px; min-height: 40px; margin: 10px auto 0;
+  background: #1877F2; color: #fff; border: 0; border-radius: 4px; cursor: pointer;
+  font: 600 14px Helvetica, Arial, sans-serif;
+}
+.signin-fb:hover:not(:disabled) { background: #166fe5; }
+.signin-fb:disabled { opacity: 0.6; cursor: progress; }
 .signin-google .gsi-btn { min-height: 44px; display: flex; justify-content: center; }
 .signin-or { display: flex; align-items: center; gap: 10px; margin: 14px 0 12px;
   font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em;
