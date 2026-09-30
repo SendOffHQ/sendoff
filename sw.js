@@ -35,7 +35,7 @@ const SHELL_URLS = [
   // what a crew member opens with no signal.
   '/', '/index.html', '/app/', '/app/index.html',
   '/race.html', '/pit.html', '/racer.html', '/settings.html', '/setup.html',
-  '/charts.html', '/print-report.html', '/signup.html', '/reset.html', '/admin.html',
+  '/charts.html', '/print-report.html', '/profile.html', '/signup.html', '/reset.html', '/admin.html',
   '/manifest.webmanifest',
   // Leaflet, so the course map draws without signal. Its tiles are not cached:
   // a blank ground under a real route line is the honest version of that.

@@ -45,6 +45,8 @@ const raceFile = (slug, file) => fileAt(path.posix.join('races', slug, file));
 // Photos uploaded during a run. Reset by restarting the harness, which every
 // test does.
 const MEDIA = [];
+// What the profile page has written down, for this run only.
+const RESULTS = { bySlug: {}, manual: [] };
 
 // Whether an invite comes back with a rendered message beside the link. An
 // older worker does not send one, and the page has to cope by not offering a
@@ -198,6 +200,60 @@ const server = http.createServer((req, res) => {
       'Access-Control-Expose-Headers': 'ETag' });
     return res.end(JSON.stringify({ sha: 'stub-sha', path: p,
       content: Buffer.from(text, 'utf8').toString('base64'), encoding: 'base64' }));
+  }
+  // The profile page. Races are the ones whose runner record carries this
+  // stub's address, read from the same files every other endpoint serves, so a
+  // test links a racer the way the page does: by saving the config.
+  if (url.pathname === '/api/my-results' && req.method === 'GET') {
+    if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+    const slugs = new Set();
+    for (const base of [path.join(ROOT, 'races'), FIXTURES]) {
+      try { for (const d of fs.readdirSync(base, { withFileTypes: true })) if (d.isDirectory()) slugs.add(d.name); } catch (e) {}
+    }
+    for (const k of WRITTEN.keys()) { const m = /^races\/([^/]+)\/config\.json$/.exec(k); if (m) slugs.add(m[1]); }
+    const races = [], candidates = [];
+    for (const slug of slugs) {
+      let cfg; try { cfg = JSON.parse(raceFile(slug, 'config.json') || 'null'); } catch (e) { cfg = null; }
+      if (!cfg) continue;
+      const mine = (cfg.runners || []).find(r => r && String(r.email || '').toLowerCase() === ME);
+      if (mine) {
+        let data = null; try { data = JSON.parse(raceFile(slug, 'data.json') || 'null'); } catch (e) {}
+        const legs = (((data && data.runners) || []).find(r => r.id === mine.id) || {}).legs || [];
+        const { runners, crewNotes, createdBy, people, ...rest } = cfg;
+        races.push({ slug, visibility: cfg.visibility === 'private' ? 'private' : 'public',
+          config: { ...rest, runners: [{ id: mine.id, name: mine.name, email: ME }] }, runner: { id: mine.id, legs } });
+      } else if (String(cfg.createdBy || '').toLowerCase() === ME) {
+        const unlinked = (cfg.runners || []).filter(r => r && r.id && !r.email);
+        if (unlinked.length) candidates.push({ slug, name: cfg.name, startTime: cfg.startTime,
+          runners: unlinked.map(r => ({ id: r.id, name: r.name })) });
+      }
+    }
+    return send(200, JSON.stringify({ email: ME, races, candidates, results: RESULTS }), 'application/json');
+  }
+  if (url.pathname === '/api/my-results/save' || url.pathname === '/api/my-results/delete') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+      const j = JSON.parse(body || '{}');
+      if (url.pathname.endsWith('/delete')) {
+        if (j.slug) delete RESULTS.bySlug[j.slug];
+        if (j.id) RESULTS.manual = RESULTS.manual.filter(m => m.id !== j.id);
+        return send(200, JSON.stringify({ results: RESULTS }), 'application/json');
+      }
+      // The worker's validation is tested against the worker. Here, only the
+      // one refusal the page has to show: a race from before SendOff needs a name.
+      const r = { ...(j.result || {}), updatedAt: new Date().toISOString() };
+      if (r.dnf) delete r.officialSec;
+      if (j.slug) RESULTS.bySlug[j.slug] = r;
+      else {
+        if (!r.name) return send(400, JSON.stringify({ error: 'name: required', field: 'name' }), 'application/json');
+        r.id = j.id || 'm-' + (RESULTS.manual.length + 1) + '-00000000';
+        const i = RESULTS.manual.findIndex(m => m.id === r.id);
+        if (i >= 0) RESULTS.manual[i] = r; else RESULTS.manual.push(r);
+      }
+      send(200, JSON.stringify({ result: r, results: RESULTS }), 'application/json');
+    });
   }
   if (url.pathname === '/api/my-races') {
     const cfg = JSON.parse(raceFile(SLUG, 'config.json') || '{}');

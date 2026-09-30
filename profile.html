@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SendOff · Profile</title>
+<link rel="icon" href="brand/sendoff-favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0a0f14" />
+<meta name="description" content="Your races, results and personal bests.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="canonical" href="https://sendoff.run/profile.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SendOff">
+<meta property="og:title" content="SendOff · Profile">
+<meta property="og:description" content="Your races, results and personal bests.">
+<meta property="og:url" content="https://sendoff.run/profile.html">
+<meta property="og:image" content="https://sendoff.run/brand/og-default.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SendOff · live crew tracking for ultras">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SendOff · Profile">
+<meta name="twitter:description" content="Your races, results and personal bests.">
+<meta name="twitter:image" content="https://sendoff.run/brand/og-default.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SendOff">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lib/race-theme.css?v=33dbccc8">
+<style>
+  .p-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: -6px 0 26px; }
+  /* display: flex above would otherwise win over the hidden attribute, and
+     the buttons would show to somebody signed out. */
+  .p-actions[hidden] { display: none; }
+  .p-section { margin: 0 0 34px; }
+  .p-h2 {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--text-muted); margin: 0 0 12px;
+  }
+  .p-totals { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px;
+    background: var(--border); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .p-total { background: var(--bg-card); padding: 14px 16px; }
+  .p-total b { display: block; font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; }
+  .p-total span { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--text-muted); }
+  @media (max-width: 700px) {
+    .p-totals { grid-template-columns: repeat(2, 1fr); }
+    .p-total:last-child { grid-column: 1 / -1; }
+  }
+  footer.site a { color: var(--accent); }
+
+  .p-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+    padding: 18px 20px; margin-bottom: 14px; }
+  .p-fam { margin-bottom: 14px; }
+  .p-fam h3 { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 700; margin: 0 0 8px; }
+  .p-best { display: grid; grid-template-columns: 9em 7.5em 1fr; gap: 10px; padding: 7px 0;
+    border-top: 1px solid var(--border); align-items: baseline; }
+  .p-best:first-of-type { border-top: 0; }
+  .p-best .k { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--text-muted); }
+  .p-best .v { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+  .p-best .r { color: var(--text-dim); font-size: 13px; }
+  @media (max-width: 520px) { .p-best { grid-template-columns: 1fr auto; } .p-best .r { grid-column: 1 / -1; } }
+
+  .p-race-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+  .p-race-name { font-family: 'Barlow Condensed', sans-serif; font-size: 24px; font-weight: 700; line-height: 1.1; }
+  .p-race-name a { color: inherit; text-decoration: none; }
+  .p-race-name a:hover { color: var(--accent); }
+  .p-sub { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; margin-top: 4px; }
+  .p-chip { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase;
+    padding: 4px 8px; border: 1px solid var(--border-bright); border-radius: 3px; white-space: nowrap; color: var(--text-dim); }
+  .p-chip.done { color: var(--green); border-color: var(--green); }
+  .p-chip.dnf { color: var(--yellow); border-color: var(--yellow); }
+  .p-stats { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 14px 0 4px; }
+  .p-stat { font-family: 'JetBrains Mono', monospace; }
+  .p-stat b { font-size: 17px; }
+  .p-stat span { display: block; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+  .p-note { color: var(--text-muted); font-size: 12px; margin-top: 6px; }
+  .p-report { color: var(--text-dim); font-size: 14px; line-height: 1.55; margin: 12px 0 0; white-space: pre-wrap; }
+  .p-report b { color: var(--text); font-weight: 600; }
+  .p-row-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+  .p-form { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .p-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+  .p-grid .wide { grid-column: 1 / -1; }
+  .p-form .modal-field input, .p-form .modal-field select, .p-form .modal-field textarea { width: 100%; box-sizing: border-box; }
+  /* A div, not a span: .modal-field > span is the field's label style. */
+  .p-pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; }
+  .p-pair em { color: var(--text-muted); font-style: normal; font-size: 12px; }
+  .p-check { display: flex; gap: 8px; align-items: center; margin: 2px 0 12px; font-size: 14px; color: var(--text-dim); }
+  .p-err { color: var(--red); font-size: 13px; min-height: 1em; margin: 6px 0 0; }
+  @media (max-width: 520px) { .p-grid { grid-template-columns: 1fr; } }
+
+  .p-link { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: center;
+    padding: 10px 0; border-top: 1px solid var(--border); }
+  .p-link:first-of-type { border-top: 0; }
+  .p-empty { color: var(--text-muted); font-size: 14px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="brand">
+    <div class="brand-meta">
+      <a class="wordmark" href="/app/" aria-label="SendOff · home"><svg viewBox="-130 -130 3781.0 1317.6" aria-hidden="true"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 544.24 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 489.41 469.6 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></a><span>·</span><span>Profile</span><span>·</span>
+    </div>
+    <h1 class="site" id="who">Your <em>races</em></h1>
+  </div>
+</header>
+
+<div id="error" class="error-banner" style="display:none;"></div>
+<div id="tut-host"></div>
+
+<div class="p-actions" id="actions" hidden>
+  <button type="button" class="btn" id="edit-profile">Name, crew notes and goals</button>
+  <button type="button" class="btn" id="add-manual">Add a race from before SendOff</button>
+</div>
+
+<div id="body"><p class="p-empty">Loading…</p></div>
+
+<footer class="site">
+  <span>Only you can see this page</span>
+  <span><a href="/app/">Back to the hub</a></span>
+</footer>
+
+<script src="lib/race-core.js?v=ed74c74c"></script>
+<script>
+  // The racer profile: every race this account ran, what it adds up to, and
+  // what the racer has written about each since. See ROADMAP.md, "Racer
+  // profile page". Private to the account for now; a public profile is a
+  // separate step with its own rules about what it may show.
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const $ = id => document.getElementById(id);
+  let state = null;          // what /my-results answered
+  let openForm = null;       // which card's form is open: a slug, a manual id, or 'new'
+
+  // "35:41:15", "35:41" or "2:05:00" to seconds. Hours may run past 24.
+  function parseTime(s) {
+    const parts = String(s || '').trim().split(':').map(p => p.trim());
+    if (!parts[0]) return null;
+    if (parts.length < 2 || parts.length > 3 || parts.some(p => !/^\d+$/.test(p))) return NaN;
+    const [h, m, sec] = parts.length === 3 ? parts.map(Number) : [...parts.map(Number), 0];
+    if (m > 59 || sec > 59) return NaN;
+    return h * 3600 + m * 60 + sec;
+  }
+  const hms = sec => sec > 0 ? Race.fmt.duration(sec) : '–';
+  const miles = mi => mi ? (Math.round(mi * 10) / 10).toLocaleString() + ' mi' : '–';
+  const feet = ft => ft != null ? '+' + Math.round(ft).toLocaleString() + ' ft' : '–';
+  const date = iso => iso ? new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+
+  // The results, in the shape Race.archive works in: SendOff races with what
+  // the racer entered applied over them, and hand-entered races beside them.
+  function results() {
+    const out = [];
+    for (const r of state.races) {
+      const cfg = Object.assign({ slug: r.slug }, r.config);
+      const base = Race.archive.resultFor(cfg, { runners: [r.runner] }, state.email);
+      if (!base) continue;
+      base.visibility = r.visibility;
+      out.push(Race.archive.withEntered(base, state.results.bySlug[r.slug]));
+    }
+    for (const m of state.results.manual) out.push(Race.archive.fromManual(m));
+    return Race.archive.sort(out);
+  }
+
+  function renderTotals(list) {
+    const t = Race.archive.totals(list);
+    const hrs = t.sec ? Math.round(t.sec / 3600).toLocaleString() + ' h' : '–';
+    return `<section class="p-section"><h2 class="p-h2">All of it</h2><div class="p-totals">
+      <div class="p-total"><b>${t.started}</b><span>Races</span></div>
+      <div class="p-total"><b>${t.finished}</b><span>Finished</span></div>
+      <div class="p-total"><b>${Math.round(t.miles).toLocaleString()}</b><span>Miles</span></div>
+      <div class="p-total"><b>${Math.round(t.climbFt).toLocaleString()}</b><span>Feet climbed</span></div>
+      <div class="p-total"><b>${hrs}</b><span>On course</span></div>
+    </div></section>`;
+  }
+
+  function renderBests(list) {
+    const fams = Race.archive.recordsByFamily(list).filter(f => f.finishedCount);
+    if (!fams.length) return '';
+    const line = (k, v, r) => r ? `<div class="p-best"><span class="k">${esc(k)}</span><span class="v">${v}</span>
+      <span class="r">${esc(r.name)} · ${esc(date(r.startTime))}</span></div>` : '';
+    return `<section class="p-section"><h2 class="p-h2">Personal bests</h2>` + fams.map(f => `
+      <div class="p-card p-fam"><h3>${esc(f.label)}</h3>
+        ${Object.values(f.byBucket).map(b => line(b.bucket.label, hms(b.race.finishSec), b.race)).join('')}
+        ${line('Furthest', miles(f.furthest && f.furthest.distanceMi), f.furthest)}
+        ${line('Most climb', feet(f.mostClimb && f.mostClimb.elevGainFt), f.mostClimb)}
+        ${line('Longest day', hms(f.longestDay && f.longestDay.finishSec), f.longestDay)}
+      </div>`).join('') + `</section>`;
+  }
+
+  function renderCandidates() {
+    if (!state.candidates.length) return '';
+    return `<section class="p-section"><h2 class="p-h2">Are any of these you?</h2><div class="p-card">
+      <p class="p-empty" style="margin:0 0 6px">Races you made or are on, with a racer not linked to any account.
+      Linking one puts it on this page and lets you log your own splits there.</p>` +
+      state.candidates.map(c => `<div class="p-link"><span><b>${esc(c.name)}</b>
+        <span class="p-sub">${esc(date(c.startTime))}</span></span><span>` +
+        c.runners.map(r => `<button type="button" class="btn" data-link="${esc(c.slug)}" data-runner="${esc(r.id)}">I'm ${esc(r.name)}</button>`).join(' ') +
+      `</span></div>`).join('') + `</div></section>`;
+  }
+
+  function placeLine(e) {
+    if (!e) return '';
+    const bits = [];
+    const one = (p, f, what) => { if (p) bits.push(`${p}${f ? ' of ' + f : ''} ${what}`); };
+    one(e.placeOverall, e.fieldOverall, 'overall');
+    one(e.placeGender, e.fieldGender, 'gender');
+    one(e.placeAge, e.fieldAge, e.ageGroup ? esc(e.ageGroup) : 'age group');
+    return bits.length ? `<div class="p-stat"><b>${bits[0]}</b><span>${bits.slice(1).join(' · ') || 'Place'}</span></div>` : '';
+  }
+
+  function intakeLine(r) {
+    const ph = r.perHour || {};
+    const bits = [];
+    if (ph.calories) bits.push(`${Math.round(ph.calories)} cal`);
+    if (ph.sodiumMg) bits.push(`${Math.round(ph.sodiumMg)} mg sodium`);
+    if (ph.fluidOz) bits.push(`${Math.round(ph.fluidOz * 10) / 10} oz`);
+    if (!bits.length) return '';
+    return `<div class="p-stat"><b>${bits.join(' · ')}</b><span>Per hour${r.loggedThroughLeg ? ', logged through leg ' + r.loggedThroughLeg : ''}</span></div>`;
+  }
+
+  function raceCard(r) {
+    const e = r.entered || null;
+    const key = r.manual ? r.id : r.slug;
+    const status = r.finished ? `<span class="p-chip done">Finished</span>`
+      : (r.dnf ? `<span class="p-chip dnf">DNF</span>` : `<span class="p-chip">${r.legsDone ? 'Did not finish' : 'Not started'}</span>`);
+    const name = r.manual ? esc(r.name) : `<a href="${esc(Race.raceHref(r.slug, r.visibility === 'public'))}">${esc(r.name)}</a>`;
+    const act = Race.activities.find(r.activity);
+    const sub = [date(r.startTime), r.location, act && act.label, r.manual ? 'Entered by hand' : (r.visibility === 'private' ? 'Private race' : '')]
+      .filter(Boolean).map(esc).join(' · ');
+    const timeLabel = r.finished ? (r.official ? 'Official time' : 'Logged time') : 'Time on course';
+    const time = r.finished ? hms(r.finishSec) : hms(r.raceSec);
+    const covered = r.finished ? r.distanceMi : (r.milesDone || 0);
+    // A race with no clock on it (a DNF entered by hand) says where it ended
+    // rather than showing a dash for a time nobody recorded.
+    const timeStat = (r.finished || r.raceSec)
+      ? `<div class="p-stat"><b>${time}</b><span>${timeLabel}</span></div>` : '';
+    const where = r.dnf && e && e.dnfWhere
+      ? `<div class="p-stat"><b>${esc(e.dnfWhere)}</b><span>Stopped at</span></div>` : '';
+    const report = e && (e.report || e.changeNext) ? `<p class="p-report">${e.report ? esc(e.report) : ''}${
+      e.report && e.changeNext ? '\n\n' : ''}${e.changeNext ? '<b>Next time:</b> ' + esc(e.changeNext) : ''}</p>` : '';
+    return `<article class="p-card" data-key="${esc(key)}">
+      <div class="p-race-head"><div><div class="p-race-name">${name}</div><div class="p-sub">${sub}</div></div>${status}</div>
+      <div class="p-stats">
+        ${timeStat}${where}
+        ${covered ? `<div class="p-stat"><b>${miles(covered)}</b><span>${r.finished ? 'Distance' : 'Covered'}</span></div>` : ''}
+        ${r.elevGainFt != null ? `<div class="p-stat"><b>${feet(r.elevGainFt)}</b><span>Climb</span></div>` : ''}
+        ${r.aidSec ? `<div class="p-stat"><b>${hms(r.aidSec)}</b><span>In aid stations</span></div>` : ''}
+        ${placeLine(e)}
+        ${intakeLine(r)}
+      </div>
+      ${r.finished && r.official && !r.manual && r.raceSec && Math.abs(r.raceSec - r.finishSec) >= 60
+        ? `<div class="p-note">Logged on SendOff: ${hms(r.raceSec)}</div>` : ''}
+      ${report}
+      <div class="p-row-actions">
+        <button type="button" class="btn" data-edit="${esc(key)}">${e ? 'Edit result' : 'Add result'}</button>
+        ${e && e.resultsUrl ? `<a class="btn" href="${esc(e.resultsUrl)}" target="_blank" rel="noopener">Official results</a>` : ''}
+      </div>
+      ${openForm === key ? resultForm(r) : ''}
+    </article>`;
+  }
+
+  // One form for both: a SendOff race needs only what happened afterwards; a
+  // race from before SendOff also needs to say what the race was.
+  function resultForm(r) {
+    const e = (r && r.entered) || {};
+    const manual = !r || r.manual;
+    const v = x => x == null ? '' : esc(x);
+    const opts = Race.activities.all.map(a =>
+      `<option value="${a.key}"${(e.activity || 'trail-run') === a.key ? ' selected' : ''}>${esc(a.label)}</option>`).join('');
+    const pair = (a, b, la, lb) => `<div class="p-pair"><input type="number" min="1" name="${a}" placeholder="${la}" value="${v(e[a])}">
+      <em>of</em><input type="number" min="1" name="${b}" placeholder="${lb}" value="${v(e[b])}"></div>`;
+    return `<form class="p-form" data-form="${esc(r ? (r.manual ? r.id : r.slug) : 'new')}" novalidate>
+      <div class="p-grid">
+        ${manual ? `
+        <label class="modal-field wide"><span>Race</span><input type="text" name="name" maxlength="120" value="${v(e.name)}" placeholder="Leadville Trail 100"></label>
+        <label class="modal-field"><span>Date</span><input type="date" name="date" value="${v(e.date)}"></label>
+        <label class="modal-field"><span>Discipline</span><select name="activity">${opts}</select></label>
+        <label class="modal-field"><span>Distance (miles)</span><input type="number" step="0.1" min="0" name="distanceMi" value="${v(e.distanceMi)}"></label>
+        <label class="modal-field"><span>Climb (feet, optional)</span><input type="number" min="0" name="climbFt" value="${v(e.climbFt)}"></label>
+        <label class="modal-field wide"><span>Where (optional)</span><input type="text" name="location" maxlength="120" value="${v(e.location)}"></label>` : ''}
+        <label class="modal-field"><span>Official finish time</span><input type="text" name="official" placeholder="35:41:15" inputmode="numeric"
+          value="${e.officialSec ? Race.fmt.duration(e.officialSec) : ''}"></label>
+        <label class="modal-field"><span>Results link</span><input name="resultsUrl" type="url" maxlength="500" placeholder="https://" value="${v(e.resultsUrl)}"></label>
+        <label class="p-check wide"><input type="checkbox" name="dnf"${e.dnf ? ' checked' : ''}> Did not finish</label>
+        <label class="modal-field wide"><span>Where you stopped (for a DNF)</span><input type="text" name="dnfWhere" maxlength="120" value="${v(e.dnfWhere)}" placeholder="Mile 86"></label>
+        <label class="modal-field"><span>Place overall</span>${pair('placeOverall', 'fieldOverall', 'place', 'field')}</label>
+        <label class="modal-field"><span>Place by gender</span>${pair('placeGender', 'fieldGender', 'place', 'field')}</label>
+        <label class="modal-field"><span>Age group</span><input type="text" name="ageGroup" maxlength="20" value="${v(e.ageGroup)}" placeholder="M40-49"></label>
+        <label class="modal-field"><span>Place in age group</span>${pair('placeAge', 'fieldAge', 'place', 'field')}</label>
+        <label class="modal-field wide"><span>Race report</span><textarea name="report" maxlength="5000">${v(e.report)}</textarea></label>
+        <label class="modal-field wide"><span>What I'd change next time</span><textarea name="changeNext" maxlength="1000">${v(e.changeNext)}</textarea></label>
+      </div>
+      <p class="p-err" data-err></p>
+      <div class="p-row-actions">
+        <button type="submit" class="btn primary">Save</button>
+        <button type="button" class="btn" data-cancel>Cancel</button>
+        ${r && r.entered ? `<button type="button" class="btn danger" data-remove>${r.manual ? 'Delete this race' : 'Clear result'}</button>` : ''}
+      </div>
+    </form>`;
+  }
+
+  function render() {
+    const list = results();
+    $('actions').hidden = false;
+    const newForm = openForm === 'new'
+      ? `<section class="p-section"><h2 class="p-h2">A race from before SendOff</h2><div class="p-card">${resultForm(null)}</div></section>` : '';
+    const races = list.length ? list.map(raceCard).join('') :
+      `<p class="p-empty">No races on your profile yet. A race shows up here once you are linked to a racer on it,
+       which is done on the race's settings page, or with the buttons above when SendOff can tell which racer you are.
+       Races from before SendOff can be added with the button at the top.</p>`;
+    $('body').innerHTML = newForm + renderCandidates() + renderTotals(list) + renderBests(list) +
+      `<section class="p-section"><h2 class="p-h2">Races</h2>${races}</section>`;
+  }
+
+  function formValues(form) {
+    const f = Object.fromEntries(new FormData(form).entries());
+    const out = {};
+    const sec = parseTime(f.official);
+    if (Number.isNaN(sec)) throw Object.assign(new Error('Finish time as hours:minutes:seconds, like 35:41:15.'), { field: 'official' });
+    if (sec) out.officialSec = sec;
+    out.dnf = !!form.elements.dnf.checked;
+    for (const k of ['resultsUrl', 'dnfWhere', 'ageGroup', 'report', 'changeNext', 'name', 'date', 'location', 'activity'])
+      if (f[k] != null && f[k] !== '') out[k] = f[k];
+    for (const k of ['placeOverall', 'fieldOverall', 'placeGender', 'fieldGender', 'placeAge', 'fieldAge', 'distanceMi', 'climbFt'])
+      if (f[k] != null && f[k] !== '') out[k] = Number(f[k]);
+    return out;
+  }
+
+  document.addEventListener('click', async (e) => {
+    const t = e.target;
+    if (t.id === 'edit-profile') return Race.openProfileModal();
+    if (t.id === 'add-manual') { openForm = 'new'; render(); const f = document.querySelector('[data-form="new"] input'); if (f) f.focus(); return; }
+    if (t.dataset.edit) { openForm = openForm === t.dataset.edit ? null : t.dataset.edit; render(); return; }
+    if (t.hasAttribute && t.hasAttribute('data-cancel')) { openForm = null; render(); return; }
+    if (t.hasAttribute && t.hasAttribute('data-remove')) {
+      const key = t.closest('form').dataset.form;
+      const manual = key.startsWith('m-');
+      if (!confirm(manual ? 'Delete this race from your profile?' : 'Clear what you entered for this race? The race itself stays.')) return;
+      const r = await Race.api.deleteResult(manual ? { id: key } : { slug: key });
+      state.results = r.results; openForm = null; render(); return;
+    }
+    if (t.dataset.link) {
+      t.disabled = true;
+      const slug = t.dataset.link, id = t.dataset.runner;
+      try {
+        // An ordinary config save, the same one the settings page makes when
+        // it links a racer: the worker moves the address out of the file.
+        await Race.gh.mutateJson(Race.auth.cfg(), `races/${slug}/config.json`, (doc) => {
+          const run = (doc.runners || []).find(x => x.id === id);
+          if (run && !run.email) run.email = state.email;
+          return doc;
+        }, `profile: link a racer on ${slug}`);
+        await load();
+      } catch (err) { t.disabled = false; showError('Could not link that race: ' + (err.message || err)); }
+    }
+  });
+
+  document.addEventListener('submit', async (e) => {
+    const form = e.target.closest('form[data-form]');
+    if (!form) return;
+    e.preventDefault();
+    const err = form.querySelector('[data-err]');
+    err.textContent = '';
+    const key = form.dataset.form;
+    const btn = form.querySelector('button[type=submit]');
+    try {
+      const result = formValues(form);
+      const body = key === 'new' ? { result } : key.startsWith('m-') ? { id: key, result } : { slug: key, result };
+      btn.disabled = true;
+      const r = await Race.api.saveResult(body);
+      state.results = r.results; openForm = null; render();
+    } catch (ex) {
+      btn.disabled = false;
+      err.textContent = ex.message || String(ex);
+      const field = ex.field === 'officialSec' ? 'official' : ex.field;
+      const el = field && form.elements[field];
+      if (el && el.focus) el.focus();
+    }
+  });
+
+  function showError(msg) { const b = $('error'); b.textContent = msg; b.style.display = ''; }
+
+  async function load() {
+    // hub.json first: it says whether this deployment signs in through the
+    // worker, and without it every session reads as signed out.
+    try { await Race.hub.load(); } catch (e) { /* the check below says what it can */ }
+    const sess = Race.auth.cfg();
+    if (!sess || sess.mode !== 'proxy') {
+      $('body').innerHTML = `<p class="p-empty">Sign in to see your races and results.</p>
+        <p><button type="button" class="btn primary" id="signin">Sign in</button></p>`;
+      $('signin').addEventListener('click', () => Race.openSigninModal && Race.openSigninModal());
+      return;
+    }
+    try {
+      state = await Race.api.myResults();
+      state.results = state.results || { bySlug: {}, manual: [] };
+      try {
+        const { profile } = await Race.api.profile();
+        const name = profile && (profile.displayName || [profile.firstName, profile.lastName].filter(Boolean).join(' '));
+        if (name) $('who').innerHTML = esc(name);
+      } catch (e) { /* the page works without a name */ }
+      render();
+    } catch (e) {
+      showError('Could not load your races: ' + (e.message || e));
+      $('body').innerHTML = '';
+    }
+  }
+  load();
+</script>
+</body>
+</html>

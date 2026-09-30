@@ -39,8 +39,9 @@ After the race, in this order:
 1. ~~**Finish the storage move.**~~ **Done 2026-09-30.** Race data goes to
    D1 and nowhere else, with no setting left that can say otherwise, and
    `races/**` is purged from the history. See "Doing it without a big bang".
-2. **The race archive, as a racer profile page** (stats and post-race
-   results, section 2). The cheapest real feature here, because the logic
+2. ~~**The race archive, as a racer profile page**~~ **Built 2026-09-30**,
+   private to the account; the public profile is the part left. (Stats and
+   post-race results, section 2.) The cheapest real feature here, because the logic
    already ships: `Race.archive` in `lib/race-core.js` has the distance
    buckets, `resultFor`, `records` and `sort`, and no page uses any of it. It
    needs a page and a hub link. It also lands at the first moment there is a
@@ -1620,7 +1621,34 @@ same outcome.
 Per-runner goals, hour bands and crew notes exist and travel via profiles.
 A named, reusable playbook that is not tied to one person does not.
 
-### Racer profile page: stats and post-race results — *logic built, no page*
+### Racer profile page: stats and post-race results — *built 2026-09-30, private*
+
+**Shipped.** `profile.html`, reached from Profile in the account menu, with the
+name, crew notes and goals modal one button inside it. It shows totals (races,
+finishes, miles, climb, time on course), personal bests per discipline family,
+and a card per race with time, climb, time in aid stations and intake per hour
+(saying so when the log stopped early). After a race the racer adds an official
+time, which wins over the logged one everywhere including records, place
+overall, by gender and by age group, a results link, a report and what they
+would change; a DNF records where. Races from before SendOff are entered by
+hand and count like any other. Races the account made or races on, with a racer
+linked to nobody, are offered with an "I'm <name>" button, which is the same
+config save the settings page makes.
+
+The worker side is `GET /my-results` and `POST /my-results/save` and
+`/delete`. Results live in KV under `results:<email>`, one document per
+account. The page is sent only the account's own runner from each race: no
+other racer, no address, no crew notes (`worker/test/my-results.mjs`).
+`test/profile-page.mjs` drives it on the Sangre data. `privacy.html` says what
+is kept.
+
+**Not yet:** the public profile (the opt-in decided below), cross-race fuel
+analysis beyond the per-race line, the hub filters it was meant to share chips
+with, and a link from each card to that race's finish card.
+
+---
+
+*The plan, as written 2026-09-29:*
 Asked for on 2026-09-29, after the Sangre de Cristo 100. This is the race
 archive with a person at the top of it: one page per racer, their races
 newest first, what they add up to, and the result of each one written down

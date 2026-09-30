@@ -3827,6 +3827,199 @@ async function handleProfileSave(req, env) {
   return json({ profile }, {}, env, req);
 }
 
+// ---------- a racer's own results ----------
+// The profile page: every race this account is linked to as a runner, with
+// that runner's legs, plus what the racer has written down about each one
+// since (official time, place, a report) and races run before SendOff.
+//
+// Linked means the race's runner record carries this account's address,
+// which is the link the settings page writes and racer mode reads. A race
+// you crewed is not your race and does not appear. Private races are included:
+// this page is only ever the account's own. A public profile, when there is
+// one, is a separate answer with its own rules about what it may show.
+//
+// What the racer adds lives in KV under results:<email>, one document per
+// account. It is theirs and small, and nothing else reads it.
+const RESULTS_KEY = (email) => 'results:' + normalizeEmail(email);
+const RESULT_TEXT = { ageGroup: 20, resultsUrl: 500, dnfWhere: 120, report: 5000, changeNext: 1000 };
+const RESULT_PLACES = ['placeOverall', 'fieldOverall', 'placeGender', 'fieldGender', 'placeAge', 'fieldAge'];
+
+async function loadResults(env, email) {
+  const empty = { bySlug: {}, manual: [] };
+  if (!env.AUTH_KV) return empty;
+  try {
+    const raw = await env.AUTH_KV.get(RESULTS_KEY(email));
+    const j = raw ? JSON.parse(raw) : null;
+    return { bySlug: (j && j.bySlug) || {}, manual: Array.isArray(j && j.manual) ? j.manual : [] };
+  } catch (e) { return empty; }
+}
+
+// One result, cleaned. Anything not understood is dropped rather than stored,
+// and a field that is present but wrong is an error rather than a silent
+// blank, so the form can say which.
+function cleanResult(body, manual) {
+  const out = {};
+  const bad = (field, why) => { throw Object.assign(new Error(`${field}: ${why}`), { field }); };
+  if (body.officialSec != null && body.officialSec !== '') {
+    const s = Number(body.officialSec);
+    if (!Number.isInteger(s) || s <= 0 || s > 30 * 86400) bad('officialSec', 'a finish time in seconds, up to 30 days');
+    out.officialSec = s;
+  }
+  for (const k of RESULT_PLACES) {
+    if (body[k] == null || body[k] === '') continue;
+    const n = Number(body[k]);
+    if (!Number.isInteger(n) || n < 1 || n > 100000) bad(k, 'a whole number from 1');
+    out[k] = n;
+  }
+  for (const [a, b] of [['placeOverall', 'fieldOverall'], ['placeGender', 'fieldGender'], ['placeAge', 'fieldAge']]) {
+    if (out[a] && out[b] && out[a] > out[b]) bad(a, `cannot be more than ${b}`);
+  }
+  for (const [k, max] of Object.entries(RESULT_TEXT)) {
+    if (body[k] == null || body[k] === '') continue;
+    if (typeof body[k] !== 'string') bad(k, 'text');
+    const v = body[k].trim().slice(0, max);
+    if (v) out[k] = v;
+  }
+  if (out.resultsUrl && !/^https?:\/\/[^\s]+$/i.test(out.resultsUrl)) bad('resultsUrl', 'a web address starting http');
+  out.dnf = !!body.dnf;
+  if (out.dnf) delete out.officialSec;
+  if (manual) {
+    const name = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : '';
+    if (!name) bad('name', 'required');
+    out.name = name;
+    if (typeof body.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.date)) bad('date', 'YYYY-MM-DD');
+    out.date = body.date;
+    const mi = Number(body.distanceMi);
+    if (!(mi > 0 && mi <= 1000)) bad('distanceMi', 'miles, more than 0');
+    out.distanceMi = Math.round(mi * 100) / 100;
+    if (body.climbFt != null && body.climbFt !== '') {
+      const ft = Number(body.climbFt);
+      if (!(ft >= 0 && ft <= 200000)) bad('climbFt', 'feet');
+      out.climbFt = Math.round(ft);
+    }
+    if (body.location) out.location = String(body.location).trim().slice(0, 120);
+    if (body.activity) {
+      if (!/^[a-z-]{1,24}$/.test(String(body.activity))) bad('activity', 'an activity key');
+      out.activity = String(body.activity);
+    }
+    if (!out.dnf && !out.officialSec) bad('officialSec', 'a finish time, or mark it a DNF');
+  }
+  out.updatedAt = new Date().toISOString();
+  return out;
+}
+
+// A race's data, from wherever it is: D1 for any race the mirror has, git
+// for one it has never seen.
+async function loadRaceDataNow(env, slug) {
+  const path = `races/${slug}/data.json`;
+  try {
+    const m = await readFromD1(env, path);
+    if (m) return JSON.parse(base64ToUtf8(JSON.parse(m).content));
+  } catch (e) { /* fall through to git */ }
+  try {
+    const r = await githubGetJson(env, path);
+    return r.missing ? null : r.data;
+  } catch (e) { return null; }
+}
+
+async function handleMyResults(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  const me = normalizeEmail(session.email);
+  const results = await loadResults(env, me);
+
+  const slugs = (await listRaceSlugs(env)) || [];
+  const races = [], candidates = [];
+  for (const slug of slugs) {
+    let cfg = null;
+    try { cfg = await loadRaceConfigNow(env, slug); } catch (e) { continue; }
+    if (!cfg) continue;
+    const runners = cfg.runners || [];
+    const mine = runners.find(r => r && normalizeEmail(r.email) === me);
+    if (mine) {
+      const data = await loadRaceDataNow(env, slug);
+      const legs = (((data && data.runners) || []).find(r => r && r.id === mine.id) || {}).legs || [];
+      // Only what the page needs, and only this runner: the rest of the
+      // roster, their addresses and the crew notes stay where they are.
+      races.push({
+        slug,
+        visibility: cfg.visibility === 'private' ? 'private' : 'public',
+        config: {
+          name: cfg.name, location: cfg.location, startTime: cfg.startTime,
+          activity: cfg.activity, courseType: cfg.courseType, course: cfg.course,
+          cutoffs: cfg.cutoffs, units: cfg.units, fuelMetrics: cfg.fuelMetrics,
+          fuelPresets: cfg.fuelPresets,
+          runners: [{ id: mine.id, name: mine.name, bib: mine.bib, email: me }]
+        },
+        runner: { id: mine.id, legs }
+      });
+      continue;
+    }
+    // Not linked, but this account made the race or is on it as a racer, and
+    // a runner on it is linked to nobody: very likely them, before linking
+    // existed. The page offers "this is me", which is an ordinary config save.
+    const role = roleForRace(cfg, me);
+    const canLink = normalizeEmail(cfg.createdBy) === me || role === 'owner' || role === 'racer';
+    const unlinked = runners.filter(r => r && r.id && !r.email);
+    if (canLink && unlinked.length && canEditRace(cfg, me)) {
+      candidates.push({ slug, name: cfg.name, startTime: cfg.startTime,
+        runners: unlinked.map(r => ({ id: r.id, name: r.name })) });
+    }
+  }
+  return json({ email: me, races, candidates, results }, {}, env, req);
+}
+
+async function handleMyResultSave(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Results need AUTH_KV' }, { status: 503 }, env, req);
+  let body;
+  try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  const me = normalizeEmail(session.email);
+  const doc = await loadResults(env, me);
+  let saved;
+  try {
+    if (body.slug) {
+      // A result for a SendOff race: only one this account is linked to. The
+      // check is the same one /my-results makes, so nobody writes a result
+      // against a race they did not run.
+      const cfg = await loadRaceConfigNow(env, String(body.slug));
+      const linked = cfg && (cfg.runners || []).some(r => r && normalizeEmail(r.email) === me);
+      if (!linked) return json({ error: 'You are not linked to a runner on that race' }, { status: 403 }, env, req);
+      saved = cleanResult(body.result || {}, false);
+      doc.bySlug[String(body.slug)] = saved;
+    } else {
+      saved = cleanResult(body.result || {}, true);
+      const id = body.id && /^m-[a-f0-9-]{8,40}$/.test(String(body.id)) ? String(body.id) : 'm-' + crypto.randomUUID();
+      saved.id = id;
+      const i = doc.manual.findIndex(m => m.id === id);
+      if (i >= 0) doc.manual[i] = saved; else {
+        if (doc.manual.length >= 500) return json({ error: 'That is a lot of races. 500 is the limit.' }, { status: 400 }, env, req);
+        doc.manual.push(saved);
+      }
+    }
+  } catch (e) {
+    return json({ error: e.message, field: e.field || null }, { status: 400 }, env, req);
+  }
+  await env.AUTH_KV.put(RESULTS_KEY(me), JSON.stringify(doc));
+  return json({ result: saved, results: doc }, {}, env, req);
+}
+
+async function handleMyResultDelete(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Results need AUTH_KV' }, { status: 503 }, env, req);
+  let body;
+  try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  const me = normalizeEmail(session.email);
+  const doc = await loadResults(env, me);
+  if (body.slug) delete doc.bySlug[String(body.slug)];
+  else if (body.id) doc.manual = doc.manual.filter(m => m.id !== String(body.id));
+  else return json({ error: 'slug or id required' }, { status: 400 }, env, req);
+  await env.AUTH_KV.put(RESULTS_KEY(me), JSON.stringify(doc));
+  return json({ results: doc }, {}, env, req);
+}
+
 async function handleTeamInvite(req, env) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -4864,6 +5057,9 @@ async function route(request, env, ctx) {
     if (request.method === 'GET'  && path === '/profile')         return handleProfileGet(request, env);
     if (request.method === 'POST' && path === '/profile')         return handleProfileSave(request, env);
     if (request.method === 'GET'  && path === '/my-races')        return handleMyRaces(request, env);
+    if (request.method === 'GET'  && path === '/my-results')      return handleMyResults(request, env);
+    if (request.method === 'POST' && path === '/my-results/save') return handleMyResultSave(request, env);
+    if (request.method === 'POST' && path === '/my-results/delete') return handleMyResultDelete(request, env);
     if (request.method === 'GET'  && path === '/next-race-id')    return handleNextRaceId(request, env);
     if (request.method === 'POST' && path === '/race/delete')     return handleRaceDelete(request, env);
     if (request.method === 'POST' && path === '/account-invite')  return handleAccountInvite(request, env);

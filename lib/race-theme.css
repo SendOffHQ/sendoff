@@ -499,7 +499,7 @@ header.site { position: relative; }
 
 input[type="text"], input[type="password"], input[type="number"],
 input[type="datetime-local"], input[type="date"], input[type="time"],
-input[type="email"], textarea, select {
+input[type="email"], input[type="url"], textarea, select {
   background: var(--bg-elevated); color: var(--text);
   border: 1px solid var(--border-bright); border-radius: 4px;
   padding: 10px 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px;
