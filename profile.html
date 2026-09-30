@@ -102,6 +102,10 @@
     padding: 10px 0; border-top: 1px solid var(--border); }
   .p-link:first-of-type { border-top: 0; }
   .p-empty { color: var(--text-muted); font-size: 14px; line-height: 1.6; }
+  .p-link-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  .p-hidden-line { margin: 8px 0 0; }
+  .p-textbtn { background: none; border: 0; padding: 0; cursor: pointer; color: var(--accent);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -130,7 +134,7 @@
   <span><a href="/app/">Back to the hub</a></span>
 </footer>
 
-<script src="lib/race-core.js?v=ed74c74c"></script>
+<script src="lib/race-core.js?v=a981387a"></script>
 <script>
   // The racer profile: every race this account ran, what it adds up to, and
   // what the racer has written about each since. See ROADMAP.md, "Racer
@@ -197,15 +201,24 @@
       </div>`).join('') + `</section>`;
   }
 
+  let showHidden = false;    // whether the races put aside with "Not me" are listed
+
   function renderCandidates() {
-    if (!state.candidates.length) return '';
+    const offered = state.candidates || [], hidden = state.hidden || [];
+    if (!offered.length && !hidden.length) return '';
+    const row = (c, buttons) => `<div class="p-link"><span><b>${esc(c.name)}</b>
+        <span class="p-sub">${esc(date(c.startTime))}</span></span><span class="p-link-btns">${buttons}</span></div>`;
+    const offeredRows = offered.map(c => row(c,
+      c.runners.map(r => `<button type="button" class="btn" data-link="${esc(c.slug)}" data-runner="${esc(r.id)}">I'm ${esc(r.name)}</button>`).join(' ') +
+      ` <button type="button" class="btn" data-notmine="${esc(c.slug)}" title="Stop offering this race">Not me</button>`)).join('');
+    const hiddenRows = showHidden ? hidden.map(c => row(c,
+      `<button type="button" class="btn" data-unhide="${esc(c.slug)}">Show again</button>`)).join('') : '';
+    const hiddenLine = hidden.length ? `<p class="p-hidden-line"><button type="button" class="p-textbtn" id="toggle-hidden">${
+      showHidden ? 'Hide' : 'Show'} ${hidden.length} race${hidden.length === 1 ? '' : 's'} you said ${hidden.length === 1 ? 'is' : 'are'} not you</button></p>` : '';
     return `<section class="p-section"><h2 class="p-h2">Are any of these you?</h2><div class="p-card">
-      <p class="p-empty" style="margin:0 0 6px">Races you made or are on, with a racer not linked to any account.
-      Linking one puts it on this page and lets you log your own splits there.</p>` +
-      state.candidates.map(c => `<div class="p-link"><span><b>${esc(c.name)}</b>
-        <span class="p-sub">${esc(date(c.startTime))}</span></span><span>` +
-        c.runners.map(r => `<button type="button" class="btn" data-link="${esc(c.slug)}" data-runner="${esc(r.id)}">I'm ${esc(r.name)}</button>`).join(' ') +
-      `</span></div>`).join('') + `</div></section>`;
+      ${offered.length ? `<p class="p-empty" style="margin:0 0 6px">Races you made or are on, with a racer not linked to any account.
+      Linking one puts it on this page and lets you log your own splits there. Not yours? Tap Not me and it stops being offered.</p>` : ''}
+      ${offeredRows}${hiddenRows}${hiddenLine}</div></section>`;
   }
 
   function placeLine(e) {
@@ -348,6 +361,14 @@
       if (!confirm(manual ? 'Delete this race from your profile?' : 'Clear what you entered for this race? The race itself stays.')) return;
       const r = await Race.api.deleteResult(manual ? { id: key } : { slug: key });
       state.results = r.results; openForm = null; render(); return;
+    }
+    if (t.id === 'toggle-hidden') { showHidden = !showHidden; render(); return; }
+    if (t.dataset.notmine || t.dataset.unhide) {
+      t.disabled = true;
+      const slug = t.dataset.notmine || t.dataset.unhide;
+      try { await Race.api.notMine(slug, !!t.dataset.unhide); await load(); }
+      catch (err) { t.disabled = false; showError('Could not update that race: ' + (err.message || err)); }
+      return;
     }
     if (t.dataset.link) {
       t.disabled = true;

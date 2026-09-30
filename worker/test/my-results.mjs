@@ -68,7 +68,21 @@ ok('with no crew notes', r.races[0].config.crewNotes, undefined);
 ok('and no other address anywhere', JSON.stringify(r).includes(OTHER), false);
 ok('the unlinked one I made is offered to link', r.candidates.map(c => [c.slug, c.runners.map(x => x.name)]), [['unlinked', ['Jason']]]);
 ok('a race I only crewed is neither', [...r.races, ...r.candidates].some(x => x.slug === 'crewed'), false);
-ok('no one else\'s results', r.results, { bySlug: {}, manual: [] });
+ok('no one else\'s results', r.results, { bySlug: {}, manual: [], notMine: [] });
+
+console.log('\n"not me" puts an offered race aside');
+const nm = await call('/my-results/not-mine', { token: me, body: { slug: 'unlinked' } });
+ok('it is accepted', nm.status, 200);
+let r2 = await (await call('/my-results', { token: me })).json();
+ok('it is no longer offered', r2.candidates.map(c => c.slug), []);
+ok('but listed as hidden, to bring back', r2.hidden.map(c => c.slug), ['unlinked']);
+ok('and the race itself is untouched', JSON.parse(env.DB.races.get('unlinked').config).runners.map(x => x.name), ['Jason']);
+await call('/my-results/not-mine', { token: me, body: { slug: 'unlinked', undo: true } });
+r2 = await (await call('/my-results', { token: me })).json();
+ok('taking it back offers it again', [r2.candidates.map(c => c.slug), r2.hidden.length], [['unlinked'], 0]);
+ok('a slug that is not a slug is refused',
+   (await call('/my-results/not-mine', { token: me, body: { slug: '../x' } })).status, 400);
+ok('signed out, refused', (await call('/my-results/not-mine', { body: { slug: 'unlinked' } })).status, 401);
 
 console.log('\nwriting down how it went');
 const saveMine = await call('/my-results/save', { token: me, body: { slug: 'mine', result: {

@@ -93,6 +93,16 @@ ok('a best on foot, at 100 miles', bs.map(f => [f.family, f.rows['100 mile']]), 
 
 console.log('\nthe race the page can tell is yours');
 ok('the fixture race is offered to link', await page.$$eval('[data-link]', els => els.map(e => e.textContent)), ["I'm Test Racer"]);
+ok('with a Not me beside it', await page.$$eval('[data-notmine]', els => els.map(e => e.textContent)), ['Not me']);
+await page.click('[data-notmine]');
+await page.waitForSelector('#toggle-hidden', { timeout: 10000 });
+ok('Not me stops offering it', await page.$$eval('[data-link]', els => els.length), 0);
+ok('and says there is one set aside', await page.textContent('#toggle-hidden'), 'Show 1 race you said is not you');
+await page.click('#toggle-hidden');
+await page.click('[data-unhide]');
+await page.waitForSelector('[data-link]', { timeout: 10000 });
+ok('Show again offers it again', await page.$$eval('[data-link]', els => els.length), 1);
+ok('with nothing left set aside', await page.$$eval('#toggle-hidden', els => els.length), 0);
 await page.click('[data-link]');
 await page.waitForFunction(() => document.querySelectorAll('article.p-card').length === 2, null, { timeout: 10000 });
 ok('linking it puts it on the page', (await totals()).Races, '2');

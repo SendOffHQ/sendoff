@@ -46,7 +46,7 @@ const raceFile = (slug, file) => fileAt(path.posix.join('races', slug, file));
 // test does.
 const MEDIA = [];
 // What the profile page has written down, for this run only.
-const RESULTS = { bySlug: {}, manual: [] };
+const RESULTS = { bySlug: {}, manual: [], notMine: [] };
 
 // Whether an invite comes back with a rendered message beside the link. An
 // older worker does not send one, and the page has to cope by not offering a
@@ -211,7 +211,7 @@ const server = http.createServer((req, res) => {
       try { for (const d of fs.readdirSync(base, { withFileTypes: true })) if (d.isDirectory()) slugs.add(d.name); } catch (e) {}
     }
     for (const k of WRITTEN.keys()) { const m = /^races\/([^/]+)\/config\.json$/.exec(k); if (m) slugs.add(m[1]); }
-    const races = [], candidates = [];
+    const races = [], candidates = [], hidden = [];
     for (const slug of slugs) {
       let cfg; try { cfg = JSON.parse(raceFile(slug, 'config.json') || 'null'); } catch (e) { cfg = null; }
       if (!cfg) continue;
@@ -224,11 +224,23 @@ const server = http.createServer((req, res) => {
           config: { ...rest, runners: [{ id: mine.id, name: mine.name, email: ME }] }, runner: { id: mine.id, legs } });
       } else if (String(cfg.createdBy || '').toLowerCase() === ME) {
         const unlinked = (cfg.runners || []).filter(r => r && r.id && !r.email);
-        if (unlinked.length) candidates.push({ slug, name: cfg.name, startTime: cfg.startTime,
-          runners: unlinked.map(r => ({ id: r.id, name: r.name })) });
+        if (unlinked.length) (RESULTS.notMine.includes(slug) ? hidden : candidates).push({ slug, name: cfg.name,
+          startTime: cfg.startTime, runners: unlinked.map(r => ({ id: r.id, name: r.name })) });
       }
     }
-    return send(200, JSON.stringify({ email: ME, races, candidates, results: RESULTS }), 'application/json');
+    return send(200, JSON.stringify({ email: ME, races, candidates, hidden, results: RESULTS }), 'application/json');
+  }
+  if (url.pathname === '/api/my-results/not-mine') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+      const j = JSON.parse(body || '{}');
+      const set = new Set(RESULTS.notMine);
+      if (j.undo) set.delete(j.slug); else set.add(j.slug);
+      RESULTS.notMine = [...set];
+      send(200, JSON.stringify({ results: RESULTS }), 'application/json');
+    });
   }
   if (url.pathname === '/api/my-results/save' || url.pathname === '/api/my-results/delete') {
     let body = '';

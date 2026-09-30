@@ -3845,12 +3845,13 @@ const RESULT_TEXT = { ageGroup: 20, resultsUrl: 500, dnfWhere: 120, report: 5000
 const RESULT_PLACES = ['placeOverall', 'fieldOverall', 'placeGender', 'fieldGender', 'placeAge', 'fieldAge'];
 
 async function loadResults(env, email) {
-  const empty = { bySlug: {}, manual: [] };
+  const empty = { bySlug: {}, manual: [], notMine: [] };
   if (!env.AUTH_KV) return empty;
   try {
     const raw = await env.AUTH_KV.get(RESULTS_KEY(email));
     const j = raw ? JSON.parse(raw) : null;
-    return { bySlug: (j && j.bySlug) || {}, manual: Array.isArray(j && j.manual) ? j.manual : [] };
+    return { bySlug: (j && j.bySlug) || {}, manual: Array.isArray(j && j.manual) ? j.manual : [],
+             notMine: Array.isArray(j && j.notMine) ? j.notMine : [] };
   } catch (e) { return empty; }
 }
 
@@ -3929,7 +3930,7 @@ async function handleMyResults(req, env) {
   const results = await loadResults(env, me);
 
   const slugs = (await listRaceSlugs(env)) || [];
-  const races = [], candidates = [];
+  const races = [], candidates = [], hidden = [];
   for (const slug of slugs) {
     let cfg = null;
     try { cfg = await loadRaceConfigNow(env, slug); } catch (e) { continue; }
@@ -3962,11 +3963,14 @@ async function handleMyResults(req, env) {
     const canLink = normalizeEmail(cfg.createdBy) === me || role === 'owner' || role === 'racer';
     const unlinked = runners.filter(r => r && r.id && !r.email);
     if (canLink && unlinked.length && canEditRace(cfg, me)) {
-      candidates.push({ slug, name: cfg.name, startTime: cfg.startTime,
-        runners: unlinked.map(r => ({ id: r.id, name: r.name })) });
+      const entry = { slug, name: cfg.name, startTime: cfg.startTime,
+        runners: unlinked.map(r => ({ id: r.id, name: r.name })) };
+      // "Not me" puts it aside rather than forgetting it: a race you made for
+      // somebody else is not yours, but a tap by mistake should be undoable.
+      (results.notMine.includes(slug) ? hidden : candidates).push(entry);
     }
   }
-  return json({ email: me, races, candidates, results }, {}, env, req);
+  return json({ email: me, races, candidates, hidden, results }, {}, env, req);
 }
 
 async function handleMyResultSave(req, env) {
@@ -4003,6 +4007,25 @@ async function handleMyResultSave(req, env) {
   }
   await env.AUTH_KV.put(RESULTS_KEY(me), JSON.stringify(doc));
   return json({ result: saved, results: doc }, {}, env, req);
+}
+
+// "Not me" on a race the profile offered to link, or taking that back. Only a
+// list of slugs this account has said are not its own; the race is untouched.
+async function handleMyResultNotMine(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Results need AUTH_KV' }, { status: 503 }, env, req);
+  let body;
+  try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  const slug = typeof body.slug === 'string' ? body.slug.trim() : '';
+  if (!/^[a-z0-9-]{1,120}$/.test(slug)) return json({ error: 'slug required' }, { status: 400 }, env, req);
+  const me = normalizeEmail(session.email);
+  const doc = await loadResults(env, me);
+  const set = new Set(doc.notMine);
+  if (body.undo) set.delete(slug); else set.add(slug);
+  doc.notMine = [...set].slice(-1000);
+  await env.AUTH_KV.put(RESULTS_KEY(me), JSON.stringify(doc));
+  return json({ results: doc }, {}, env, req);
 }
 
 async function handleMyResultDelete(req, env) {
@@ -5060,6 +5083,7 @@ async function route(request, env, ctx) {
     if (request.method === 'GET'  && path === '/my-results')      return handleMyResults(request, env);
     if (request.method === 'POST' && path === '/my-results/save') return handleMyResultSave(request, env);
     if (request.method === 'POST' && path === '/my-results/delete') return handleMyResultDelete(request, env);
+    if (request.method === 'POST' && path === '/my-results/not-mine') return handleMyResultNotMine(request, env);
     if (request.method === 'GET'  && path === '/next-race-id')    return handleNextRaceId(request, env);
     if (request.method === 'POST' && path === '/race/delete')     return handleRaceDelete(request, env);
     if (request.method === 'POST' && path === '/account-invite')  return handleAccountInvite(request, env);
