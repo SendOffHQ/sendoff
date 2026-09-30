@@ -1293,6 +1293,107 @@ async function handleLogin(req, env) {
   return json({ token, email, username: email, role: user.role, expiresAt: exp }, {}, env, req);
 }
 
+// ---------- sign in with Google ----------
+// Another way to prove you own an address, not another kind of account. The
+// page gets a signed ID token from Google, this checks Google signed it for
+// SendOff and vouches for the address, and then issues exactly the session a
+// password would have. Accounts are still made by invite: an address with no
+// account gets told so, not a new account.
+//
+// GOOGLE_CLIENT_ID (wrangler.toml) is the OAuth client the tokens must be
+// for. It is not a secret; Google publishes it in the button on every page.
+// Unset, this is off and the button is not drawn.
+//
+// The link between a Google identity and an address is kept under its own
+// key, glink:<email>, and deliberately not on the user record. Accounts in
+// the USERS bootstrap list have no KV record, and lookupUser reads KV first:
+// a record holding only a link would shadow the real account, losing its
+// password and its role, which for the admin is the whole admin.
+const GOOGLE_ISSUERS = ['accounts.google.com', 'https://accounts.google.com'];
+const GOOGLE_CERTS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
+let googleCerts = null;   // { keys, at }, per isolate: Google rotates them daily
+
+async function googleKeys(force) {
+  if (!force && googleCerts && Date.now() - googleCerts.at < 3600 * 1000) return googleCerts.keys;
+  const res = await fetch(GOOGLE_CERTS_URL);
+  if (!res.ok) throw new Error('Could not reach Google to check the sign-in');
+  const j = await res.json();
+  googleCerts = { keys: j.keys || [], at: Date.now() };
+  return googleCerts.keys;
+}
+
+function b64urlBytes(s) {
+  const b64 = String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4);
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+}
+
+// The claims, if and only if Google signed this token for this client, it is
+// current, and Google vouches for the address. Anything else throws.
+async function verifyGoogleIdToken(env, token) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 3) throw new Error('Not a Google sign-in token');
+  let header, claims;
+  try {
+    header = JSON.parse(new TextDecoder().decode(b64urlBytes(parts[0])));
+    claims = JSON.parse(new TextDecoder().decode(b64urlBytes(parts[1])));
+  } catch (e) { throw new Error('Not a Google sign-in token'); }
+  if (header.alg !== 'RS256' || !header.kid) throw new Error('Not a Google sign-in token');
+  let jwk = (await googleKeys(false)).find(k => k.kid === header.kid);
+  if (!jwk) jwk = (await googleKeys(true)).find(k => k.kid === header.kid);
+  if (!jwk) throw new Error('Google sign-in could not be checked');
+  const key = await crypto.subtle.importKey('jwk', { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+  const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64urlBytes(parts[2]),
+    new TextEncoder().encode(parts[0] + '.' + parts[1]));
+  if (!ok) throw new Error('Google sign-in could not be checked');
+  const now = Date.now() / 1000;
+  if (!GOOGLE_ISSUERS.includes(claims.iss)) throw new Error('Not a Google sign-in token');
+  if (claims.aud !== env.GOOGLE_CLIENT_ID) throw new Error('That sign-in was for a different site');
+  if (!(claims.exp > now - 60)) throw new Error('That Google sign-in has expired. Try again.');
+  if (claims.iat && claims.iat > now + 300) throw new Error('Google sign-in could not be checked');
+  if (!(claims.email_verified === true || claims.email_verified === 'true') || !claims.email) {
+    throw new Error('Google has not verified the address on that account');
+  }
+  if (!claims.sub) throw new Error('Google sign-in could not be checked');
+  return claims;
+}
+
+async function handleAuthProviders(req, env) {
+  return json({ google: env.GOOGLE_CLIENT_ID || null }, {}, env, req);
+}
+
+async function handleLoginGoogle(req, env) {
+  if (!env.GOOGLE_CLIENT_ID) return json({ error: 'Google sign-in is not set up' }, { status: 404 }, env, req);
+  let body;
+  try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  let claims;
+  try { claims = await verifyGoogleIdToken(env, body && body.credential); }
+  catch (e) { return json({ error: e.message || 'Google sign-in could not be checked' }, { status: 401 }, env, req); }
+  const email = normalizeEmail(claims.email);
+  const user = await lookupUser(env, email);
+  if (!user) {
+    return json({ error: `There is no SendOff account for ${email} yet. SendOff is invite only while it is in beta: request one, or accept your invite first.`,
+                  code: 'no_account', email }, { status: 403 }, env, req);
+  }
+  // The first Google sign-in links that Google identity to the account. A
+  // later one from a different Google identity with the same address, which
+  // happens when a Workspace address is reissued to somebody new, is refused
+  // rather than handed the old owner's races.
+  if (env.AUTH_KV) {
+    const raw = await env.AUTH_KV.get('glink:' + email);
+    let link = null;
+    try { link = raw ? JSON.parse(raw) : null; } catch (e) { link = null; }
+    if (link && link.sub && link.sub !== claims.sub) {
+      return json({ error: `A different Google account is already linked to ${email}. Sign in with your password.` },
+        { status: 403 }, env, req);
+    }
+    if (!link) await env.AUTH_KV.put('glink:' + email, JSON.stringify({ sub: claims.sub, linkedAt: new Date().toISOString() }));
+  }
+  const exp = Date.now() + SESSION_HOURS * 3600 * 1000;
+  const token = await signJwt({ sub: email, email, role: user.role, exp }, env.JWT_SECRET);
+  return json({ token, email, username: email, role: user.role, expiresAt: exp, via: 'google' }, {}, env, req);
+}
+
 // Changes the signed-in user's password. The new hash is written to KV, which
 // lookupUser checks before USERS, so this works for env-var users too.
 async function handleChangePassword(req, env) {
@@ -1857,6 +1958,10 @@ async function handleAccountDelete(req, env) {
   }
   await env.AUTH_KV.delete('user:' + email);
   await env.AUTH_KV.delete('profile:' + email);
+  // Everything else kept per account goes with it: the results and reports
+  // from the profile page, and a Google sign-in link.
+  await env.AUTH_KV.delete(RESULTS_KEY(email));
+  await env.AUTH_KV.delete('glink:' + email);
   return json({ ok: true }, {}, env, req);
 }
 
@@ -5056,6 +5161,8 @@ async function route(request, env, ctx) {
     if (request.method === 'GET'  && path === '/access-requests') return handleAccessRequests(request, env);
     if (request.method === 'POST' && path === '/access-request/delete') return handleAccessRequestDelete(request, env);
     if (request.method === 'POST' && path === '/login')           return handleLogin(request, env);
+    if (request.method === 'POST' && path === '/login/google')    return handleLoginGoogle(request, env);
+    if (request.method === 'GET'  && path === '/auth-providers')  return handleAuthProviders(request, env);
     if (request.method === 'POST' && path === '/accept-invite')   return handleAcceptInvite(request, env);
     if (request.method === 'POST' && path === '/change-password') return handleChangePassword(request, env);
     if (request.method === 'POST' && path === '/reset-link')      return handleResetLink(request, env);

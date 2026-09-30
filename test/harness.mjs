@@ -47,6 +47,7 @@ const raceFile = (slug, file) => fileAt(path.posix.join('races', slug, file));
 const MEDIA = [];
 // What the profile page has written down, for this run only.
 const RESULTS = { bySlug: {}, manual: [], notMine: [] };
+let googleOn = false;
 
 // Whether an invite comes back with a rendered message beside the link. An
 // older worker does not send one, and the page has to cope by not offering a
@@ -204,6 +205,29 @@ const server = http.createServer((req, res) => {
   // The profile page. Races are the ones whose runner record carries this
   // stub's address, read from the same files every other endpoint serves, so a
   // test links a racer the way the page does: by saving the config.
+  // Sign in with Google. Off until a test turns it on, the way an unset
+  // GOOGLE_CLIENT_ID leaves it off. The worker's checks on the token are
+  // tested against the worker; here a credential is just a word.
+  if (url.pathname === '/api/google-on') { googleOn = true; return send(200, '{"ok":true}', 'application/json'); }
+  if (url.pathname === '/api/auth-providers') {
+    return send(200, JSON.stringify({ google: googleOn ? 'test-client.apps.googleusercontent.com' : null }), 'application/json');
+  }
+  if (url.pathname === '/api/login/google') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      if (!googleOn) return send(404, '{"error":"Google sign-in is not set up"}', 'application/json');
+      const { credential } = JSON.parse(body || '{}');
+      if (credential === 'good') {
+        return send(200, JSON.stringify({ token: 'stub', email: ME, username: ME, role: 'owner',
+          expiresAt: Date.now() + 7 * 24 * 3600e3, via: 'google' }), 'application/json');
+      }
+      if (credential === 'nobody') {
+        return send(403, JSON.stringify({ error: 'There is no SendOff account for stranger@example.com yet. SendOff is invite only while it is in beta: request one, or accept your invite first.', code: 'no_account' }), 'application/json');
+      }
+      send(401, '{"error":"Google sign-in could not be checked"}', 'application/json');
+    });
+  }
   if (url.pathname === '/api/my-results' && req.method === 'GET') {
     if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
     const slugs = new Set();

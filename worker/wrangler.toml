@@ -31,6 +31,11 @@ GITHUB_BRANCH = "main"
 # change. A promise that is quietly too generous is the survivable direction;
 # one that is quietly too narrow is not.
 ADMIN_RACE_ACCESS = "true"
+# Sign in with Google: the OAuth client ID ID tokens must be issued for. Not
+# a secret (Google shows it in the button on every page). Empty turns Google
+# sign-in off and the button is not drawn. See worker/src/worker.js,
+# "sign in with Google".
+GOOGLE_CLIENT_ID = ""
 # If you mount the worker at a subpath (e.g. on a route like
 # api.example.com/race-dashboard/*), set MOUNT_PATH to that prefix.
 # Leave empty if the worker is at the root of its hostname.
