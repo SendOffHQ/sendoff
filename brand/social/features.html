@@ -53,22 +53,253 @@
 
   .foot{position:absolute;left:88px;bottom:88px;font-family:var(--mono);font-size:21px;letter-spacing:.16em;
          text-transform:uppercase;color:var(--mute);z-index:2}
+
+  /* A wide device under the text, for screens that do not fit a phone:
+     the settings table and the printed report. */
+  .wide .phone{display:none}
+  .tablet{position:absolute;left:50%;transform:translateX(-50%);top:640px;width:800px;padding:16px;border-radius:40px;
+          background:#05080B;border:2px solid #2A3845;z-index:1;
+          box-shadow:0 40px 120px rgba(0,0,0,.6), 0 0 90px rgba(15,184,191,.18)}
+  .tablet img{display:block;width:100%;border-radius:26px}
+  .wide h1 br.n{display:none}
+  .wide .foot{display:none}
+
+  /* The share post: the race's own card as a phone shows a pasted link. */
+  .thread{position:absolute;left:88px;right:88px;top:620px;display:flex;flex-direction:column;gap:18px;z-index:1}
+  .bubble{align-self:flex-end;max-width:640px;border-radius:34px 34px 10px 34px;overflow:hidden;
+          background:#1F2A35;box-shadow:0 30px 90px rgba(0,0,0,.5)}
+  .bubble img{display:block;width:100%}
+  .bubble .meta{padding:20px 28px 24px;font-size:26px;line-height:1.3}
+  .bubble .meta b{display:block;font-weight:600}
+  .bubble .meta span{color:var(--mute);font-family:var(--mono);font-size:21px}
+  .reply{align-self:flex-start;background:#26323D;border-radius:34px 34px 34px 10px;padding:22px 30px;
+         font-size:28px;max-width:560px}
+  .reply.me{align-self:flex-end;background:var(--signal);color:#062226;border-radius:34px 34px 10px 34px}
+
+  /* The disciplines post: the list itself is the picture. */
+  .cloud{display:flex;flex-wrap:wrap;gap:16px;margin-top:56px;max-width:900px}
+  .cloud .chip{font-size:30px;padding:16px 30px}
+  .cloud .chip.hot{background:var(--signal);color:#062226;border-color:var(--signal)}
 </style></head><body>
 
 <section class="slide grad glow" id="live-race">
   <div class="top">
-    <div class="wm"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" width="3059" height="1066" viewBox="-130 -130 3781.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 544.24 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 489.41 469.6 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></div>
+    <div class="wm"></div>
     <p class="kick">Live race page</p>
     <h1>Where are<br>they now?<br><em>Right here.</em></h1>
     <p class="lead" style="max-width:21ch">Splits, pace against the cutoff and the projected finish, as it happens.</p>
-    <div class="chips">
-      <span class="chip">No refresh</span>
-      <span class="chip">No account to watch</span>
-      <span class="chip">Updates in seconds</span>
-    </div>
+    <div class="chips"><span class="chip">No refresh</span><span class="chip">No account to watch</span><span class="chip">Updates in seconds</span></div>
   </div>
   <div class="phone"><img src="shots/live-race.png" alt=""></div>
   <div class="foot">sendoff.run</div>
 </section>
 
+<section class="slide grad glow" id="map">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Course map</p>
+    <h1>Every<br>climb, on<br><em>the map.</em></h1>
+    <p class="lead" style="max-width:21ch">The course, the aid stations and about where they are now, with the elevation profile under it.</p>
+    <div class="chips"><span class="chip">Aid stations marked</span><span class="chip">Elevation profile</span><span class="chip">Live position estimate</span></div>
+  </div>
+  <div class="phone"><img src="shots/map.png" alt=""></div>
+  <div class="foot">sendoff.run</div>
+</section>
+
+<section class="slide grad glow" id="photos">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Race photos</p>
+    <h1>The race,<br>told from<br><em>the aid<br>stations.</em></h1>
+    <p class="lead" style="max-width:21ch">Crew and racers post photos from the course, filed under the leg they were taken on.</p>
+    <div class="chips"><span class="chip">Filed by leg</span><span class="chip">Camera button</span><span class="chip">Live to everyone</span></div>
+  </div>
+  <div class="phone"><img src="shots/photos.png" alt=""></div>
+  <div class="foot">sendoff.run</div>
+</section>
+
+<section class="slide grad glow" id="share">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Share link</p>
+    <h1>One link.<br><em>Everyone's in.</em></h1>
+    <p class="lead" style="max-width:34ch">Every race gets its own page and its own preview card. Text it to the family, post it, drop it in the group chat.</p>
+  </div>
+  <div class="thread">
+    <div class="bubble"><img src="shots/share-card.png" alt="">
+      <div class="meta"><b>Sangre de Cristo 100 · SendOff</b><span>sendoff.run</span></div></div>
+    <div class="reply">Watching all weekend. Go get it!</div>
+  </div>
+  <div class="foot">sendoff.run</div>
+</section>
+
+<section class="slide grad glow" id="pit">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Pit board</p>
+    <h1>Know when<br>to have<br><em>the chair<br>ready.</em></h1>
+    <p class="lead" style="max-width:21ch">How long they have been out, where they are headed, and one big button when they arrive.</p>
+    <div class="chips"><span class="chip">One-tap check-in</span><span class="chip">Send Off when they leave</span><span class="chip">Intake and notes per leg</span></div>
+  </div>
+  <div class="phone"><img src="shots/pit.png" alt=""></div>
+  <div class="foot">sendoff.run</div>
+</section>
+
+<section class="slide grad glow wide" id="fuel-plan">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Fuel plan</p>
+    <h1>Hour 30 is <br class="n"><em>not hour 3.</em></h1>
+    <p class="lead" style="max-width:40ch">Targets that change as the race wears on: the night, the heat, day two. Every screen tracks against the one that is live.</p>
+  </div>
+  <div class="tablet" style="top:560px;width:820px"><img src="shots/fuel-plan.png" alt=""></div>
+</section>
+
+<section class="slide grad glow" id="offline">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Works with no signal</p>
+    <h1>No bars?<br><em>No<br>problem.</em></h1>
+    <p class="lead" style="max-width:21ch">Every tap is saved on the phone and sends itself the moment there is signal again.</p>
+    <div class="chips"><span class="chip">Built for canyons</span><span class="chip">Nothing lost</span><span class="chip">Syncs on its own</span></div>
+  </div>
+  <div class="phone" style="top:400px"><img src="shots/racer-offline.png" alt=""></div>
+  <div class="foot">sendoff.run</div>
+</section>
+
+<section class="slide grad glow" id="access">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Your crew</p>
+    <h1>Everyone<br>gets the<br><em>right keys.</em></h1>
+    <p class="lead" style="max-width:21ch">Invite crew, pacers and family. Crew can log, viewers can watch, and you decide who can invite.</p>
+    <div class="chips"><span class="chip">Crew</span><span class="chip">Pacer</span><span class="chip">Viewer</span></div>
+  </div>
+  <div class="phone"><img src="shots/access.png" alt=""></div>
+  <div class="foot">sendoff.run</div>
+</section>
+
+<section class="slide grad glow" id="reorder">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Racer screen</p>
+    <h1>Log your<br>gel without<br><em>breaking<br>stride.</em></h1>
+    <p class="lead" style="max-width:21ch">One-tap buttons for everything you carry. Drag the ones you use most to the top.</p>
+    <div class="chips"><span class="chip">One tap per item</span><span class="chip">Your order</span><span class="chip">Undo a mis-tap</span></div>
+  </div>
+  <div class="phone"><img src="shots/racer-reorder.png" alt=""></div>
+  <div class="foot">sendoff.run</div>
+</section>
+
+<section class="slide grad glow" id="write-in">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Write-in notes</p>
+    <h1>Quesadilla<br>at <em>mile 60?</em></h1>
+    <p class="lead" style="max-width:21ch">For everything that is not a button: aid station food, gear changes, hot spots. Type it, log it, keep moving.</p>
+    <div class="chips"><span class="chip">Food</span><span class="chip">Gear</span><span class="chip">Anything</span></div>
+  </div>
+  <div class="phone"><img src="shots/racer-jot.png" alt=""></div>
+  <div class="foot">sendoff.run</div>
+</section>
+
+<section class="slide grad glow" id="per-hour">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Hourly intake</p>
+    <h1>Eat to<br>the plan,<br><em>hour by<br>hour.</em></h1>
+    <p class="lead" style="max-width:21ch">Calories, fluid and sodium for the hour against your target, right on the racer screen.</p>
+    <div class="chips"><span class="chip">Calories</span><span class="chip">Fluid</span><span class="chip">Sodium</span></div>
+  </div>
+  <div class="phone"><img src="shots/racer.png" alt=""></div>
+  <div class="foot">sendoff.run</div>
+</section>
+
+<section class="slide grad glow" id="finish-card">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Finish card</p>
+    <h1>You earned<br>it. <em>Post it.</em></h1>
+    <p class="lead" style="max-width:21ch">Your time, the course profile and the numbers, in four sizes for every feed. You choose what goes on it.</p>
+    <div class="chips"><span class="chip">4:5  1:1  4:3  16:9</span><span class="chip">Made on your phone</span></div>
+  </div>
+  <div class="phone"><img src="shots/finish-card.png" alt=""></div>
+  <div class="foot">sendoff.run</div>
+</section>
+
+<section class="slide grad glow" id="charts">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Charts</p>
+    <h1>Where did<br><em>the time<br>go?</em></h1>
+    <p class="lead" style="max-width:21ch">Leg times, pace, intake per hour and time in aid. Usually it is the aid stations.</p>
+    <div class="chips"><span class="chip">Leg time</span><span class="chip">Aid station time</span><span class="chip">Progress vs cutoff</span></div>
+  </div>
+  <div class="phone"><img src="shots/charts.png" alt=""></div>
+  <div class="foot">sendoff.run</div>
+</section>
+
+<section class="slide grad glow wide" id="report">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Race report</p>
+    <h1>The whole race <br class="n"><em>on one page.</em></h1>
+    <p class="lead" style="max-width:40ch">Every leg, every aid station, everything eaten. Print it, file it, bring it next year.</p>
+  </div>
+  <div class="tablet" style="top:630px;width:860px"><img src="shots/report.png" alt=""></div>
+</section>
+
+<section class="slide grad glow" id="forever">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Every race, forever</p>
+    <h1>Your<br>races stay<br><em>online.</em></h1>
+    <p class="lead" style="max-width:21ch">Every public race stays readable for good, splits and all. No account needed. Never behind a paywall.</p>
+    <div class="chips"><span class="chip">Free to watch</span><span class="chip">Free to keep</span></div>
+  </div>
+  <div class="phone"><img src="shots/hub.png" alt=""></div>
+  <div class="foot">sendoff.run</div>
+</section>
+
+<section class="slide grad glow" id="gpx">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">GPX upload</p>
+    <h1>Drop in<br>the GPX.<br><em>Get every<br>climb.</em></h1>
+    <p class="lead" style="max-width:21ch">SendOff works out the climb and descent for every leg. Know better? Type in your own.</p>
+    <div class="chips"><span class="chip">Climb per leg</span><span class="chip">Miles per leg</span><span class="chip">Crew access noted</span></div>
+  </div>
+  <div class="phone"><img src="shots/legs.png" alt=""></div>
+  <div class="foot">sendoff.run</div>
+</section>
+
+<section class="slide grad glow" id="disciplines">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Not just running</p>
+    <h1>Crew any race<br><em>that needs one.</em></h1>
+    <p class="lead" style="max-width:34ch">Ultras on foot, on wheels and on water. Now with obstacle course races, for the 24-hour kind with a crew tent.</p>
+    <div class="cloud"><span class="chip">Trail run</span><span class="chip">Road run</span><span class="chip hot">Obstacle course</span><span class="chip">Paddle</span><span class="chip">Mountain bike</span><span class="chip">Gravel bike</span><span class="chip">Road bike</span><span class="chip">Hike</span><span class="chip">Swim</span><span class="chip">Mixed discipline</span></div>
+  </div>
+  <div class="foot">sendoff.run</div>
+</section>
+
+<section class="slide grad glow" id="private">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Private races</p>
+    <h1>Some races<br>are <em>just for<br>the crew.</em></h1>
+    <p class="lead" style="max-width:21ch">Keep a race off the hub. Only the people you invite can open it.</p>
+    <div class="chips"><span class="chip">Off the hub</span><span class="chip">Invite only</span><span class="chip">Public any time</span></div>
+  </div>
+  <div class="phone"><img src="shots/setup.png" alt=""></div>
+  <div class="foot">sendoff.run</div>
+</section>
+
+<template id="wm-src"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" width="3059" height="1066" viewBox="-130 -130 3781.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 544.24 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 489.41 469.6 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></template>
+<script>
+  // One copy of the wordmark, placed in every slide.
+  const wm = document.getElementById('wm-src').content;
+  document.querySelectorAll('.wm').forEach(el => el.appendChild(wm.cloneNode(true)));
+</script>
 </body></html>

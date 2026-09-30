@@ -32,6 +32,21 @@ const SRC = process.env.SRC || path.join(__dirname, 'features.html');
     .filter(i => !i.complete || i.naturalWidth === 0).map(i => i.getAttribute('src')));
   if (broken.length) { console.error('IMAGES NOT LOADED:', broken.join(', ')); process.exit(1); }
 
+  // Text that runs into the device is the mistake that is easiest to miss at
+  // full size and most obvious in the grid. Measure it rather than eyeball it.
+  const clashes = await p.$$eval('section.slide[id]', slides => slides.flatMap(s => {
+    const dev = s.querySelector('.phone, .tablet, .thread');
+    if (!dev) return [];
+    const d = dev.getBoundingClientRect();
+    return [...s.querySelectorAll('.top h1, .top p, .top .chip')].flatMap(el => {
+      const r = document.createRange(); r.selectNodeContents(el);
+      return [...r.getClientRects()].filter(b => b.width > 0 &&
+        b.right > d.left - 12 && b.left < d.right && b.bottom > d.top - 12 && b.top < d.bottom)
+        .map(() => `${s.id}: "${el.textContent.trim().slice(0, 30)}"`);
+    });
+  }));
+  if (clashes.length) { console.error('TEXT RUNS INTO THE DEVICE:\n  ' + [...new Set(clashes)].join('\n  ')); process.exit(1); }
+
   const only = process.argv[2];
   for (const id of await p.$$eval('section.slide[id]', s => s.map(x => x.id))) {
     if (only && only !== id) continue;

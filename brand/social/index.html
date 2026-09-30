@@ -113,6 +113,16 @@
 
 <section>
   <hr>
+  <h2>Feature posts</h2>
+  <p class="note">One post per feature, 1080&times;1350. The phone screens are
+  real screenshots of the app on the Sangre de Cristo 100, with the clock wound
+  back to a moment during the race. Rebuild with
+  <code>node capture-race.mjs</code>, then <code>node shoot-features.js</code>.</p>
+  <div class="grid" id="features"></div>
+</section>
+
+<section>
+  <hr>
   <h2>Rebuilding the set</h2>
   <ol class="steps">
     <li>Edit <code>brand/social/ig.html</code>.</li>
@@ -142,6 +152,14 @@
     [`sendoff-${prefix}-${n(i + 1)}.png`, `${i + 1} of 6`]);
 
   fill('carousel', six('ig'));
+  fill('features', [
+    ['live-race', 'Live race page'], ['map', 'Course map'], ['photos', 'Race photos'],
+    ['share', 'Share link'], ['pit', 'Pit board'], ['fuel-plan', 'Fuel plan'],
+    ['offline', 'No signal'], ['access', 'Your crew'], ['reorder', 'One-tap items'],
+    ['write-in', 'Write-in notes'], ['per-hour', 'Hourly intake'], ['finish-card', 'Finish card'],
+    ['charts', 'Charts'], ['report', 'Race report'], ['forever', 'Every race, forever'],
+    ['gpx', 'GPX upload'], ['disciplines', 'Disciplines'], ['private', 'Private races']
+  ].map(([id, cap]) => [`sendoff-feature-${id}.png`, cap]));
   fill('stories', six('story'));
   fill('triplinks', [1, 2, 3].map(i =>
     [`sendoff-pin-${i}-of-3.png`, `Tile ${i}`]));

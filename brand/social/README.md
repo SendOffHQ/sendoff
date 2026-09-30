@@ -16,7 +16,7 @@ hand somewhere else.
 | `sendoff-pin-1..3-of-3.png` | 1080x1350 | The wordmark split across three profile tiles |
 | `sendoff-announce-logo.png` | 1080x1350 | The wordmark on the gradient, 4:5 |
 | `sendoff-announce-card.png` | 1080x1350 | "Send them out, bring them home.", 4:5 |
-| `sendoff-feature-*.png` | 1080x1350 | One post per feature, 4:5, from `features.html` |
+| `sendoff-feature-*.png` | 1080x1350 | Eighteen posts, one per feature, 4:5, from `features.html` |
 | `_strip.png`, `_pin-sheet.png` | working | The uncut strip and an assembled preview. Not for posting. |
 
 The announce pair has its own source and its own script, `announce.html` and
@@ -50,6 +50,9 @@ The phone screens in the feature posts are real screenshots, not mockups.
 `capture-race.mjs` serves the site through `test/harness.mjs`, opens a real
 race with the clock wound back to a moment during it, and cuts the logged data
 off at that moment, so the page draws itself as a spectator saw it then.
+Map tiles and the race's photos are fetched by the script and handed to the
+page, since the headless browser has no network of its own. `shoot-features.js`
+refuses to render if any text runs into a device frame.
 
 `shoot.js` reads `PLAYWRIGHT_BROWSERS_PATH` the usual way; if Chromium lives
 somewhere Playwright will not find on its own, set `CHROMIUM` to the binary.
