@@ -53,12 +53,15 @@ const SRC = process.env.SRC || path.join(__dirname, 'features.html');
     const el = await p.$('#' + id);
     const name = 'sendoff-feature-' + id;
     await el.screenshot({ path: `${OUT}/${name}.png` });
+    // And a JPEG, because that is the only image format Instagram's
+    // publishing API takes. tools/instagram-post.mjs posts these.
+    await el.screenshot({ path: `${OUT}/${name}.jpg`, type: 'jpeg', quality: 92 });
     const box = await el.boundingBox();
     if (Math.round(box.width) !== 1080 || Math.round(box.height) !== 1350) {
       console.error('WRONG SIZE', name, JSON.stringify(box));
       process.exit(1);
     }
-    console.log(name, '1080x1350');
+    console.log(name, '1080x1350, png and jpg');
   }
   await b.close();
 })();

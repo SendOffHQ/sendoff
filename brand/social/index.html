@@ -181,18 +181,6 @@
       </figure>`;
   }).join('');
 
-  // Each caption is the text between its "## ... (`file`)" heading and the
-  // next "---" rule, trimmed. That is exactly what gets pasted into Instagram.
-  function parseCaptions(md) {
-    const out = {};
-    for (const block of md.split(/^---\s*$/m)) {
-      const m = block.match(/^##\s.*\(`([^`]+)`\)\s*$/m);
-      if (!m) continue;
-      out[m[1]] = block.slice(block.indexOf(m[0]) + m[0].length).trim();
-    }
-    return out;
-  }
-
   async function copyText(text) {
     try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
     // Older browsers, and a page opened from disk.
@@ -206,9 +194,14 @@
     return ok;
   }
 
-  fetch('captions.md', { cache: 'no-cache' })
-    .then(r => r.ok ? r.text() : Promise.reject(new Error(r.status)))
-    .then(md => {
+  // The parser is shared with tools/instagram-post.mjs, so what is copied here
+  // is what would be published.
+  Promise.all([
+    import('./captions.mjs'),
+    fetch('captions.md', { cache: 'no-cache' })
+      .then(r => r.ok ? r.text() : Promise.reject(new Error(r.status)))
+  ])
+    .then(([{ parseCaptions }, md]) => {
       const captions = parseCaptions(md);
       document.querySelectorAll('#features button.copy').forEach(btn => {
         const text = captions[btn.dataset.file];

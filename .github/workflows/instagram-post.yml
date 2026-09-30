@@ -1,0 +1,83 @@
+# Posts one of the feature posts to SendOff's Instagram.
+#
+# Started by hand from the Actions tab, or by Claude through the GitHub API
+# once you have said to post. The image is the JPEG sendoff.run serves for the
+# post and the caption is its entry in brand/social/captions.md, so what goes
+# out is what is in the repository and nothing is typed at posting time.
+#
+# The credentials are repository secrets that only this job can read:
+#   IG_USER_ID       the Instagram professional account's id
+#   IG_ACCESS_TOKEN  a long-lived Instagram token (see brand/social/INSTAGRAM.md)
+#
+# A dry run is the default. It checks the post, checks the image is live, and
+# with the secrets set proves the token works for the right account, without
+# posting. A post already on the account is refused unless force is ticked.
+name: Post to Instagram
+
+on:
+  workflow_dispatch:
+    inputs:
+      post:
+        description: Which feature post
+        required: true
+        type: choice
+        options:
+          - live-race
+          - map
+          - photos
+          - share
+          - pit
+          - fuel-plan
+          - offline
+          - access
+          - reorder
+          - write-in
+          - per-hour
+          - finish-card
+          - charts
+          - report
+          - forever
+          - gpx
+          - disciplines
+          - private
+      dry_run:
+        description: Dry run (check everything, post nothing)
+        type: boolean
+        default: true
+      force:
+        description: Post even if it is already on the account
+        type: boolean
+        default: false
+
+# One post at a time, and never cancelled halfway: a publish that was cut off
+# can leave a container made and nothing posted, or the reverse.
+concurrency:
+  group: instagram
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Inputs arrive through env, never pasted into the script, so nothing
+      # in a post name or a caption can become a shell command.
+      - name: Post
+        env:
+          POST: ${{ inputs.post }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          FORCE: ${{ inputs.force }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+        run: |
+          args=("$POST")
+          [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
+          [ "$FORCE" = "true" ] && args+=(--force)
+          node tools/instagram-post.mjs "${args[@]}"
