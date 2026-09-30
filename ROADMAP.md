@@ -36,11 +36,9 @@ the only step with no race-day workaround.
 
 After the race, in this order:
 
-1. **Finish the storage move.** *Done 2026-09-30 except the purge.* Race
-   data goes to D1 and nowhere else, with no setting left that can say
-   otherwise (step 3 below). What remains is the history purge, which is a
-   decision for the owner of the repository rather than code: see "What is
-   left" under "Doing it without a big bang".
+1. ~~**Finish the storage move.**~~ **Done 2026-09-30.** Race data goes to
+   D1 and nowhere else, with no setting left that can say otherwise, and
+   `races/**` is purged from the history. See "Doing it without a big bang".
 2. **The race archive, as a racer profile page** (stats and post-race
    results, section 2). The cheapest real feature here, because the logic
    already ships: `Race.archive` in `lib/race-core.js` has the distance
@@ -644,8 +642,19 @@ before promising an event in another hemisphere.
 Stopping after step 1 leaves the app exactly as it is today, which is the
 property that made it safe to start.
 
-What is left, as of 2026-09-30: ~~stop writing race data to git~~ (done),
-then purge `races/**` from history. That is all.
+~~What is left: stop writing race data to git, then purge `races/**` from
+history.~~ **Both done 2026-09-30.** The purge was pushed by the repository's
+owner from their own machine, because a force push to a public repository is
+not something an automated session should do on its own. Checked on GitHub
+afterwards: `main` has the same tree as before (`01908fd`), 357 commits where
+there were 696, only the four public races anywhere in history (all in the
+one restore commit), no personal address in any commit message, and the old
+head is no longer an ancestor of any branch.
+
+Still outside what a push can reach, and worth doing: ask GitHub Support to
+drop cached views and the pull request refs that pin the old commits, and
+delete old Cloudflare Pages deployments, each of which still serves the files
+it was built with.
 
 **The client's fallback to the published copy stays**, which reverses what
 this entry used to say. Once the history is purged, the published copy can
@@ -655,7 +664,7 @@ a finished race when the worker cannot be reached, and what a spectator's
 phone has cached for no signal. Removing it would cost that and protect
 nothing.
 
-**The purge, measured 2026-09-30.** Fourteen race directories are in the
+**The purge, as measured before it ran.** Fourteen race directories are in the
 history of `main`; four are in the tree today, all public (Sangre de Cristo,
 Hennepin, Highball to Thurmond, Six-0). The other ten are test races, the
 private dry run, the hosting test, and races deleted since. Commit messages
