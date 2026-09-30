@@ -1,0 +1,49 @@
+# Deletes old Cloudflare Pages deployments of the site, keeping the live one.
+#
+# Every deployment Pages builds stays reachable at its own address, serving
+# the files it was built from. After race files were purged from this
+# repository's history, those old deployments were the last public copy.
+# See tools/cf-pages-prune.mjs.
+#
+# A dry run is the default: it says how many it would delete, by day, and
+# deletes nothing. Untick it to delete. Nothing in the log names a deployment
+# by id or address, because this repository's Actions logs are public and a
+# deployment's id is its address.
+name: Prune Cloudflare Pages deployments
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Dry run (count, delete nothing)
+        type: boolean
+        default: true
+
+# The deploy's own group, so a prune never runs while a deploy is going out.
+concurrency:
+  group: cf-pages
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Prune
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            node tools/cf-pages-prune.mjs
+          else
+            node tools/cf-pages-prune.mjs --delete
+          fi
