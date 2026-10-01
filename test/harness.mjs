@@ -48,6 +48,7 @@ const MEDIA = [];
 // What the profile page has written down, for this run only.
 const RESULTS = { bySlug: {}, manual: [], notMine: [] };
 let googleOn = false, facebookOn = false;
+const authLinks = { google: null, facebook: null };
 
 // Whether an invite comes back with a rendered message beside the link. An
 // older worker does not send one, and the page has to cope by not offering a
@@ -213,6 +214,34 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/auth-providers') {
     return send(200, JSON.stringify({ google: googleOn ? 'test-client.apps.googleusercontent.com' : null,
       facebook: facebookOn ? '123456789' : null }), 'application/json');
+  }
+  // The Account box's sign-in methods. The worker's rules are tested against
+  // the worker; here a credential or token is a word: 'good' is this
+  // account's, 'other' carries another address.
+  if (url.pathname === '/api/auth-links' && req.method === 'GET') {
+    if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+    return send(200, JSON.stringify({ email: ME, password: true, google: authLinks.google, facebook: authLinks.facebook,
+      available: { google: googleOn, facebook: facebookOn } }), 'application/json');
+  }
+  if (url.pathname === '/api/auth-links/google' || url.pathname === '/api/auth-links/facebook' || url.pathname === '/api/auth-links/remove') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+      const j = JSON.parse(body || '{}');
+      if (url.pathname.endsWith('/remove')) {
+        authLinks[j.provider] = null;
+        return send(200, JSON.stringify({ ok: true }), 'application/json');
+      }
+      const p = url.pathname.endsWith('/google') ? 'google' : 'facebook';
+      const word = p === 'google' ? j.credential : j.accessToken;
+      if (word === 'other') {
+        return send(403, JSON.stringify({ error: `That ${p === 'google' ? 'Google' : 'Facebook'} account is for other@example.com, not ${ME}. Connect one that uses ${ME}.`, code: 'wrong_email' }), 'application/json');
+      }
+      if (word !== 'good') return send(400, '{"error":"Could not be checked"}', 'application/json');
+      authLinks[p] = { linkedAt: '2026-10-01T15:00:00Z' };
+      send(200, JSON.stringify({ ok: true }), 'application/json');
+    });
   }
   // Sign in with Facebook, the same way: an access token is just a word here.
   if (url.pathname === '/api/login/facebook') {

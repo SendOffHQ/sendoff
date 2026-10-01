@@ -694,6 +694,21 @@ label.field > .hint {
 .signin-fb:hover:not(:disabled) { background: #166fe5; }
 .signin-fb:disabled { opacity: 0.6; cursor: progress; }
 .signin-google .gsi-btn { min-height: 44px; display: flex; justify-content: center; }
+/* The Account box: who you are, then one row per way of signing in. */
+.acct-who { font-size: 14px; color: var(--text-dim); margin: 0 0 16px; overflow-wrap: anywhere; }
+.acct-who b { color: var(--text); }
+.acct-h { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--text-muted); margin: 0 0 4px; }
+.acct-row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 0; border-top: 1px solid var(--border); }
+.acct-row:first-of-type { border-top: 0; }
+.acct-row-main b { display: block; font-size: 14px; }
+.acct-row-main span { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); }
+.acct-connect { margin: 0 0 12px; }
+.signin-google.acct-connect .gsi-btn { justify-content: flex-start; }
+.signin-fb.acct-connect { margin: 0 0 12px; }
+.acct-note { font-size: 12px; line-height: 1.5; color: var(--text-muted); margin: 14px 0 0; }
+.acct-note a { color: var(--accent); }
 .signin-or { display: flex; align-items: center; gap: 10px; margin: 14px 0 12px;
   font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em;
   text-transform: uppercase; color: var(--text-muted); }

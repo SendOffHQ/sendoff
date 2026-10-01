@@ -1480,6 +1480,96 @@ async function handleLoginFacebook(req, env) {
   return json({ token, email, username: email, role: user.role, expiresAt: exp, via: 'facebook' }, {}, env, req);
 }
 
+// ---------- sign-in methods ----------
+// What the Account box shows and changes: which Google and Facebook accounts
+// can sign in as the signed-in person, connecting one, and taking one off.
+// Only ever the caller's own account. A password always exists, so taking a
+// link off can never leave somebody with no way in.
+//
+// Connecting runs the same check a sign-in does and the same rule: the Google
+// or Facebook account has to carry this account's address. One that is
+// already linked is replaced only by being taken off first, so a stray tap on
+// the wrong Google account does not quietly swap who can sign in.
+const LINKS = {
+  google:   { key: 'glink:',  idField: 'sub', label: 'Google' },
+  facebook: { key: 'fblink:', idField: 'id',  label: 'Facebook' },
+};
+async function readLink(env, provider, email) {
+  const raw = await env.AUTH_KV.get(LINKS[provider].key + email);
+  try { return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+}
+
+async function handleAuthLinks(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Sign-in methods need the AUTH_KV binding' }, { status: 503 }, env, req);
+  const email = normalizeEmail(session.email);
+  const out = { email, password: true };
+  // Only what the page needs to draw: whether, and since when. Not the
+  // Google or Facebook identifier itself.
+  for (const provider of Object.keys(LINKS)) {
+    const link = await readLink(env, provider, email);
+    out[provider] = link ? { linkedAt: link.linkedAt || null } : null;
+  }
+  out.available = { google: !!env.GOOGLE_CLIENT_ID, facebook: facebookOn(env) };
+  return json(out, {}, env, req);
+}
+
+async function handleAuthLinkConnect(req, env, provider) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Sign-in methods need the AUTH_KV binding' }, { status: 503 }, env, req);
+  const on = provider === 'google' ? !!env.GOOGLE_CLIENT_ID : facebookOn(env);
+  if (!on) return json({ error: `${LINKS[provider].label} sign-in is not set up` }, { status: 404 }, env, req);
+  let body;
+  try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  let who;
+  try {
+    if (provider === 'google') {
+      const c = await verifyGoogleIdToken(env, body && body.credential);
+      who = { id: c.sub, email: c.email };
+    } else {
+      who = await verifyFacebookToken(env, body && body.accessToken);
+    }
+  } catch (e) {
+    // 400, not 401: the session is fine, the Google or Facebook token is not,
+    // and the page treats a 401 as "signed out".
+    return json({ error: e.message || `${LINKS[provider].label} could not be checked` }, { status: 400 }, env, req);
+  }
+  const email = normalizeEmail(session.email);
+  if (!who.email) {
+    return json({ error: `${LINKS[provider].label} did not share an email address, so it cannot be matched to this account.`,
+                  code: 'no_email' }, { status: 403 }, env, req);
+  }
+  if (normalizeEmail(who.email) !== email) {
+    return json({ error: `That ${LINKS[provider].label} account is for ${normalizeEmail(who.email)}, not ${email}. Connect one that uses ${email}.`,
+                  code: 'wrong_email' }, { status: 403 }, env, req);
+  }
+  const link = await readLink(env, provider, email);
+  const field = LINKS[provider].idField;
+  if (link && link[field] && link[field] !== who.id) {
+    return json({ error: `A different ${LINKS[provider].label} account is connected already. Disconnect it first.`,
+                  code: 'other_linked' }, { status: 409 }, env, req);
+  }
+  const linkedAt = (link && link.linkedAt) || new Date().toISOString();
+  if (!link) await env.AUTH_KV.put(LINKS[provider].key + email, JSON.stringify({ [field]: who.id, linkedAt }));
+  return json({ ok: true, [provider]: { linkedAt } }, {}, env, req);
+}
+
+async function handleAuthLinkRemove(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Sign-in methods need the AUTH_KV binding' }, { status: 503 }, env, req);
+  let body;
+  try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  const provider = body && body.provider;
+  if (!Object.prototype.hasOwnProperty.call(LINKS, provider)) {
+    return json({ error: 'provider must be google or facebook' }, { status: 400 }, env, req);
+  }
+  await env.AUTH_KV.delete(LINKS[provider].key + normalizeEmail(session.email));
+  return json({ ok: true, [provider]: null }, {}, env, req);
+}
+
 // Changes the signed-in user's password. The new hash is written to KV, which
 // lookupUser checks before USERS, so this works for env-var users too.
 async function handleChangePassword(req, env) {
@@ -5251,6 +5341,10 @@ async function route(request, env, ctx) {
     if (request.method === 'POST' && path === '/login/google')    return handleLoginGoogle(request, env);
     if (request.method === 'POST' && path === '/login/facebook')  return handleLoginFacebook(request, env);
     if (request.method === 'GET'  && path === '/auth-providers')  return handleAuthProviders(request, env);
+    if (request.method === 'GET'  && path === '/auth-links')      return handleAuthLinks(request, env);
+    if (request.method === 'POST' && path === '/auth-links/google')   return handleAuthLinkConnect(request, env, 'google');
+    if (request.method === 'POST' && path === '/auth-links/facebook') return handleAuthLinkConnect(request, env, 'facebook');
+    if (request.method === 'POST' && path === '/auth-links/remove')   return handleAuthLinkRemove(request, env);
     if (request.method === 'POST' && path === '/accept-invite')   return handleAcceptInvite(request, env);
     if (request.method === 'POST' && path === '/change-password') return handleChangePassword(request, env);
     if (request.method === 'POST' && path === '/reset-link')      return handleResetLink(request, env);
