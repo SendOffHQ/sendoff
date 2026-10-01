@@ -35,7 +35,7 @@ ADMIN_RACE_ACCESS = "true"
 # a secret (Google shows it in the button on every page). Empty turns Google
 # sign-in off and the button is not drawn. See worker/src/worker.js,
 # "sign in with Google".
-GOOGLE_CLIENT_ID = ""
+GOOGLE_CLIENT_ID = "30357276936-qui51fgf7ahb1a1cs1ie7eje6mc7uqu2.apps.googleusercontent.com"
 # Sign in with Facebook: the Meta app's id. Public (the page's SDK needs it).
 # Facebook sign-in also needs FACEBOOK_APP_SECRET, which is a secret and set
 # with `wrangler secret put FACEBOOK_APP_SECRET`, never here. Either missing
