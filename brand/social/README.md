@@ -45,6 +45,7 @@ python3 cut.py
 node shoot-announce.js          # the two announce images
 node capture-race.mjs           # real app screenshots into shots/, from the repo root harness
 node shoot-features.js          # the feature posts
+node ../../tools/stamp-assets.mjs   # versions.json, so the gallery shows the new images at once
 ```
 
 The phone screens in the feature posts are real screenshots, not mockups.

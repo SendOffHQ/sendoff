@@ -71,6 +71,25 @@ export function survey() {
   return rows;
 }
 
+// The social images, the same way. brand/social/index.html builds its
+// gallery in script, so there is no reference here to rewrite; it reads this
+// list instead and asks for each image with its hash. Without it a re-rendered
+// post kept showing its old self for a day, which is how long /brand/* may be
+// cached. Working files (a leading underscore) are not published, so not listed.
+export const SOCIAL_DIR = path.join(ROOT, 'brand', 'social');
+export const SOCIAL_VERSIONS = path.join(SOCIAL_DIR, 'versions.json');
+export function socialVersions() {
+  const out = {};
+  for (const name of fs.readdirSync(SOCIAL_DIR).sort()) {
+    if (/^[^_].*\.(png|jpg)$/.test(name)) out[name] = hashOf(path.join(SOCIAL_DIR, name));
+  }
+  return JSON.stringify(out, null, 1) + '\n';
+}
+export function socialStale() {
+  const has = fs.existsSync(SOCIAL_VERSIONS) ? fs.readFileSync(SOCIAL_VERSIONS, 'utf8') : '';
+  return has !== socialVersions();
+}
+
 function stamp() {
   let changed = 0, pages = 0;
   const cache = new Map();
@@ -91,6 +110,7 @@ function stamp() {
     });
     if (after !== before) { fs.writeFileSync(page, after); pages++; changed += hits; }
   }
+  if (socialStale()) { fs.writeFileSync(SOCIAL_VERSIONS, socialVersions()); changed++; console.log('  brand/social/versions.json rewritten'); }
   for (const [asset, h] of [...cache].sort()) console.log(`  ${asset.padEnd(24)} ${h}`);
   console.log(changed ? `\nstamped ${changed} reference(s) across ${pages} page(s)\n`
                       : '\nalready current\n');
@@ -103,7 +123,8 @@ if (process.argv.includes('--check')) {
       ? `${path.relative(ROOT, r.page)}: ${r.asset} does not exist`
       : `${path.relative(ROOT, r.page)}: ${r.asset} asks for ${r.has}, should be ${r.want}`);
   }
-  if (stale.length) { console.error('\nRun: node tools/stamp-assets.mjs\n'); process.exit(1); }
+  if (socialStale()) console.error('brand/social/versions.json does not match the images');
+  if (stale.length || socialStale()) { console.error('\nRun: node tools/stamp-assets.mjs\n'); process.exit(1); }
   console.log('every reference is current');
 } else if (import.meta.url === `file://${process.argv[1]}`) {
   stamp();

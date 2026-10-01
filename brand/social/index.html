@@ -149,16 +149,29 @@
 <script>
   // Built from a list rather than typed out fifteen times, so adding a slide
   // to ig.html means changing one number here.
+  // Each image is asked for with its own hash (versions.json, written by
+  // tools/stamp-assets.mjs), because /brand/* is cached for a day and a post
+  // that has been re-rendered should show as it is now, not as it was.
+  let VERSIONS = {};
+  const v = file => VERSIONS[file] ? `${file}?v=${VERSIONS[file]}` : file;
   const fill = (id, items) => {
     document.getElementById(id).innerHTML = items.map(([file, cap]) => `
       <figure>
-        <a href="${file}"><img src="${file}" alt="${cap}" loading="lazy"></a>
+        <a href="${v(file)}"><img src="${v(file)}" alt="${cap}" loading="lazy"></a>
         <figcaption><a href="${file}" download>${cap}</a></figcaption>
       </figure>`).join('');
   };
   const n = i => String(i).padStart(2, '0');
   const six = (prefix) => Array.from({length: 6}, (_, i) =>
     [`sendoff-${prefix}-${n(i + 1)}.png`, `${i + 1} of 6`]);
+
+  // The list first, then the gallery, so no image is ever asked for without
+  // its version. If the list cannot be had the images load as they are.
+  (async () => {
+  try {
+    const r = await fetch('versions.json', { cache: 'no-cache' });
+    if (r.ok) VERSIONS = await r.json();
+  } catch (e) { /* the plain file names still work */ }
 
   fill('carousel', six('ig'));
   // The feature posts. The link under each copies that post's caption from
@@ -175,7 +188,7 @@
   document.getElementById('features').innerHTML = FEATURES.map(([id, cap]) => {
     const file = `sendoff-feature-${id}.png`;
     return `<figure>
-        <a href="${file}"><img src="${file}" alt="${cap}" loading="lazy"></a>
+        <a href="${v(file)}"><img src="${v(file)}" alt="${cap}" loading="lazy"></a>
         <figcaption><button type="button" class="copy" data-file="${file}" disabled
           title="Copy the Instagram caption">${cap}</button></figcaption>
       </figure>`;
@@ -224,8 +237,9 @@
   fill('triplinks', [1, 2, 3].map(i =>
     [`sendoff-pin-${i}-of-3.png`, `Tile ${i}`]));
   document.getElementById('trip').innerHTML = [1, 2, 3].map(i =>
-    `<img src="sendoff-pin-${i}-of-3.png" alt="Wordmark tile ${i} of 3" loading="lazy">`
+    `<img src="${v(`sendoff-pin-${i}-of-3.png`)}" alt="Wordmark tile ${i} of 3" loading="lazy">`
   ).join('');
+  })();
 </script>
 </body>
 </html>

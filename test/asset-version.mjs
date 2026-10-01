@@ -17,7 +17,7 @@
 //
 //   node test/asset-version.mjs
 import path from 'node:path';
-import { survey } from '../tools/stamp-assets.mjs';
+import { survey, socialStale } from '../tools/stamp-assets.mjs';
 
 const ROOT = path.resolve(new URL('..', import.meta.url).pathname);
 const rel = p => path.relative(ROOT, p);
@@ -48,6 +48,11 @@ ok('none stale', stale.length, 0);
 // behind, on a version nobody can name. It cannot happen while the value is
 // derived, so this is here to catch a hand-edited one rather than a forgotten
 // run, and to fail with the page named rather than as a mystery.
+// The social gallery asks for each image by the hash listed here, so a
+// re-rendered post shows at once instead of a day later.
+console.log('\nthe social images are listed by their current hash');
+ok('brand/social/versions.json current', socialStale(), false);
+
 console.log('\nand every page agrees, asset by asset');
 const byAsset = new Map();
 for (const r of rows) {
