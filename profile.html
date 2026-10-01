@@ -104,6 +104,24 @@
   .p-empty { color: var(--text-muted); font-size: 14px; line-height: 1.6; }
   .p-link-btns { display: flex; flex-wrap: wrap; gap: 8px; }
   .p-hidden-line { margin: 8px 0 0; }
+  .p-tools { display: grid; gap: 10px; margin: 0 0 14px; }
+  /* The theme's input style, which leaves search boxes to each page. */
+  .p-tools input[type="search"] { width: 100%; box-sizing: border-box; background: var(--bg-elevated); color: var(--text);
+    border: 1px solid var(--border-bright); border-radius: 4px; padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+  .p-tools input[type="search"]::placeholder { color: var(--text-muted); }
+  .p-chips { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+  .p-chips[hidden] { display: none; }
+  .p-chips .sep { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
+  .p-fchip { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em;
+    padding: 6px 11px; border: 1px solid var(--border-bright); border-radius: 999px; cursor: pointer;
+    background: transparent; color: var(--text-dim); }
+  .p-fchip:hover { color: var(--text); }
+  .p-fchip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 700; }
+  .p-chips select { width: auto; padding-top: 5px; padding-bottom: 5px; }
+  .p-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em;
+    color: var(--text-muted); margin: 0 0 10px; }
+  .p-more { display: flex; justify-content: center; margin: 4px 0 0; }
   .p-textbtn { background: none; border: 0; padding: 0; cursor: pointer; color: var(--accent);
     font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-decoration: underline; }
 </style>
@@ -145,6 +163,43 @@
   const $ = id => document.getElementById(id);
   let state = null;          // what /my-results answered
   let openForm = null;       // which card's form is open: a slug, a manual id, or 'new'
+
+  // Finding a race in a long list. All of it is already here from one
+  // /my-results answer, so searching, filtering and "show more" are only a
+  // question of which cards to draw. The filter lives in the address, so a
+  // refresh, the back button and a bookmark all keep it.
+  const PAGE = 10;           // cards drawn at first, and per "Show more"
+  const TOOLS_AT = 9;        // below this many races the list needs no tools
+  const OUTCOMES = { finished: 'Finished', dnf: 'Did not finish', upcoming: 'Not started' };
+  let shown = PAGE;
+  const filter = (() => {
+    const q = new URLSearchParams(location.search);
+    const pick = (k, ok) => { const v = q.get(k) || ''; return ok(v) ? v : ''; };
+    return { q: (q.get('q') || '').slice(0, 100),
+             d: pick('d', v => Object.prototype.hasOwnProperty.call(Race.archive.FAMILIES, v)),
+             o: pick('o', v => Object.prototype.hasOwnProperty.call(OUTCOMES, v)),
+             y: pick('y', v => /^\d{4}$/.test(v)) };
+  })();
+  const filtering = () => !!(filter.q.trim() || filter.d || filter.o || filter.y);
+  const keyOf = r => r.manual ? r.id : r.slug;
+  const outcomeOf = r => r.finished ? 'finished' : (r.dnf || r.legsDone) ? 'dnf' : 'upcoming';
+  const yearOf = r => r.startTime ? String(new Date(r.startTime).getFullYear()) : '';
+  function matches(r) {
+    if (filter.d && r.family !== filter.d) return false;
+    if (filter.o && outcomeOf(r) !== filter.o) return false;
+    if (filter.y && yearOf(r) !== filter.y) return false;
+    const words = filter.q.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return true;
+    const act = Race.activities.find(r.activity);
+    const hay = [r.name, r.location, act && act.label].filter(Boolean).join(' ').toLowerCase();
+    return words.every(w => hay.includes(w));
+  }
+  function saveFilter() {
+    const q = new URLSearchParams(location.search);
+    for (const k of ['q', 'd', 'o', 'y']) { const v = k === 'q' ? filter.q.trim() : filter[k]; if (v) q.set(k, v); else q.delete(k); }
+    const qs = q.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+  }
 
   // "35:41:15", "35:41" or "2:05:00" to seconds. Hours may run past 24.
   function parseTime(s) {
@@ -322,18 +377,87 @@
     </form>`;
   }
 
+  // The search box is drawn once per render() and left alone while somebody
+  // types in it; the chips and the cards below it are redrawn on each change.
+  function renderTools(list) {
+    if (list.length < TOOLS_AT && !filtering()) return '';
+    return `<div class="p-tools">
+      <input type="search" id="race-q" placeholder="Search by race or place" aria-label="Search your races"
+             autocomplete="off" spellcheck="false" value="${esc(filter.q)}">
+      <div class="p-chips" id="race-chips"></div>
+    </div>`;
+  }
+
+  function renderChips(list) {
+    const host = $('race-chips');
+    if (!host) return;
+    const count = (fn) => { const m = new Map(); for (const r of list) { const k = fn(r); if (k) m.set(k, (m.get(k) || 0) + 1); } return m; };
+    const fams = count(r => r.family), outs = count(outcomeOf), years = count(yearOf);
+    const chip = (dim, val, label) => `<button type="button" class="p-fchip" data-f="${dim}" data-v="${esc(val)}"
+      aria-pressed="${filter[dim] === val}">${esc(label)}</button>`;
+    // A choice that cannot narrow anything is not offered: one discipline,
+    // one outcome or one year is not a filter. One already chosen stays, so
+    // it can be taken off.
+    const group = (dim, m, labels) => (m.size > 1 || filter[dim])
+      ? Object.keys(labels).filter(k => m.has(k) || filter[dim] === k).map(k => chip(dim, k, labels[k])).join('') : '';
+    const parts = [group('d', fams, Race.archive.FAMILIES), group('o', outs, OUTCOMES)].filter(Boolean);
+    if (years.size > 1 || filter.y) {
+      const ys = [...new Set([...years.keys(), filter.y].filter(Boolean))].sort().reverse();
+      parts.push(`<select id="race-year" aria-label="Year"><option value="">Any year</option>${
+        ys.map(y => `<option value="${esc(y)}"${filter.y === y ? ' selected' : ''}>${esc(y)}</option>`).join('')}</select>`);
+    }
+    if (filtering()) parts.push(`<button type="button" class="p-textbtn" data-clear>Clear</button>`);
+    host.innerHTML = parts.join('<span class="sep" aria-hidden="true"></span>');
+    host.hidden = !parts.length;
+  }
+
+  function renderList(list) {
+    renderChips(list);
+    const host = $('race-list');
+    if (!host) return;
+    if (!list.length) {
+      host.innerHTML = `<p class="p-empty">No races on your profile yet. A race shows up here once you are linked to a racer on it,
+       which is done on the race's settings page, or with the buttons above when SendOff can tell which racer you are.
+       Races from before SendOff can be added with the button at the top.</p>`;
+      return;
+    }
+    const matched = list.filter(matches);
+    if (!matched.length) {
+      host.innerHTML = `<p class="p-empty">No races match.</p><p><button type="button" class="btn" data-clear>Clear the search and filters</button></p>`;
+      return;
+    }
+    // A card somebody is writing in stays, whatever the filter says.
+    const keep = new Set(matched.slice(0, shown).map(keyOf));
+    if (openForm && list.some(r => keyOf(r) === openForm)) keep.add(openForm);
+    const drawn = list.filter(r => keep.has(keyOf(r)));
+    const showing = Math.min(shown, matched.length);
+    const of = filtering() ? `${matched.length} of ${list.length} races match` : `${list.length} races`;
+    const count = list.length < TOOLS_AT && !filtering() ? ''
+      : `<p class="p-count" aria-live="polite">${showing < matched.length ? `Showing ${showing} of ${matched.length} · ` : ''}${of}</p>`;
+    const left = matched.length - showing;
+    const more = left > 0 ? `<div class="p-more"><button type="button" class="btn" id="race-more">${
+      left > PAGE ? `Show ${PAGE} more` : `Show the last ${left}`}</button></div>` : '';
+    host.innerHTML = count + drawn.map(raceCard).join('') + more;
+  }
+
   function render() {
     const list = results();
     $('actions').hidden = false;
     const newForm = openForm === 'new'
       ? `<section class="p-section"><h2 class="p-h2">A race from before SendOff</h2><div class="p-card">${resultForm(null)}</div></section>` : '';
-    const races = list.length ? list.map(raceCard).join('') :
-      `<p class="p-empty">No races on your profile yet. A race shows up here once you are linked to a racer on it,
-       which is done on the race's settings page, or with the buttons above when SendOff can tell which racer you are.
-       Races from before SendOff can be added with the button at the top.</p>`;
     $('body').innerHTML = newForm + renderCandidates() + renderTotals(list) + renderBests(list) +
-      `<section class="p-section"><h2 class="p-h2">Races</h2>${races}</section>`;
+      `<section class="p-section"><h2 class="p-h2">Races</h2>${renderTools(list)}<div id="race-list"></div></section>`;
+    renderList(list);
   }
+
+  // A change to the filter starts the list from the top again.
+  function refilter() { shown = PAGE; saveFilter(); renderList(results()); }
+  document.addEventListener('input', (e) => {
+    if (e.target.id === 'race-q') { filter.q = e.target.value; refilter(); }
+  });
+  document.addEventListener('change', (e) => {
+    if (e.target.id === 'race-year') { filter.y = e.target.value; refilter(); }
+  });
 
   function formValues(form) {
     const f = Object.fromEntries(new FormData(form).entries());
@@ -361,6 +485,31 @@
       if (!confirm(manual ? 'Delete this race from your profile?' : 'Clear what you entered for this race? The race itself stays.')) return;
       const r = await Race.api.deleteResult(manual ? { id: key } : { slug: key });
       state.results = r.results; openForm = null; render(); return;
+    }
+    if (t.id === 'race-more') {
+      const first = document.querySelectorAll('#race-list .p-card').length;
+      shown += PAGE; renderList(results());
+      // Keyboard and screen reader users land on the first new card, not
+      // back at the top of the list.
+      const next = document.querySelectorAll('#race-list .p-card')[first];
+      const a = next && next.querySelector('a, button');
+      if (a) a.focus({ preventScroll: true });
+      return;
+    }
+    const chip = t.closest && t.closest('[data-f]');
+    if (chip) {
+      const { f, v } = chip.dataset;
+      filter[f] = filter[f] === v ? '' : v;
+      refilter();
+      // The chip was drawn again; keep the keyboard on it.
+      const again = [...document.querySelectorAll('#race-chips [data-f]')].find(b => b.dataset.f === f && b.dataset.v === v);
+      if (again) again.focus();
+      return;
+    }
+    if (t.closest && t.closest('[data-clear]')) {
+      Object.assign(filter, { q: '', d: '', o: '', y: '' });
+      const box = $('race-q'); if (box) box.value = '';
+      refilter(); return;
     }
     if (t.id === 'toggle-hidden') { showHidden = !showHidden; render(); return; }
     if (t.dataset.notmine || t.dataset.unhide) {

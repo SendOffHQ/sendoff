@@ -1635,6 +1635,12 @@ hand and count like any other. Races the account made or races on, with a racer
 linked to nobody, are offered with an "I'm <name>" button, which is the same
 config save the settings page makes.
 
+A long list (9 races or more) gets a search box over name, place and
+discipline, chips for discipline and outcome, and a year picker. Only choices
+that narrow something are offered, the filter is kept in the address, and the
+list draws 10 cards at a time behind a "Show 10 more" button. Totals and bests
+always count every race (`test/profile-filters.mjs`).
+
 The worker side is `GET /my-results` and `POST /my-results/save` and
 `/delete`. Results live in KV under `results:<email>`, one document per
 account. The page is sent only the account's own runner from each race: no
