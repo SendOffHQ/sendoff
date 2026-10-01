@@ -180,6 +180,15 @@
   .preset-chip .chip-count:not(:empty) { margin-left: 6px; color: var(--accent); font-weight: 700; }
   .preset-chip:hover { border-color: var(--accent); color: var(--accent); }
   .preset-chip:active { transform: translateY(1px); }
+  /* Before the start: the items as they will be, not yet pressable. */
+  .intake-preview { padding-top: 12px; padding-bottom: 14px; }
+  .intake-preview .intake-panel-head { margin-bottom: 8px; }
+  .intake-preview .intake-presets { margin: 0 0 8px; }
+  .preset-chip.is-preview { display: inline-flex; align-items: center; cursor: default;
+    color: var(--text-muted); border-style: dashed; }
+  .preset-chip.is-preview:hover { border-color: var(--border); color: var(--text-muted); }
+  .intake-preview-note { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-dim); }
+  .intake-preview-note a { color: var(--accent); }
 
   .racer-switch {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -647,7 +656,25 @@
           }).join('')}
         </div>`;
 
-    const intakePanel = panelLegs.length === 0 ? '' : `
+    // Before the first send-off there is no leg to log against, so the panel
+    // cannot be live; but a crew new to SendOff had no way to know it would
+    // appear at all. So it is shown small: the race's one-tap items, not
+    // pressable, and a line saying when the real thing arrives. With no items
+    // set up yet it says so, which is a job best done before race day.
+    const who = escapeHtml(runner.name || runner.id);
+    const itemsLink = `settings.html?id=${encodeURIComponent(slug)}#items`;
+    const intakePreview = `
+      <div class="intake-panel intake-preview" data-intake-preview>
+        <div class="intake-panel-head"><span class="intake-panel-title">Intake / notes</span></div>
+        ${presets.length ? `<div class="intake-presets">${presets.map(({ p }) =>
+          `<span class="preset-chip is-preview">+ ${escapeHtml(p.name)}</span>`).join('')}</div>` : ''}
+        <p class="intake-preview-note">Fluids, food and notes for each leg go here once ${who} is sent off.
+          ${presets.length
+            ? `<a href="${itemsLink}">Change the one-tap items</a>`
+            : `No one-tap items yet. <a href="${itemsLink}">Add your gels, flasks and bottles in settings</a>.`}</p>
+      </div>`;
+
+    const intakePanel = panelLegs.length === 0 ? (next.state === 'finished' ? '' : intakePreview) : `
       <div class="intake-panel">
         <div class="intake-panel-head">
           <span class="intake-panel-title">Intake / notes</span>
@@ -929,8 +956,8 @@
       points: [
         'One button per racer, and it alternates. <b>Send Off</b> when they ' +
           'leave, <b>Check In</b> when they reach you.',
-        'Fluids, food and notes go in afterwards. None of it is needed to log ' +
-          'a split.',
+        'Fluids, food and notes appear under each racer once they are sent ' +
+          'off. None of it is needed to log a split.',
         '<b>Undo last</b> fixes a wrong press. ' + Race.plans.offlineNote(ent)
       ]
     });

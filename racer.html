@@ -110,6 +110,12 @@
   }
   .rchip:hover { border-color: var(--accent); }
   .rchip:disabled { opacity: 0.5; cursor: default; }
+  /* Before the start: what the buttons will be, small and not pressable. */
+  .rpreview-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 10px; }
+  .rpreview-chip { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted);
+    border: 1px dashed var(--border-bright); border-radius: 999px; padding: 6px 11px; }
+  .rpreview-note { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--text-dim); }
+  .rpreview-note a { color: var(--accent); }
   .rchip .sub { display: block; font-size: 10px; color: var(--text-muted); margin-top: 2px; }
   .rchip .cnt { font-size: 13px; color: var(--accent); min-width: 26px; text-align: right; }
 
@@ -481,8 +487,29 @@
     const next = Race.compute.nextActionFor(runner, cfg);
     const sec = document.getElementById('intake');
     const legIndex = intakeLeg(next);
-    sec.style.display = legIndex ? '' : 'none';
-    if (!legIndex) return;
+    const jot = document.getElementById('jot-form');
+    if (!legIndex) {
+      // Before the start, the items as they will be, small and not pressable,
+      // so a racer new to SendOff knows they are coming and can check them.
+      // Nothing can be logged: there is no leg yet. After the finish, nothing.
+      sec.style.display = next.state === 'idle' ? '' : 'none';
+      jot.style.display = 'none';
+      if (next.state !== 'idle') return;
+      const items = Race.fuel.presetsInOrder(cfg);
+      const link = `settings.html?id=${encodeURIComponent(slug)}#items`;
+      document.getElementById('intake-chips').innerHTML = `<div class="rblock rpreview">
+        <span class="rlbl">Log what you took</span>
+        ${items.length ? `<div class="rpreview-chips">${items.map(({ p }) =>
+          `<span class="rpreview-chip">+ ${esc(p.name)}</span>`).join('')}</div>` : ''}
+        <p class="rpreview-note">${items.length
+          ? `These log once your race starts. <a href="${link}">Change them</a>`
+          : `Your gels, flasks and bottles go here as one-tap buttons once your race starts. <a href="${link}">Add them in settings</a>`}</p>
+      </div>`;
+      document.getElementById('jot-list').innerHTML = '';
+      return;
+    }
+    sec.style.display = '';
+    jot.style.display = '';
     const leg = (runner.legs || []).find(l => l.index === legIndex) || {};
     const chips = [];
 

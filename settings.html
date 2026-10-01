@@ -412,7 +412,7 @@
       <button class="add-row" type="button" id="add-band">+ Add an hour band</button>
       <div class="editor-warn" id="band-warn" style="display:none; margin:10px 0 0;"></div>
 
-      <div class="fuel-editor-title" style="margin-top:18px;">One-tap items</div>
+      <div class="fuel-editor-title" id="items" style="margin-top:18px;">One-tap items</div>
       <p class="fuel-hint">
         The things handed over by the item rather than by the number: a flask,
         a gel, a pill. Each becomes a button on the pit board and the racer
@@ -1584,6 +1584,19 @@
     document.getElementById('last-updated').textContent = lu;
   }
 
+  // settings.html?id=…#items, from the pit board's "add items" nudge: the
+  // racers section opened and scrolled to the one-tap items, the first time
+  // the page has something to show. Only once, so a later reload of the race
+  // does not yank the page back there.
+  let openedFromHash = false;
+  function openFromHash() {
+    if (openedFromHash || location.hash !== '#items') return;
+    openedFromHash = true;
+    document.getElementById('runner-editor').classList.remove('collapsed');
+    const el = document.getElementById('items');
+    if (el) el.scrollIntoView({ block: 'start' });
+  }
+
   async function load() {
     try {
       // data.json reads through the worker when signed in (GitHub API, no
@@ -1615,6 +1628,7 @@
       document.getElementById('race-title').textContent = cfg.name;
       document.getElementById('error').style.display = 'none';
       render();
+      openFromHash();
     } catch (err) {
       const e = document.getElementById('error');
       e.style.display = 'block';
