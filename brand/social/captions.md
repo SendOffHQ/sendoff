@@ -37,7 +37,7 @@ Link in bio.
 
 ## 3. Race photos (`sendoff-feature-photos.png`)
 
-The race, told straight from the course. 📸
+The race, told right from the course. 📸
 
 Crew and racers post photos as the race happens, and each one is filed under the leg where it was taken. Everyone following sees them within seconds.
 
