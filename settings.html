@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=cc13372f">
+<link rel="stylesheet" href="lib/race-theme.css?v=dc2feb59">
 <style>
   body { padding: 20px 16px 32px; }
   .wrap { max-width: 860px; margin: 0 auto; }
@@ -307,6 +307,7 @@
       <tbody id="aid-rows"></tbody>
     </table>
     <button class="add-row" type="button" id="add-aid">+ Add aid station</button>
+    <div id="aid-import"></div>
     <div style="margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;">
       <button class="btn" id="aid-reload">Reset</button>
       <button class="btn primary" id="aid-save">Save changes</button>
@@ -485,7 +486,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=ddc9fd1f"></script>
+<script src="lib/race-core.js?v=534e074a"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -1689,6 +1690,19 @@
     editingAid = null; render();
   });
   document.getElementById('aid-save').addEventListener('click', saveAidStations);
+  // A spreadsheet in place of retyping the table. The table here is in miles,
+  // so the stations go in as the importer hands them over; nothing is saved
+  // until Save changes.
+  Race.aidImport.mount(document.getElementById('aid-import'), {
+    unit: () => Race.units.of(cfg).distance,
+    count: () => (editingAid || []).length,
+    saveWord: 'press Save changes',
+    apply: (stations) => {
+      editingAid = stations.map(a => ({ ...a, mileage: Math.round(a.mileage * 100) / 100,
+        arriveCutoffHours: a.arriveCutoffHours == null ? '' : a.arriveCutoffHours }));
+      renderAidEditor();
+    }
+  });
 
   document.getElementById('delete-editor-head').addEventListener('click', () => {
     document.getElementById('delete-editor').classList.toggle('collapsed');

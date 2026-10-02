@@ -30,6 +30,7 @@ optional Cloudflare Worker auth proxy.
 
 ## Race setup & config (`setup.html`)
 - Create and configure races; define runners, targets, cutoffs
+- Aid stations from a spreadsheet: the setup wizard and the settings page both import a CSV or Excel (.xlsx) file into the aid station table, and offer a template in both formats (`templates/`, built by `tools/make-aid-template.py`). Columns are found by heading in any order; only name and distance are needed. Distances in miles or kilometres, cutoffs as hours or as times, yes/no for crew, drop bag, pacer and checkpoint. A file with problems names each one by row and changes nothing; a good one fills the table, and nothing is saved until the person saves. Read in the browser with no library (`Race.aidImport`); `test/aid-import.mjs`.
 - Per-race ACL: visibility, editors, viewers
 
 ## Accounts & auth (Cloudflare Worker proxy)

@@ -1,0 +1,7 @@
+﻿Aid station,Distance (mi),Arrive cutoff (hours),Crew can meet,Drop bag,Pacer pickup,Checkpoint only,Crew note
+Start,0,,yes,no,no,no,Park in the main lot
+Ridge Road,6.2,,yes,no,no,no,"Pull-off on the left, 4 cars"
+Summit Timing,11.4,,no,no,no,yes,
+Lakeside,17.9,5.5,yes,yes,yes,no,Walk in 0.3 mi from the boat ramp
+Pine Hollow,24.6,8,yes,no,no,no,
+Finish,31.1,10,yes,no,no,no,
