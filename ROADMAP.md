@@ -47,17 +47,33 @@ After the race, in this order:
    needs a page and a hub link. It also lands at the first moment there is a
    finished race to show. Build it together with the hub filters ("Finding a
    race among many" below): both want the same chips over the same list.
-3. **Goal-time planner.** Target finish in, per-aid target times out, live
+**Reordered 2026-10-02**: time-based races and cheers and messages moved to
+the front, with usernames beside them as the start of following a racer.
+
+3. **Time-based races.** 24-hour obstacle races, backyard ultras and fixed-time
+   loops, where the clock is fixed and the distance is the result. The pit
+   board already fits; what changes is everything that counts the race. See
+   "Time-based races" in section 1.
+4. **Cheers and messages for the next aid station.** A one-tap cheer and a
+   line of text from anyone following, delivered to the crew at the next aid
+   station to be read out, never to the racer's own screen. The live
+   connection that carries photos is the delivery path this used to wait on.
+   See section 3.
+5. **Usernames.** A handle on the profile that is not used to sign in but
+   names a person: to find them, to add them to a race, and, later, to follow
+   them. The identity that "Follow a runner" says does not exist yet. See
+   "Usernames" in section 3.
+6. **Goal-time planner.** Target finish in, per-aid target times out, live
    delta against them. Self-contained, needs no billing, and it is what makes a
    second race better than the first.
-4. **Printable crew sheet.** One sheet per crew member, two or three racers to
+7. **Printable crew sheet.** One sheet per crew member, two or three racers to
    a sheet: checkpoints, which of them crew can reach, cutoffs as clock times,
    racer details, and room to write. Printed the night before. Every number on it already exists, so it
    is mostly a second print template. It comes after the planner because
    target times are the one column that is not already computable, and it is
    the layer under the offline layer: paper has no battery and can be handed
    to a pacer who just showed up.
-5. **Data export.** CSV, JSON, GPX. Small, read-only, no race-day risk, and it
+8. **Data export.** CSV, JSON, GPX. Small, read-only, no race-day risk, and it
    is what lets somebody trust a season of their racing to this: they can
    always get it back out.
 
@@ -1760,6 +1776,21 @@ A spectator writes a line; it queues; the pit board shows it when the runner
 is in the aid station, and a crew member reads it out. Never pushed to the
 runner's own screen. The racer screen stays one button.
 
+### Usernames — *next, decisions pending*
+Asked for 2026-10-02. A unique handle on each account's profile, like
+`@jason`. It is not a way to sign in, which stays email and password, Google
+or Facebook. It is a way to name a person who is not in the room:
+
+- **Find somebody** by their handle rather than knowing their email address.
+- **Add them to a race** by handle, which today needs their address.
+- **Follow them**, below: the public identity this section says is missing.
+
+To settle before it is built: what a handle may contain and whether it can
+change; whether one is required or offered; who can search for one and what a
+result shows (never the email address); and names held back (admin, support,
+sendoff and the like). A handle that can be found makes an account
+discoverable for the first time, so `privacy.html` changes with it.
+
 ### Follow a runner — *not built*
 Person-level rather than race-level: their next race appears in your feed,
 and you are told when it starts. Needs something that does not exist yet, a
@@ -1844,10 +1875,13 @@ Three costs the rest of the roadmap does not have:
   file in a repository.
 
 ### Where it goes in the order
-After billing, alongside spectator alerts, because both need the same two
-things that do not exist: an identity for people without accounts, and a
-delivery path. The finish card is done and needed neither.
-The cheer button is the other one that needs no plumbing.
+Moved to the front on 2026-10-02 (cheers and messages; following comes after
+usernames). This used to say after billing, because it needed two things that
+did not exist: an identity for people without accounts, and a delivery path.
+The delivery path exists now: the live connection that pushes photos and
+splits to every open page. A cheer needs no identity at all. A message needs
+only a name typed with it, and the crew, who read it before anyone hears it,
+are the moderation. The finish card is done and needed neither.
 
 ## 4. Access & branding
 
