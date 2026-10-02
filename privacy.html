@@ -147,7 +147,25 @@
   a link to the official results, a race report, what you would change next time, and where you
   stopped if you did not finish. Also races from before SendOff that you enter by hand: their name,
   date, distance, climb, discipline and place. And the races you told it are not yours, so it stops
-  offering them. Only you can see any of it; there is no public profile page.</p>
+  offering them. Only you can see any of it unless you make your profile public.</p>
+
+<h3>Your public profile, if you switch it on</h3>
+<p>It is off unless you switch it on, on your profile page, and you need a username for it: the
+  address is sendoff.run/@ and your username. While it is on, anyone with the address can see,
+  without signing in:</p>
+<ul>
+  <li>your name and username;</li>
+  <li>your listed public races and the races you entered by hand, with dates, distances, climb,
+    finish times or how far you got, places and official results links;</li>
+  <li>the totals and personal bests worked out from those races alone.</li>
+</ul>
+<p>It never shows a private or unlisted race, not even in its totals, never your email address,
+  and never the notes, issues, medications or gear written on a leg. Your race report and "what I'd
+  change" appear only on races where you switch them on, and so do your calories, fluid and sodium,
+  race by race. You can hide any race from it. It is kept out of search engines unless you tick
+  "Let search engines show my profile". Switch it off and the address stops working straight away;
+  an address with no public profile behind it says the same thing whether or not the username
+  exists.</p>
 
 <h3>A race</h3>
 <p>Its name, location, start time, activity, course (segments, aid stations, and the elevation
@@ -180,7 +198,7 @@
 
 <h2>Where it is stored</h2>
 <table>
-  <tr><td>Cloudflare Workers KV</td><td>accounts, profiles, usernames, results you enter, access lists, invite and reset tokens, share links, feedback</td></tr>
+  <tr><td>Cloudflare Workers KV</td><td>accounts, profiles, usernames, public profile settings, results you enter, access lists, invite and reset tokens, share links, feedback</td></tr>
   <tr><td>Cloudflare D1</td><td>races and logged splits</td></tr>
   <tr><td>GitHub</td><td>races and logged splits, as files in a repository</td></tr>
   <tr><td>Your own browser</td><td>your session, a copy of the races you have opened so they still work with no signal, and any feedback waiting to send</td></tr>
@@ -366,6 +384,6 @@
     <span aria-hidden="true"> &middot; </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=956f441c"></script>
+<script src="lib/race-core.js?v=5cc78094"></script>
 </body>
 </html>

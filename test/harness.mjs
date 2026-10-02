@@ -55,6 +55,7 @@ const myHandle = { username: null, findable: true, nextChangeAt: null };
 const DIRECTORY = [{ username: 'jasmine_r', displayName: 'Jasmine R', email: 'jasmine@example.com' },
                    { username: 'jasper', displayName: 'Jasper Lee', email: 'jasper@example.com' }];
 const addedPeople = [];
+const pubSettings = { public: false, indexable: false, races: {} };
 let myProfile = { email: ME, firstName: '', lastName: '', displayName: '', targets: {}, phaseTargets: [], notes: '' };
 
 // Whether an invite comes back with a rendered message beside the link. An
@@ -263,6 +264,47 @@ const server = http.createServer((req, res) => {
         targets: j.targets || {}, phaseTargets: j.phaseTargets || [], notes: j.notes || '' };
       send(200, JSON.stringify({ profile: myProfile }), 'application/json');
     });
+  }
+  // Public profiles. The worker's filtering is tested against the worker;
+  // here the public answer is Sangre's racer, times only, when it is on.
+  if (url.pathname === '/api/public-profile-settings') {
+    if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+    if (req.method === 'GET') return send(200, JSON.stringify({ ...pubSettings, username: myHandle.username }), 'application/json');
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      const j = JSON.parse(body || '{}');
+      if (j.public === true && !myHandle.username) {
+        return send(400, JSON.stringify({ error: 'Pick a username first: it is the address of your public profile.', code: 'no_username' }), 'application/json');
+      }
+      if (typeof j.public === 'boolean') pubSettings.public = j.public;
+      if (typeof j.indexable === 'boolean') pubSettings.indexable = j.indexable;
+      if (j.race && j.race.key) {
+        const cur = pubSettings.races[j.race.key] || {};
+        for (const f of ['hide', 'report', 'fuel']) if (typeof j.race[f] === 'boolean') cur[f] = j.race[f];
+        pubSettings.races[j.race.key] = cur;
+      }
+      send(200, JSON.stringify({ ...pubSettings, username: myHandle.username }), 'application/json');
+    });
+  }
+  if (url.pathname === '/api/public-profile') {
+    const u = (url.searchParams.get('u') || '').toLowerCase();
+    if (!pubSettings.public || !myHandle.username || u !== myHandle.username.toLowerCase()) {
+      return send(404, '{"error":"Not found"}', 'application/json');
+    }
+    const slug = '000001-sangre-de-cristo-100';
+    const cfg = JSON.parse(raceFile(slug, 'config.json') || '{}');
+    const data = JSON.parse(raceFile(slug, 'data.json') || '{}');
+    const runner = (cfg.runners || [])[0] || {};
+    const legs = (((data.runners || []).find(r => r.id === runner.id) || {}).legs || [])
+      .map(l => ({ index: l.index, startTime: l.startTime, endTime: l.endTime }));
+    const races = (pubSettings.races[slug] || {}).hide ? [] : [{ slug,
+      config: { name: cfg.name, location: cfg.location, startTime: cfg.startTime, activity: cfg.activity,
+        courseType: cfg.courseType, course: cfg.course, cutoffs: cfg.cutoffs, units: cfg.units, fuelMetrics: [],
+        runners: [{ id: runner.id, name: runner.name }] },
+      runner: { id: runner.id, legs }, entered: null, fuel: false }];
+    return send(200, JSON.stringify({ username: myHandle.username,
+      name: myProfile.displayName || myHandle.username, indexable: pubSettings.indexable, races, manual: [] }), 'application/json');
   }
   if (url.pathname === '/api/username' && req.method === 'GET') {
     if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
@@ -639,6 +681,9 @@ const server = http.createServer((req, res) => {
     return res.end();
   }
   let full = path.join(ROOT, decodeURIComponent(url.pathname));
+  // What _redirects does on the host: a public profile's address is the
+  // profile page, with the address left as it was.
+  if (/^\/(@|u\/)[^/]+\/?$/.test(decodeURIComponent(url.pathname))) full = path.join(ROOT, 'profile.html');
   // A fixture race is served at the same address a real one would be, so the
   // published-file path the app falls back to works for it as well.
   const fx = /^\/races\/([^/]+)\/(.+)$/.exec(decodeURIComponent(url.pathname));

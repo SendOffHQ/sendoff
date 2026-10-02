@@ -62,9 +62,9 @@ the front, with usernames beside them as the start of following a racer.
 5. ~~**Usernames.**~~ **Built 2026-10-02.** A handle on the profile that is
    not used to sign in but names a person: to find them, to add them to a
    race, and, later, to follow them. See "Usernames" in section 3.
-6. **Public racer profiles.** The profile page, made public by choice, at an
-   address built on the username. Prepared 2026-10-02 with its decisions
-   still open: see "Public racer profile" in section 2.
+6. ~~**Public racer profiles.**~~ **Built 2026-10-02.** The profile page,
+   made public by choice, at sendoff.run/@username. See "Public racer
+   profile" in section 2.
 7. **Goal-time planner.** Target finish in, per-aid target times out, live
    delta against them. Self-contained, needs no billing, and it is what makes a
    second race better than the first.
@@ -1726,7 +1726,22 @@ but are marked as entered by hand.
 the post-race form, the hand-entered result, and a link from the hub and the
 account menu.
 
-### Public racer profile — *next, prepared 2026-10-02, decisions open*
+### Public racer profile — *built 2026-10-02*
+
+**As built,** all eight decisions below as written. `/@name` and `/u/name`
+are rewrites in `_redirects` to `profile.html`, which draws a read-only view
+from the unauthenticated `GET /public-profile?u=` when it finds a username in
+its path (or `?u=`). Settings live under `pub:<email>` and are changed with
+`POST /public-profile-settings`; the profile page has the switch, the
+address and search engine box, and on each race card Shown/Hidden, Report
+and Fueling. The public answer is cached for 60 seconds and dropped from the
+cache when the settings change. The private `/profile` sends `X-Robots-Tag:
+noindex`; the public addresses carry a `noindex` the page removes only when
+the racer ticked search engines. Tests: `worker/test/public-profile.mjs`,
+`test/public-profile-page.mjs`. Left for later, as decided: a share image,
+the Follow button, links from race pages to a racer's profile.
+
+*The plan, as prepared:*
 
 The private page above, made public by the racer's choice. It is what
 "Follow a runner" in section 3 is waiting on, and usernames give it an

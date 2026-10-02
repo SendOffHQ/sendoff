@@ -4,10 +4,23 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>SendOff · Profile</title>
+<!-- Served at /@name and /u/name too, so relative addresses resolve from the
+     root rather than from /u/. -->
+<base href="/">
 <link rel="icon" href="brand/sendoff-favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0a0f14" />
 <meta name="description" content="Your races, results and personal bests.">
-<meta name="robots" content="noindex, nofollow">
+<!-- Kept out of search engines unless a public profile's owner said
+     otherwise. Set here rather than in the HTML, because a public profile
+     that has opted in has to be able to take it away; /profile itself also
+     gets X-Robots-Tag from _headers. -->
+<script>
+  (function () {
+    var m = document.createElement('meta');
+    m.name = 'robots'; m.content = 'noindex, nofollow'; m.id = 'robots-meta';
+    document.head.appendChild(m);
+  })();
+</script>
 <link rel="canonical" href="https://sendoff.run/profile.html">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SendOff">
@@ -133,6 +146,15 @@
   .p-uname-msg { font-size: 13px; color: var(--text-muted); margin: 0; min-height: 1.2em; }
   .p-uname-msg.ok { color: var(--green); } .p-uname-msg.err { color: var(--red); }
   .p-uname-help { font-size: 13px; line-height: 1.5; color: var(--text-muted); margin: 0; }
+  .p-pub .p-card { display: grid; gap: 10px; }
+  .p-pub-addr { font-family: 'JetBrains Mono', monospace; font-size: 14px; overflow-wrap: anywhere; }
+  .p-pub-addr a { color: var(--accent); }
+  .p-race-pub { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 12px; padding-top: 10px;
+    border-top: 1px dashed var(--border); font-size: 12px; color: var(--text-muted); }
+  .p-race-pub .lbl { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+  .p-pubchip { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 4px 9px; border-radius: 999px; cursor: pointer;
+    background: transparent; color: var(--text-dim); border: 1px solid var(--border-bright); }
+  .p-pubchip[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
   .p-textbtn { background: none; border: 0; padding: 0; cursor: pointer; color: var(--accent);
     font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-decoration: underline; }
 </style>
@@ -159,15 +181,16 @@
 <!-- Drawn on its own, so a redraw of the races below never takes a half-typed
      username with it. -->
 <section class="p-section p-uname" id="uname" hidden></section>
+<section class="p-section p-pub" id="pubprof" hidden></section>
 
 <div id="body"><p class="p-empty">Loading…</p></div>
 
-<footer class="site">
+<footer class="site" id="foot">
   <span>Only you can see this page</span>
   <span><a href="/app/">Back to the hub</a></span>
 </footer>
 
-<script src="lib/race-core.js?v=956f441c"></script>
+<script src="lib/race-core.js?v=5cc78094"></script>
 <script>
   // The racer profile: every race this account ran, what it adds up to, and
   // what the racer has written about each since. See ROADMAP.md, "Racer
@@ -177,6 +200,16 @@
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const $ = id => document.getElementById(id);
   let state = null;          // what /my-results answered
+  // Read-only, for anyone: a public profile, at /@name or /u/name (or
+  // ?u=name), drawn by this same page from what /public-profile allows.
+  const PUBLIC_NAME = (() => {
+    const m = location.pathname.match(/^\/(?:@|u\/)([A-Za-z0-9_.]{1,40})\/?$/);
+    return m ? m[1] : (new URLSearchParams(location.search).get('u') || '').replace(/^@/, '') || null;
+  })();
+  const PUBLIC = !!PUBLIC_NAME;
+  // The public answer carries no addresses; this stands in for the racer so
+  // the archive can find their runner the way it does on the private page.
+  const PUBLIC_ME = 'public-profile@sendoff.invalid';
   let openForm = null;       // which card's form is open: a slug, a manual id, or 'new'
 
   // Finding a race in a long list. All of it is already here from one
@@ -344,10 +377,11 @@
       ${r.finished && r.official && !r.manual && r.raceSec && Math.abs(r.raceSec - r.finishSec) >= 60
         ? `<div class="p-note">Logged on SendOff: ${hms(r.raceSec)}</div>` : ''}
       ${report}
-      <div class="p-row-actions">
-        <button type="button" class="btn" data-edit="${esc(key)}">${e ? 'Edit result' : 'Add result'}</button>
+      ${PUBLIC && !(e && e.resultsUrl) ? '' : `<div class="p-row-actions">
+        ${PUBLIC ? '' : `<button type="button" class="btn" data-edit="${esc(key)}">${e ? 'Edit result' : 'Add result'}</button>`}
         ${e && e.resultsUrl ? `<a class="btn" href="${esc(e.resultsUrl)}" target="_blank" rel="noopener">Official results</a>` : ''}
-      </div>
+      </div>`}
+      ${pubControls(r)}
       ${openForm === key ? resultForm(r) : ''}
     </article>`;
   }
@@ -457,6 +491,12 @@
 
   function render() {
     const list = results();
+    if (PUBLIC) {
+      $('body').innerHTML = (list.length ? renderTotals(list) + renderBests(list) : '') +
+        `<section class="p-section"><h2 class="p-h2">Races</h2>${renderTools(list)}<div id="race-list"></div></section>`;
+      renderList(list);
+      return;
+    }
     $('actions').hidden = false;
     const newForm = openForm === 'new'
       ? `<section class="p-section"><h2 class="p-h2">A race from before SendOff</h2><div class="p-card">${resultForm(null)}</div></section>` : '';
@@ -573,6 +613,75 @@
     }
   });
 
+  // ---------- public profile ----------
+  // Off until switched on. The card says what going public shows and what it
+  // never does; each race card then carries its own switches.
+  let pub = null;
+  async function loadPub() {
+    try { pub = await Race.api.publicSettings(); } catch (e) { pub = null; }
+    renderPub();
+    // The race cards carry their switches once it is known whether it is on.
+    if (state && $('race-list')) renderList(results());
+  }
+  const pubOpt = (key) => (pub && pub.races && pub.races[key]) || {};
+  const pubAddress = () => pub && pub.username ? 'sendoff.run/@' + pub.username : '';
+  function renderPub() {
+    const host = $('pubprof');
+    if (!pub || PUBLIC) { host.hidden = true; return; }
+    host.hidden = false;
+    const noName = !pub.username;
+    host.innerHTML = `<h2 class="p-h2">Public profile</h2><div class="p-card">
+      <label class="p-check"><input type="checkbox" id="pub-on"${pub.public ? ' checked' : ''}${noName ? ' disabled' : ''}>
+        Make my profile public</label>
+      ${noName ? `<p class="p-uname-help">Pick a username first: it is the address of your public profile.</p>` : ''}
+      ${pub.public ? `
+        <div class="p-pub-addr"><a href="/@${esc(pub.username)}" target="_blank" rel="noopener" id="pub-link">${esc(pubAddress())}</a>
+          <button type="button" class="p-textbtn" id="pub-copy">Copy</button>
+          <a class="p-textbtn" href="/@${esc(pub.username)}" target="_blank" rel="noopener">See it as others do</a></div>
+        <label class="p-check"><input type="checkbox" id="pub-index"${pub.indexable ? ' checked' : ''}>
+          Let search engines show my profile</label>` : ''}
+      <p class="p-uname-help">${pub.public
+        ? 'Anyone with the address can see your name, your listed public races and races you entered by hand, with times, places and results links. Private and unlisted races never appear, not even in the totals, so the totals there can be smaller than here. Reports and fueling numbers show only on races where you switch them on below.'
+        : 'Off. Nobody can see this page but you. Switch it on to share your races and results at an address made from your username.'}</p>
+    </div>`;
+  }
+  // The switches on each race card, when the profile is public.
+  function pubControls(r) {
+    if (PUBLIC || !pub || !pub.public) return '';
+    const key = r.manual ? r.id : r.slug;
+    if (!r.manual && r.visibility !== 'public') {
+      return `<div class="p-race-pub"><span class="lbl">Public profile</span> Private or unlisted race: never shown there.</div>`;
+    }
+    const o = pubOpt(key);
+    const chip = (f, on, label) => `<button type="button" class="p-pubchip" data-pub="${f}" data-key="${esc(key)}" aria-pressed="${on}">${label}</button>`;
+    return `<div class="p-race-pub"><span class="lbl">Public profile</span>
+      ${chip('hide', !o.hide, o.hide ? 'Hidden' : 'Shown')}
+      ${o.hide ? '' : chip('report', !!o.report, 'Report')}
+      ${o.hide || r.manual ? '' : chip('fuel', !!o.fuel, 'Fueling')}</div>`;
+  }
+  async function savePub(body) {
+    try { pub = await Race.api.savePublicSettings(body); }
+    catch (err) { showError('Could not save that: ' + (err.message || err)); }
+    renderPub(); renderList(results());
+  }
+  document.addEventListener('change', (e) => {
+    if (e.target.id === 'pub-on') savePub({ public: e.target.checked });
+    else if (e.target.id === 'pub-index') savePub({ indexable: e.target.checked });
+  });
+  document.addEventListener('click', async (e) => {
+    if (e.target.id === 'pub-copy') {
+      try { await navigator.clipboard.writeText('https://' + pubAddress()); e.target.textContent = 'Copied'; }
+      catch (err) { e.target.textContent = 'Copy failed'; }
+      setTimeout(() => { e.target.textContent = 'Copy'; }, 1500);
+      return;
+    }
+    const b = e.target.closest && e.target.closest('[data-pub]');
+    if (!b) return;
+    const f = b.dataset.pub, key = b.dataset.key, o = pubOpt(key);
+    // The chip says what is true now; pressing it flips that.
+    savePub({ race: { key, [f]: f === 'hide' ? !o.hide : !o[f] } });
+  });
+
   // ---------- username ----------
   // A handle that names you without being a way to sign in. Offered once
   // with a suggestion from your name; "Not now" folds it to one line.
@@ -667,6 +776,8 @@
       uname = await Race.api.setUsername(v);
       unameEditing = false;
       renderUname();
+      // The public address is made from it.
+      loadPub();
     } catch (err) {
       $('uname-save').disabled = false;
       msg.textContent = err.message || String(err); msg.className = 'p-uname-msg err';
@@ -686,7 +797,44 @@
 
   function showError(msg) { const b = $('error'); b.textContent = msg; b.style.display = ''; }
 
+  // A public profile: no sign-in, and only what the worker's public answer
+  // holds, which is only what the racer chose to show.
+  async function loadPublic() {
+    try { await Race.hub.load(); } catch (e) {}
+    $('foot').innerHTML = `<span>A racer profile on <a href="/">SendOff</a></span><span><a href="/app/">Races on SendOff</a></span>`;
+    const base = (Race.hub.proxyUrl && Race.hub.proxyUrl() || '').replace(/\/+$/, '');
+    let res = null, data = null;
+    try {
+      res = await fetch(base + '/public-profile?u=' + encodeURIComponent(PUBLIC_NAME));
+      data = res.ok ? await res.json() : null;
+    } catch (e) { data = null; }
+    if (!data) {
+      document.title = 'Not found · SendOff';
+      $('who').innerHTML = 'Not <em>found</em>';
+      $('body').innerHTML = `<p class="p-empty">There is no public profile at this address. Either nobody has this
+        username, or its owner has not made their profile public.</p>`;
+      return;
+    }
+    document.title = `${data.name} · SendOff`;
+    $('who').textContent = data.name;
+    const crumb = [...document.querySelectorAll('.brand-meta span')].find(x => x.textContent.trim() === 'Profile');
+    if (crumb) crumb.textContent = '@' + data.username;
+    const canon = document.querySelector('link[rel="canonical"]');
+    if (canon) canon.href = 'https://sendoff.run/@' + data.username;
+    if (data.indexable) { const m = $('robots-meta'); if (m) m.remove(); }
+    state = {
+      email: PUBLIC_ME,
+      races: (data.races || []).map(r => ({ slug: r.slug, visibility: 'public', runner: r.runner,
+        config: { ...r.config, runners: (r.config.runners || []).map(x => ({ ...x, email: PUBLIC_ME })) } })),
+      results: { bySlug: Object.fromEntries((data.races || []).filter(r => r.entered).map(r => [r.slug, r.entered])),
+                 manual: data.manual || [], notMine: [] },
+      candidates: [], hidden: []
+    };
+    render();
+  }
+
   async function load() {
+    if (PUBLIC) return loadPublic();
     // hub.json first: it says whether this deployment signs in through the
     // worker, and without it every session reads as signed out.
     try { await Race.hub.load(); } catch (e) { /* the check below says what it can */ }
@@ -707,6 +855,7 @@
       } catch (e) { /* the page works without a name */ }
       render();
       loadUname();
+      loadPub();
     } catch (e) {
       showError('Could not load your races: ' + (e.message || e));
       $('body').innerHTML = '';

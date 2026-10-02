@@ -1753,6 +1753,143 @@ async function emailForUsername(env, name) {
   return normalizeEmail(idx.email);
 }
 
+// ---------- public racer profiles ----------
+// The profile page, made public by the racer's choice, at an address built on
+// their username. Off until switched on. Kept apart from everything else
+// under pub:<email>:
+//   { public, indexable, races: { <slug or manual id>: { hide, report, fuel } } }
+// The public answer is a second, narrower reading of the same data the
+// private page gets: listed public races and races entered by hand, never a
+// private or unlisted race, and of each leg only its times unless the racer
+// chose to show that race's fuel. Notes, issues, meds and gear never leave.
+const PUB_KEY = (email) => 'pub:' + normalizeEmail(email);
+const PUB_CACHE = (name) => `https://cache.sendoff.invalid/public-profile/${String(name).toLowerCase()}`;
+const PUB_CACHE_SECONDS = 60;
+const PUB_DEFAULT_FUEL = ['calories', 'fluidOz', 'sodiumMg'];
+
+async function loadPub(env, email) {
+  const raw = await env.AUTH_KV.get(PUB_KEY(email));
+  let p = null;
+  try { p = raw ? JSON.parse(raw) : null; } catch (e) { p = null; }
+  return { public: false, indexable: false, races: {}, ...(p || {}) };
+}
+const pubRaceKey = (k) => typeof k === 'string' && /^[A-Za-z0-9._-]{1,120}$/.test(k);
+
+async function handlePublicProfileSettingsGet(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Profiles need the AUTH_KV binding' }, { status: 503 }, env, req);
+  const p = await loadPub(env, session.email);
+  const h = await loadHandle(env, session.email);
+  return json({ ...p, username: h.username || null }, {}, env, req);
+}
+
+async function handlePublicProfileSettingsSave(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Profiles need the AUTH_KV binding' }, { status: 503 }, env, req);
+  let body;
+  try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  const email = normalizeEmail(session.email);
+  const p = await loadPub(env, email);
+  const h = await loadHandle(env, email);
+  if (body && typeof body.public === 'boolean') {
+    if (body.public && !h.username) {
+      return json({ error: 'Pick a username first: it is the address of your public profile.', code: 'no_username' }, { status: 400 }, env, req);
+    }
+    p.public = body.public;
+  }
+  if (body && typeof body.indexable === 'boolean') p.indexable = body.indexable;
+  if (body && body.race && pubRaceKey(body.race.key)) {
+    const cur = p.races[body.race.key] || {};
+    for (const f of ['hide', 'report', 'fuel']) if (typeof body.race[f] === 'boolean') cur[f] = body.race[f];
+    p.races[body.race.key] = cur;
+    // Nothing left to say about a race at the defaults.
+    if (!cur.hide && !cur.report && !cur.fuel) delete p.races[body.race.key];
+  }
+  await env.AUTH_KV.put(PUB_KEY(email), JSON.stringify(p));
+  // Switching it off takes it down now, not when a cache runs out.
+  if (h.username) { try { await caches.default.delete(PUB_CACHE(h.username)); } catch (e) {} }
+  return json({ ...p, username: h.username || null }, {}, env, req);
+}
+
+const PUB_NOT_FOUND = (env, req) => json({ error: 'Not found' }, { status: 404 }, env, req);
+
+// Unauthenticated. The same 404, word for word, for a username nobody has and
+// a profile that is not public, so the address cannot be used to ask whether
+// somebody has an account.
+async function handlePublicProfile(req, env) {
+  if (!env.AUTH_KV) return PUB_NOT_FOUND(env, req);
+  const name = String(new URL(req.url).searchParams.get('u') || '').trim().replace(/^@/, '');
+  if (!/^[A-Za-z0-9_.]{3,20}$/.test(name)) return PUB_NOT_FOUND(env, req);
+  const cacheKey = PUB_CACHE(name);
+  try {
+    const hit = await caches.default.match(cacheKey);
+    if (hit) return json(await hit.json(), {}, env, req);
+  } catch (e) {}
+  const idx = await readUnameIndex(env, name);
+  if (!idx || idx.held || !idx.email) return PUB_NOT_FOUND(env, req);
+  const email = normalizeEmail(idx.email);
+  const [p, h] = [await loadPub(env, email), await loadHandle(env, email)];
+  if (!p.public || !h.username) return PUB_NOT_FOUND(env, req);
+  const prof = await loadProfile(env, email);
+  const results = await loadResults(env, email);
+  const opt = (key) => p.races[key] || {};
+
+  const entered = (e, key) => {
+    if (!e) return null;
+    const out = {};
+    for (const k of ['officialSec', 'dnf', 'dnfWhere', 'resultsUrl', 'ageGroup', ...RESULT_PLACES]) if (e[k] != null) out[k] = e[k];
+    if (opt(key).report) { if (e.report) out.report = e.report; if (e.changeNext) out.changeNext = e.changeNext; }
+    return out;
+  };
+
+  const races = [];
+  for (const slug of ((await listRaceSlugs(env)) || [])) {
+    if (opt(slug).hide) continue;
+    let cfg = null;
+    try { cfg = await loadRaceConfigNow(env, slug); } catch (e) { continue; }
+    // Listed public races only: a private race is never shown, not even as a
+    // count, and an unlisted one was taken off the hub on purpose.
+    if (!cfg || cfg.visibility !== 'public') continue;
+    const mine = (cfg.runners || []).find(r => r && normalizeEmail(r.email) === email);
+    if (!mine) continue;
+    const data = await loadRaceDataNow(env, slug);
+    const fuelOn = !!opt(slug).fuel;
+    const fuelKeys = Array.isArray(cfg.fuelMetrics) ? cfg.fuelMetrics.map(m => m && m.key).filter(Boolean) : PUB_DEFAULT_FUEL;
+    const legs = ((((data && data.runners) || []).find(r => r && r.id === mine.id) || {}).legs || []).map(l => {
+      const o = { index: l.index };
+      if (l.startTime) o.startTime = l.startTime;
+      if (l.endTime) o.endTime = l.endTime;
+      if (fuelOn) for (const k of fuelKeys) if (l[k] != null && Number.isFinite(+l[k])) o[k] = +l[k];
+      return o;
+    });
+    races.push({
+      slug,
+      config: {
+        name: cfg.name, location: cfg.location, startTime: cfg.startTime, activity: cfg.activity,
+        courseType: cfg.courseType, course: cfg.course, cutoffs: cfg.cutoffs, units: cfg.units,
+        fuelMetrics: fuelOn ? cfg.fuelMetrics : [],
+        runners: [{ id: mine.id, name: mine.name }]
+      },
+      runner: { id: mine.id, legs },
+      entered: entered(results.bySlug[slug], slug),
+      fuel: fuelOn
+    });
+  }
+  const manual = (results.manual || []).filter(m => m && m.id && !opt(m.id).hide).map(m => {
+    const o = entered(m, m.id);
+    for (const k of ['id', 'name', 'date', 'location', 'activity', 'distanceMi', 'climbFt']) if (m[k] != null) o[k] = m[k];
+    return o;
+  });
+  const body = { username: h.username, name: profileName(prof) || h.username, indexable: !!p.indexable, races, manual };
+  try {
+    await caches.default.put(cacheKey, new Response(JSON.stringify(body), {
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${PUB_CACHE_SECONDS}` } }));
+  } catch (e) {}
+  return json(body, {}, env, req);
+}
+
 // Changes the signed-in user's password. The new hash is written to KV, which
 // lookupUser checks before USERS, so this works for env-var users too.
 async function handleChangePassword(req, env) {
@@ -2327,6 +2464,7 @@ async function handleAccountDelete(req, env) {
   const gone = await loadHandle(env, email);
   if (gone.username) await holdUsername(env, gone.username, email);
   await env.AUTH_KV.delete(HANDLE_KEY(email));
+  await env.AUTH_KV.delete(PUB_KEY(email));
   return json({ ok: true }, {}, env, req);
 }
 
@@ -5550,6 +5688,9 @@ async function route(request, env, ctx) {
     if (request.method === 'POST' && path === '/username')        return handleUsernameSet(request, env);
     if (request.method === 'POST' && path === '/username/findable') return handleUsernameFindable(request, env);
     if (request.method === 'GET'  && path === '/users/search')    return handleUserSearch(request, env);
+    if (request.method === 'GET'  && path === '/public-profile')  return handlePublicProfile(request, env);
+    if (request.method === 'GET'  && path === '/public-profile-settings') return handlePublicProfileSettingsGet(request, env);
+    if (request.method === 'POST' && path === '/public-profile-settings') return handlePublicProfileSettingsSave(request, env);
     if (request.method === 'POST' && path === '/auth-links/google')   return handleAuthLinkConnect(request, env, 'google');
     if (request.method === 'POST' && path === '/auth-links/facebook') return handleAuthLinkConnect(request, env, 'facebook');
     if (request.method === 'POST' && path === '/auth-links/remove')   return handleAuthLinkRemove(request, env);

@@ -1,0 +1,8 @@
+# Cloudflare Pages rewrites. A 200 serves the target with the address left
+# as it was, so /@jason stays /@jason in the bar.
+#
+# A public racer profile: profile.html reads the username out of the path and
+# asks the worker for that profile. /u/ is the same page for anywhere an
+# address starting with @ is awkward to type or link.
+/@*    /profile    200
+/u/*   /profile    200

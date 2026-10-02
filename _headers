@@ -40,3 +40,10 @@
 # Brand artwork and social cards. Change rarely; a day is plenty.
 /brand/*
   Cache-Control: public, max-age=86400
+
+# The private profile page. Its public form is served at /@name and /u/name,
+# which do not match these, so a racer who opts in can be indexed there.
+/profile
+  X-Robots-Tag: noindex
+/profile.html
+  X-Robots-Tag: noindex
