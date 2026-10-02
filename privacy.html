@@ -29,7 +29,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=5f169341">
+<link rel="stylesheet" href="lib/race-theme.css?v=cc13372f">
 <style>
   /* A reading column. Legal text that runs the width of a desktop screen does
      not get read, and this is text somebody should actually be able to read. */
@@ -95,7 +95,7 @@
 </header>
 
 <main class="legal">
-<p class="updated">Last updated 1 October 2026</p>
+<p class="updated">Last updated 2 October 2026</p>
 <h2>The short version</h2>
 <p>SendOff stores what you type into it: your email address, your race, and what your crew logs.
   There is no analytics, no advertising, no third-party trackers, no cookies, and nothing is sold
@@ -130,6 +130,17 @@
 
 <h3>Your profile, if you fill one in</h3>
 <p>A display name, fueling goals, hour bands, and the notes you want a crew to have.</p>
+
+<h3>Your username, if you pick one</h3>
+<p>A username, like @jason, is optional and is never used to sign in. While "Let people find me by
+  username" is on, which it is unless you turn it off, anyone signed in to SendOff can find you by
+  it. What they see is your username and the name on your profile, never your email address,
+  your races or your results. They can also add you to a race they run by your username. Once
+  you are on a race, the people who run it can see your email address, as they can for everyone
+  on it. Turn finding off and nobody can find you or add you by username; you keep the name.</p>
+<p>You can change your username once every 30 days. A username you give up, or one belonging to
+  an account that is deleted, is kept back from everyone else for 30 days, so nobody can take it
+  straight away and be mistaken for you.</p>
 
 <h3>Your results, if you write them down</h3>
 <p>What you add on your profile page about races you ran: an official finish time, your place,
@@ -169,7 +180,7 @@
 
 <h2>Where it is stored</h2>
 <table>
-  <tr><td>Cloudflare Workers KV</td><td>accounts, profiles, results you enter, access lists, invite and reset tokens, share links, feedback</td></tr>
+  <tr><td>Cloudflare Workers KV</td><td>accounts, profiles, usernames, results you enter, access lists, invite and reset tokens, share links, feedback</td></tr>
   <tr><td>Cloudflare D1</td><td>races and logged splits</td></tr>
   <tr><td>GitHub</td><td>races and logged splits, as files in a repository</td></tr>
   <tr><td>Your own browser</td><td>your session, a copy of the races you have opened so they still work with no signal, and any feedback waiting to send</td></tr>
@@ -289,7 +300,8 @@
   <tr><td>Share links</td><td>30 days by default</td></tr>
   <tr><td>Invite and access requests</td><td>90 days</td></tr>
   <tr><td>Feedback</td><td>180 days</td></tr>
-  <tr><td>Rate limit counters</td><td>1 hour</td></tr>
+  <tr><td>Rate limit counters</td><td>1 hour, or a day for adding people by username</td></tr>
+  <tr><td>A username given up</td><td>kept back from others for 30 days</td></tr>
   <tr><td>Races and logged data</td><td>until deleted</td></tr>
 </table>
 
@@ -329,7 +341,7 @@
   behalf, and no others:</p>
 <table>
   <tr><td>Cloudflare, Inc. (US)</td><td>runs the worker that answers requests, and holds accounts,
-    profiles, results you enter, access lists, tokens, share links and feedback. Also serves traffic from whichever
+    profiles, usernames, results you enter, access lists, tokens, share links and feedback. Also serves traffic from whichever
     of its locations is nearest the person asking, worldwide.</td></tr>
   <tr><td>GitHub, Inc. (US, a Microsoft company)</td><td>holds races and logged splits as files in
     a public repository, and serves the pages people watch.</td></tr>
@@ -354,6 +366,6 @@
     <span aria-hidden="true"> &middot; </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=e0539e21"></script>
+<script src="lib/race-core.js?v=ddc9fd1f"></script>
 </body>
 </html>

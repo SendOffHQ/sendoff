@@ -33,7 +33,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=5f169341">
+<link rel="stylesheet" href="lib/race-theme.css?v=cc13372f">
 <style>
   .p-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: -6px 0 26px; }
   /* display: flex above would otherwise win over the hidden attribute, and
@@ -122,6 +122,17 @@
   .p-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em;
     color: var(--text-muted); margin: 0 0 10px; }
   .p-more { display: flex; justify-content: center; margin: 4px 0 0; }
+  .p-uname .p-card { display: grid; gap: 10px; }
+  .p-handle { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: var(--accent); overflow-wrap: anywhere; }
+  .p-uname-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .p-uname-field { display: flex; align-items: stretch; flex: 1 1 220px; min-width: 0; }
+  .p-uname-field span { display: flex; align-items: center; padding: 0 10px; border: 1px solid var(--border-bright);
+    border-right: 0; border-radius: 4px 0 0 4px; background: var(--bg-elevated); color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace; }
+  .p-uname-field input { border-radius: 0 4px 4px 0; min-width: 0; }
+  .p-uname-msg { font-size: 13px; color: var(--text-muted); margin: 0; min-height: 1.2em; }
+  .p-uname-msg.ok { color: var(--green); } .p-uname-msg.err { color: var(--red); }
+  .p-uname-help { font-size: 13px; line-height: 1.5; color: var(--text-muted); margin: 0; }
   .p-textbtn { background: none; border: 0; padding: 0; cursor: pointer; color: var(--accent);
     font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-decoration: underline; }
 </style>
@@ -145,6 +156,10 @@
   <button type="button" class="btn" id="add-manual">Add a race from before SendOff</button>
 </div>
 
+<!-- Drawn on its own, so a redraw of the races below never takes a half-typed
+     username with it. -->
+<section class="p-section p-uname" id="uname" hidden></section>
+
 <div id="body"><p class="p-empty">Loading…</p></div>
 
 <footer class="site">
@@ -152,7 +167,7 @@
   <span><a href="/app/">Back to the hub</a></span>
 </footer>
 
-<script src="lib/race-core.js?v=e0539e21"></script>
+<script src="lib/race-core.js?v=ddc9fd1f"></script>
 <script>
   // The racer profile: every race this account ran, what it adds up to, and
   // what the racer has written about each since. See ROADMAP.md, "Racer
@@ -558,6 +573,117 @@
     }
   });
 
+  // ---------- username ----------
+  // A handle that names you without being a way to sign in. Offered once
+  // with a suggestion from your name; "Not now" folds it to one line.
+  const UNAME_LATER = 'so:uname-later';
+  let uname = null, unameEditing = false, unameTimer = null;
+  const suggestName = () => {
+    const n = (($('who').textContent || '').trim().toLowerCase() === 'your races' ? '' : $('who').textContent || '')
+      .normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+      .replace(/\s+/g, '_').replace(/[^a-z0-9_.]/g, '').replace(/^[._]+|[._]+$/g, '').slice(0, 20);
+    return n.length >= 3 ? n : '';
+  };
+  function renderUname() {
+    const host = $('uname');
+    if (!uname) { host.hidden = true; return; }
+    host.hidden = false;
+    let later = false;
+    try { later = !!localStorage.getItem(UNAME_LATER); } catch (e) {}
+    const help = `<p class="p-uname-help">Not used to sign in. People can find you by it and add you to a race
+      without knowing your email address. 3 to 20 letters, numbers, underscores or full stops.</p>`;
+    if (!uname.username && later && !unameEditing) {
+      host.innerHTML = `<p class="p-hidden-line">No username yet. <button type="button" class="p-textbtn" id="uname-pick">Pick one</button></p>`;
+      return;
+    }
+    if (uname.username && !unameEditing) {
+      const wait = uname.nextChangeAt ? new Date(uname.nextChangeAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+      host.innerHTML = `<h2 class="p-h2">Username</h2><div class="p-card">
+        <div class="p-uname-row"><span class="p-handle">@${esc(uname.username)}</span>
+          ${wait ? `<span class="p-uname-help">You can change it again on ${esc(wait)}.</span>`
+                 : `<button type="button" class="btn" id="uname-change">Change</button>`}</div>
+        <label class="p-check"><input type="checkbox" id="uname-findable"${uname.findable ? ' checked' : ''}>
+          Let people find me by username</label>
+        <p class="p-uname-help">${uname.findable
+          ? 'Signed-in people can find you by it and add you to a race. They see your username and your name, never your email.'
+          : 'Nobody can find you by it or add you by it. Your username stays yours.'}</p>
+      </div>`;
+      return;
+    }
+    const start = uname.username || suggestName();
+    host.innerHTML = `<h2 class="p-h2">${uname.username ? 'Change your username' : 'Pick a username'}</h2><div class="p-card">
+      <form id="uname-form" class="p-uname-row" novalidate>
+        <label class="p-uname-field"><span aria-hidden="true">@</span>
+          <input type="text" id="uname-input" value="${esc(start)}" maxlength="20" autocomplete="off" spellcheck="false"
+                 autocapitalize="off" aria-label="Username" aria-describedby="uname-msg"></label>
+        <button type="submit" class="btn primary" id="uname-save">Save</button>
+        <button type="button" class="p-textbtn" id="uname-cancel">${uname.username ? 'Cancel' : 'Not now'}</button>
+      </form>
+      <p class="p-uname-msg" id="uname-msg" role="status"></p>
+      ${uname.username ? '<p class="p-uname-help">After a change you can change it again in 30 days, and nobody else can take your old one for 30 days.</p>' : ''}
+      ${help}
+    </div>`;
+    if (start) checkUname();
+  }
+  function checkUname() {
+    clearTimeout(unameTimer);
+    const input = $('uname-input'), msg = $('uname-msg');
+    if (!input) return;
+    const v = input.value.trim().replace(/^@/, '');
+    if (!v) { msg.textContent = ''; msg.className = 'p-uname-msg'; return; }
+    if (uname.username && v.toLowerCase() === uname.username.toLowerCase()) { msg.textContent = 'That is your username now.'; msg.className = 'p-uname-msg'; return; }
+    unameTimer = setTimeout(async () => {
+      let r;
+      try { r = await Race.api.usernameCheck(v); } catch (e) { return; }
+      if (!$('uname-input') || $('uname-input').value.trim().replace(/^@/, '') !== v) return;
+      msg.textContent = r.ok ? '@' + v + ' is free.' : r.reason;
+      msg.className = 'p-uname-msg ' + (r.ok ? 'ok' : 'err');
+    }, 300);
+  }
+  async function loadUname() {
+    try { uname = await Race.api.username(); } catch (e) { uname = null; }
+    renderUname();
+  }
+  document.addEventListener('input', (e) => {
+    if (e.target.id !== 'uname-input') return;
+    // The @ is drawn beside the box, so one typed or pasted in is dropped.
+    if (e.target.value.startsWith('@')) e.target.value = e.target.value.replace(/^@+/, '');
+    checkUname();
+  });
+  document.addEventListener('change', async (e) => {
+    if (e.target.id !== 'uname-findable') return;
+    e.target.disabled = true;
+    try { uname = await Race.api.setFindable(e.target.checked); renderUname(); }
+    catch (err) { e.target.disabled = false; e.target.checked = !e.target.checked; showError('Could not save that: ' + (err.message || err)); }
+  });
+  document.addEventListener('submit', async (e) => {
+    if (e.target.id !== 'uname-form') return;
+    e.preventDefault();
+    const v = $('uname-input').value.trim().replace(/^@/, '');
+    const msg = $('uname-msg');
+    if (!v) { msg.textContent = 'Type a username first.'; msg.className = 'p-uname-msg err'; return; }
+    $('uname-save').disabled = true;
+    try {
+      uname = await Race.api.setUsername(v);
+      unameEditing = false;
+      renderUname();
+    } catch (err) {
+      $('uname-save').disabled = false;
+      msg.textContent = err.message || String(err); msg.className = 'p-uname-msg err';
+      $('uname-input').focus();
+    }
+  });
+  document.addEventListener('click', (e) => {
+    const id = e.target.id;
+    if (id === 'uname-pick' || id === 'uname-change') {
+      unameEditing = true; renderUname();
+      const i = $('uname-input'); if (i) { i.focus(); i.select(); }
+    } else if (id === 'uname-cancel') {
+      if (!uname.username) { try { localStorage.setItem(UNAME_LATER, '1'); } catch (err) {} }
+      unameEditing = false; renderUname();
+    }
+  });
+
   function showError(msg) { const b = $('error'); b.textContent = msg; b.style.display = ''; }
 
   async function load() {
@@ -580,6 +706,7 @@
         if (name) $('who').innerHTML = esc(name);
       } catch (e) { /* the page works without a name */ }
       render();
+      loadUname();
     } catch (e) {
       showError('Could not load your races: ' + (e.message || e));
       $('body').innerHTML = '';

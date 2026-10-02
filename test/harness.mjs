@@ -49,6 +49,12 @@ const MEDIA = [];
 const RESULTS = { bySlug: {}, manual: [], notMine: [] };
 let googleOn = false, facebookOn = false;
 const authLinks = { google: null, facebook: null };
+// Usernames: this stub's own, and a small directory of other people. The
+// worker's rules are tested against the worker; here 'taken' is taken.
+const myHandle = { username: null, findable: true, nextChangeAt: null };
+const DIRECTORY = [{ username: 'jasmine_r', displayName: 'Jasmine R', email: 'jasmine@example.com' },
+                   { username: 'jasper', displayName: 'Jasper Lee', email: 'jasper@example.com' }];
+const addedPeople = [];
 
 // Whether an invite comes back with a rendered message beside the link. An
 // older worker does not send one, and the page has to cope by not offering a
@@ -241,6 +247,49 @@ const server = http.createServer((req, res) => {
       if (word !== 'good') return send(400, '{"error":"Could not be checked"}', 'application/json');
       authLinks[p] = { linkedAt: '2026-10-01T15:00:00Z' };
       send(200, JSON.stringify({ ok: true }), 'application/json');
+    });
+  }
+  if (url.pathname === '/api/username' && req.method === 'GET') {
+    if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+    return send(200, JSON.stringify(myHandle), 'application/json');
+  }
+  if (url.pathname === '/api/username/check') {
+    if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+    const n = (url.searchParams.get('name') || '').replace(/^@/, '');
+    const reason = n.length < 3 ? 'A username is 3 to 20 characters.'
+      : (n.toLowerCase() === 'taken' || DIRECTORY.some(d => d.username === n.toLowerCase())) ? 'That username is taken.' : null;
+    return send(200, JSON.stringify(reason ? { ok: false, reason } : { ok: true }), 'application/json');
+  }
+  if (url.pathname === '/api/users/search') {
+    if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+    const q = (url.searchParams.get('q') || '').replace(/^@/, '').toLowerCase();
+    const results = q.length < 2 ? [] : DIRECTORY.filter(d => d.username.startsWith(q))
+      .map(({ username, displayName }) => ({ username, displayName }));
+    return send(200, JSON.stringify({ results }), 'application/json');
+  }
+  if (url.pathname === '/api/username' || url.pathname === '/api/username/findable' || url.pathname === '/api/access/add') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+      const j = JSON.parse(body || '{}');
+      if (url.pathname.endsWith('/findable')) { myHandle.findable = !!j.findable; return send(200, JSON.stringify(myHandle), 'application/json'); }
+      if (url.pathname === '/api/access/add') {
+        let person = null;
+        if (j.username) {
+          const d = DIRECTORY.find(x => x.username === String(j.username).replace(/^@/, '').toLowerCase());
+          if (!d) return send(404, JSON.stringify({ error: `Nobody can be found as @${j.username}. Check the spelling, or add them by email.`, code: 'no_username' }), 'application/json');
+          person = { email: d.email, role: j.role, displayName: d.displayName, username: d.username };
+        } else person = { email: j.email, role: j.role, displayName: '', username: null };
+        addedPeople.push(person);
+        return send(200, JSON.stringify({ people: addedPeople }), 'application/json');
+      }
+      const n = String(j.username || '').replace(/^@/, '');
+      if (n.toLowerCase() === 'taken') return send(409, JSON.stringify({ error: 'That username is taken.', code: 'taken' }), 'application/json');
+      const changing = !!myHandle.username;
+      myHandle.username = n || null;
+      myHandle.nextChangeAt = changing ? new Date(Date.now() + 30 * 864e5).toISOString() : null;
+      send(200, JSON.stringify(myHandle), 'application/json');
     });
   }
   // Sign in with Facebook, the same way: an access token is just a word here.
@@ -489,7 +538,7 @@ const server = http.createServer((req, res) => {
       createdByName: notCreator ? 'Someone Else' : 'Casey Kim',
       teamCanInvite: false,
       canManageAccess: true,
-      people: [{ email: ME, role: 'owner', displayName: 'Casey Kim' }],
+      people: [{ email: ME, role: 'owner', displayName: 'Casey Kim' }, ...addedPeople],
       editors: [], viewers: [], shareLinks: [], pendingInvites: []
     }), 'application/json');
   }

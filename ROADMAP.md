@@ -59,21 +59,23 @@ the front, with usernames beside them as the start of following a racer.
    station to be read out, never to the racer's own screen. The live
    connection that carries photos is the delivery path this used to wait on.
    See section 3.
-5. **Usernames.** A handle on the profile that is not used to sign in but
-   names a person: to find them, to add them to a race, and, later, to follow
-   them. The identity that "Follow a runner" says does not exist yet. See
-   "Usernames" in section 3.
-6. **Goal-time planner.** Target finish in, per-aid target times out, live
+5. ~~**Usernames.**~~ **Built 2026-10-02.** A handle on the profile that is
+   not used to sign in but names a person: to find them, to add them to a
+   race, and, later, to follow them. See "Usernames" in section 3.
+6. **Public racer profiles.** The profile page, made public by choice, at an
+   address built on the username. Prepared 2026-10-02 with its decisions
+   still open: see "Public racer profile" in section 2.
+7. **Goal-time planner.** Target finish in, per-aid target times out, live
    delta against them. Self-contained, needs no billing, and it is what makes a
    second race better than the first.
-7. **Printable crew sheet.** One sheet per crew member, two or three racers to
+8. **Printable crew sheet.** One sheet per crew member, two or three racers to
    a sheet: checkpoints, which of them crew can reach, cutoffs as clock times,
    racer details, and room to write. Printed the night before. Every number on it already exists, so it
    is mostly a second print template. It comes after the planner because
    target times are the one column that is not already computable, and it is
    the layer under the offline layer: paper has no battery and can be handed
    to a pacer who just showed up.
-8. **Data export.** CSV, JSON, GPX. Small, read-only, no race-day risk, and it
+9. **Data export.** CSV, JSON, GPX. Small, read-only, no race-day risk, and it
    is what lets somebody trust a season of their racing to this: they can
    always get it back out.
 
@@ -1724,6 +1726,45 @@ but are marked as entered by hand.
 the post-race form, the hand-entered result, and a link from the hub and the
 account menu.
 
+### Public racer profile — *next, prepared 2026-10-02, decisions open*
+
+The private page above, made public by the racer's choice. It is what
+"Follow a runner" in section 3 is waiting on, and usernames give it an
+address. Nothing about the private page changes; the public one is a second,
+narrower answer from the worker, built from the same data.
+
+**The proposal, to settle before building:**
+
+1. **Address:** `sendoff.run/@jason`, served as a rewrite to one page that
+   asks the worker for that username. If Pages will not route a path that
+   starts with `@`, `sendoff.run/u/jason` instead. Needs a username; without
+   one there is nothing to put in the address.
+2. **Off until switched on**, by one switch on the profile page, with a "See
+   it as others do" preview beside it. Switching it off takes it down at once.
+3. **What shows:** name, @username, totals, personal bests by discipline, and
+   one card per race with date, distance, climb, finish time or how far they
+   got, place, and the official results link.
+4. **What does not, unless the racer says so per race:** the race report and
+   "what I'd change", and the fuel numbers (calories, sodium, fluid per hour),
+   which are close enough to health information to be opt-in.
+5. **Which races:** listed public races and races entered by hand. Never a
+   private race, not even as a count, and not an unlisted one: totals on the
+   public page are worked out from what it shows, so they can be smaller than
+   the private page's, and the private page says so. Any race can be hidden
+   from the public page one at a time.
+6. **Search engines:** kept out (`noindex`) unless the racer ticks "Let search
+   engines show my profile".
+7. **Served by** an unauthenticated `GET /public-profile/<username>` that
+   returns only the public fields above, cached briefly, and a 404 that reads
+   the same for "no such username" and "not public" so the address cannot be
+   used to test whether an account exists.
+8. **Later, not in the first version:** a share card image for the profile,
+   the Follow button, and a link from each race page's racer to their
+   profile.
+
+`privacy.html` changes with it: what a public profile shows, that it is off
+by default, and how to take it down.
+
 **Decided 2026-09-29**, all four as written:
 
 - **Public or not.** The profile becomes a public identity for a racer, which
@@ -1776,20 +1817,36 @@ A spectator writes a line; it queues; the pit board shows it when the runner
 is in the aid station, and a crew member reads it out. Never pushed to the
 runner's own screen. The racer screen stays one button.
 
-### Usernames — *next, decisions pending*
-Asked for 2026-10-02. A unique handle on each account's profile, like
-`@jason`. It is not a way to sign in, which stays email and password, Google
-or Facebook. It is a way to name a person who is not in the room:
+### Usernames — *built 2026-10-02*
+A unique handle on each account's profile, like `@jason`. It is not a way to
+sign in, which stays email and password, Google or Facebook. It is a way to
+name a person who is not in the room: to find them, to add them to a race,
+and, next, to follow them.
 
-- **Find somebody** by their handle rather than knowing their email address.
-- **Add them to a race** by handle, which today needs their address.
-- **Follow them**, below: the public identity this section says is missing.
+**As built.** 3 to 20 letters, numbers, underscores and full stops, unique
+whatever the capitals and shown as typed. Optional: the profile page offers
+it once, and "Not now" folds the offer to a line. The first pick can be
+changed straight away; after that, one change per 30 days. A name given up,
+or left behind by a deleted account, is held back from everyone else for 30
+days. Names like admin, support and sendoff are kept back for good.
 
-To settle before it is built: what a handle may contain and whether it can
-change; whether one is required or offered; who can search for one and what a
-result shows (never the email address); and names held back (admin, support,
-sendoff and the like). A handle that can be found makes an account
-discoverable for the first time, so `privacy.html` changes with it.
+**Finding people.** Signed in only, by the start of a username, up to ten
+results, 120 searches an hour per account. A result is a username and a
+display name and never an address. "Let people find me by username" is on
+unless turned off; off, nobody finds or adds you by it.
+
+**Adding by username.** The access panel's add box takes an email or an
+@username, offers matches as you type, and adds a findable account only, 20
+a day per account. **The roster still shows email addresses** to the people
+who run a race, as it always has for everyone on it, so adding somebody by
+username lets the race's runners see their address. `privacy.html` says so.
+Showing usernames in place of addresses in rosters is the follow-up that
+closes it: it touches every place a roster travels (the access list, the
+config handed to crew, the runner picker), which is why it was not folded in.
+
+KV keys: `handle:<email>` for the account's own record, `uname:<lower>` for
+the index, a held name being `{ held, by }` with a 30-day expiry. Tests:
+`worker/test/usernames.mjs`, `test/username-page.mjs`.
 
 ### Follow a runner — *not built*
 Person-level rather than race-level: their next race appears in your feed,

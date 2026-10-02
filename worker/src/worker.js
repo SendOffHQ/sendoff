@@ -1570,6 +1570,189 @@ async function handleAuthLinkRemove(req, env) {
   return json({ ok: true, [provider]: null }, {}, env, req);
 }
 
+// ---------- usernames ----------
+// A handle on an account, like @jason. Never a way to sign in: a way to name a
+// person who is not in the room, so they can be found, added to a race, and
+// later followed. Kept apart from the profile record, which is rewritten
+// whole on every profile save, under two keys:
+//   handle:<email>   { username, findable, setAt, changedAt }
+//   uname:<lower>    { email }  the index, one per name, unique by case
+//                    { held: true, by }  a name just given up, kept back for
+//                    USERNAME_HOLD_DAYS so nobody else can take it and pose as
+//                    the person who had it. KV expires it.
+// A search returns a username and a display name, never an address, and only
+// for people who have left "let people find me" on.
+const HANDLE_KEY = (email) => 'handle:' + normalizeEmail(email);
+const UNAME_KEY = (name) => 'uname:' + String(name).toLowerCase();
+const USERNAME_HOLD_DAYS = 30;
+const USERNAME_CHANGE_DAYS = 30;
+const USERNAME_SEARCH_PER_HOUR = 120;
+const USERNAME_ADDS_PER_DAY = 20;
+const RESERVED_USERNAMES = new Set(['admin', 'administrator', 'root', 'system', 'support', 'help',
+  'info', 'mail', 'email', 'www', 'api', 'app', 'staff', 'team', 'official', 'sendoff', 'sendoffhq',
+  'sendoff_hq', 'crew', 'racer', 'racers', 'race', 'races', 'hub', 'pit', 'settings', 'profile',
+  'account', 'login', 'signin', 'signup', 'logout', 'about', 'privacy', 'terms', 'roadmap',
+  'security', 'abuse', 'billing', 'moderator', 'mod', 'owner', 'null', 'undefined', 'me', 'you',
+  'everyone', 'anonymous', 'guest', 'test']);
+
+function usernameProblem(name) {
+  if (typeof name !== 'string') return 'A username is required.';
+  if (name.length < 3 || name.length > 20) return 'A username is 3 to 20 characters.';
+  if (!/^[A-Za-z0-9_.]+$/.test(name)) return 'Use letters, numbers, underscores and full stops only.';
+  if (name.startsWith('.') || name.endsWith('.') || name.includes('..')) {
+    return 'A full stop cannot start or end a username, or sit next to another.';
+  }
+  if (RESERVED_USERNAMES.has(name.toLowerCase())) return 'That username is kept back. Pick another.';
+  return null;
+}
+async function loadHandle(env, email) {
+  const raw = await env.AUTH_KV.get(HANDLE_KEY(email));
+  let h = null;
+  try { h = raw ? JSON.parse(raw) : null; } catch (e) { h = null; }
+  return { username: null, findable: true, setAt: null, changedAt: null, ...(h || {}) };
+}
+async function readUnameIndex(env, name) {
+  const raw = await env.AUTH_KV.get(UNAME_KEY(name));
+  try { return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+}
+function nextChangeAt(h) {
+  if (!h.changedAt) return null;
+  const t = Date.parse(h.changedAt) + USERNAME_CHANGE_DAYS * 864e5;
+  return t > Date.now() ? new Date(t).toISOString() : null;
+}
+// Free for this account to take: unused, or held for this account itself.
+function unameFreeFor(idx, email) {
+  if (!idx) return true;
+  if (idx.held) return normalizeEmail(idx.by) === email;
+  return normalizeEmail(idx.email) === email;
+}
+// Give a name back, kept from anyone else for a while.
+async function holdUsername(env, name, email) {
+  await env.AUTH_KV.put(UNAME_KEY(name), JSON.stringify({ held: true, by: normalizeEmail(email) }),
+    { expirationTtl: USERNAME_HOLD_DAYS * 86400 });
+}
+async function countAndLimit(env, key, max, ttl) {
+  const seen = parseInt((await env.AUTH_KV.get(key)) || '0', 10);
+  if (seen >= max) return false;
+  await env.AUTH_KV.put(key, String(seen + 1), { expirationTtl: ttl });
+  return true;
+}
+const handleView = (h) => ({ username: h.username || null, findable: h.findable !== false, nextChangeAt: nextChangeAt(h) });
+const unameUnauthorized = (env, req) => json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+const unameNoKv = (env, req) => json({ error: 'Usernames need the AUTH_KV binding' }, { status: 503 }, env, req);
+
+async function handleUsernameGet(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return unameUnauthorized(env, req);
+  if (!env.AUTH_KV) return unameNoKv(env, req);
+  return json(handleView(await loadHandle(env, session.email)), {}, env, req);
+}
+
+async function handleUsernameCheck(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return unameUnauthorized(env, req);
+  if (!env.AUTH_KV) return unameNoKv(env, req);
+  const name = (new URL(req.url).searchParams.get('name') || '').trim().replace(/^@/, '');
+  const problem = usernameProblem(name);
+  if (problem) return json({ ok: false, reason: problem }, {}, env, req);
+  const idx = await readUnameIndex(env, name);
+  if (!unameFreeFor(idx, normalizeEmail(session.email))) return json({ ok: false, reason: 'That username is taken.' }, {}, env, req);
+  return json({ ok: true }, {}, env, req);
+}
+
+async function handleUsernameSet(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return unameUnauthorized(env, req);
+  if (!env.AUTH_KV) return unameNoKv(env, req);
+  let body;
+  try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  const email = normalizeEmail(session.email);
+  const h = await loadHandle(env, email);
+  const wanted = typeof (body && body.username) === 'string' ? body.username.trim().replace(/^@/, '') : '';
+  const current = h.username || '';
+  const now = new Date().toISOString();
+
+  // The same name in different capitals is a correction, not a change.
+  if (wanted && current && wanted.toLowerCase() === current.toLowerCase()) {
+    const problem = usernameProblem(wanted);
+    if (problem) return json({ error: problem, field: 'username' }, { status: 400 }, env, req);
+    const next = { ...h, username: wanted };
+    await env.AUTH_KV.put(HANDLE_KEY(email), JSON.stringify(next));
+    return json(handleView(next), {}, env, req);
+  }
+  if (!wanted && !current) return json(handleView(h), {}, env, req);
+
+  // Picking the first one is free; after that, one change per window, and
+  // giving a name up counts as a change.
+  if (current) {
+    const wait = nextChangeAt(h);
+    if (wait) {
+      return json({ error: `You can change your username again on ${wait.slice(0, 10)}.`, code: 'too_soon', nextChangeAt: wait },
+        { status: 429 }, env, req);
+    }
+  }
+  if (wanted) {
+    const problem = usernameProblem(wanted);
+    if (problem) return json({ error: problem, field: 'username' }, { status: 400 }, env, req);
+    const idx = await readUnameIndex(env, wanted);
+    if (!unameFreeFor(idx, email)) return json({ error: 'That username is taken.', field: 'username', code: 'taken' }, { status: 409 }, env, req);
+    await env.AUTH_KV.put(UNAME_KEY(wanted), JSON.stringify({ email }));
+  }
+  if (current) await holdUsername(env, current, email);
+  const next = { ...h, username: wanted || null, setAt: h.setAt || now, changedAt: current ? now : h.changedAt };
+  await env.AUTH_KV.put(HANDLE_KEY(email), JSON.stringify(next));
+  return json(handleView(next), {}, env, req);
+}
+
+async function handleUsernameFindable(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return unameUnauthorized(env, req);
+  if (!env.AUTH_KV) return unameNoKv(env, req);
+  let body;
+  try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  const h = await loadHandle(env, session.email);
+  const next = { ...h, findable: !!(body && body.findable) };
+  await env.AUTH_KV.put(HANDLE_KEY(session.email), JSON.stringify(next));
+  return json(handleView(next), {}, env, req);
+}
+
+// The beginning of a username in, up to ten people out: their username and
+// the name on their profile. Signed in only, and counted, so it is a way to
+// find a person and not a way to list everyone.
+async function handleUserSearch(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return unameUnauthorized(env, req);
+  if (!env.AUTH_KV) return unameNoKv(env, req);
+  const q = String(new URL(req.url).searchParams.get('q') || '').trim().replace(/^@/, '').toLowerCase();
+  if (q.length < 2 || !/^[a-z0-9_.]+$/.test(q)) return json({ results: [] }, {}, env, req);
+  if (!await countAndLimit(env, 'usrl:' + normalizeEmail(session.email), USERNAME_SEARCH_PER_HOUR, 3600)) {
+    return json({ error: 'That is a lot of searching. Try again in a while.' }, { status: 429 }, env, req);
+  }
+  const listed = await env.AUTH_KV.list({ prefix: UNAME_KEY(q), limit: 40 });
+  const results = [];
+  for (const k of listed.keys) {
+    if (results.length >= 10) break;
+    const idx = await readUnameIndex(env, k.name.slice('uname:'.length));
+    if (!idx || idx.held || !idx.email) continue;
+    const h = await loadHandle(env, idx.email);
+    if (!h.username || h.findable === false) continue;
+    results.push({ username: h.username, displayName: profileName(await loadProfile(env, idx.email)) || '' });
+  }
+  return json({ results }, {}, env, req);
+}
+
+// A findable username to the address behind it, for the worker's own use.
+// Never sent back to a page.
+async function emailForUsername(env, name) {
+  const clean = String(name || '').trim().replace(/^@/, '');
+  if (!/^[A-Za-z0-9_.]{3,20}$/.test(clean)) return null;
+  const idx = await readUnameIndex(env, clean);
+  if (!idx || idx.held || !idx.email) return null;
+  const h = await loadHandle(env, idx.email);
+  if (!h.username || h.findable === false) return null;
+  return normalizeEmail(idx.email);
+}
+
 // Changes the signed-in user's password. The new hash is written to KV, which
 // lookupUser checks before USERS, so this works for env-var users too.
 async function handleChangePassword(req, env) {
@@ -2139,6 +2322,11 @@ async function handleAccountDelete(req, env) {
   await env.AUTH_KV.delete(RESULTS_KEY(email));
   await env.AUTH_KV.delete('glink:' + email);
   await env.AUTH_KV.delete('fblink:' + email);
+  // The username goes with the account, and is kept back for a while so
+  // nobody can take it straight away and be mistaken for them.
+  const gone = await loadHandle(env, email);
+  if (gone.username) await holdUsername(env, gone.username, email);
+  await env.AUTH_KV.delete(HANDLE_KEY(email));
   return json({ ok: true }, {}, env, req);
 }
 
@@ -3951,7 +4139,8 @@ async function handleAccessList(req, env) {
   const named = [];
   for (const p of people) {
     const prof = await loadProfile(env, p.email);
-    named.push({ ...p, displayName: profileName(prof) });
+    const h = env.AUTH_KV ? await loadHandle(env, p.email) : {};
+    named.push({ ...p, displayName: profileName(prof), username: h.username || null });
   }
   let creatorName = '';
   if (raceCfg.createdBy) {
@@ -3982,13 +4171,27 @@ async function handleAccessAdd(req, env) {
   try { body = await req.json(); }
   catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
   const { slug } = body || {};
-  const email = normalizeEmail(body && body.email);
+  let email = normalizeEmail(body && body.email);
   const role = body && body.role;
+  // By username: only a findable one, counted per day, so this is a way to
+  // add somebody you know and not a way to turn usernames into addresses.
+  const byUsername = !email && typeof (body && body.username) === 'string' && body.username.trim();
+  if (byUsername) {
+    if (!env.AUTH_KV) return json({ error: 'Usernames need the AUTH_KV binding' }, { status: 503 }, env, req);
+    if (!await countAndLimit(env, 'uadd:' + normalizeEmail(session.email), USERNAME_ADDS_PER_DAY, 86400)) {
+      return json({ error: 'That is a lot of people added by username today. Try again tomorrow, or add them by email.' }, { status: 429 }, env, req);
+    }
+    email = await emailForUsername(env, body.username);
+    if (!email) {
+      return json({ error: `Nobody can be found as @${String(body.username).trim().replace(/^@/, '')}. Check the spelling, or add them by email.`, code: 'no_username' },
+        { status: 404 }, env, req);
+    }
+  }
   // "editor" is still accepted so an older client, or a share link built before
   // roles existed, keeps working; it means what it always meant.
   const wanted = role === 'editor' ? 'crew' : role;
   if (!slug || !email || !RACE_ROLES.includes(wanted)) {
-    return json({ error: `slug, email, role (${RACE_ROLES.join('|')}) required` }, { status: 400 }, env, req);
+    return json({ error: `slug, email or username, role (${RACE_ROLES.join('|')}) required` }, { status: 400 }, env, req);
   }
   let raceCfg;
   try { raceCfg = await requireAccessManager(env, slug, session.email, session); }
@@ -5342,6 +5545,11 @@ async function route(request, env, ctx) {
     if (request.method === 'POST' && path === '/login/facebook')  return handleLoginFacebook(request, env);
     if (request.method === 'GET'  && path === '/auth-providers')  return handleAuthProviders(request, env);
     if (request.method === 'GET'  && path === '/auth-links')      return handleAuthLinks(request, env);
+    if (request.method === 'GET'  && path === '/username')        return handleUsernameGet(request, env);
+    if (request.method === 'GET'  && path === '/username/check')  return handleUsernameCheck(request, env);
+    if (request.method === 'POST' && path === '/username')        return handleUsernameSet(request, env);
+    if (request.method === 'POST' && path === '/username/findable') return handleUsernameFindable(request, env);
+    if (request.method === 'GET'  && path === '/users/search')    return handleUserSearch(request, env);
     if (request.method === 'POST' && path === '/auth-links/google')   return handleAuthLinkConnect(request, env, 'google');
     if (request.method === 'POST' && path === '/auth-links/facebook') return handleAuthLinkConnect(request, env, 'facebook');
     if (request.method === 'POST' && path === '/auth-links/remove')   return handleAuthLinkRemove(request, env);

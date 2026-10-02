@@ -617,7 +617,7 @@ label.field > .hint {
   font-style: italic;
 }
 .access-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.access-add input[type="email"] {
+.access-add input[type="email"], .access-add #ax-email {
   flex: 1 1 200px; padding: 8px 12px;
   font-family: 'JetBrains Mono', monospace; font-size: 12px;
 }
@@ -709,6 +709,16 @@ label.field > .hint {
 .signin-fb.acct-connect { margin: 0 0 12px; }
 .acct-note { font-size: 12px; line-height: 1.5; color: var(--text-muted); margin: 14px 0 0; }
 .acct-note a { color: var(--accent); }
+/* Usernames offered under the access panel's add box. */
+.ax-suggest { flex-basis: 100%; display: flex; flex-direction: column; border: 1px solid var(--border-bright);
+  border-radius: 4px; background: var(--bg-elevated); overflow: hidden; }
+.ax-suggest button { text-align: left; padding: 9px 12px; background: none; border: 0; border-top: 1px solid var(--border);
+  color: var(--text); font: 13px 'JetBrains Mono', monospace; cursor: pointer;
+  text-transform: none; letter-spacing: normal; }
+.ax-suggest button:first-child { border-top: 0; }
+.ax-suggest button:hover, .ax-suggest button:focus-visible { background: rgba(15, 184, 191, 0.08); color: var(--accent); }
+.ax-suggest button span { color: var(--text-muted); font-family: 'IBM Plex Sans', sans-serif; margin-left: 6px; }
+.ax-suggest[hidden] { display: none; }
 .signin-or { display: flex; align-items: center; gap: 10px; margin: 14px 0 12px;
   font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em;
   text-transform: uppercase; color: var(--text-muted); }
