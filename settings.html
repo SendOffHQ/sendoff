@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=dc2feb59">
+<link rel="stylesheet" href="lib/race-theme.css?v=9b76b24c">
 <style>
   body { padding: 20px 16px 32px; }
   .wrap { max-width: 860px; margin: 0 auto; }
@@ -202,6 +202,10 @@
   /* The Name column holds a picker once there is a roster to pick from, so it
      takes the full cell the way the text field it replaces does. */
   .runner-who { width: 100%; padding: 8px 10px; font-size: 12px; }
+  .runner-shown { font-size: 12px; color: var(--text-muted); margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .runner-shown strong { color: var(--text); }
+  .runner-use-name { background: none; border: 1px solid var(--accent); color: var(--accent); border-radius: 3px;
+    padding: 3px 8px; font: 600 11px 'JetBrains Mono', monospace; cursor: pointer; }
 
   .plan-for {
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -486,7 +490,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=534e074a"></script>
+<script src="lib/race-core.js?v=956f441c"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -1235,12 +1239,20 @@
     const stale = (linked && !known)
       ? `<option value="${escapeAttr(linked)}" selected>${escapeHtml(linked)} (no longer on this race)</option>` : '';
 
+    // A linked racer keeps the name they were linked with, so a later change
+    // to their profile does not rewrite this race. Say what the race shows,
+    // and offer the profile's name when the two have drifted apart.
+    const acct = accountPeople.find(p => p.email === linked);
+    const profName = acct && acct.displayName ? acct.displayName : '';
+    const shown = linked ? `<div class="runner-shown">Shown as <strong>${escapeHtml(r.name || '')}</strong>${
+      profName && profName !== r.name
+        ? ` <button type="button" class="runner-use-name" data-use-profile-name="${i}">Use \u201c${escapeHtml(profName)}\u201d</button>` : ''}</div>` : '';
     return `
       <select data-runner="${i}" data-k="who" class="runner-who" aria-label="Account for racer ${i + 1}">
         <option value=""${linked ? '' : ' selected'}>Not linked · type a name</option>
         ${opts}${stale}
       </select>
-      ${linked ? '' : nameInput}`;
+      ${linked ? shown : nameInput}`;
   }
 
   function renderRunnerRows() {
@@ -1755,7 +1767,8 @@
     const email = e.target.value;
     if (email) {
       // Linking says this runner is that account, so the name comes from it.
-      // To show something else, unlink and type it, or change it in the profile.
+      // After that the race keeps it: a new profile name reaches the race by
+      // the "Use" button beside the row, or the offer the profile box makes.
       r.email = email;
       r.name = personName(accountPeople.find(p => p.email === email) || { email });
     } else {
@@ -1767,6 +1780,13 @@
     renderProfilePicker();
   });
   document.getElementById('runner-edit-rows').addEventListener('click', (e) => {
+    const use = e.target.closest && e.target.closest('[data-use-profile-name]');
+    if (use) {
+      const r = editingRunners[+use.dataset.useProfileName];
+      const acct = accountPeople.find(p => p.email === String(r.email || '').toLowerCase());
+      if (acct && acct.displayName) { r.name = acct.displayName; renderRunnerRows(); renderPlanPicker(); }
+      return;
+    }
     const del = e.target.dataset.delRunner;
     if (del == null) return;
     const gone = editingRunners[+del];

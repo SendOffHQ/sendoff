@@ -55,6 +55,7 @@ const myHandle = { username: null, findable: true, nextChangeAt: null };
 const DIRECTORY = [{ username: 'jasmine_r', displayName: 'Jasmine R', email: 'jasmine@example.com' },
                    { username: 'jasper', displayName: 'Jasper Lee', email: 'jasper@example.com' }];
 const addedPeople = [];
+let myProfile = { email: ME, firstName: '', lastName: '', displayName: '', targets: {}, phaseTargets: [], notes: '' };
 
 // Whether an invite comes back with a rendered message beside the link. An
 // older worker does not send one, and the page has to cope by not offering a
@@ -247,6 +248,20 @@ const server = http.createServer((req, res) => {
       if (word !== 'good') return send(400, '{"error":"Could not be checked"}', 'application/json');
       authLinks[p] = { linkedAt: '2026-10-01T15:00:00Z' };
       send(200, JSON.stringify({ ok: true }), 'application/json');
+    });
+  }
+  // This stub's own profile, kept in memory: what the profile box saves and
+  // reads back.
+  if (url.pathname === '/api/profile') {
+    if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+    if (req.method === 'GET') return send(200, JSON.stringify({ profile: myProfile, own: true }), 'application/json');
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      const j = JSON.parse(body || '{}');
+      myProfile = { email: ME, firstName: j.firstName || '', lastName: j.lastName || '', displayName: j.displayName || '',
+        targets: j.targets || {}, phaseTargets: j.phaseTargets || [], notes: j.notes || '' };
+      send(200, JSON.stringify({ profile: myProfile }), 'application/json');
     });
   }
   if (url.pathname === '/api/username' && req.method === 'GET') {

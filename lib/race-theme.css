@@ -709,6 +709,15 @@ label.field > .hint {
 .signin-fb.acct-connect { margin: 0 0 12px; }
 .acct-note { font-size: 12px; line-height: 1.5; color: var(--text-muted); margin: 14px 0 0; }
 .acct-note a { color: var(--accent); }
+/* Carrying a new profile name over to the races you are the racer on. */
+.ns-lead { margin: 0 0 6px; font-size: 15px; }
+.ns-list { display: grid; gap: 2px; margin-top: 12px; }
+.ns-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--border); cursor: pointer; }
+.ns-row:first-child { border-top: 0; }
+.ns-row input { margin-top: 3px; accent-color: var(--accent); }
+.ns-row > span { display: grid; gap: 2px; min-width: 0; }
+.ns-now { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); }
+
 /* Importing aid stations from a spreadsheet, under the aid station table. */
 .aid-import { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-top: 12px; }
 .aid-import-btn { position: relative; cursor: pointer; }
