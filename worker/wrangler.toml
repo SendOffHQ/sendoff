@@ -40,7 +40,7 @@ GOOGLE_CLIENT_ID = "30357276936-qui51fgf7ahb1a1cs1ie7eje6mc7uqu2.apps.googleuser
 # Facebook sign-in also needs FACEBOOK_APP_SECRET, which is a secret and set
 # with `wrangler secret put FACEBOOK_APP_SECRET`, never here. Either missing
 # turns it off and the button is not drawn.
-FACEBOOK_APP_ID = ""
+FACEBOOK_APP_ID = "1859403088390377"
 # If you mount the worker at a subpath (e.g. on a route like
 # api.example.com/race-dashboard/*), set MOUNT_PATH to that prefix.
 # Leave empty if the worker is at the root of its hostname.
