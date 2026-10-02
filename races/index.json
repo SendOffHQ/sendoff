@@ -62,7 +62,24 @@
         "ronnie.reineke"
       ],
       "cutoffHours": 30
+    },
+    {
+      "slug": "000005-rio-del-lago-100",
+      "name": "Rio del Lago 100",
+      "location": "Folsom, CA",
+      "startTime": "2026-11-07T07:00:00-06:00",
+      "courseType": "segments",
+      "units": {
+        "distance": "mi",
+        "elevation": "ft"
+      },
+      "activity": "trail-run",
+      "totalDistanceMi": 100,
+      "runnerNames": [
+        "Jason"
+      ],
+      "cutoffHours": 30
     }
   ],
-  "lastUpdated": "2026-10-02T02:21:29.754Z"
+  "lastUpdated": "2026-10-02T16:00:03.295Z"
 }
