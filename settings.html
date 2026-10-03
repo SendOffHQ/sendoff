@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=9b76b24c">
+<link rel="stylesheet" href="lib/race-theme.css?v=d430ed4a">
 <style>
   body { padding: 20px 16px 32px; }
   .wrap { max-width: 860px; margin: 0 auto; }
@@ -112,6 +112,11 @@
     letter-spacing: 0.1em; text-transform: uppercase; margin-top: 8px;
   }
   .add-row:hover { color: var(--accent); border-color: var(--accent); }
+  /* Start, zone and cutoffs: laid out like the rows around them, the label
+     over its controls. */
+  .time-row { margin-top: 10px; }
+  .time-row > label { display: block; }
+  .time-row > select { width: 100%; max-width: 100%; }
   .row-del {
     background: transparent; border: 1px solid var(--border);
     color: var(--text-muted); cursor: pointer;
@@ -273,6 +278,28 @@
     </div>
     <p class="hint" style="margin-top:8px">What this race is. It decides how a
       pace reads and, later, what a result is comparable to.</p>
+    <div class="row time-row" style="margin-top:14px">
+      <label for="race-start-date">Start</label>
+      <span class="cut-pick">
+        <input type="date" id="race-start-date" aria-label="Start date" />
+        <input type="time" id="race-start-time" aria-label="Start time" />
+      </span>
+    </div>
+    <div class="row time-row">
+      <label for="race-tz">Time zone</label>
+      <select id="race-tz"></select>
+    </div>
+    <div class="row time-row">
+      <label>Finish cutoff</label>
+      <div id="race-cutoff-pick"></div>
+    </div>
+    <div class="row time-row" id="race-last-leg-row" style="display:none">
+      <label>Last-lap gate</label>
+      <div id="race-last-leg-pick"></div>
+    </div>
+    <p class="hint" id="race-time-hint" style="margin-top:8px">The start, the cutoffs and
+      every split are on the race's own clock, in this zone. Moving the start keeps each
+      cutoff at its day and time.</p>
     <div class="row" style="margin-top:14px">
       <label for="race-unit-distance">Distance</label>
       <select id="race-unit-distance">
@@ -306,7 +333,7 @@
     <div class="editor-warn" id="aid-warn" style="display:none;"></div>
     <table class="aid-list">
       <thead>
-        <tr><th>#</th><th>Name</th><th>Cum mile</th><th>Arrive cutoff (h)</th><th></th></tr>
+        <tr><th>#</th><th>Name</th><th>Cum mile</th><th></th></tr>
       </thead>
       <tbody id="aid-rows"></tbody>
     </table>
@@ -490,7 +517,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=5cc78094"></script>
+<script src="lib/race-core.js?v=fa0ab11c"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -606,12 +633,15 @@
       // aidStations() carries each station's settings, so the editor opens
       // showing what the race actually has rather than a row of blanks it would
       // then save over the top of.
-      editingAid = Race.course.aidStations(cfg).map(a => ({ ...a, arriveCutoffHours: '' }));
-      // Pull arriveCutoffHours from the segment that arrives at each aid
+      editingAid = Race.course.aidStations(cfg).map(a => ({ ...a, arriveCutoffHours: '', cut: null }));
+      // Each cutoff comes from the segment that arrives at the aid, and is
+      // edited as the day and time it falls on, in the race's zone.
       const segs = cfg.course?.segments || [];
       editingAid.forEach((a, i) => {
         if (i === 0) return;
-        a.arriveCutoffHours = segs[i - 1]?.arriveCutoffHours ?? '';
+        const h = segs[i - 1]?.arriveCutoffHours;
+        a.cut = h == null ? null : Race.tz.hoursToWall(cfg.startTime, h, raceZone());
+        if (!a.cut && h != null) a.arriveCutoffHours = h;
       });
       renderAidEditor();
     }
@@ -950,10 +980,11 @@
   // stored, so moving the race start moves every band with it.
   function bandClock(fromHour) {
     if (!cfg.startTime) return '';
-    const t = new Date(new Date(cfg.startTime).getTime() + (+fromHour || 0) * 3600000);
+    const t = Date.parse(cfg.startTime) + (+fromHour || 0) * 3600000;
     if (isNaN(t)) return '';
-    const day = Math.floor((t - new Date(new Date(cfg.startTime).toDateString())) / 86400000);
-    return t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + (day > 0 ? ` D${day + 1}` : '');
+    const z = raceZone();
+    const day = Race.tz.days(cfg.startTime, z, 8).findIndex(d => d.value === Race.tz.toInputs(t, z).date);
+    return Race.tz.format(t, z, { hour: 'numeric', minute: '2-digit' }) + (day > 0 ? ` D${day + 1}` : '');
   }
 
   // Same column rule as the item table: one per metric currently in the editor,
@@ -1435,6 +1466,15 @@
       <input type="checkbox" data-aid="${i}" data-k="${key}" ${on ? 'checked' : ''} />${label}</label>`;
   }
 
+  // A race set up before the start date was required has no start to put a
+  // day against, so its cutoffs stay as hours.
+  function aidCutCell(a, i) {
+    if (!cfg.startTime || isNaN(Date.parse(cfg.startTime))) {
+      return `<input type="number" data-aid="${i}" data-k="arriveCutoffHours" value="${a.arriveCutoffHours === '' || a.arriveCutoffHours == null ? '' : a.arriveCutoffHours}" step="0.25" min="0" placeholder="Hours" />`;
+    }
+    return Race.tz.cutoffInputs(cfg.startTime, raceZone(), a.cut, `data-aid="${i}" data-k="cut"`, `${a.name || 'Aid station'} cutoff`);
+  }
+
   function renderAidEditor() {
     const tbody = document.getElementById('aid-rows');
     tbody.innerHTML = editingAid.map((a, i) => `
@@ -1442,13 +1482,13 @@
         <td style="font-family: 'JetBrains Mono', monospace; color: var(--text-muted); width: 30px;">${i+1}</td>
         <td><input type="text" data-aid="${i}" data-k="name" value="${escapeAttr(a.name)}" /></td>
         <td><input type="number" data-aid="${i}" data-k="mileage" value="${a.mileage === '' || a.mileage == null ? '' : a.mileage}" step="0.1" min="0" ${i === 0 ? 'readonly style="opacity:0.6"' : ''} /></td>
-        <td><input type="number" data-aid="${i}" data-k="arriveCutoffHours" value="${a.arriveCutoffHours === '' || a.arriveCutoffHours == null ? '' : a.arriveCutoffHours}" step="0.25" min="0" placeholder="–" ${i === 0 ? 'readonly style="opacity:0.6"' : ''} /></td>
         <td>${i > 1 ? `<button class="row-del" data-del-aid="${i}" type="button" aria-label="Delete">×</button>` : ''}</td>
       </tr>
       <tr class="aid-opts-row">
         <td></td>
-        <td colspan="4">
+        <td colspan="3">
           <div class="aid-opts">
+            ${i === 0 ? '' : `<div class="aid-cut"><span class="aid-cut-lbl">Cutoff</span>${aidCutCell(a, i)}</div>`}
             ${aidToggle(i, 'crewAccess', 'Crew can meet', a.crewAccess !== false)}
             ${aidToggle(i, 'dropBag', 'Drop bag', !!a.dropBag)}
             ${aidToggle(i, 'pacerEligible', 'Pacer pickup', !!a.pacerEligible)}
@@ -1487,7 +1527,48 @@
     const eu = document.getElementById('race-unit-elevation');
     if (du) du.value = u.distance === 'km' ? 'km' : 'mi';
     if (eu) eu.value = u.elevation === 'm' ? 'm' : 'ft';
+    fillRaceTimes();
   }
+
+  // ---------- start, zone and race cutoffs ----------
+  // The race's own zone, or for a race from before races had one, this
+  // device's, which is how its times have always been shown.
+  function raceZone() { return Race.tz.of(cfg) || Race.tz.device(); }
+
+  // What the Race details form holds: the start and the cutoffs as wall
+  // clocks, so changing the zone keeps 7:00 AM at 7:00 AM in the new one.
+  // Left alone once edited, so a poll redrawing the page does not undo it.
+  let raceForm = null, raceFormDirty = false;
+  function fillRaceTimes() {
+    if (!cfg || raceFormDirty) return;
+    const z = raceZone(), st = cfg.startTime, c = cfg.cutoffs || {};
+    raceForm = {
+      zone: z,
+      start: isNaN(Date.parse(st)) ? { date: '', time: '' } : Race.tz.toInputs(Date.parse(st), z),
+      // 36 hours is what every page has assumed for a race that never set one.
+      finishCut: Race.tz.hoursToWall(st, c.totalHours || 36, z),
+      lastLegCut: c.lastLegStartHours != null ? Race.tz.hoursToWall(st, c.lastLegStartHours, z) : null
+    };
+    document.getElementById('race-start-date').value = raceForm.start.date;
+    document.getElementById('race-start-time').value = raceForm.start.time;
+    document.getElementById('race-tz').innerHTML = Race.tz.optionsHtml(z);
+    document.getElementById('race-last-leg-row').style.display =
+      cfg.courseType === 'loops' || c.lastLegStartHours != null ? '' : 'none';
+    renderRaceCutoffs();
+  }
+  function formStartIso() {
+    if (!raceForm) return null;
+    const ms = Race.tz.fromInputs(raceForm.start.date, raceForm.start.time, raceForm.zone);
+    return ms == null || isNaN(ms) ? null : Race.tz.isoWithOffset(ms, raceForm.zone);
+  }
+  function renderRaceCutoffs() {
+    const start = formStartIso();
+    document.getElementById('race-cutoff-pick').innerHTML =
+      Race.tz.cutoffInputs(start, raceForm.zone, raceForm.finishCut, 'data-racecut="finishCut"', 'Finish cutoff');
+    document.getElementById('race-last-leg-pick').innerHTML =
+      Race.tz.cutoffInputs(start, raceForm.zone, raceForm.lastLegCut, 'data-racecut="lastLegCut"', 'Last-lap gate');
+  }
+  const wallHoursFrom = (start, w) => (start && w && w.time) ? Race.tz.wallToHours(start, w.date, w.time, raceForm.zone) : null;
 
   async function saveRaceDetails() {
     const el = document.getElementById('race-activity');
@@ -1496,19 +1577,50 @@
     const eSel = document.getElementById('race-unit-elevation');
     const distance = dSel && dSel.value === 'km' ? 'km' : 'mi';
     const elevation = eSel && eSel.value === 'm' ? 'm' : 'ft';
+    const newStart = formStartIso(), zone = raceForm && raceForm.zone;
+    const totalHours = wallHoursFrom(newStart, raceForm && raceForm.finishCut);
+    const lastLeg = wallHoursFrom(newStart, raceForm && raceForm.lastLegCut);
+    if (!newStart) { toast('Pick the start date and time.', 'error'); return; }
+    if (!(totalHours > 0)) { toast('The finish cutoff has to be after the start.', 'error'); return; }
+    if (lastLeg != null && !(lastLeg > 0 && lastLeg < totalHours)) {
+      toast('The last-lap gate has to be between the start and the finish cutoff.', 'error'); return;
+    }
     const btn = document.getElementById('race-save');
     Race.saveBtn.busy(btn);
     try {
-      await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
+      const written = await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
         if (chosen) remote.activity = chosen; else delete remote.activity;
         remote.units = { distance, elevation };
+        // A cutoff is stored as hours from the start. When the start or the
+        // zone moves, each aid station's is worked out again so it stays at
+        // the day and time the race publishes.
+        const oldStart = remote.startTime, oldZone = Race.tz.of(remote) || Race.tz.device();
+        if (oldStart && (Date.parse(oldStart) !== Date.parse(newStart) || oldZone !== zone)) {
+          const keep = (h) => {
+            const w = Race.tz.hoursToWall(oldStart, h, oldZone);
+            return w ? Race.tz.wallToHours(newStart, w.date, w.time, zone) : h;
+          };
+          for (const list of [remote.course && remote.course.segments, remote.course && remote.course.loopSegments]) {
+            (list || []).forEach(sg => { if (sg && sg.arriveCutoffHours != null) sg.arriveCutoffHours = keep(sg.arriveCutoffHours); });
+          }
+        }
+        remote.startTime = newStart;
+        remote.timezone = zone;
+        remote.cutoffs = { ...(remote.cutoffs || {}), totalHours };
+        if (lastLeg != null) remote.cutoffs.lastLegStartHours = lastLeg; else delete remote.cutoffs.lastLegStartHours;
         return remote;
       }, `settings: set race details for ${slug}`);
       // Applied in place rather than re-read. Reading the config back straight
       // after writing it races GitHub's own consistency, and would briefly show
       // the units from before the save.
       if (cfg) cfg.units = { distance, elevation };
+      if (cfg && written) {
+        cfg.startTime = written.startTime; cfg.timezone = written.timezone;
+        cfg.cutoffs = written.cutoffs; cfg.course = written.course;
+      }
+      raceFormDirty = false;
       render();
+      if (editingAid) renderAidEditor();
       // The hub draws its cards from the manifest, not from the config, so a
       // change that stopped here would show on the race page and nowhere else.
       // A public race only; a private one is not in the manifest at all.
@@ -1518,6 +1630,9 @@
             const e = (m.races || []).find(r => r.slug === slug);
             if (e) {
               if (chosen) e.activity = chosen; else delete e.activity;
+              e.startTime = newStart;
+              e.timezone = zone;
+              e.cutoffHours = totalHours;
               m.lastUpdated = new Date().toISOString();
             }
             return m;
@@ -1546,9 +1661,12 @@
         pacerEligible: !!a.pacerEligible,
         dropBag: !!a.dropBag,
         checkpoint: !!a.checkpoint,
-        arriveCutoffHours: a.arriveCutoffHours === '' || a.arriveCutoffHours == null ? null : parseFloat(a.arriveCutoffHours)
+        arriveCutoffHours: a.cut ? Race.tz.wallToHours(cfg.startTime, a.cut.date, a.cut.time, raceZone())
+          : a.arriveCutoffHours === '' || a.arriveCutoffHours == null ? null : parseFloat(a.arriveCutoffHours)
       }))
       .filter(a => a.name && a.mileage != null && !isNaN(a.mileage));
+    const early = aids.slice(1).find(a => a.arriveCutoffHours != null && !(a.arriveCutoffHours > 0));
+    if (early) { toast(`The cutoff for ${early.name} is before the start.`, 'error'); return; }
 
     if (aids.length < 2) { toast('Need at least 2 aid stations.', 'error'); return; }
     for (let i = 1; i < aids.length; i++) {
@@ -1690,6 +1808,12 @@
       renderAidEditor();
       return;
     }
+    if (k === 'cut') {
+      const day = document.querySelector(`#aid-rows select[data-aid="${i}"][data-k="cut"]`);
+      const time = document.querySelector(`#aid-rows input[data-aid="${i}"][data-k="cut"]`);
+      a.cut = time && time.value ? { date: day.value, time: time.value } : null;
+      return;
+    }
     a[k] = e.target.value;
   });
   document.getElementById('aid-rows').addEventListener('click', (e) => {
@@ -1710,8 +1834,11 @@
     count: () => (editingAid || []).length,
     saveWord: 'press Save changes',
     apply: (stations) => {
-      editingAid = stations.map(a => ({ ...a, mileage: Math.round(a.mileage * 100) / 100,
-        arriveCutoffHours: a.arriveCutoffHours == null ? '' : a.arriveCutoffHours }));
+      // "Sun 6:00 AM" and hours alike become the day and time they fall on.
+      const walls = Race.aidImport.placeCutoffs(stations, cfg.startTime, raceZone());
+      editingAid = stations.map((a, i) => ({ ...a, mileage: Math.round(a.mileage * 100) / 100, cutoffAt: undefined,
+        cut: i === 0 ? null : walls[i],
+        arriveCutoffHours: walls[i] || a.arriveCutoffHours == null ? '' : a.arriveCutoffHours }));
       renderAidEditor();
     }
   });
@@ -1726,6 +1853,27 @@
     document.getElementById('race-editor').classList.toggle('collapsed');
   });
   document.getElementById('race-save').addEventListener('click', saveRaceDetails);
+  // The start and the zone. The cutoffs keep their day and time; what
+  // changes is which days there are to pick from.
+  for (const id of ['race-start-date', 'race-start-time', 'race-tz']) {
+    document.getElementById(id).addEventListener('change', (e) => {
+      if (!raceForm) return;
+      raceFormDirty = true;
+      if (id === 'race-tz') raceForm.zone = e.target.value;
+      else raceForm.start[id === 'race-start-date' ? 'date' : 'time'] = e.target.value;
+      renderRaceCutoffs();
+    });
+  }
+  for (const id of ['race-cutoff-pick', 'race-last-leg-pick']) {
+    document.getElementById(id).addEventListener('input', (e) => {
+      const k = e.target.dataset.racecut;
+      if (!k || !raceForm) return;
+      raceFormDirty = true;
+      const host = document.getElementById(id);
+      const day = host.querySelector('[data-part="day"]'), time = host.querySelector('[data-part="time"]');
+      raceForm[k] = time && time.value ? { date: day.value, time: time.value } : null;
+    });
+  }
 
   document.getElementById('runner-editor-head').addEventListener('click', () => {
     document.getElementById('runner-editor').classList.toggle('collapsed');

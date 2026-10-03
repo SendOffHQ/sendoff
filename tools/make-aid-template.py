@@ -13,15 +13,15 @@ from xml.sax.saxutils import escape
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'templates')
 
-HEAD = ['Aid station', 'Distance (mi)', 'Arrive cutoff (hours)', 'Crew can meet',
+HEAD = ['Aid station', 'Distance (mi)', 'Cutoff (day and time)', 'Crew can meet',
         'Drop bag', 'Pacer pickup', 'Checkpoint only', 'Crew note']
 ROWS = [
     ['Start',            0,    '',   'yes', 'no',  'no',  'no',  'Park in the main lot'],
     ['Ridge Road',       6.2,  '',   'yes', 'no',  'no',  'no',  'Pull-off on the left, 4 cars'],
     ['Summit Timing',    11.4, '',   'no',  'no',  'no',  'yes', ''],
-    ['Lakeside',         17.9, 5.5,  'yes', 'yes', 'yes', 'no',  'Walk in 0.3 mi from the boat ramp'],
-    ['Pine Hollow',      24.6, 8,    'yes', 'no',  'no',  'no',  ''],
-    ['Finish',           31.1, 10,   'yes', 'no',  'no',  'no',  ''],
+    ['Lakeside',         17.9, 'Sat 12:30 PM',  'yes', 'yes', 'yes', 'no',  'Walk in 0.3 mi from the boat ramp'],
+    ['Pine Hollow',      24.6, 'Sat 3:00 PM',  'yes', 'no',  'no',  'no',  ''],
+    ['Finish',           31.1, 'Sat 5:00 PM',  'yes', 'no',  'no',  'no',  ''],
 ]
 HOWTO = [
     ['How to fill in the aid stations sheet'],
@@ -30,7 +30,9 @@ HOWTO = [
     ['Aid station: the name your crew will see. Required.'],
     ['Distance: how far from the start, not from the last stop. The first row is 0. Required.'],
     ['   Head the column "Distance (km)" instead if your distances are in kilometres.'],
-    ['Arrive cutoff (hours): hours from the start, like 30 or 30:00. Leave empty if there is none.'],
+    ['Cutoff: the day and time the race publishes, like Sun 1:00 PM, in the race\'s time zone.'],
+    ['   With no day, like 6:00 AM, it is the first 6:00 AM after the cutoff above it.'],
+    ['   A number on its own, like 30, is hours from the start. Leave empty if there is none.'],
     ['Crew can meet, Drop bag, Pacer pickup, Checkpoint only: yes or no. Empty means no,'],
     ['   except Crew can meet, where empty means yes.'],
     ['Checkpoint only: a timing point with no aid, where the racer is logged but nobody meets them.'],
@@ -106,7 +108,7 @@ FILES = {
         '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>'
         '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
         '</styleSheet>',
-    'xl/worksheets/sheet1.xml': sheet([HEAD] + ROWS, [20, 14, 20, 14, 10, 13, 16, 36]),
+    'xl/worksheets/sheet1.xml': sheet([HEAD] + ROWS, [20, 14, 22, 14, 10, 13, 16, 36]),
     'xl/worksheets/sheet2.xml': sheet(HOWTO, [100], header_style=True, freeze=False),
 }
 
