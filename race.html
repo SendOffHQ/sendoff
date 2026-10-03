@@ -282,8 +282,9 @@
   .seg-list { display: flex; flex-direction: column; }
   .seg-row {
     /* minmax(0, 1fr), not 1fr: a plain 1fr will not go narrower than the
-       longest thing in it that cannot wrap, and a long crew note used to push
-       the whole row past the edge of a phone, taking the leg time with it. */
+       longest thing in it that cannot wrap, and a long crew note (shown here
+       until 2026-10-04) used to push the whole row past the edge of a phone,
+       taking the leg time with it. */
     display: grid; grid-template-columns: 32px minmax(0, 1fr) 80px 80px 80px;
     gap: 10px; padding: 10px 8px;
     border-bottom: 1px solid var(--border);
@@ -420,11 +421,6 @@
   .st-tag.nocrew { color: var(--red); }
   .st-tag.bag    { color: var(--accent); }
   .st-tag.pacer  { color: var(--green); }
-  /* A crew note is a sentence, not a label: its own line, wrapping, never
-     wider than the row it is in. */
-  .st-tag.note   { color: var(--yellow); text-transform: none; letter-spacing: 0.04em;
-                   display: block; width: fit-content; max-width: 100%; box-sizing: border-box;
-                   margin: 4px 0 2px; white-space: normal; overflow-wrap: anywhere; line-height: 1.45; }
 
   /* On a phone the columns do not fit: the segment name wraps to four lines
      and the last fuel metric falls off the right edge, and a race is free to
@@ -697,8 +693,9 @@
   }
 
   // What waits at the end of a leg: a timing point with no aid, a stop the crew
-  // cannot drive to, the lot they park in. A crew needs this while planning the
-  // day, not only in the log after the leg is already run.
+  // cannot drive to, a bag, a pacer. The crew's own notes (the lot, the walk-in,
+  // a pin to drop) are not here: they are for the people driving to it, and
+  // they live on the pit board, beside the racer the crew is meeting.
   function stationTags(st) {
     if (!st) return '';
     const tags = [];
@@ -706,7 +703,6 @@
     else if (!st.crewAccess) tags.push(['nocrew', 'No crew']);
     if (st.dropBag) tags.push(['bag', 'Drop bag']);
     if (st.pacerEligible) tags.push(['pacer', 'Pacer']);
-    if (st.crewNote) tags.push(['note', st.crewNote]);
     return tags.length
       ? ' ' + tags.map(([c, t]) => `<span class="st-tag ${c}">${escapeHtml(t)}</span>`).join('')
       : '';
@@ -717,7 +713,8 @@
     // The start is not a leg, so it has no row of its own, but a bag left there
     // or a lot the crew parks in is worth saying before the race begins.
     const st = Race.course.startAidTags(cfg);
-    const startRow = !st ? '' : `
+    // A start with only a crew note has nothing left to say here.
+    const startRow = !st || !stationTags(st) ? '' : `
         <div class="seg-row start">
           <span class="num">–</span>
           <span class="nm">

@@ -90,6 +90,22 @@
     color: var(--text-dim);
   }
   .where strong { color: var(--text); }
+  .where .stop { margin-top: 8px; line-height: 1.6; }
+  .where .stop .k { color: var(--text-muted); }
+  .stop-tag {
+    display: inline-block; padding: 0 5px; border: 1px solid currentColor; border-radius: 2px;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+  }
+  .stop-tag.cp { color: var(--blue); }
+  .stop-tag.nocrew { color: var(--red); }
+  .stop-tag.bag { color: var(--accent); }
+  .stop-tag.pacer { color: var(--green); }
+  /* A sentence, wrapping inside the card however long it is. */
+  .stop-note {
+    margin-top: 4px; padding: 6px 8px; border-left: 2px solid var(--yellow);
+    background: var(--bg-elevated); color: var(--text);
+    white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45;
+  }
   .where .arrow { color: var(--text-muted); margin: 0 6px; }
 
   .state-timer {
@@ -569,6 +585,41 @@
     return `In pit · next: <strong>${escapeHtml(nextDef ? nextDef.name : '?')}</strong>`;
   }
 
+  // The stop the crew is driving to, and what they need to know getting there:
+  // the lot, the walk-in, a pin to drop. These notes used to be on the race
+  // page too, where spectators had no use for them and a long one pushed the
+  // course list off a phone. Here they sit beside the racer being met.
+  //
+  // On course, it is where the racer will come in. In a pit, it is the next
+  // one, because that is where the crew goes once the racer is sent off.
+  // Before the start, the start itself.
+  function stopLine(next) {
+    let label, name, st;
+    if (next.state === 'finished') return '';
+    if (next.state === 'idle') {
+      st = Race.course.startAid(cfg);
+      label = 'At the start';
+      name = (Race.course.aidStations(cfg)[0] || {}).name || 'Start';
+    } else {
+      const idx = next.state === 'on-course' ? next.currentLegIndex : next.nextLegIndex;
+      st = Race.stationAt(cfg, idx);
+      label = next.state === 'on-course' ? 'Meet at' : 'Next stop';
+      name = st && st.name;
+    }
+    if (!st || !name) return '';
+    const tags = [];
+    if (st.checkpoint) tags.push(['cp', 'Checkpoint, no aid']);
+    else if (!st.crewAccess) tags.push(['nocrew', 'No crew access']);
+    if (st.dropBag) tags.push(['bag', 'Drop bag']);
+    if (st.pacerEligible) tags.push(['pacer', 'Pacer pickup']);
+    if (!tags.length && !st.crewNote) return '';
+    return `<div class="stop">
+        <span class="k">${label}</span> <strong>${escapeHtml(name)}</strong>${
+          tags.map(([c, t]) => ` <span class="stop-tag ${c}">${escapeHtml(t)}</span>`).join('')}
+        ${st.crewNote ? `<div class="stop-note">${escapeHtml(st.crewNote)}</div>` : ''}
+      </div>`;
+  }
+
   // The two times the selected leg actually holds, to the second. A press that
   // went in a minute late, or one that never went in at all, is the thing a
   // crew is scanning for, and neither shows up in a duration.
@@ -747,7 +798,7 @@
           <div class="runner-name">${escapeHtml(runner.name)}</div>
           <div class="state-badge state-${stateClass}">${stateLabel}</div>
         </div>
-        <div class="where">${whereLine(runner, next)}</div>
+        <div class="where">${whereLine(runner, next)}${stopLine(next)}</div>
         <div class="state-timer" data-since="${since}"${done ? ` data-elapsed="${finishedSec}"` : ''}>
           <span class="label">${timerLabel}</span>
           <span class="value runner-timer">–</span>

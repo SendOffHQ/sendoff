@@ -1,6 +1,8 @@
-// A long crew note on the race page's course list, on a phone. It used to sit
-// on one unbreakable line, push its row past the edge of the screen and take
-// the leg's time with it ("01:0").
+// Crew notes on an aid station (the lot, the walk-in, a pin) are for the crew
+// driving there, so they are on the pit board, beside the racer being met, and
+// not on the race page. A long one on the race page used to sit on one
+// unbreakable line, push its row past the edge of a phone and take the leg's
+// time with it ("01:0").
 //
 //   node test/long-crew-note.mjs
 import { chromium } from 'playwright';
@@ -45,24 +47,45 @@ await page.evaluate(async ([slug, a, c]) => {
     body: JSON.stringify({ path: `races/${slug}/config.json`, content: JSON.stringify(cfg), message: 'note' }) });
 }, [SLUG, LONG, COORDS]);
 
+const setLegs = (legs) => page.evaluate(async ([slug, legs]) => {
+  await fetch('/api/commit', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer stub' },
+    body: JSON.stringify({ path: `races/${slug}/data.json`, content: JSON.stringify({ runners: [{ id: 'jason', legs }] }), message: 'legs' }) });
+}, [SLUG, legs]);
+const t = (h) => new Date(Date.parse('2026-09-07T14:11:13Z') + h * 3600e3).toISOString();
+
+console.log('\nthe race page');
+await setLegs([{ index: 1, startTime: t(0), endTime: t(2.3) }, { index: 2, startTime: t(2.35), endTime: t(3) }]);
 await page.goto(BASE + `/race.html?id=${SLUG}`);
-await page.waitForSelector('.seg-row .st-tag.note', { state: 'attached', timeout: 20000 });
-// The course list sits in a collapsed section on some layouts; open whatever holds it.
-await page.evaluate(() => { const r = document.querySelector('.seg-row'); let p = r; while (p) { if (p.tagName === 'DETAILS') p.open = true; p.classList && p.classList.remove('collapsed'); p = p.parentElement; } });
-await page.waitForTimeout(300);
-const rows = await page.$$eval('.seg-row', rs => rs.filter(r => r.querySelector('.st-tag.note') && r.querySelector('.st-tag.note').textContent.length > 60).map(r => {
-  const box = r.getBoundingClientRect(), note = r.querySelector('.st-tag.note').getBoundingClientRect();
-  const dur = r.querySelector('.col-dur'), d = dur.getBoundingClientRect();
-  return { text: r.querySelector('.st-tag.note').textContent, rowFits: r.scrollWidth <= r.clientWidth + 1,
-    noteInside: note.right <= box.right + 1, noteLines: Math.round(note.height / parseFloat(getComputedStyle(r.querySelector('.st-tag.note')).lineHeight)),
-    time: dur.textContent.trim(), timeInside: d.right <= box.right + 1 && dur.scrollWidth <= dur.clientWidth + 1 };
+await page.waitForSelector('.seg-row', { state: 'attached', timeout: 20000 });
+const course = await page.$eval('body', b => b.textContent);
+ok('carries no crew notes', [course.includes('gravel lot'), course.includes('Tylenol'), course.includes('Crew lot C1')], [false, false, false]);
+ok('but still says where a drop bag is', await page.$$eval('.seg-row .st-tag.bag', els => els.length > 0), true);
+const rows = await page.$$eval('.seg-row', rs => rs.map(r => {
+  const box = r.getBoundingClientRect(), dur = r.querySelector('.col-dur'), d = dur.getBoundingClientRect();
+  return r.scrollWidth <= r.clientWidth + 1 && d.right <= box.right + 1 && dur.scrollWidth <= dur.clientWidth + 1;
 }));
-ok('both notes are there, whole', rows.map(r => r.text), [LONG, COORDS]);
-ok('each row stays inside the screen', rows.map(r => r.rowFits), [true, true]);
-ok('the note wraps inside its row', rows.map(r => [r.noteInside, r.noteLines > 1]), [[true, true], [true, true]]);
-ok('and the leg time is all there', rows.map(r => [/^\d\d:\d\d(:\d\d)?$/.test(r.time), r.timeInside]), [[true, true], [true, true]]);
-ok('nothing pushes the page sideways', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
-await page.screenshot({ path: process.env.SHOT || '/dev/null', fullPage: false }).catch(() => {});
+ok('and every row, leg time included, fits a phone', rows.every(Boolean), true);
+
+console.log('\nthe pit board');
+const stop = async () => {
+  await page.goto(BASE + `/pit.html?id=${SLUG}`);
+  await page.waitForSelector('article.runner .where', { timeout: 20000 });
+  return page.$eval('article.runner', a => {
+    const s = a.querySelector('.where .stop'), n = s && s.querySelector('.stop-note');
+    const card = a.getBoundingClientRect(), nb = n && n.getBoundingClientRect();
+    return s && { line: s.firstElementChild.textContent + ' ' + s.querySelector('strong').textContent,
+      tags: [...s.querySelectorAll('.stop-tag')].map(x => x.textContent), note: n ? n.textContent : null,
+      wraps: n ? nb.right <= card.right + 1 && nb.height > 30 : null };
+  });
+};
+await setLegs([{ index: 1, startTime: t(0) }]);
+let st = await stop();
+ok('on course: where to meet the racer, with its note', [st.line, st.note], ['Meet at Music Pass', LONG]);
+ok('a long note wraps inside the card', st.wraps, true);
+await setLegs([{ index: 1, startTime: t(0), endTime: t(2.3) }]);
+st = await stop();
+ok('in the pit: where the crew goes next', [st.line, st.tags, st.note], ['Next stop Music Meadows 1', ['Drop bag'], COORDS]);
+ok('nothing pushes the pit board sideways', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
 
 ok('no page errors', errs, []);
 await b.close(); srv.kill('SIGKILL');
