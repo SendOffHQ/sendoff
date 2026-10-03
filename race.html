@@ -586,8 +586,8 @@
      predicted position still draw with no signal. The tiles underneath are
      Esri's and will be missing offline; the map is useful without them. -->
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/finish-card.js?v=81ff34ca"></script>
-<script src="lib/race-core.js?v=fa0ab11c"></script>
+<script src="lib/finish-card.js?v=779a41b4"></script>
+<script src="lib/race-core.js?v=9ba112c5"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -652,18 +652,20 @@
     return 'done';
   }
 
+  // On the race's own clock, as the race publishes them: "Sun 1:00 PM", and
+  // the zone named once, so somebody watching from elsewhere knows whose
+  // clock it is.
   function renderCutoffs() {
     const start = new Date(cfg.startTime);
     const cuts = cfg.cutoffs || {};
     const final = new Date(start.getTime() + (cuts.totalHours || 0) * 3600 * 1000);
-    const day = d => d.toDateString() === start.toDateString() ? '' : ' D2';
-    const fmt = d => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + day(d);
+    const fmt = d => Race.tz.dayClock(d.getTime(), cfg);
     const tightHtml = cuts.lastLegStartHours
       ? `<div class="cutoff-item warn"><span class="v">${fmt(new Date(start.getTime() + cuts.lastLegStartHours * 3600 * 1000))}</span><span class="l">Last leg start · ${cuts.lastLegStartHours}h</span></div>`
       : '';
     document.getElementById('cutoffs').style.display = '';
     document.getElementById('cutoffs').innerHTML = `
-      <span class="cutoffs-label">Cutoffs</span>
+      <span class="cutoffs-label">Cutoffs · ${escapeHtml(Race.tz.label(cfg, start.getTime()))}</span>
       <div></div>
       <div class="cutoff-item"><span class="v">${fmt(start)}</span><span class="l">Start</span></div>
       ${tightHtml}
@@ -914,7 +916,7 @@
       return `
         <tr class="leg-row${oldCls}">
           <td class="leg-num">${legLabel}</td>
-          <td class="num" data-label="Done">${Race.fmt.clockTime(l.endTime)}</td>
+          <td class="num" data-label="Done">${Race.fmt.clockTime(l.endTime, cfg)}</td>
           <td class="num" data-label="Leg">${dur ? Race.fmt.durationShort(dur) : '–'}</td>
           <td class="num" data-label="Pit">${pitCell}</td>
           ${fuelMetrics().map(m => `<td class="num" data-label="${escapeHtml(m.short)}">${
@@ -1614,7 +1616,7 @@
   function updateLastUpdated() {
     if (!data) return;
     const lu = data.lastUpdated
-      ? `Data updated ${new Date(data.lastUpdated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+      ? `Data updated ${Race.fmt.clockTime(data.lastUpdated, cfg)}`
       : 'Awaiting start';
     let live = '';
     if (lastFetchAt) {

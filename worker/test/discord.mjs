@@ -140,6 +140,19 @@ ok('where and when', /Vermont/.test(posts[0].content) && /October 3, 2026/.test(
 ok('and a link somebody can follow',
   /https:\/\/sendoff\.run\/race\.html\?id=902-open/.test(posts[0].content), true);
 
+console.log('\nan evening start, announced on its own day');
+posts = [];
+// 9 PM in Denver on October 3 is already October 4 in UTC.
+await commit('races/903-night/config.json',
+  { ...course, startTime: '2026-10-03T21:00:00-06:00', timezone: 'America/Denver',
+    name: 'Night Owl 50', location: 'Colorado', visibility: 'public', createdBy: ME });
+ok('in the race\'s zone', /October 3, 2026/.test(posts[0] && posts[0].content), true);
+posts = [];
+await commit('races/904-night-old/config.json',
+  { ...course, startTime: '2026-10-03T21:00:00-06:00',
+    name: 'Night Owl Classic', location: 'Colorado', visibility: 'public', createdBy: ME });
+ok('and with no zone, by the date its start was written with', /October 3, 2026/.test(posts[0] && posts[0].content), true);
+
 console.log('\nwhen the race has a share page of its own');
 // tools/make-og.py has been run for this one, so /races/<slug>/ exists and
 // carries that race's name and card rather than the generic ones.

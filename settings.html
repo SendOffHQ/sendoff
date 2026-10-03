@@ -517,7 +517,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=fa0ab11c"></script>
+<script src="lib/race-core.js?v=9ba112c5"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -1710,7 +1710,7 @@
   function updateLastUpdatedLabel() {
     if (!data) return;
     const lu = data.lastUpdated
-      ? `Updated ${new Date(data.lastUpdated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+      ? `Updated ${Race.fmt.clockTime(data.lastUpdated, cfg)}`
       : 'Awaiting start';
     document.getElementById('last-updated').textContent = lu;
   }

@@ -14,6 +14,7 @@ optional Cloudflare Worker auth proxy.
 - Point-to-point segments, multi-loop courses, and loops-with-aid-segments
 - GPX course upload with elevation profile and interactive aid-station markers
 - Cutoff tracking (total time, last-leg start)
+- Race time zone (`cfg.timezone`, `Race.tz`): picked in the setup wizard and on the settings page. The start, the finish cutoff, the last-lap gate and each aid station cutoff are entered as the day and clock time a race publishes ("Sun 1:00 PM"), and every time on the race, pit, racer, report and chart pages is shown on the race's clock with the zone named, whatever zone the viewer is in. A split corrected by hand on the pit board is read on the race clock too. Cutoffs are still stored as hours from the start; moving the start or changing the zone in settings keeps each cutoff at its day and time. A race from before zones shows each viewer's own zone, as it always did. The Discord announcement and share pages date a race in its zone. `test/race-timezone.mjs`.
 
 ## Charts (`charts.html` and the print report)
 - Leg time per leg
@@ -30,7 +31,7 @@ optional Cloudflare Worker auth proxy.
 
 ## Race setup & config (`setup.html`)
 - Create and configure races; define runners, targets, cutoffs
-- Aid stations from a spreadsheet: the setup wizard and the settings page both import a CSV or Excel (.xlsx) file into the aid station table, and offer a template in both formats (`templates/`, built by `tools/make-aid-template.py`). Columns are found by heading in any order; only name and distance are needed. Distances in miles or kilometres, cutoffs as hours or as times, yes/no for crew, drop bag, pacer and checkpoint. A file with problems names each one by row and changes nothing; a good one fills the table, and nothing is saved until the person saves. Read in the browser with no library (`Race.aidImport`); `test/aid-import.mjs`.
+- Aid stations from a spreadsheet: the setup wizard and the settings page both import a CSV or Excel (.xlsx) file into the aid station table, and offer a template in both formats (`templates/`, built by `tools/make-aid-template.py`). Columns are found by heading in any order; only name and distance are needed. Distances in miles or kilometres, cutoffs as times ("Sun 1:00 PM", "6:00 AM", "Sat noon", a date and time) or as hours, yes/no for crew, drop bag, pacer and checkpoint. A file with problems names each one by row and changes nothing; a good one fills the table, and nothing is saved until the person saves. Read in the browser with no library (`Race.aidImport`); `test/aid-import.mjs`.
 - Per-race ACL: visibility, editors, viewers
 
 ## Accounts & auth (Cloudflare Worker proxy)

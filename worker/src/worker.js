@@ -3792,14 +3792,26 @@ async function shareUrl(env, slug) {
   return `${base}/race.html?id=${encodeURIComponent(slug)}`;
 }
 
+// The day a race starts, where it starts. In its own zone when it has one;
+// otherwise the date written in its start time, which carries the offset of
+// the place it was set up, rather than UTC's, which puts a 9 PM start in
+// Denver on the next day.
+function raceDay(iso, zone, opts) {
+  const t = iso ? new Date(iso) : null;
+  if (!t || isNaN(t)) return null;
+  if (zone && typeof zone === 'string') {
+    try { return t.toLocaleDateString('en-US', { ...opts, timeZone: zone }); } catch (e) {}
+  }
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(iso));
+  const noon = m ? new Date(m[1] + 'T12:00:00Z') : t;
+  return noon.toLocaleDateString('en-US', { ...opts, timeZone: 'UTC' });
+}
+
 async function announceNewRace(env, slug, cfg) {
   if (!isPublicRace(cfg)) return;
   const name = forDiscord(cfg.name) || 'A race';
   const where = forDiscord(cfg.location, 80);
-  const when = cfg.startTime ? new Date(cfg.startTime) : null;
-  const day = when && isFinite(when.getTime())
-    ? when.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
-    : null;
+  const day = raceDay(cfg.startTime, cfg.timezone, { month: 'long', day: 'numeric', year: 'numeric' });
   const bits = [where, day].filter(Boolean).join(', ');
   await postToDiscord(env,
     `**${name}** is on the board${bits ? ` (${bits})` : ''}.\n${await shareUrl(env, slug)}`);
@@ -5223,12 +5235,8 @@ function sharePageHtml(env, slug, cfg) {
   const esc = (v) => String(v == null ? '' : v)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  const day = (iso) => {
-    const t = iso ? new Date(iso) : null;
-    if (!t || isNaN(t)) return String(iso || '').slice(0, 10);
-    return t.toLocaleDateString('en-US',
-      { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-  };
+  const day = (iso) => raceDay(iso, cfg.timezone, { month: 'short', day: 'numeric', year: 'numeric' }) ||
+    String(iso || '').slice(0, 10);
   // The slug goes into attributes and into the redirect below, so it is
   // escaped too. The endpoint only accepts a slug of letters, digits and
   // dashes, which is what every slug the wizard makes is, so this never has

@@ -278,7 +278,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=fa0ab11c"></script>
+<script src="lib/race-core.js?v=9ba112c5"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -372,7 +372,7 @@
     if (next.state === 'finished') return '<div class="rmargin ok">Finished.</div>';
     const c = cutoffFor(next);
     if (!c) return '<div class="rmargin none">No cutoff set for this race.</div>';
-    const clock = new Date(c.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const clock = Race.fmt.clockTime(c.at, cfg);
     if (c.leftMs < 0) {
       return `<div class="rmargin late">${Race.fmt.duration(-c.leftMs / 1000)} past ${esc(c.what)} · closed ${clock}</div>`;
     }
@@ -441,7 +441,7 @@
       out.push(`<div class="rblock">
         <span class="rlbl">In aid${def && def.toAid ? ' · ' + esc(def.toAid) : ''}</span>
         <span class="raid" id="raid-timer" data-since="${next.lastTs}">${Race.fmt.duration((Date.now() - new Date(next.lastTs).getTime()) / 1000)}</span>
-        <div class="rmeta">Arrived ${new Date(next.lastTs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}${bits.length ? ' · ' + bits.join(' · ') : ''}</div>
+        <div class="rmeta">Arrived ${Race.fmt.clockTime(next.lastTs, cfg)}${bits.length ? ' · ' + bits.join(' · ') : ''}</div>
         ${st && st.crewNote ? `<div class="rnote">${esc(st.crewNote)}</div>` : ''}
       </div>`);
     } else if (next.nextLegIndex) {
@@ -674,7 +674,7 @@
 
     const def = Race.course.legAt(cfg, next.nextLegIndex);
     undoLabel = (next.nextAction === 'in' ? 'Arrived' : 'Out') +
-      ` ${new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` +
+      ` ${Race.fmt.clockTime(now, cfg)}` +
       ((def && def.toAid) ? ` · ${def.toAid}` : '');
     undoUntil = Date.now() + UNDO_MS;
     render();
@@ -866,7 +866,7 @@
     const dr = (data.runners || []).find(r => r.id === meId);
     const leg = dr && (dr.legs || []).find(l => l.index === legIndex);
     if (!leg) return;
-    const at = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const at = Race.fmt.clockTime(new Date().toISOString(), cfg);
     const notes = [String(leg.notes || '').trim(), `${at}: ${text}`].filter(Boolean).join('\n');
     leg.notes = notes;
     input.value = '';

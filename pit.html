@@ -248,7 +248,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=fa0ab11c"></script>
+<script src="lib/race-core.js?v=9ba112c5"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -355,28 +355,29 @@
     const other = field === 'startTime' ? leg.endTime : leg.startTime;
     // A time that was never recorded still needs a day to sit on: the leg's
     // other end if it has one, otherwise the race start, otherwise today.
-    const base = new Date(leg[field] || other || cfg.startTime || Date.now());
+    const base = Date.parse(leg[field] || other || cfg.startTime) || Date.now();
     const pad = n => String(n).padStart(2, '0');
-    const seed = leg[field] ? new Date(leg[field]) : new Date();
+    // Read and shown on the race's clock, not this phone's: a crew member
+    // still on home time types what the race clock said.
+    const seed = Race.tz.parts(leg[field] ? Date.parse(leg[field]) : Date.now(), cfg);
     const input = prompt(
-      `${leg[field] ? 'Edit' : 'Set'} ${field === 'startTime' ? 'send-off' : 'arrival'} (24h, HH:MM or HH:MM:SS):`,
-      `${pad(seed.getHours())}:${pad(seed.getMinutes())}:${pad(seed.getSeconds())}`
+      `${leg[field] ? 'Edit' : 'Set'} ${field === 'startTime' ? 'send-off' : 'arrival'} (24h, HH:MM or HH:MM:SS, ${Race.tz.label(cfg, base)}):`,
+      `${pad(seed.h)}:${pad(seed.mi)}:${pad(seed.s)}`
     );
     if (!input) return;
     const m = input.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-    if (!m) { alert('Bad format. Use HH:MM or HH:MM:SS.'); return; }
-    const next = new Date(base);
-    next.setHours(+m[1], +m[2], +(m[3] || 0), 0);
+    if (!m || +m[1] > 23 || +m[2] > 59 || +(m[3] || 0) > 59) { alert('Bad format. Use HH:MM or HH:MM:SS.'); return; }
+    let next = Race.tz.atClock(base, +m[1], +m[2], +(m[3] || 0), cfg);
     // A clock time has no day on it, and this race runs through two nights.
     // Leaving 00:30 on the day of a 23:50 send-off would read as a leg that
     // finished twenty-three hours before it started, so the day follows the
     // only reading that makes sense against the leg's other end.
-    if (field === 'endTime' && leg.startTime && next < new Date(leg.startTime)) {
-      next.setDate(next.getDate() + 1);
-    } else if (field === 'startTime' && leg.endTime && next > new Date(leg.endTime)) {
-      next.setDate(next.getDate() - 1);
+    if (field === 'endTime' && leg.startTime && next < Date.parse(leg.startTime)) {
+      next = Race.tz.atClock(base, +m[1], +m[2], +(m[3] || 0), cfg, 1);
+    } else if (field === 'startTime' && leg.endTime && next > Date.parse(leg.endTime)) {
+      next = Race.tz.atClock(base, +m[1], +m[2], +(m[3] || 0), cfg, -1);
     }
-    const iso = next.toISOString();
+    const iso = new Date(next).toISOString();
     try {
       const r = await Race.queue.write(DATA_PATH, 'setLegTimes',
         { runnerId, legs: { [legIndex]: { [field]: iso } } },
@@ -557,7 +558,7 @@
   // crew is scanning for, and neither shows up in a duration.
   function legTimesLine(leg) {
     if (!leg) return '';
-    const clock = ts => new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+    const clock = ts => Race.fmt.clockTimeSec(ts, cfg);
     const cell = (label, ts) => ts
       ? `<span><span class="k">${label}</span> ${escapeHtml(clock(ts))}</span>`
       : `<span class="missing"><span class="k">${label}</span> not recorded</span>`;
@@ -856,7 +857,7 @@
   function updateLastUpdatedLabel() {
     if (!data) return;
     const lu = data.lastUpdated
-      ? `Updated ${new Date(data.lastUpdated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+      ? `Updated ${Race.fmt.clockTime(data.lastUpdated, cfg)}`
       : 'Awaiting start';
     document.getElementById('last-updated').textContent = lu;
   }

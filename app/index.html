@@ -308,7 +308,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=fa0ab11c"></script>
+<script src="lib/race-core.js?v=9ba112c5"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
@@ -410,7 +410,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     const activityLabel = Race.activities.short(r);
     const runners = (r.runnerNames || []).join(' · ') || '–';
     const startDate = r.startTime
-      ? new Date(r.startTime).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' })
+      ? Race.tz.format(r.startTime, r, { year: 'numeric', month: 'short', day: 'numeric' })
       : '–';
     const dist = r.totalDistanceMi != null ? Race.units.distance(r.totalDistanceMi, { units: r.units }) : '–';
     let badge = '';

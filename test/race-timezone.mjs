@@ -118,6 +118,34 @@ await openSettings(page);
 ok('is on the race\'s clock, not Tokyo\'s', await form(page), ['2026-09-07', '10:11', 'America/Denver', 'Wed, Sep 9 23:11']);
 ok('and so are its aid cutoffs', await aidCuts(page),
   ['Tue, Sep 8 04:41', 'Tue, Sep 8 11:41', 'Tue, Sep 8 13:56', 'Tue, Sep 8 19:11', 'Tue, Sep 8 23:11']);
+
+await page.goto(BASE + `/race.html?id=${SLUG}`);
+await page.waitForSelector('#cutoffs .cutoff-item', { timeout: 20000 });
+ok('the race page names the zone and uses its clock', await page.$$eval('#cutoffs > *', els => els.map(e => e.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean)),
+  ['Cutoffs · MDT', 'Mon 10:11 AMStart', 'Wed 11:11 PMFinal · 61h']);
+
+// The pit board's correction box takes a clock time with no day on it, and
+// it is the race's clock, not the phone's.
+const wall = (ms, sec) => new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Denver', hour: '2-digit', minute: '2-digit',
+  second: sec ? '2-digit' : undefined, hourCycle: 'h23' }).format(new Date(ms));
+await page.goto(BASE + `/pit.html?id=${SLUG}`);
+await page.waitForSelector('[data-action="edit-time"][data-field="endTime"]', { state: 'attached', timeout: 20000 });
+const target = await page.evaluate(() => { const b = [...document.querySelectorAll('[data-action="edit-time"][data-field="endTime"]')].find(x => x.dataset.leg);
+  return b && { runner: b.dataset.runner, leg: +b.dataset.leg }; });
+const legNow = async () => page.evaluate(async ([slug, t]) => {
+  const r = await (await fetch(`/api/get?path=races/${slug}/data.json`, { headers: { Authorization: 'Bearer stub' } })).json();
+  const d = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(r.content), c => c.charCodeAt(0))));
+  return d.runners.find(x => x.id === t.runner).legs.find(l => l.index === t.leg);
+}, [SLUG, target]);
+const before = await legNow();
+let asked = null;
+page.removeAllListeners('dialog');
+const later = Date.parse(before.endTime) + 10 * 60e3;
+page.once('dialog', d => { asked = [d.message(), d.defaultValue()]; d.accept(wall(later, true)); });
+await page.click(`[data-action="edit-time"][data-runner="${target.runner}"][data-field="endTime"]`);
+await page.waitForTimeout(1500);
+ok('it offers the time on the race clock, and says whose', asked && [asked[1], /MDT/.test(asked[0])], [wall(Date.parse(before.endTime), true), true]);
+ok('and a time typed in is read on the race clock', (await legNow()).endTime, new Date(Math.floor(later / 1000) * 1000).toISOString());
 await page.context().close();
 
 // The wizard, from a laptop in New York, for a race in Colorado.

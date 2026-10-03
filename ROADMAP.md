@@ -65,9 +65,10 @@ the front, with usernames beside them as the start of following a racer.
 6. ~~**Public racer profiles.**~~ **Built 2026-10-02.** The profile page,
    made public by choice, at sendoff.run/@username. See "Public racer
    profile" in section 2.
-6a. **Race time zone and cutoffs as clock times.** Asked for 2026-10-03,
-   to build after the Hennepin 100 finishes (it started that morning), and
-   merged only once it has. Decided:
+6a. **Race time zone and cutoffs as clock times.** Asked for 2026-10-03.
+   **Built 2026-10-03 on the working branch, held there until the Hennepin
+   100 finishes** (it started that morning), and merged only once it has.
+   Decided:
    - **Each race gets a time zone**, chosen in setup and settings, and every
      time anybody types in (the start, cutoffs, a corrected split) is read
      in that zone, and every time shown is shown in it, with the zone named.
@@ -79,6 +80,10 @@ the front, with usernames beside them as the start of following a racer.
    - The cutoff arithmetic (margin, projection, tight and off pace) is
      unchanged; existing races keep their cutoffs and show them as times.
    - The aid station template's cutoff column takes times; hours still work.
+   - A race from before zones has none and shows times in each viewer's own
+     zone, as it always did, until somebody picks one in settings.
+   - Not yet in the zone: the dates on a profile's results list, which come
+     from the saved result and carry no zone of their own.
 7. **Goal-time planner.** Target finish in, per-aid target times out, live
    delta against them. Self-contained, needs no billing, and it is what makes a
    second race better than the first.

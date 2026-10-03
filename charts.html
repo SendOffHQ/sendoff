@@ -110,7 +110,7 @@
   <span>Charts auto-refresh every 30s</span>
 </footer>
 
-<script src="lib/race-core.js?v=fa0ab11c"></script>
+<script src="lib/race-core.js?v=9ba112c5"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -171,7 +171,7 @@
       document.getElementById('error').style.display = 'none';
       Race.charts.render(document.getElementById('body'), cfg, data);
       document.getElementById('last-updated').textContent = data.lastUpdated
-        ? 'Updated ' + new Date(data.lastUpdated).toLocaleString()
+        ? 'Updated ' + Race.tz.format(data.lastUpdated, cfg, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })
         : 'Awaiting data';
     } catch (err) {
       const e = document.getElementById('error');

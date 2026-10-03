@@ -318,7 +318,7 @@
   <div>Auto-generated · race-dashboard hub</div>
 </footer>
 
-<script src="lib/race-core.js?v=fa0ab11c"></script>
+<script src="lib/race-core.js?v=9ba112c5"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -337,7 +337,7 @@
     const start = new Date(cfg.startTime);
     const cuts = cfg.cutoffs || {};
     const final = new Date(start.getTime() + (cuts.totalHours || 0) * 3600 * 1000);
-    const fmt = d => d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const fmt = d => Race.tz.format(d.getTime(), cfg, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     const tightHtml = cuts.lastLegStartHours
       ? `<div class="cutoff-item warn"><span class="v">${fmt(new Date(start.getTime() + cuts.lastLegStartHours * 3600 * 1000))}</span><span class="l">Last leg start · ${cuts.lastLegStartHours}h</span></div>` : '';
     document.getElementById('cutoffs').style.display = '';
@@ -386,8 +386,8 @@
       return `
         <tr>
           <td class="leg-num">${l.index}${legName}</td>
-          <td class="num">${Race.fmt.clockTimeSec(l.startTime)}</td>
-          <td class="num">${Race.fmt.clockTimeSec(l.endTime)}</td>
+          <td class="num">${Race.fmt.clockTimeSec(l.startTime, cfg)}</td>
+          <td class="num">${Race.fmt.clockTimeSec(l.endTime, cfg)}</td>
           <td class="num">${dur ? Race.fmt.durationShort(dur) : '–'}</td>
           <td class="num">${pitSec != null ? Race.fmt.durationShort(pitSec) : '–'}</td>
           ${metrics.map(m => `<td class="num">${
@@ -514,7 +514,7 @@
       Race.charts.render(document.getElementById('charts'), cfg, data);
 
       document.getElementById('meta').textContent = data.lastUpdated
-        ? 'Data: ' + new Date(data.lastUpdated).toLocaleString()
+        ? 'Data: ' + Race.tz.format(data.lastUpdated, cfg, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })
         : 'Pre-race';
     } catch (err) {
       const e = document.getElementById('error');
