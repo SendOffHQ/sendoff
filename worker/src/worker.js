@@ -29,6 +29,10 @@
 //     POST /access/add       { slug, email, role }                    → { people, editors, viewers }
 //     POST /access/remove    { slug, email }                          → { people, editors, viewers }
 //     POST /share/revoke     { token }                                 → { ok: true }
+//     POST /ai-crew          { slug, runnerId, label? }               → { token, url, expiresAt } (Pro)
+//     GET  /ai-crew?slug=...                                           → { aiCrew: [...] }
+//     POST /ai-crew/revoke   { token }                                 → { ok: true }
+//     POST /mcp/<token>      MCP (JSON-RPC) for an AI invited as crew   → see src/ai-crew.js
 //     GET  /access?slug=...                                            → { people, editors, viewers, shareLinks, teamCanInvite }
 //     POST /access/team-invite { slug, allowed }                       → { teamCanInvite }
 //     GET  /profile[?email=&slug=]                                     → { profile, own }
@@ -77,6 +81,7 @@ const RESET_TTL_DAYS = 2;
 // it does not by default: see the commented block there.
 export { RaceHub } from './race-hub.js';
 import { RaceHub as _RaceHub } from './race-hub.js';
+import * as aiCrew from './ai-crew.js';
 
 // ---------- live push ----------
 // Off unless the RACE_HUB binding exists. A worker without it runs exactly the
@@ -555,6 +560,11 @@ const PLANS = {
     maxCrewPerRace: 2,
     privateRaces: false,
     shareLinks: false,
+    // An AI invited as crew. Pro because every call it makes is a worker
+    // request against the same daily allowance a race's spectators draw on,
+    // and an assistant asked "how am I doing" every few minutes for thirty
+    // hours is a lot of them.
+    aiCrew: false,
     // True on both, on purpose. The pricing plan puts offline logging in Pro
     // and nothing gates it yet, so today every account has it. It is named
     // here so the crew screens can say which it is from the entitlement rather
@@ -571,6 +581,7 @@ const PLANS = {
     maxCrewPerRace: null,
     privateRaces: true,
     shareLinks: true,
+    aiCrew: true,
     offlineLogging: true
   }
 };
@@ -4891,6 +4902,234 @@ async function handleShareRevoke(req, env) {
   return json({ ok: true }, {}, env, req);
 }
 
+// ---------- the AI as crew ----------
+// An assistant invited onto one race as crew for one racer. Its credential is
+// a KV record naming the race and the racer, like a share link but for
+// writing intake rather than reading, and it is taken away the same way. It
+// is never a person's password and never a session: it cannot open any other
+// race, read the roster, or reach any endpoint but /mcp/<token>. What it can
+// do there is in src/ai-crew.js.
+const AI_CREW_TTL_DAYS = 30;
+const AI_CREW_MAX_PER_RACE = 5;
+const AI_CREW_TOKEN = /^[A-Za-z0-9_-]{20,100}$/;
+
+async function aiCrewRecord(env, token) {
+  if (!env.AUTH_KV || !token || !AI_CREW_TOKEN.test(token)) return null;
+  const raw = await env.AUTH_KV.get('aicrew:' + token);
+  if (!raw) return null;
+  let rec;
+  try { rec = JSON.parse(raw); } catch (e) { return null; }
+  if (!rec || !rec.slug || !rec.runnerId) return null;
+  if (rec.expiresAt && Date.now() > rec.expiresAt) return null;
+  return rec;
+}
+
+async function aiCrewForRace(env, slug) {
+  const out = [];
+  if (!env.AUTH_KV) return out;
+  const list = await env.AUTH_KV.list({ prefix: 'aicrew:' });
+  for (const k of list.keys) {
+    const raw = await env.AUTH_KV.get(k.name);
+    if (!raw) continue;
+    try {
+      const rec = JSON.parse(raw);
+      if (rec.slug === slug && !(rec.expiresAt && Date.now() > rec.expiresAt)) {
+        out.push(Object.assign({ token: k.name.slice('aicrew:'.length) }, rec));
+      }
+    } catch (e) {}
+  }
+  return out;
+}
+
+// The address an assistant is given. The worker's own, because that is what
+// answers it, and the credential is the last part of the path: a connector is
+// set up by pasting one URL, and most have nowhere else to put a secret.
+function aiCrewUrl(req, env, token) {
+  const u = new URL(req.url);
+  return `${u.origin}${env.MOUNT_PATH || ''}/mcp/${token}`;
+}
+
+async function handleAiCrewCreate(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'AI crew needs the AUTH_KV namespace' }, { status: 503 }, env, req);
+  let body;
+  try { body = await req.json(); }
+  catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  const { slug, runnerId } = body || {};
+  if (!slug || !runnerId) return json({ error: 'slug and runnerId required' }, { status: 400 }, env, req);
+  let cfg;
+  try { cfg = await requireAccessManager(env, slug, session.email, session); }
+  catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
+  const ent = await raceOwnerEntitlements(env, cfg);
+  if (!ent.aiCrew) {
+    return json({
+      error: `An AI as crew is a Pro feature. This race is on the ${PLANS[ent.plan].label} plan.`,
+      code: 'plan_limit', limit: 'aiCrew', plan: ent.plan
+    }, { status: 402 }, env, req);
+  }
+  const runner = (cfg.runners || []).find(r => r && r.id === runnerId);
+  if (!runner) return json({ error: 'No such racer on this race' }, { status: 400 }, env, req);
+  const have = await aiCrewForRace(env, slug);
+  if (have.length >= AI_CREW_MAX_PER_RACE) {
+    return json({ error: `A race can have ${AI_CREW_MAX_PER_RACE} AI crew at once. Remove one first.` }, { status: 400 }, env, req);
+  }
+  const label = String(body.label || '').replace(/\s+/g, ' ').trim().slice(0, 40) || 'AI crew';
+  // Long enough to outlast the race: a link made a month ahead should not die
+  // the week before, and one made on the morning should not die mid-race.
+  const now = Date.now();
+  const start = Date.parse(cfg.startTime);
+  const end = isNaN(start) ? now : start + ((+(cfg.cutoffs && cfg.cutoffs.totalHours) || 48) * 3600e3);
+  const expiresAt = Math.min(now + 365 * 864e5, Math.max(now + AI_CREW_TTL_DAYS * 864e5, end + 7 * 864e5));
+  const token = randomToken(24);
+  const rec = { slug, runnerId, label, createdBy: normalizeEmail(session.email),
+    createdAt: new Date(now).toISOString(), expiresAt };
+  await env.AUTH_KV.put('aicrew:' + token, JSON.stringify(rec), { expiration: Math.floor(expiresAt / 1000) });
+  return json({ token, url: aiCrewUrl(req, env, token), runnerId, label, expiresAt }, {}, env, req);
+}
+
+async function handleAiCrewList(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  const slug = new URL(req.url).searchParams.get('slug');
+  if (!slug) return json({ error: 'Missing slug' }, { status: 400 }, env, req);
+  let cfg;
+  try { cfg = await requireRaceWriter(env, slug, session.email, session); }
+  catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
+  // Everybody who can write the race sees that an AI is on it, and for whom.
+  // Only those who can hand out access see its address, which is its key.
+  const manager = canManageAccess(cfg, session.email) || asSiteAdmin(env, session);
+  const names = Object.fromEntries((cfg.runners || []).map(r => [r.id, r.name || r.id]));
+  let list = [];
+  try { list = await aiCrewForRace(env, slug); } catch (e) { list = null; }
+  return json({ aiCrew: list && list.map(r => Object.assign({
+    label: r.label, runnerId: r.runnerId, runnerName: names[r.runnerId] || r.runnerId,
+    createdAt: r.createdAt, expiresAt: r.expiresAt
+  }, manager ? { token: r.token, url: aiCrewUrl(req, env, r.token) } : {})), canManage: manager }, {}, env, req);
+}
+
+async function handleAiCrewRevoke(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'AI crew needs the AUTH_KV namespace' }, { status: 503 }, env, req);
+  let body;
+  try { body = await req.json(); }
+  catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  const token = body && body.token;
+  if (!token || !AI_CREW_TOKEN.test(token)) return json({ error: 'token required' }, { status: 400 }, env, req);
+  const raw = await env.AUTH_KV.get('aicrew:' + token);
+  if (!raw) return json({ ok: true }, {}, env, req);
+  let rec;
+  try { rec = JSON.parse(raw); } catch (e) { rec = null; }
+  if (rec && rec.slug) {
+    try { await requireAccessManager(env, rec.slug, session.email, session); }
+    catch (err) { return json({ error: err.message }, { status: err.status || 500 }, env, req); }
+  } else if (!asSiteAdmin(env, session)) {
+    return json({ error: 'Forbidden' }, { status: 403 }, env, req);
+  }
+  await env.AUTH_KV.delete('aicrew:' + token);
+  return json({ ok: true }, {}, env, req);
+}
+
+// data.json changed the way a crew member's press changes it: read, change,
+// write back under the version guard, and again if somebody else got there
+// first. Then the same nudge a press sends, so open pages see it.
+async function mutateRaceData(env, ctx, slug, change) {
+  const path = `races/${slug}/data.json`;
+  for (let i = 0; i < 4; i++) {
+    let doc = null, sha = null;
+    const m = await readFromD1(env, path);
+    if (m) {
+      const e = JSON.parse(m);
+      doc = JSON.parse(base64ToUtf8(e.content)); sha = e.sha;
+    } else {
+      const r = await githubGetJson(env, path);
+      doc = r.missing ? null : r.data; sha = r.sha;
+    }
+    if (!doc || typeof doc !== 'object') doc = { runners: [] };
+    const result = change(doc);
+    doc.lastUpdated = new Date().toISOString();
+    const failed = await commitToD1(env, path, JSON.stringify(doc, null, 2) + '\n', 'ai-crew', sha);
+    if (!failed) {
+      await purgeReadCache(env, path);
+      if (ctx && ctx.waitUntil) ctx.waitUntil(publishChange(env, path));
+      return result;
+    }
+    if (failed.status !== 409) throw new Error(failed.error || 'Could not save that');
+  }
+  throw new Error('The race was busy. Try again in a moment.');
+}
+
+function mcpHeaders() {
+  // Any origin: an MCP client is a program, not one of the site's pages, and
+  // the credential is in the path, not in a cookie a page could ride on.
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, Mcp-Session-Id, Mcp-Protocol-Version',
+    'Access-Control-Max-Age': '86400'
+  };
+}
+
+async function handleMcp(req, env, ctx, pathToken) {
+  const h = mcpHeaders();
+  const send = (status, body) => new Response(body == null ? null : JSON.stringify(body),
+    { status, headers: Object.assign({}, h, body == null ? {} : { 'Content-Type': 'application/json' }) });
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: h });
+  // Nothing to stream and no session to end: every answer comes back on the
+  // POST that asked for it.
+  if (req.method !== 'POST') return new Response(null, { status: 405, headers: Object.assign({ Allow: 'POST, OPTIONS' }, h) });
+  const bearer = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  const token = pathToken || bearer || null;
+  const rec = await aiCrewRecord(env, token);
+  if (!rec) {
+    return send(404, { jsonrpc: '2.0', id: null,
+      error: { code: -32001, message: 'This SendOff AI crew link was removed or has expired. Ask the race owner for a new one.' } });
+  }
+  let body;
+  try { body = await req.json(); }
+  catch (e) { return send(400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }); }
+
+  // Loaded once per request, on first use, and checked against the race as it
+  // is now: a race deleted, a racer taken off it, or an owner no longer on a
+  // plan with AI crew all close the door.
+  let loaded = null;
+  const load = async () => {
+    if (loaded) return loaded;
+    const cfg = await loadRaceConfigNow(env, rec.slug);
+    if (!cfg) throw new Error('This race no longer exists.');
+    const runner = (cfg.runners || []).find(r => r && r.id === rec.runnerId);
+    if (!runner) throw new Error('The racer this AI crew was for is no longer on the race.');
+    const ent = await raceOwnerEntitlements(env, cfg);
+    if (!ent.aiCrew) throw new Error('AI crew is a Pro feature, and this race is no longer on Pro.');
+    const data = await loadRaceDataNow(env, rec.slug);
+    loaded = { cfg, data, runnerId: rec.runnerId, runnerName: runner.name || null };
+    return loaded;
+  };
+  const io = {
+    load,
+    now: () => Date.now(),
+    write: async (fn) => {
+      const { cfg } = await load();
+      const result = await mutateRaceData(env, ctx, rec.slug, (doc) => fn(doc, cfg, rec.runnerId));
+      loaded = null;
+      return result;
+    }
+  };
+  const one = async (msg) => {
+    try { return await aiCrew.handleRpc(msg, io); }
+    catch (e) {
+      return { jsonrpc: '2.0', id: (msg && msg.id) ?? null, error: { code: -32603, message: e && e.message ? e.message : String(e) } };
+    }
+  };
+  if (Array.isArray(body)) {
+    const out = (await Promise.all(body.slice(0, 20).map(one))).filter(Boolean);
+    return out.length ? send(200, out) : send(202, null);
+  }
+  const out = await one(body);
+  return out ? send(200, out) : send(202, null);
+}
+
 // Every race created from the wizard gets a zero-padded numeric prefix on its
 // slug (000042-forest-fifty), so two races sharing a name never collide. The
 // counter has to see private races too, and those are deliberately absent from
@@ -5668,6 +5907,13 @@ export default {
 };
 
 async function route(request, env, ctx) {
+    {
+      // The AI crew's door, ahead of everything else: it answers its own
+      // preflight, because an MCP client is not one of the site's origins.
+      const p = new URL(request.url).pathname.slice((env.MOUNT_PATH || '').length).replace(/\/+$/, '');
+      const m = /^\/mcp(?:\/([A-Za-z0-9_-]{1,100}))?$/.exec(p);
+      if (m) return handleMcp(request, env, ctx, m[1] || null);
+    }
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders(env, request) });
     }
@@ -5719,6 +5965,9 @@ async function route(request, env, ctx) {
     if (request.method === 'POST' && path === '/invite')          return handleInvite(request, env);
     if (request.method === 'POST' && path === '/share-link')      return handleShareLink(request, env);
     if (request.method === 'POST' && path === '/share/revoke')    return handleShareRevoke(request, env);
+    if (request.method === 'POST' && path === '/ai-crew')         return handleAiCrewCreate(request, env);
+    if (request.method === 'GET'  && path === '/ai-crew')         return handleAiCrewList(request, env);
+    if (request.method === 'POST' && path === '/ai-crew/revoke')  return handleAiCrewRevoke(request, env);
     if (request.method === 'POST' && path === '/access/add')      return handleAccessAdd(request, env);
     if (request.method === 'POST' && path === '/access/remove')   return handleAccessRemove(request, env);
     if (request.method === 'GET'  && path === '/access')          return handleAccessList(request, env);

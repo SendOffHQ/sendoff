@@ -585,6 +585,12 @@ label.field > .hint {
 .seg-row.start .num { color: var(--text-muted); }
 .seg-row.start .nm { color: var(--text-dim); }
 .access-list .row .tag.creator { color: var(--green); border-color: var(--green); }
+/* An AI on the race, marked as one. */
+.access-list .row .tag.ai { color: var(--accent); border-color: var(--accent); }
+.ax-ai-steps { margin: 10px 0 6px; padding-left: 20px; font-size: 12px; line-height: 1.6; }
+/* Words, in a box made for an address: break between them, not inside. */
+.access-invite-result .ax-ai-what, .access-invite-result .ax-ai-steps, .access-invite-result .access-hint { word-break: normal; overflow-wrap: break-word; }
+.ax-ai-privacy { margin-top: 8px; }
 /* The role is a control, not a label: changing someone from Viewer to Pacer
    is one choice here rather than a revoke followed by a re-invite. */
 .access-list .row .role-pick {
@@ -760,3 +766,6 @@ label.field > .hint {
   font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em;
   text-transform: uppercase; color: var(--text-muted); }
 .signin-or::before, .signin-or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* Part of this number is an AI crew's guess, until somebody types the real one. */
+.est-tag { color: var(--accent); font-size: 10px; letter-spacing: 0.04em; text-transform: none; white-space: nowrap; }

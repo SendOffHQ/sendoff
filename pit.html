@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=d430ed4a">
+<link rel="stylesheet" href="lib/race-theme.css?v=581f8462">
 <style>
   body { padding: 20px 16px 32px; }
   .wrap { max-width: 860px; margin: 0 auto; }
@@ -248,7 +248,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=9ba112c5"></script>
+<script src="lib/race-core.js?v=abca3514"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -497,6 +497,22 @@
       fields[`preset_${idx}`] = (+legNow[`preset_${idx}`] || 0) + n;
     }
 
+    // A number a person typed replaces an AI crew's estimate of it. What the
+    // box would hold from the leg and the items tapped here is not typing, so
+    // the guess survives a save that only added a gel.
+    if (legNow.aiEst) {
+      const est = Object.assign({}, legNow.aiEst);
+      const items = Race.fuel.presets(cfg);
+      let changed = false;
+      for (const [m, v] of amounts) {
+        if (est[m.key] == null) continue;
+        let expect = +legNow[m.key] || 0;
+        for (const [idx, n] of Object.entries(staged)) expect += (+n || 0) * (+((items[idx] || {}).values || {})[m.key] || 0);
+        if (v === '' || Race.fuel.round(m, v) !== Race.fuel.round(m, expect)) { delete est[m.key]; changed = true; }
+      }
+      if (changed) fields.aiEst = Object.keys(est).length ? est : null;
+    }
+
     // By selector, not by element: the redraw below throws this button away
     // and builds another, so the thing to mark afterwards is whatever is
     // standing in its place by then.
@@ -685,7 +701,8 @@
         ${fuelMetrics.length ? `<div class="intake-grid">
           ${fuelMetrics.map(m => `
           <label class="field">
-            <span class="lbl">${escapeHtml(Race.fuel.fieldLabel(m))}</span>
+            <span class="lbl">${escapeHtml(Race.fuel.fieldLabel(m))}${Race.fuel.estimated(selectedLeg, m.key)
+              ? ' <span class="est-tag" title="Part of this is an AI crew\'s estimate. Type the real number to replace it.">~ estimate</span>' : ''}</span>
             <input type="number" data-intake="${escapeAttr(m.key)}" min="0" step="${m.step}" value="${selectedLeg?.[m.key] ?? ''}" />
           </label>`).join('')}
         </div>` : ''}
