@@ -281,23 +281,26 @@
   /* Segments timeline (Sangre-style) */
   .seg-list { display: flex; flex-direction: column; }
   .seg-row {
-    display: grid; grid-template-columns: 32px 1fr 80px 80px 80px;
+    /* minmax(0, 1fr), not 1fr: a plain 1fr will not go narrower than the
+       longest thing in it that cannot wrap, and a long crew note used to push
+       the whole row past the edge of a phone, taking the leg time with it. */
+    display: grid; grid-template-columns: 32px minmax(0, 1fr) 80px 80px 80px;
     gap: 10px; padding: 10px 8px;
     border-bottom: 1px solid var(--border);
     align-items: center; font-size: 12px;
   }
   @media (max-width: 700px) {
-    .seg-row { grid-template-columns: 28px 1fr 60px; }
+    .seg-row { grid-template-columns: 28px minmax(0, 1fr) auto; }
     .seg-row .col-cut, .seg-row .col-pit { display: none; }
   }
   .seg-row:last-child { border-bottom: none; }
   .seg-row .num { font-family: 'JetBrains Mono', monospace; color: var(--accent); font-weight: 700; }
-  .seg-row .nm { color: var(--text); }
+  .seg-row .nm { color: var(--text); min-width: 0; overflow-wrap: anywhere; }
   .seg-row .nm .meta { color: var(--text-muted); font-size: 11px; font-family: 'JetBrains Mono', monospace; }
   .seg-row .col-dur, .seg-row .col-cut, .seg-row .col-pit {
     font-family: 'JetBrains Mono', monospace; text-align: right;
   }
-  .seg-row .col-dur { color: var(--text); }
+  .seg-row .col-dur { color: var(--text); white-space: nowrap; min-width: 60px; }
   .seg-row .col-cut { color: var(--text-muted); font-size: 11px; }
   .seg-row .col-pit { color: var(--text-dim); font-size: 11px; }
   .seg-row.done { background: rgba(110, 231, 168, 0.05); }
@@ -417,7 +420,11 @@
   .st-tag.nocrew { color: var(--red); }
   .st-tag.bag    { color: var(--accent); }
   .st-tag.pacer  { color: var(--green); }
-  .st-tag.note   { color: var(--yellow); text-transform: none; letter-spacing: 0.04em; }
+  /* A crew note is a sentence, not a label: its own line, wrapping, never
+     wider than the row it is in. */
+  .st-tag.note   { color: var(--yellow); text-transform: none; letter-spacing: 0.04em;
+                   display: block; width: fit-content; max-width: 100%; box-sizing: border-box;
+                   margin: 4px 0 2px; white-space: normal; overflow-wrap: anywhere; line-height: 1.45; }
 
   /* On a phone the columns do not fit: the segment name wraps to four lines
      and the last fuel metric falls off the right edge, and a race is free to
