@@ -1,0 +1,191 @@
+{
+  "lastUpdated": "2026-10-04T14:19:40.594Z",
+  "runners": [
+    {
+      "id": "ronnie-reineke",
+      "legs": [
+        {
+          "index": 1,
+          "startTime": "2026-10-03T12:00:39.933Z",
+          "notes": "2 salt tabs",
+          "calories": 255,
+          "carbs": 66,
+          "preset_3": 1,
+          "sodiumMg": 570,
+          "preset_22": 1,
+          "fluidOz": 29,
+          "preset_24": 1,
+          "preset_6": 1,
+          "preset_15": 1,
+          "preset_2": 1,
+          "endTime": "2026-10-03T12:52:22.242Z",
+          "preset_25": 1
+        },
+        {
+          "index": 2,
+          "startTime": "2026-10-03T12:52:43.003Z",
+          "endTime": "2026-10-03T13:42:07.422Z",
+          "sodiumMg": 500,
+          "preset_25": 1
+        },
+        {
+          "index": 3,
+          "startTime": "2026-10-03T13:44:06.952Z",
+          "calories": 310,
+          "sodiumMg": 280,
+          "carbs": 77,
+          "preset_0": 1,
+          "fluidOz": 32.2,
+          "preset_16": 1,
+          "preset_12": 1,
+          "preset_7": 1,
+          "preset_6": 1,
+          "endTime": "2026-10-03T14:26:54.887Z"
+        },
+        {
+          "index": 4,
+          "startTime": "2026-10-03T14:28:34.012Z",
+          "endTime": "2026-10-03T15:26:25.593Z"
+        },
+        {
+          "index": 5,
+          "startTime": "2026-10-03T15:27:33.453Z",
+          "preset_4": 0,
+          "preset_15": 1,
+          "calories": 100,
+          "fluidOz": 24,
+          "sodiumMg": 250,
+          "carbs": 25,
+          "preset_7": 1,
+          "preset_24": 1,
+          "preset_26": 1,
+          "endTime": "2026-10-03T16:19:15.702Z"
+        },
+        {
+          "index": 6,
+          "startTime": "2026-10-03T16:22:03.162Z",
+          "endTime": "2026-10-03T17:20:26.007Z"
+        },
+        {
+          "index": 7,
+          "startTime": "2026-10-03T17:22:10.351Z",
+          "endTime": "2026-10-03T18:22:49.384Z",
+          "calories": 380,
+          "fluidOz": 3.2,
+          "carbs": 66,
+          "preset_13": 2,
+          "preset_16": 1,
+          "sodiumMg": 750,
+          "preset_27": 1,
+          "preset_28": 1
+        },
+        {
+          "index": 8,
+          "startTime": "2026-10-03T18:28:40.474Z",
+          "endTime": "2026-10-03T19:53:55.775Z"
+        },
+        {
+          "index": 9,
+          "startTime": "2026-10-03T19:58:38.850Z",
+          "calories": 440,
+          "sodiumMg": 980,
+          "carbs": 46,
+          "preset_29": 2,
+          "endTime": "2026-10-03T21:24:23.819Z",
+          "fluidOz": 25.5,
+          "preset_6": 1,
+          "preset_8": 1
+        },
+        {
+          "index": 10,
+          "startTime": "2026-10-03T21:24:58.578Z",
+          "endTime": "2026-10-03T22:18:04.377Z",
+          "calories": 140,
+          "sodiumMg": 800,
+          "carbs": 6,
+          "preset_30": 2
+        },
+        {
+          "index": 11,
+          "startTime": "2026-10-03T22:18:05.295Z",
+          "calories": 110,
+          "sodiumMg": 170,
+          "carbs": 21,
+          "notes": "2 beef jerky (no reception)",
+          "preset_2": 1,
+          "endTime": "2026-10-03T23:05:28.065Z",
+          "fluidOz": 20.5,
+          "preset_8": 1,
+          "preset_24": 1
+        },
+        {
+          "index": 12,
+          "startTime": "2026-10-03T23:05:52.470Z",
+          "endTime": "2026-10-04T00:00:49.576Z"
+        },
+        {
+          "index": 13,
+          "startTime": "2026-10-04T00:00:50.259Z",
+          "endTime": "2026-10-04T00:00:51.422Z"
+        },
+        {
+          "index": 14,
+          "startTime": "2026-10-04T00:11:11.359Z",
+          "endTime": "2026-10-04T02:46:33.890Z",
+          "preset_4": 1,
+          "meds": "Advil"
+        },
+        {
+          "index": 15,
+          "startTime": "2026-10-04T02:59:57.414Z",
+          "preset_4": 1,
+          "endTime": "2026-10-04T04:46:17.702Z"
+        },
+        {
+          "index": 16,
+          "startTime": "2026-10-04T04:50:01.367Z",
+          "endTime": "2026-10-04T06:21:37.336Z",
+          "preset_4": 1
+        },
+        {
+          "index": 17,
+          "startTime": "2026-10-04T06:26:17.304Z",
+          "endTime": "2026-10-04T07:56:10.263Z"
+        },
+        {
+          "index": 18,
+          "startTime": "2026-10-04T07:59:38.730Z",
+          "fluidOz": 54,
+          "preset_6": 2,
+          "calories": 210,
+          "sodiumMg": 1370,
+          "carbs": 25,
+          "preset_21": 2,
+          "preset_2": 1,
+          "endTime": "2026-10-04T09:13:56.772Z"
+        },
+        {
+          "index": 19,
+          "startTime": "2026-10-04T09:15:56.039Z",
+          "endTime": "2026-10-04T10:41:49.988Z"
+        },
+        {
+          "index": 20,
+          "startTime": "2026-10-04T10:43:13.906Z",
+          "calories": 50,
+          "fluidOz": 10,
+          "sodiumMg": 600,
+          "carbs": 2,
+          "notes": "Pancake, ibuprofen",
+          "preset_21": 1,
+          "endTime": "2026-10-04T12:38:44.659Z"
+        },
+        {
+          "index": 21,
+          "startTime": "2026-10-04T12:38:45.365Z",
+          "endTime": "2026-10-04T14:19:40.374Z"
+        }
+      ]
+    }
+  ]
+}
