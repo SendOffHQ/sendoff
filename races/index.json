@@ -67,7 +67,7 @@
       "slug": "000005-rio-del-lago-100",
       "name": "Rio del Lago 100",
       "location": "Folsom, CA",
-      "startTime": "2026-11-07T07:00:00-06:00",
+      "startTime": "2026-11-07T05:00:00-08:00",
       "courseType": "segments",
       "units": {
         "distance": "mi",
@@ -78,8 +78,9 @@
       "runnerNames": [
         "Jason Dupree"
       ],
-      "cutoffHours": 30
+      "cutoffHours": 30,
+      "timezone": "America/Los_Angeles"
     }
   ],
-  "lastUpdated": "2026-10-04T08:52:21.111Z"
+  "lastUpdated": "2026-10-04T19:12:13.886Z"
 }
