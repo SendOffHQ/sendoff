@@ -38,7 +38,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=9b76b24c">
+<link rel="stylesheet" href="lib/race-theme.css?v=581f8462">
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css" />
 <style>
   .cutoffs {
@@ -281,23 +281,27 @@
   /* Segments timeline (Sangre-style) */
   .seg-list { display: flex; flex-direction: column; }
   .seg-row {
-    display: grid; grid-template-columns: 32px 1fr 80px 80px 80px;
+    /* minmax(0, 1fr), not 1fr: a plain 1fr will not go narrower than the
+       longest thing in it that cannot wrap, and a long crew note (shown here
+       until 2026-10-04) used to push the whole row past the edge of a phone,
+       taking the leg time with it. */
+    display: grid; grid-template-columns: 32px minmax(0, 1fr) 80px 80px 80px;
     gap: 10px; padding: 10px 8px;
     border-bottom: 1px solid var(--border);
     align-items: center; font-size: 12px;
   }
   @media (max-width: 700px) {
-    .seg-row { grid-template-columns: 28px 1fr 60px; }
+    .seg-row { grid-template-columns: 28px minmax(0, 1fr) auto; }
     .seg-row .col-cut, .seg-row .col-pit { display: none; }
   }
   .seg-row:last-child { border-bottom: none; }
   .seg-row .num { font-family: 'JetBrains Mono', monospace; color: var(--accent); font-weight: 700; }
-  .seg-row .nm { color: var(--text); }
+  .seg-row .nm { color: var(--text); min-width: 0; overflow-wrap: anywhere; }
   .seg-row .nm .meta { color: var(--text-muted); font-size: 11px; font-family: 'JetBrains Mono', monospace; }
   .seg-row .col-dur, .seg-row .col-cut, .seg-row .col-pit {
     font-family: 'JetBrains Mono', monospace; text-align: right;
   }
-  .seg-row .col-dur { color: var(--text); }
+  .seg-row .col-dur { color: var(--text); white-space: nowrap; min-width: 60px; }
   .seg-row .col-cut { color: var(--text-muted); font-size: 11px; }
   .seg-row .col-pit { color: var(--text-dim); font-size: 11px; }
   .seg-row.done { background: rgba(110, 231, 168, 0.05); }
@@ -417,7 +421,6 @@
   .st-tag.nocrew { color: var(--red); }
   .st-tag.bag    { color: var(--accent); }
   .st-tag.pacer  { color: var(--green); }
-  .st-tag.note   { color: var(--yellow); text-transform: none; letter-spacing: 0.04em; }
 
   /* On a phone the columns do not fit: the segment name wraps to four lines
      and the last fuel metric falls off the right edge, and a race is free to
@@ -586,8 +589,8 @@
      predicted position still draw with no signal. The tiles underneath are
      Esri's and will be missing offline; the map is useful without them. -->
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/finish-card.js?v=81ff34ca"></script>
-<script src="lib/race-core.js?v=5cc78094"></script>
+<script src="lib/finish-card.js?v=779a41b4"></script>
+<script src="lib/race-core.js?v=abca3514"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -652,18 +655,20 @@
     return 'done';
   }
 
+  // On the race's own clock, as the race publishes them: "Sun 1:00 PM", and
+  // the zone named once, so somebody watching from elsewhere knows whose
+  // clock it is.
   function renderCutoffs() {
     const start = new Date(cfg.startTime);
     const cuts = cfg.cutoffs || {};
     const final = new Date(start.getTime() + (cuts.totalHours || 0) * 3600 * 1000);
-    const day = d => d.toDateString() === start.toDateString() ? '' : ' D2';
-    const fmt = d => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + day(d);
+    const fmt = d => Race.tz.dayClock(d.getTime(), cfg);
     const tightHtml = cuts.lastLegStartHours
       ? `<div class="cutoff-item warn"><span class="v">${fmt(new Date(start.getTime() + cuts.lastLegStartHours * 3600 * 1000))}</span><span class="l">Last leg start · ${cuts.lastLegStartHours}h</span></div>`
       : '';
     document.getElementById('cutoffs').style.display = '';
     document.getElementById('cutoffs').innerHTML = `
-      <span class="cutoffs-label">Cutoffs</span>
+      <span class="cutoffs-label">Cutoffs · ${escapeHtml(Race.tz.label(cfg, start.getTime()))}</span>
       <div></div>
       <div class="cutoff-item"><span class="v">${fmt(start)}</span><span class="l">Start</span></div>
       ${tightHtml}
@@ -688,8 +693,9 @@
   }
 
   // What waits at the end of a leg: a timing point with no aid, a stop the crew
-  // cannot drive to, the lot they park in. A crew needs this while planning the
-  // day, not only in the log after the leg is already run.
+  // cannot drive to, a bag, a pacer. The crew's own notes (the lot, the walk-in,
+  // a pin to drop) are not here: they are for the people driving to it, and
+  // they live on the pit board, beside the racer the crew is meeting.
   function stationTags(st) {
     if (!st) return '';
     const tags = [];
@@ -697,7 +703,6 @@
     else if (!st.crewAccess) tags.push(['nocrew', 'No crew']);
     if (st.dropBag) tags.push(['bag', 'Drop bag']);
     if (st.pacerEligible) tags.push(['pacer', 'Pacer']);
-    if (st.crewNote) tags.push(['note', st.crewNote]);
     return tags.length
       ? ' ' + tags.map(([c, t]) => `<span class="st-tag ${c}">${escapeHtml(t)}</span>`).join('')
       : '';
@@ -708,7 +713,8 @@
     // The start is not a leg, so it has no row of its own, but a bag left there
     // or a lot the crew parks in is worth saying before the race begins.
     const st = Race.course.startAidTags(cfg);
-    const startRow = !st ? '' : `
+    // A start with only a crew note has nothing left to say here.
+    const startRow = !st || !stationTags(st) ? '' : `
         <div class="seg-row start">
           <span class="num">–</span>
           <span class="nm">
@@ -914,11 +920,11 @@
       return `
         <tr class="leg-row${oldCls}">
           <td class="leg-num">${legLabel}</td>
-          <td class="num" data-label="Done">${Race.fmt.clockTime(l.endTime)}</td>
+          <td class="num" data-label="Done">${Race.fmt.clockTime(l.endTime, cfg)}</td>
           <td class="num" data-label="Leg">${dur ? Race.fmt.durationShort(dur) : '–'}</td>
           <td class="num" data-label="Pit">${pitCell}</td>
           ${fuelMetrics().map(m => `<td class="num" data-label="${escapeHtml(m.short)}">${
-            l[m.key] != null && l[m.key] !== '' ? Race.fuel.fmt(m, l[m.key]) : '–'}</td>`).join('')}
+            Race.fuel.cell(m, l)}</td>`).join('')}
         </tr>
         ${noteRow}${mediaRow}`;
     }).join('');
@@ -1614,7 +1620,7 @@
   function updateLastUpdated() {
     if (!data) return;
     const lu = data.lastUpdated
-      ? `Data updated ${new Date(data.lastUpdated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+      ? `Data updated ${Race.fmt.clockTime(data.lastUpdated, cfg)}`
       : 'Awaiting start';
     let live = '';
     if (lastFetchAt) {

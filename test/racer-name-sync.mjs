@@ -41,11 +41,13 @@ const read = (p) => page.evaluate(async (p) => {
   const r = await (await fetch(`/api/get?path=${p}`, { headers: { Authorization: 'Bearer stub' } })).json();
   return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(r.content), c => c.charCodeAt(0))));
 }, p);
-// Link Sangre's racer to this account.
+// Link Sangre's racer to this account, under the short name it started
+// with. Set here rather than read from the repo, where the real race has
+// since been renamed through this very feature.
 await page.evaluate(async ([slug, me]) => {
   const env0 = await (await fetch(`/api/get?path=races/${slug}/config.json`, { headers: { Authorization: 'Bearer stub' } })).json();
   const cfg = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(env0.content), c => c.charCodeAt(0))));
-  delete cfg.myRole; cfg.runners[0].email = me;
+  delete cfg.myRole; cfg.runners[0].email = me; cfg.runners[0].name = 'Jason';
   await fetch('/api/commit', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer stub' },
     body: JSON.stringify({ path: `races/${slug}/config.json`, content: JSON.stringify(cfg), message: 'link' }) });
 }, [SANGRE, ME]);

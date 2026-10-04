@@ -65,6 +65,25 @@ the front, with usernames beside them as the start of following a racer.
 6. ~~**Public racer profiles.**~~ **Built 2026-10-02.** The profile page,
    made public by choice, at sendoff.run/@username. See "Public racer
    profile" in section 2.
+6a. **Race time zone and cutoffs as clock times.** Asked for 2026-10-03.
+   **Built 2026-10-03 on the working branch, held there until the Hennepin
+   100 finishes** (it started that morning), and merged only once it has.
+   Decided:
+   - **Each race gets a time zone**, chosen in setup and settings, and every
+     time anybody types in (the start, cutoffs, a corrected split) is read
+     in that zone, and every time shown is shown in it, with the zone named.
+     Family watching from another zone see the race's clock, not theirs.
+   - **Cutoffs are entered and shown as clock times**, the way races publish
+     them ("Sun 1:00 PM"), with a day picked from the race's own dates.
+   - **They stay at those clock times** if the start is moved afterwards. A
+     delayed start does not quietly hand anybody extra minutes.
+   - The cutoff arithmetic (margin, projection, tight and off pace) is
+     unchanged; existing races keep their cutoffs and show them as times.
+   - The aid station template's cutoff column takes times; hours still work.
+   - A race from before zones has none and shows times in each viewer's own
+     zone, as it always did, until somebody picks one in settings.
+   - Not yet in the zone: the dates on a profile's results list, which come
+     from the saved result and carry no zone of their own.
 7. **Goal-time planner.** Target finish in, per-aid target times out, live
    delta against them. Self-contained, needs no billing, and it is what makes a
    second race better than the first.
@@ -1398,7 +1417,44 @@ The race also found the racer-page clock bug, fixed the same day: the
 screenshot sent from the finish reads 51:27:47, which is the time since the
 start at the moment it was taken, not the 35:41:15 the runner actually ran.
 
-### Your AI as crew — *not built, Pro*
+### Your AI as crew — *built 2026-10-03, Pro, held for the Hennepin 100*
+
+**Built 2026-10-03** on the working branch, alongside the race time zone, and
+merged with it once the Hennepin 100 is over. What was built, against the plan
+below:
+
+- **The credential** is a KV record, `aicrew:<token>`, naming one race and one
+  racer, made from a new "AI as crew" section of Manage access by whoever can
+  hand out access, and removed there. It lasts a week past the race's cutoff or
+  a month, whichever is later. Crew see that an AI is on the race and for whom;
+  only those who can hand out access see its link. It is on the roster, tagged
+  AI.
+- **The MCP server is the worker itself**, at `/mcp/<token>`: JSON-RPC over
+  MCP's streamable HTTP, answered as plain JSON. The token in the path is the
+  key, because a connector is set up by pasting one address. The logic is in
+  `worker/src/ai-crew.js`, pure functions of config and data.
+- **Tools:** `race_status` (where the racer is, the next station by name, its
+  distance and cutoff on the race clock, intake against the plan, the one-tap
+  items, unread notes), `log_intake`, `log_item`, `add_note`, `read_notes` and
+  `mark_notes_read`. Intake, items and notes only, for that racer only. No
+  splits.
+- **Estimates** are kept per leg in `aiEst`, shown as "~480cal" on the race
+  page and the report and as "~ estimate" on the pit board, and a number a
+  person types there replaces the guess. A save that only adds a tapped item
+  keeps it.
+- **Notes** the racer typed with no signal come back through `read_notes`, and
+  the ones handled are remembered per leg in `aiNoted`. Every line the AI
+  writes says "AI crew:".
+- **Pro** as planned: `aiCrew` in `PLANS`, checked against the race owner when
+  a link is made and on every call.
+- **The privacy page** has its own section, and the panel says what is shared
+  beside the button and again in the confirmation.
+- Not done: a cap on calls. Each call is a few reads and, for a write, one D1
+  write; if an assistant turns out to poll, a per-link daily count is the next
+  step.
+- Tests: `worker/test/ai-crew.mjs`, `test/ai-crew-page.mjs`.
+
+The plan, as written on 2026-09-28:
 
 Raised 2026-09-28, after the Sangre de Cristo 100, from how the race was
 actually logged. Racing it alone, the founder dictated each aid station to an

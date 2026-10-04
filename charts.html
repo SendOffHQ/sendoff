@@ -33,7 +33,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=9b76b24c">
+<link rel="stylesheet" href="lib/race-theme.css?v=581f8462">
 <style>
   .chart-card {
     background: var(--bg-card); border: 1px solid var(--border);
@@ -110,7 +110,7 @@
   <span>Charts auto-refresh every 30s</span>
 </footer>
 
-<script src="lib/race-core.js?v=5cc78094"></script>
+<script src="lib/race-core.js?v=abca3514"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -171,7 +171,7 @@
       document.getElementById('error').style.display = 'none';
       Race.charts.render(document.getElementById('body'), cfg, data);
       document.getElementById('last-updated').textContent = data.lastUpdated
-        ? 'Updated ' + new Date(data.lastUpdated).toLocaleString()
+        ? 'Updated ' + Race.tz.format(data.lastUpdated, cfg, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })
         : 'Awaiting data';
     } catch (err) {
       const e = document.getElementById('error');

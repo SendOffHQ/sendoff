@@ -29,7 +29,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=9b76b24c">
+<link rel="stylesheet" href="lib/race-theme.css?v=581f8462">
 <style>
   /* A reading column. Legal text that runs the width of a desktop screen does
      not get read, and this is text somebody should actually be able to read. */
@@ -95,7 +95,7 @@
 </header>
 
 <main class="legal">
-<p class="updated">Last updated 2 October 2026</p>
+<p class="updated">Last updated 4 October 2026</p>
 <h2>The short version</h2>
 <p>SendOff stores what you type into it: your email address, your race, and what your crew logs.
   There is no analytics, no advertising, no third-party trackers, no cookies, and nothing is sold
@@ -278,9 +278,34 @@
   <dt>Esri</dt>
   <dd>Serves the map tiles behind a course map. Opening a race page that draws a map sends your IP
     address and the map coordinates to Esri, which reveals roughly where the race is.</dd>
+  <dt>An AI you connect as crew</dt>
+  <dd>Only if somebody who runs the race connects one, and only that race and that racer. See
+    <a href="#ai-crew">an AI as crew</a>.</dd>
 </dl>
 <p>That is the whole list. No analytics, no advertising networks, no social pixels, no session
   recording.</p>
+
+<h2 id="ai-crew">An AI as crew</h2>
+<p>Whoever can hand out access to a race can connect an AI assistant to it, such as Claude, as crew
+  for one racer. It is made from Manage access on the race's settings page, and that is where this
+  is said first.</p>
+<p><strong>What it is sent.</strong> Every time the assistant asks, it is given that race's name,
+  location, course, aid station names and notes, start and cutoffs, and that one racer's name,
+  bib, splits, food, drink, one-tap items, notes and goals. Nothing about anybody else on the
+  race, and no email address.</p>
+<p><strong>Who gets it.</strong> Whoever runs the assistant: Anthropic for Claude, OpenAI for
+  ChatGPT, and so on. What they keep, for how long, and whether they use it to train their models
+  is set by their terms and your settings with them, not by SendOff. The conversation with the
+  assistant is theirs, not SendOff's, and SendOff never sees it.</p>
+<p><strong>What it can change.</strong> Food, drink, one-tap items and notes on that racer's legs.
+  Each line it writes says it came from the AI, and its numbers are kept as estimates and shown
+  with a ~ until a person types the real one. It cannot check anybody in or out, or change the
+  course, the roster or who can see the race.</p>
+<p><strong>The link.</strong> Connecting one makes a link that works for that race and racer only.
+  SendOff keeps it, with who made it, when, and when it expires, until it is removed or expires:
+  a week after the race's cutoff or a month after it was made, whichever is later. Removing it from
+  Manage access stops it at once. Whoever has the link
+  can do what the assistant can, so keep it to yourself.</p>
 
 <h2>What is not done</h2>
 <p>No cookies are set. Your sign-in session lives in your browser's local storage rather than a
@@ -359,13 +384,15 @@
   behalf, and no others:</p>
 <table>
   <tr><td>Cloudflare, Inc. (US)</td><td>runs the worker that answers requests, and holds accounts,
-    profiles, usernames, results you enter, access lists, tokens, share links and feedback. Also serves traffic from whichever
+    profiles, usernames, results you enter, access lists, tokens, share links, AI crew links and feedback. Also serves traffic from whichever
     of its locations is nearest the person asking, worldwide.</td></tr>
   <tr><td>GitHub, Inc. (US, a Microsoft company)</td><td>holds races and logged splits as files in
     a public repository, and serves the pages people watch.</td></tr>
 </table>
 <p>Both are United States companies operating globally, so your data is stored in the United States
-  and may pass through or be cached in other countries as it is served. Nobody else is given it.
+  and may pass through or be cached in other countries as it is served. Nobody else is given it,
+  except an AI that somebody running a race connects as crew, which is their choice and goes to
+  whoever runs that AI: see <a href="#ai-crew">an AI as crew</a>.
   There is no advertising network, no analytics provider and no data broker in this list because
   there are none.</p>
 
@@ -384,6 +411,6 @@
     <span aria-hidden="true"> &middot; </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=5cc78094"></script>
+<script src="lib/race-core.js?v=abca3514"></script>
 </body>
 </html>

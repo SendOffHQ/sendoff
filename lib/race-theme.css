@@ -585,6 +585,12 @@ label.field > .hint {
 .seg-row.start .num { color: var(--text-muted); }
 .seg-row.start .nm { color: var(--text-dim); }
 .access-list .row .tag.creator { color: var(--green); border-color: var(--green); }
+/* An AI on the race, marked as one. */
+.access-list .row .tag.ai { color: var(--accent); border-color: var(--accent); }
+.ax-ai-steps { margin: 10px 0 6px; padding-left: 20px; font-size: 12px; line-height: 1.6; }
+/* Words, in a box made for an address: break between them, not inside. */
+.access-invite-result .ax-ai-what, .access-invite-result .ax-ai-steps, .access-invite-result .access-hint { word-break: normal; overflow-wrap: break-word; }
+.ax-ai-privacy { margin-top: 8px; }
 /* The role is a control, not a label: changing someone from Viewer to Pacer
    is one choice here rather than a revoke followed by a re-invite. */
 .access-list .row .role-pick {
@@ -709,6 +715,22 @@ label.field > .hint {
 .signin-fb.acct-connect { margin: 0 0 12px; }
 .acct-note { font-size: 12px; line-height: 1.5; color: var(--text-muted); margin: 14px 0 0; }
 .acct-note a { color: var(--accent); }
+/* A cutoff as a race publishes it: the day, and the time on that day. */
+.cut-pick { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.cut-pick select { flex: 1 1 7.5em; min-width: 0; width: auto; }
+.cut-pick input[type="time"] { flex: 1 1 6.5em; min-width: 0; width: auto; }
+.cut-pick input[type="date"] { flex: 1 1 9em; min-width: 0; width: auto; }
+.cut-wait { font-size: 11px; color: var(--text-muted); }
+/* An aid station's cutoff, on its own line under the name and distance,
+   where a day and a time have room on a phone. */
+.aid-cut { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.aid-cut-lbl { flex: 0 0 auto; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.aid-cut .cut-pick { flex: 1 1 15em; max-width: 24em; }
+@media (max-width: 520px) {
+  .datetime-row input[type="date"] { flex: 1 1 100%; }
+}
+
 /* Carrying a new profile name over to the races you are the racer on. */
 .ns-lead { margin: 0 0 6px; font-size: 15px; }
 .ns-list { display: grid; gap: 2px; margin-top: 12px; }
@@ -744,3 +766,6 @@ label.field > .hint {
   font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em;
   text-transform: uppercase; color: var(--text-muted); }
 .signin-or::before, .signin-or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* Part of this number is an AI crew's guess, until somebody types the real one. */
+.est-tag { color: var(--accent); font-size: 10px; letter-spacing: 0.04em; text-transform: none; white-space: nowrap; }

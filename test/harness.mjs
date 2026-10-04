@@ -71,6 +71,7 @@ let visibilityFails = false;
 // Not on the race at all, which is what a site admin is for a race somebody
 // else made: the config comes back with no role and the roster is refused.
 let notOnRace = false;
+let aiCrewLinks = [];
 
 // Whether hub.json advertises the live push. Off by default: a page that
 // believes in it opens a websocket, and this server does not speak one.
@@ -582,6 +583,33 @@ const server = http.createServer((req, res) => {
   // The roster, which is also how a page learns who made the race: the config
   // in a public repository no longer names anybody. Manage access and the two
   // creator-only sections beside it all hang off this answer.
+  // An AI invited as crew: the links a race has, making one, removing one.
+  // Held in memory like everything else here; the worker's own rules are in
+  // worker/test/ai-crew.mjs.
+  if (url.pathname === '/api/ai-crew' || url.pathname === '/api/ai-crew/revoke') {
+    if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+    if (req.method === 'GET') {
+      const slug = url.searchParams.get('slug') || '';
+      return send(200, JSON.stringify({ canManage: true, aiCrew: aiCrewLinks.filter(a => a.slug === slug) }), 'application/json');
+    }
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      let j = {}; try { j = JSON.parse(body || '{}'); } catch (e) {}
+      if (url.pathname === '/api/ai-crew/revoke') {
+        aiCrewLinks = aiCrewLinks.filter(a => a.token !== j.token);
+        return send(200, '{"ok":true}', 'application/json');
+      }
+      let cfg = {}; try { cfg = JSON.parse(raceFile(j.slug, 'config.json') || '{}'); } catch (e) {}
+      const r = (cfg.runners || []).find(x => x.id === j.runnerId);
+      if (!r) return send(400, '{"error":"No such racer on this race"}', 'application/json');
+      const token = 'stubaicrew' + String(aiCrewLinks.length + 1).padStart(22, '0');
+      const link = { slug: j.slug, token, url: `https://worker.example/mcp/${token}`, label: j.label || 'AI crew',
+        runnerId: r.id, runnerName: r.name || r.id, createdAt: new Date().toISOString(), expiresAt: Date.now() + 30 * 864e5 };
+      aiCrewLinks.push(link);
+      send(200, JSON.stringify(link), 'application/json');
+    });
+  }
   if (url.pathname === '/api/access') {
     if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
     const slug = url.searchParams.get('slug') || '';

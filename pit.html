@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=9b76b24c">
+<link rel="stylesheet" href="lib/race-theme.css?v=581f8462">
 <style>
   body { padding: 20px 16px 32px; }
   .wrap { max-width: 860px; margin: 0 auto; }
@@ -90,6 +90,22 @@
     color: var(--text-dim);
   }
   .where strong { color: var(--text); }
+  .where .stop { margin-top: 8px; line-height: 1.6; }
+  .where .stop .k { color: var(--text-muted); }
+  .stop-tag {
+    display: inline-block; padding: 0 5px; border: 1px solid currentColor; border-radius: 2px;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+  }
+  .stop-tag.cp { color: var(--blue); }
+  .stop-tag.nocrew { color: var(--red); }
+  .stop-tag.bag { color: var(--accent); }
+  .stop-tag.pacer { color: var(--green); }
+  /* A sentence, wrapping inside the card however long it is. */
+  .stop-note {
+    margin-top: 4px; padding: 6px 8px; border-left: 2px solid var(--yellow);
+    background: var(--bg-elevated); color: var(--text);
+    white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45;
+  }
   .where .arrow { color: var(--text-muted); margin: 0 6px; }
 
   .state-timer {
@@ -248,7 +264,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=5cc78094"></script>
+<script src="lib/race-core.js?v=abca3514"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -355,28 +371,29 @@
     const other = field === 'startTime' ? leg.endTime : leg.startTime;
     // A time that was never recorded still needs a day to sit on: the leg's
     // other end if it has one, otherwise the race start, otherwise today.
-    const base = new Date(leg[field] || other || cfg.startTime || Date.now());
+    const base = Date.parse(leg[field] || other || cfg.startTime) || Date.now();
     const pad = n => String(n).padStart(2, '0');
-    const seed = leg[field] ? new Date(leg[field]) : new Date();
+    // Read and shown on the race's clock, not this phone's: a crew member
+    // still on home time types what the race clock said.
+    const seed = Race.tz.parts(leg[field] ? Date.parse(leg[field]) : Date.now(), cfg);
     const input = prompt(
-      `${leg[field] ? 'Edit' : 'Set'} ${field === 'startTime' ? 'send-off' : 'arrival'} (24h, HH:MM or HH:MM:SS):`,
-      `${pad(seed.getHours())}:${pad(seed.getMinutes())}:${pad(seed.getSeconds())}`
+      `${leg[field] ? 'Edit' : 'Set'} ${field === 'startTime' ? 'send-off' : 'arrival'} (24h, HH:MM or HH:MM:SS, ${Race.tz.label(cfg, base)}):`,
+      `${pad(seed.h)}:${pad(seed.mi)}:${pad(seed.s)}`
     );
     if (!input) return;
     const m = input.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-    if (!m) { alert('Bad format. Use HH:MM or HH:MM:SS.'); return; }
-    const next = new Date(base);
-    next.setHours(+m[1], +m[2], +(m[3] || 0), 0);
+    if (!m || +m[1] > 23 || +m[2] > 59 || +(m[3] || 0) > 59) { alert('Bad format. Use HH:MM or HH:MM:SS.'); return; }
+    let next = Race.tz.atClock(base, +m[1], +m[2], +(m[3] || 0), cfg);
     // A clock time has no day on it, and this race runs through two nights.
     // Leaving 00:30 on the day of a 23:50 send-off would read as a leg that
     // finished twenty-three hours before it started, so the day follows the
     // only reading that makes sense against the leg's other end.
-    if (field === 'endTime' && leg.startTime && next < new Date(leg.startTime)) {
-      next.setDate(next.getDate() + 1);
-    } else if (field === 'startTime' && leg.endTime && next > new Date(leg.endTime)) {
-      next.setDate(next.getDate() - 1);
+    if (field === 'endTime' && leg.startTime && next < Date.parse(leg.startTime)) {
+      next = Race.tz.atClock(base, +m[1], +m[2], +(m[3] || 0), cfg, 1);
+    } else if (field === 'startTime' && leg.endTime && next > Date.parse(leg.endTime)) {
+      next = Race.tz.atClock(base, +m[1], +m[2], +(m[3] || 0), cfg, -1);
     }
-    const iso = next.toISOString();
+    const iso = new Date(next).toISOString();
     try {
       const r = await Race.queue.write(DATA_PATH, 'setLegTimes',
         { runnerId, legs: { [legIndex]: { [field]: iso } } },
@@ -496,6 +513,22 @@
       fields[`preset_${idx}`] = (+legNow[`preset_${idx}`] || 0) + n;
     }
 
+    // A number a person typed replaces an AI crew's estimate of it. What the
+    // box would hold from the leg and the items tapped here is not typing, so
+    // the guess survives a save that only added a gel.
+    if (legNow.aiEst) {
+      const est = Object.assign({}, legNow.aiEst);
+      const items = Race.fuel.presets(cfg);
+      let changed = false;
+      for (const [m, v] of amounts) {
+        if (est[m.key] == null) continue;
+        let expect = +legNow[m.key] || 0;
+        for (const [idx, n] of Object.entries(staged)) expect += (+n || 0) * (+((items[idx] || {}).values || {})[m.key] || 0);
+        if (v === '' || Race.fuel.round(m, v) !== Race.fuel.round(m, expect)) { delete est[m.key]; changed = true; }
+      }
+      if (changed) fields.aiEst = Object.keys(est).length ? est : null;
+    }
+
     // By selector, not by element: the redraw below throws this button away
     // and builds another, so the thing to mark afterwards is whatever is
     // standing in its place by then.
@@ -552,12 +585,47 @@
     return `In pit · next: <strong>${escapeHtml(nextDef ? nextDef.name : '?')}</strong>`;
   }
 
+  // The stop the crew is driving to, and what they need to know getting there:
+  // the lot, the walk-in, a pin to drop. These notes used to be on the race
+  // page too, where spectators had no use for them and a long one pushed the
+  // course list off a phone. Here they sit beside the racer being met.
+  //
+  // On course, it is where the racer will come in. In a pit, it is the next
+  // one, because that is where the crew goes once the racer is sent off.
+  // Before the start, the start itself.
+  function stopLine(next) {
+    let label, name, st;
+    if (next.state === 'finished') return '';
+    if (next.state === 'idle') {
+      st = Race.course.startAid(cfg);
+      label = 'At the start';
+      name = (Race.course.aidStations(cfg)[0] || {}).name || 'Start';
+    } else {
+      const idx = next.state === 'on-course' ? next.currentLegIndex : next.nextLegIndex;
+      st = Race.stationAt(cfg, idx);
+      label = next.state === 'on-course' ? 'Meet at' : 'Next stop';
+      name = st && st.name;
+    }
+    if (!st || !name) return '';
+    const tags = [];
+    if (st.checkpoint) tags.push(['cp', 'Checkpoint, no aid']);
+    else if (!st.crewAccess) tags.push(['nocrew', 'No crew access']);
+    if (st.dropBag) tags.push(['bag', 'Drop bag']);
+    if (st.pacerEligible) tags.push(['pacer', 'Pacer pickup']);
+    if (!tags.length && !st.crewNote) return '';
+    return `<div class="stop">
+        <span class="k">${label}</span> <strong>${escapeHtml(name)}</strong>${
+          tags.map(([c, t]) => ` <span class="stop-tag ${c}">${escapeHtml(t)}</span>`).join('')}
+        ${st.crewNote ? `<div class="stop-note">${escapeHtml(st.crewNote)}</div>` : ''}
+      </div>`;
+  }
+
   // The two times the selected leg actually holds, to the second. A press that
   // went in a minute late, or one that never went in at all, is the thing a
   // crew is scanning for, and neither shows up in a duration.
   function legTimesLine(leg) {
     if (!leg) return '';
-    const clock = ts => new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+    const clock = ts => Race.fmt.clockTimeSec(ts, cfg);
     const cell = (label, ts) => ts
       ? `<span><span class="k">${label}</span> ${escapeHtml(clock(ts))}</span>`
       : `<span class="missing"><span class="k">${label}</span> not recorded</span>`;
@@ -684,7 +752,8 @@
         ${fuelMetrics.length ? `<div class="intake-grid">
           ${fuelMetrics.map(m => `
           <label class="field">
-            <span class="lbl">${escapeHtml(Race.fuel.fieldLabel(m))}</span>
+            <span class="lbl">${escapeHtml(Race.fuel.fieldLabel(m))}${Race.fuel.estimated(selectedLeg, m.key)
+              ? ' <span class="est-tag" title="Part of this is an AI crew\'s estimate. Type the real number to replace it.">~ estimate</span>' : ''}</span>
             <input type="number" data-intake="${escapeAttr(m.key)}" min="0" step="${m.step}" value="${selectedLeg?.[m.key] ?? ''}" />
           </label>`).join('')}
         </div>` : ''}
@@ -729,7 +798,7 @@
           <div class="runner-name">${escapeHtml(runner.name)}</div>
           <div class="state-badge state-${stateClass}">${stateLabel}</div>
         </div>
-        <div class="where">${whereLine(runner, next)}</div>
+        <div class="where">${whereLine(runner, next)}${stopLine(next)}</div>
         <div class="state-timer" data-since="${since}"${done ? ` data-elapsed="${finishedSec}"` : ''}>
           <span class="label">${timerLabel}</span>
           <span class="value runner-timer">–</span>
@@ -856,7 +925,7 @@
   function updateLastUpdatedLabel() {
     if (!data) return;
     const lu = data.lastUpdated
-      ? `Updated ${new Date(data.lastUpdated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+      ? `Updated ${Race.fmt.clockTime(data.lastUpdated, cfg)}`
       : 'Awaiting start';
     document.getElementById('last-updated').textContent = lu;
   }
