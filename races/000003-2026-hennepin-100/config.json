@@ -1,0 +1,622 @@
+{
+  "name": "2026 Hennepin 100",
+  "location": "Sterling, IL",
+  "startTime": "2026-10-03T07:00:00-05:00",
+  "courseType": "segments",
+  "activity": "trail-run",
+  "units": {
+    "distance": "mi",
+    "elevation": "ft"
+  },
+  "visibility": "public",
+  "cutoffs": {
+    "totalHours": 30
+  },
+  "course": {
+    "segments": [
+      {
+        "name": "Start → Aid station 1",
+        "fromAid": "Start",
+        "toAid": "Aid station 1",
+        "distanceMi": 5.3,
+        "elevationGainFt": 16,
+        "elevationLossFt": 34,
+        "arriveCutoffHours": null,
+        "crewAccess": false,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 1 → Aid station 2",
+        "fromAid": "Aid station 1",
+        "toAid": "Aid station 2",
+        "distanceMi": 5.5,
+        "elevationGainFt": 0,
+        "elevationLossFt": 0,
+        "arriveCutoffHours": null,
+        "crewAccess": false,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 2 → Aid station 3",
+        "fromAid": "Aid station 2",
+        "toAid": "Aid station 3",
+        "distanceMi": 4.1,
+        "elevationGainFt": 0,
+        "elevationLossFt": 0,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": "Limited parking",
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 3 → Aid station 4",
+        "fromAid": "Aid station 3",
+        "toAid": "Aid station 4",
+        "distanceMi": 5.5,
+        "elevationGainFt": 0,
+        "elevationLossFt": 0,
+        "arriveCutoffHours": null,
+        "crewAccess": false,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 4 → Aid station 5",
+        "fromAid": "Aid station 4",
+        "toAid": "Aid station 5",
+        "distanceMi": 2.7,
+        "elevationGainFt": 0,
+        "elevationLossFt": 0,
+        "arriveCutoffHours": 6.92,
+        "crewAccess": true,
+        "crewNote": "Very limited parking. Skip it unless runner needs you. 2 500 MG Tylenol",
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 5 → Aid station 6",
+        "fromAid": "Aid station 5",
+        "toAid": "Aid station 6",
+        "distanceMi": 4.2,
+        "elevationGainFt": 0,
+        "elevationLossFt": 0,
+        "arriveCutoffHours": null,
+        "crewAccess": false,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 6 → Aid station 7",
+        "fromAid": "Aid station 6",
+        "toAid": "Aid station 7",
+        "distanceMi": 4.8,
+        "elevationGainFt": 0,
+        "elevationLossFt": 0,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": "41.4008686, -89.7981585, took 2 Tylenol",
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 7 → Aid station 8",
+        "fromAid": "Aid station 7",
+        "toAid": "Aid station 8",
+        "distanceMi": 6.6,
+        "elevationGainFt": 0,
+        "elevationLossFt": 0,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": "41.384894, -89.699362",
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 8 → Aid station 9",
+        "fromAid": "Aid station 8",
+        "toAid": "Aid station 9",
+        "distanceMi": 5.6,
+        "elevationGainFt": 0,
+        "elevationLossFt": 20,
+        "arriveCutoffHours": null,
+        "crewAccess": false,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 9 → Aid station 10",
+        "fromAid": "Aid station 9",
+        "toAid": "Aid station 10",
+        "distanceMi": 3.2,
+        "elevationGainFt": 0,
+        "elevationLossFt": 47,
+        "arriveCutoffHours": 14,
+        "crewAccess": true,
+        "crewNote": "41.3433699, -89.5573171",
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 10 → Aid station 11",
+        "fromAid": "Aid station 10",
+        "toAid": "Aid station 11",
+        "distanceMi": 3,
+        "elevationGainFt": 0,
+        "elevationLossFt": 15,
+        "arriveCutoffHours": 14.75,
+        "crewAccess": false,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 11 → Aid station 12",
+        "fromAid": "Aid station 11",
+        "toAid": "Aid station 12",
+        "distanceMi": 3.5,
+        "elevationGainFt": 51,
+        "elevationLossFt": 0,
+        "arriveCutoffHours": 15.75,
+        "crewAccess": true,
+        "crewNote": "41.3433699, -89.5573171",
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 12 → Aid station 13",
+        "fromAid": "Aid station 12",
+        "toAid": "Aid station 13",
+        "distanceMi": 3.2,
+        "elevationGainFt": 46,
+        "elevationLossFt": 18,
+        "arriveCutoffHours": null,
+        "crewAccess": false,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 13 → Aid station 14",
+        "fromAid": "Aid station 13",
+        "toAid": "Aid station 14",
+        "distanceMi": 5.2,
+        "elevationGainFt": 0,
+        "elevationLossFt": 0,
+        "arriveCutoffHours": 18.25,
+        "crewAccess": true,
+        "crewNote": "41.384894, -89.699362,  2 500 mg Tylenol",
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 14 → Aid station 15",
+        "fromAid": "Aid station 14",
+        "toAid": "Aid station 15",
+        "distanceMi": 6.5,
+        "elevationGainFt": 0,
+        "elevationLossFt": 33,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": "41.4008686, -89.7981585",
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 15 → Aid station 16",
+        "fromAid": "Aid station 15",
+        "toAid": "Aid station 16",
+        "distanceMi": 5.7,
+        "elevationGainFt": 39,
+        "elevationLossFt": 34,
+        "arriveCutoffHours": 22.08,
+        "crewAccess": true,
+        "crewNote": "41.4090926, -89.9048984",
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 16 → Aid station 17",
+        "fromAid": "Aid station 16",
+        "toAid": "Aid station 17",
+        "distanceMi": 5,
+        "elevationGainFt": 17,
+        "elevationLossFt": 17,
+        "arriveCutoffHours": 23.55,
+        "crewAccess": false,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 17 → Aid station 18",
+        "fromAid": "Aid station 17",
+        "toAid": "Aid station 18",
+        "distanceMi": 4.1,
+        "elevationGainFt": 0,
+        "elevationLossFt": 0,
+        "arriveCutoffHours": 25.12,
+        "crewAccess": false,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 18 → Aid station 19",
+        "fromAid": "Aid station 18",
+        "toAid": "Aid station 19",
+        "distanceMi": 4.4,
+        "elevationGainFt": 0,
+        "elevationLossFt": 0,
+        "arriveCutoffHours": 26.43,
+        "crewAccess": true,
+        "crewNote": "41.475876, -90.141891",
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 19 → Aid station 20",
+        "fromAid": "Aid station 19",
+        "toAid": "Aid station 20",
+        "distanceMi": 6.6,
+        "elevationGainFt": 30,
+        "elevationLossFt": 59,
+        "arriveCutoffHours": 28.42,
+        "crewAccess": true,
+        "crewNote": "41.4730959, -90.2622503",
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Aid station 20 → Finish",
+        "fromAid": "Aid station 20",
+        "toAid": "Finish",
+        "distanceMi": 5.4,
+        "elevationGainFt": 0,
+        "elevationLossFt": 0,
+        "arriveCutoffHours": 30,
+        "crewAccess": true,
+        "crewNote": "Colonna Fire Dept.",
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      }
+    ],
+    "startAid": {
+      "crewAccess": true,
+      "crewNote": "Sinnissippi Park, 2 500mg Tylenol",
+      "pacerEligible": false,
+      "dropBag": false
+    }
+  },
+  "runners": [
+    {
+      "id": "ronnie-reineke",
+      "name": "Ronnie Reineke",
+      "bib": "#267",
+      "color": "#0a8b92",
+      "targets": {
+        "caloriesPerHour": 250,
+        "fluidOzPerHour": 20,
+        "sodiumMgPerHour": 600,
+        "carbsPerHour": 60
+      },
+      "phaseTargets": [],
+      "crewNotes": "Rest/Eat while you walk! Keep moving"
+    }
+  ],
+  "fuelMetrics": [
+    {
+      "key": "calories",
+      "label": "Calories",
+      "unit": "cal",
+      "short": "Cal",
+      "decimals": 0,
+      "step": 10
+    },
+    {
+      "key": "fluidOz",
+      "label": "Fluid",
+      "unit": "oz",
+      "short": "Fluid",
+      "decimals": 1,
+      "step": 1
+    },
+    {
+      "key": "sodiumMg",
+      "label": "Sodium",
+      "unit": "mg",
+      "short": "Na",
+      "decimals": 0,
+      "step": 50
+    },
+    {
+      "key": "carbs",
+      "label": "Carbs",
+      "unit": "G",
+      "short": "Carb",
+      "decimals": 0,
+      "step": 1
+    }
+  ],
+  "fuelPresets": [
+    {
+      "name": "Maurten Gel",
+      "values": {
+        "calories": 160,
+        "sodiumMg": 30,
+        "carbs": 40
+      }
+    },
+    {
+      "name": "Stinger Gummies",
+      "values": {
+        "calories": 100,
+        "sodiumMg": 40,
+        "carbs": 23
+      }
+    },
+    {
+      "name": "Pretzels",
+      "values": {
+        "calories": 110,
+        "sodiumMg": 170,
+        "carbs": 21
+      }
+    },
+    {
+      "name": "Banana",
+      "values": {
+        "calories": 105,
+        "carbs": 47
+      }
+    },
+    {
+      "name": "Chicken Soup",
+      "values": {}
+    },
+    {
+      "name": "Precision Fuel - Caffeine",
+      "values": {
+        "calories": 120,
+        "carbs": 30
+      }
+    },
+    {
+      "name": "Big Flask - Water",
+      "values": {
+        "fluidOz": 17
+      }
+    },
+    {
+      "name": "Medium Flask - Gnarley",
+      "values": {
+        "fluidOz": 12,
+        "calories": 100,
+        "sodiumMg": 250,
+        "carbs": 25
+      }
+    },
+    {
+      "name": "Small Flask - Water",
+      "values": {
+        "fluidOz": 8.5
+      }
+    },
+    {
+      "name": "Big Flask - Electrolytes",
+      "values": {
+        "calories": 80,
+        "fluidOz": 17,
+        "sodiumMg": 400,
+        "carbs": 20
+      }
+    },
+    {
+      "name": "Small Flask - Electrolytes",
+      "values": {
+        "fluidOz": 8.5,
+        "calories": 80,
+        "sodiumMg": 400,
+        "carbs": 20
+      }
+    },
+    {
+      "name": "Mashed Potatoes",
+      "values": {
+        "calories": 170,
+        "sodiumMg": 680,
+        "carbs": 30
+      }
+    },
+    {
+      "name": "Peanut Butter Jelly",
+      "values": {}
+    },
+    {
+      "name": "Quesadilla",
+      "values": {}
+    },
+    {
+      "name": "Cookies",
+      "values": {}
+    },
+    {
+      "name": "Chips",
+      "values": {}
+    },
+    {
+      "name": "Applesauce",
+      "values": {
+        "calories": 50,
+        "fluidOz": 3.2,
+        "carbs": 12
+      }
+    },
+    {
+      "name": "Saltine crackers",
+      "values": {}
+    },
+    {
+      "name": "Maurten Gel -Caffeine",
+      "values": {
+        "calories": 100,
+        "sodiumMg": 22,
+        "carbs": 25
+      }
+    },
+    {
+      "name": "Peanutbutter crackers",
+      "values": {
+        "calories": 200,
+        "sodiumMg": 290,
+        "carbs": 23
+      }
+    },
+    {
+      "name": "Ginger snaps",
+      "values": {
+        "calories": 120,
+        "sodiumMg": 115,
+        "carbs": 22
+      }
+    },
+    {
+      "name": "Chicken bone broth",
+      "values": {
+        "calories": 50,
+        "fluidOz": 10,
+        "sodiumMg": 600,
+        "carbs": 2
+      }
+    },
+    {
+      "name": "Coffee waffle",
+      "values": {
+        "calories": 150,
+        "sodiumMg": 70,
+        "carbs": 19
+      }
+    },
+    {
+      "name": "Electrolytes caps",
+      "values": {
+        "sodiumMg": 215
+      }
+    },
+    {
+      "name": "Medium Flask - water",
+      "values": {
+        "fluidOz": 12
+      }
+    },
+    {
+      "name": "Salt tabs - 2",
+      "values": {
+        "sodiumMg": 500
+      }
+    },
+    {
+      "name": "Breakfast sandwich",
+      "values": {}
+    },
+    {
+      "name": "Check mix",
+      "values": {
+        "calories": 210,
+        "sodiumMg": 560,
+        "carbs": 37
+      }
+    },
+    {
+      "name": "Gold fish",
+      "values": {
+        "calories": 120,
+        "sodiumMg": 190,
+        "carbs": 17
+      }
+    },
+    {
+      "name": "Corn dog",
+      "values": {
+        "calories": 220,
+        "sodiumMg": 490,
+        "carbs": 23
+      }
+    },
+    {
+      "name": "Beef jerky",
+      "values": {
+        "calories": 70,
+        "sodiumMg": 400,
+        "carbs": 3
+      }
+    }
+  ],
+  "phaseTargets": [],
+  "targets": {
+    "caloriesPerHour": 250,
+    "fluidOzPerHour": 20,
+    "sodiumMgPerHour": 500
+  },
+  "presetOrder": [
+    0,
+    18,
+    5,
+    1,
+    16,
+    3,
+    21,
+    4,
+    15,
+    22,
+    14,
+    23,
+    20,
+    11,
+    19,
+    12,
+    2,
+    13,
+    17,
+    6,
+    8,
+    10,
+    9,
+    7,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30
+  ]
+}
