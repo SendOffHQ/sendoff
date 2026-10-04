@@ -62,6 +62,12 @@ globalThis.fetch = async (url, opts = {}) => {
 
   if (path && method === 'GET') {
     const f = git.get(path);
+    // A folder, listed the way the contents API lists one.
+    if (!f) {
+      const inside = [...git.keys()].filter(k => k.startsWith(path + '/') && !k.slice(path.length + 1).includes('/'));
+      if (inside.length) return new Response(JSON.stringify(inside.map(k =>
+        ({ type: 'file', name: k.slice(path.length + 1), path: k, sha: git.get(k).sha }))), { status: 200 });
+    }
     if (!f) return new Response('{"message":"Not Found"}', { status: 404 });
     // Over a megabyte GitHub stops inlining the blob: empty content, encoding
     // "none", sha still there. A detailed GPX reaches that, so it is modelled.
@@ -240,6 +246,10 @@ git.set(`races/${SLUG}/course.gpx`, { text: GPX, sha: 'git-gpx-0' });
 // the hub links to, and the card its preview tags point at.
 git.set(`races/${SLUG}/index.html`, { text: '<html>old stub</html>', sha: 'git-stub-0' });
 git.set(`races/${SLUG}/og.png`, { text: 'PNG-bytes', sha: 'git-card-0' });
+// A racer finished while it was listed, so it has a finish card and page too.
+git.set(`races/${SLUG}/finishers.json`, { text: '{"finishers":[{"id":"r1","name":"Pat"}]}', sha: 'git-fin-0' });
+git.set(`races/${SLUG}/finish-r1.html`, { text: '<html>Pat finished</html>', sha: 'git-fin-1' });
+git.set(`races/${SLUG}/finish-r1.png`, { text: 'PNG-bytes', sha: 'git-fin-2' });
 
 console.log('\na public race, listed on the hub with its course in the repo');
 ok('the config write succeeds', (await put(`races/${SLUG}/config.json`, race)).status, 200);
@@ -283,6 +293,8 @@ ok('and in private storage, byte for byte', bucket.get(`course/${SLUG}/course.gp
 // link is pasted into. An unlisted race that still has one is not unlisted.
 ok('the share page is off the site', git.has(`races/${SLUG}/index.html`), false);
 ok('and so is its preview card', git.has(`races/${SLUG}/og.png`), false);
+ok('and the finish page, its card, and the list they came from',
+  [`finish-r1.html`, `finish-r1.png`, `finishers.json`].map(n => git.has(`races/${SLUG}/${n}`)), [false, false, false]);
 
 // Taking a race off the hub cannot take back what was published while it was
 // on it, so the race has to remember having been there. Without this it reads

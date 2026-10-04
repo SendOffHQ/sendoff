@@ -25,6 +25,8 @@ let posts = [];
 
 // Which races have been through tools/make-og.py, and so have a share page.
 let sharePages = new Set();
+// Which finishers have had their finish card drawn and put on the site.
+let finishPages = new Set();
 
 globalThis.fetch = async (url, opts = {}) => {
   const u = String(url);
@@ -33,6 +35,8 @@ globalThis.fetch = async (url, opts = {}) => {
   if (share) {
     return new Response('', { status: sharePages.has(share[1]) ? 200 : 404 });
   }
+  const fin = u.match(/^https:\/\/sendoff\.run\/races\/([^/]+)\/finish-([^/]+)$/);
+  if (fin) return new Response('', { status: finishPages.has(fin[1] + '/' + fin[2]) ? 200 : 404 });
   if (u.startsWith('https://discord.test/')) {
     posts.push(JSON.parse(opts.body));
     return new Response('', { status: 204 });
@@ -165,10 +169,18 @@ ok('that page is what gets posted',
   /https:\/\/sendoff\.run\/races\/905-pretty\/$/m.test(posts[0].content.trim()), true);
 ok('and not the generic app URL', /race\.html\?id=/.test(posts[0].content), false);
 
+const flush = async (e = env) => (await (await worker.fetch(new Request('https://w/discord/flush', { method: 'POST' }), e, ctx)).json());
 posts = [];
 await commit('races/905-pretty/data.json', legs(4));
-ok('a finish uses it too',
-  /https:\/\/sendoff\.run\/races\/905-pretty\/$/m.test(posts[0].content.trim()), true);
+ok('a finish waits for its own card', posts.length, 0);
+ok('and puts the finisher where make-og.py draws it from',
+  JSON.parse(repo.get('races/905-pretty/finishers.json')).finishers, [{ id: 'jd', name: 'Jason Dupree', time: '04:00:00' }]);
+ok('asking before the card is up sends nothing', [(await flush()).posted, posts.length], [0, 0]);
+finishPages.add('905-pretty/jd');
+ok('once it is on the site, the post goes', (await flush()).posted, 1);
+ok('linking the finish page, whose preview is the finish card',
+  /^https:\/\/sendoff\.run\/races\/905-pretty\/finish-jd$/m.test(posts[0].content.trim()), true);
+ok('and only once', [(await flush()).posted, posts.length], [0, 1]);
 
 console.log('\nand when it does not have one yet');
 posts = [];
@@ -183,9 +195,30 @@ posts = [];
 await commit('races/902-open/data.json', legs(2));
 ok('half way through, nothing is said', posts.length, 0);
 await commit('races/902-open/data.json', legs(4));
-ok('the finish is announced', posts.length, 1);
+ok('the finish is held for its card', posts.length, 0);
+// The card never arrives: half an hour on, the post goes with the race's own.
+const held = JSON.parse(kvStore.get('dsc:finpend'));
+kvStore.set('dsc:finpend', JSON.stringify(held.map(p => ({ ...p, at: p.at - 31 * 60e3 }))));
+await flush();
+ok('and goes anyway when the card is too long coming', posts.length, 1);
 ok('naming the racer', /Jason Dupree/.test(posts[0].content), true);
 ok('with the elapsed time', /04:00:00/.test(posts[0].content), true);
+ok('and the race\'s own address', /race\.html\?id=902-open/.test(posts[0].content), true);
+
+console.log('\na held finish for a race that is gone');
+posts = [];
+kvStore.set('dsc:finpend', JSON.stringify([{ slug: 'nowhere', id: 'x', text: '**X** finished.', at: Date.now() - 60 * 60e3 }]));
+await flush();
+ok('is dropped, not posted', [posts.length, kvStore.has('dsc:finpend')], [0, false]);
+
+console.log('\nwhen the repository will not take the finish');
+posts = [];
+const noGit = { ...env, GITHUB_TOKEN: '' };
+await commit('races/907-nogit/config.json',
+  { ...course, name: 'No Repo 50', location: 'Ohio', visibility: 'public', createdBy: ME }, noGit);
+posts = [];
+await commit('races/907-nogit/data.json', legs(4), noGit);
+ok('the finish is posted at once, with the race\'s card', [posts.length, /race\.html\?id=907-nogit/.test(posts[0] && posts[0].content)], [1, true]);
 
 console.log('\nand only once');
 posts = [];

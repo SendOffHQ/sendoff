@@ -6,6 +6,10 @@ Writes:
   races/<slug>/og.png           per-race card: name, date, location, distance, runner
   races/<slug>/index.html       the URL to hand a spectator; carries that race's
                                 Open Graph tags, then forwards into the app
+  races/<slug>/finish-<id>.png  a finisher's card: their name and finish time
+  races/<slug>/finish-<id>.html the page the Discord finish post links, whose
+                                preview is that card (read from finishers.json,
+                                which the worker writes at the finish)
 
 race.html is a single static file serving every race off ?id=, so it can only
 ever carry one set of preview tags. Crawlers do not run JS, which rules out
@@ -230,6 +234,33 @@ def race_stats(slug):
     return out
 
 
+SAFE_ID = re.compile(r'^[A-Za-z0-9_-]{1,40}$')
+
+def finishers(slug):
+    """Who has finished, from races/<slug>/finishers.json.
+
+    The worker writes it when a racer finishes a public race, and holds the
+    Discord post until the card drawn from it is on the site. Name and time
+    only, both of which the race page already shows anybody.
+    """
+    f = ROOT / 'races' / slug / 'finishers.json'
+    if not f.exists():
+        return []
+    try:
+        rows = json.loads(f.read_text()).get('finishers') or []
+    except Exception:
+        return []
+    return [r for r in rows if isinstance(r, dict) and SAFE_ID.match(str(r.get('id', '')))]
+
+
+def finish_page(stub, slug, fid):
+    """The race's share page, pointed at one finisher's card and address."""
+    race = f'{BASE}/races/{slug}/'
+    return (stub.replace(f'{race}og.png', f'{BASE}/races/{slug}/finish-{fid}.png')
+                .replace(f'href="{race}"', f'href="{BASE}/races/{slug}/finish-{fid}"')
+                .replace(f'content="{race}"', f'content="{BASE}/races/{slug}/finish-{fid}"'))
+
+
 def elevation_path(slug, width, height, samples=280):
     """The course, as an SVG area path, from that race's own GPX.
 
@@ -382,7 +413,9 @@ def prune(listed):
     for d in sorted(races.iterdir()):
         if not d.is_dir() or d.name in listed:
             continue
-        for name in ('index.html', 'og.png'):
+        names = ['index.html', 'og.png', 'finishers.json'] + \
+                [f.name for f in d.glob('finish-*') if f.suffix in ('.html', '.png')]
+        for name in names:
             f = d / name
             if f.exists():
                 f.unlink()
@@ -417,6 +450,25 @@ def main():
         stub.write_text(STUB.format(slug=slug, title=esc(name), desc=esc(desc), base=BASE),
                         encoding='utf-8')
         print(f'  {stub.relative_to(ROOT)}')
+
+        # A card per finisher: their name, and the finish time where the
+        # race's card has the cutoff. Distance and climb stay.
+        done = finishers(slug)
+        if done:
+            stats = [s for s in race_stats(slug) if s[1] != 'cutoff']
+            where = ' · '.join(b for b in [name, pretty_date(race.get('startTime')), race.get('location') or ''] if b)
+            for f in done:
+                fid, who, time = f['id'], str(f.get('name') or f['id']), f.get('time')
+                f_main, f_accent = split_accent(who)
+                render(card_html(f_main, f_accent, where, 'Finished',
+                                 profile=elevation_path(slug, W, 210),
+                                 stats=([(time, 'finish time')] if time else []) + stats),
+                       ROOT / 'races' / slug / f'finish-{fid}.png')
+                title = f"{who} finished {name}" + (f" in {time}" if time else '')
+                page = ROOT / 'races' / slug / f'finish-{fid}.html'
+                page.write_text(finish_page(STUB.format(slug=slug, title=esc(title), desc=esc(f"{where}: on SendOff."), base=BASE),
+                                            slug, fid), encoding='utf-8')
+                print(f'  {page.relative_to(ROOT)}')
 
 if __name__ == '__main__':
     main()

@@ -24,6 +24,9 @@ on:
     branches: [main]
     paths:
       - 'races/index.json'
+      # Written by the worker when somebody finishes a public race. The Discord
+      # post of that finish waits for the card this draws from it.
+      - 'races/*/finishers.json'
       - 'tools/make-og.py'
       - '.github/workflows/share-cards.yml'
   workflow_dispatch:

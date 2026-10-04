@@ -43,7 +43,9 @@ const leaked = [];
 for (const slug of fs.readdirSync(path.join(ROOT, 'races'))) {
   const dir = path.join(ROOT, 'races', slug);
   if (!fs.statSync(dir).isDirectory() || listed.has(slug)) continue;
-  if (fs.existsSync(path.join(dir, 'index.html'))) leaked.push(slug);
+  // A finish page names a racer as much as the share page does.
+  if (fs.existsSync(path.join(dir, 'index.html')) ||
+      fs.readdirSync(dir).some(n => /^finish-.*\.html$/.test(n))) leaked.push(slug);
 }
 ok('nothing unlisted has a public share page', leaked, []);
 

@@ -3849,18 +3849,127 @@ async function announceFinishes(env, slug, cfg, data) {
   if (!fresh.length) return;
 
   const byId = new Map(((cfg.runners) || []).map(r => [r.id, r]));
-  // Asked once for the whole batch rather than per racer.
-  const url = await shareUrl(env, slug);
-  for (const r of fresh) {
-    const who = forDiscord((byId.get(r.id) || {}).name || r.id, 60);
+  const done_ = fresh.map(r => {
     const last = r.legs[r.legs.length - 1];
-    const time = cfg.startTime && last ? elapsedHms(cfg.startTime, last.endTime) : null;
-    await postToDiscord(env,
-      `**${who}** finished ${forDiscord(cfg.name) || 'the race'}${time ? ` in ${time}` : ''}.\n` + url);
-    seen.add(r.id);
+    return { id: r.id, name: String((byId.get(r.id) || {}).name || r.id).slice(0, 80),
+      time: cfg.startTime && last ? elapsedHms(cfg.startTime, last.endTime) : null };
+  });
+  // The post waits for its picture. The race's own card shows the cutoff,
+  // which is the wrong number once somebody has finished, and nothing here can
+  // draw a PNG. So the finish goes into the repository, tools/make-og.py draws
+  // that racer's finish card from it, and the post goes out once the page
+  // carrying it is on the site (flushFinishPosts). If the repository will not
+  // take it, the post goes now with the race's card rather than not at all.
+  const recorded = await recordFinishers(env, slug, cfg, done_);
+  const pending = recorded ? await readFinishPending(env) : null;
+  let url = null;
+  for (const f of done_) {
+    const text = `**${forDiscord(f.name, 60)}** finished ${forDiscord(cfg.name) || 'the race'}${f.time ? ` in ${f.time}` : ''}.`;
+    if (pending && FINISH_ID.test(f.id)) {
+      pending.push({ slug, id: f.id, text, at: Date.now() });
+    } else {
+      url = url || await shareUrl(env, slug);
+      await postToDiscord(env, text + '\n' + url);
+    }
+    seen.add(f.id);
   }
   await env.AUTH_KV.put(key, JSON.stringify([...seen]),
     { expirationTtl: DISCORD_SEEN_TTL_DAYS * 24 * 3600 });
+  if (pending) await writeFinishPending(env, pending);
+}
+
+// ---------- finish cards ----------
+// A finish, waiting for the card that shows its time. See announceFinishes.
+//
+// races/<slug>/finishers.json is the list make-og.py draws from: name and time
+// for each racer who has finished, which a public race already shows on its
+// race page. The pending posts are one KV key rather than one per post, so
+// checking whether there is anything to do is a single read, and the endpoint
+// that asks for a check costs nothing when the answer is no.
+const FINISH_ID = /^[A-Za-z0-9_-]{1,40}$/;
+const FINISH_PENDING_KEY = 'dsc:finpend';
+// How long a post waits for its card before going out with the race's own.
+const FINISH_CARD_WAIT_MS = 30 * 60 * 1000;
+
+async function recordFinishers(env, slug, cfg, finishers) {
+  if (!env.GITHUB_TOKEN) return false;
+  const path = `races/${slug}/finishers.json`;
+  try {
+    let doc = { finishers: [] }, sha = null;
+    const res = await githubGet(env, path);
+    if (res.ok) {
+      const j = await res.json();
+      sha = j.sha;
+      try { doc = JSON.parse(base64ToUtf8(j.content)); } catch (e) { doc = { finishers: [] }; }
+    } else if (res.status !== 404) return false;
+    const list = Array.isArray(doc.finishers) ? doc.finishers : [];
+    for (const f of finishers) {
+      if (!FINISH_ID.test(f.id)) continue;
+      const i = list.findIndex(x => x && x.id === f.id);
+      const row = { id: f.id, name: f.name, time: f.time };
+      if (i >= 0) list[i] = row; else list.push(row);
+    }
+    const text = JSON.stringify({ race: cfg.name || slug, finishers: list }, null, 2) + '\n';
+    const put = await gitPutRaw(env, path, text, `finish: ${slug}`, sha);
+    return put.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function readFinishPending(env) {
+  try {
+    const v = JSON.parse((await env.AUTH_KV.get(FINISH_PENDING_KEY)) || '[]');
+    return Array.isArray(v) ? v : [];
+  } catch (e) { return []; }
+}
+async function writeFinishPending(env, list) {
+  if (list.length) await env.AUTH_KV.put(FINISH_PENDING_KEY, JSON.stringify(list.slice(-50)));
+  else await env.AUTH_KV.delete(FINISH_PENDING_KEY);
+}
+
+// Sends every finish whose card is now on the site, and any that has waited
+// too long for one. Asked for by the site deploy (POST /discord/flush) and by
+// every data write, and safe to ask for any number of times: an empty list is
+// one KV read, and each post leaves the list before it is sent.
+async function flushFinishPosts(env) {
+  if (!discordEnabled(env) || !env.AUTH_KV) return 0;
+  const pending = await readFinishPending(env);
+  if (!pending.length) return 0;
+  const base = (env.PUBLIC_BASE_URL || 'https://sendoff.run').replace(/\/+$/, '');
+  const keep = [], send = [];
+  const stillPublic = {};
+  for (const p of pending) {
+    if (!p || !p.slug || !FINISH_ID.test(p.id || '')) continue;
+    // Unlisted or deleted while it waited: the rule that it is never posted
+    // holds for a post already queued too.
+    if (stillPublic[p.slug] === undefined) {
+      let c = null;
+      try { c = await loadRaceConfigNow(env, p.slug); } catch (e) { c = null; }
+      stillPublic[p.slug] = !!(c && isPublicRace(c));
+    }
+    if (!stillPublic[p.slug]) { send.push({ p, drop: true }); continue; }
+    const url = `${base}/races/${p.slug}/finish-${p.id}`;
+    let ready = false;
+    try { ready = (await fetch(url, { method: 'HEAD' })).ok; } catch (e) { ready = false; }
+    if (ready) send.push({ p, url });
+    else if (Date.now() - (+p.at || 0) > FINISH_CARD_WAIT_MS) send.push({ p, url: null });
+    else keep.push(p);
+  }
+  if (!send.length) return 0;
+  await writeFinishPending(env, keep);
+  let posted = 0;
+  for (const { p, url, drop } of send) {
+    if (drop) continue;
+    await postToDiscord(env, p.text + '\n' + (url || await shareUrl(env, p.slug)));
+    posted++;
+  }
+  return posted;
+}
+
+async function handleDiscordFlush(req, env) {
+  const posted = await flushFinishPosts(env);
+  return json({ ok: true, posted }, {}, env, req);
 }
 
 // The single entry point a commit calls, so handleCommit carries one line of
@@ -3876,6 +3985,7 @@ async function announceCommit(env, path, content, cfg, isCreation) {
       if (isCreation) await announceNewRace(env, slug, doc);
     } else if (path.endsWith('/data.json')) {
       await announceFinishes(env, slug, cfg, doc);
+      await flushFinishPosts(env);
     }
   } catch (e) {
     // Rule 2. A chat post is never worth failing a write over, and by the
@@ -5546,7 +5656,18 @@ async function moveSharePageForVisibility(env, slug, want, cfg, actor) {
 
   if (want === 'private') {
     const left = [];
-    for (const path of [stub, card]) {
+    // The finish cards and the list they are drawn from name racers too.
+    const extra = [];
+    try {
+      const dir = await githubGet(env, `races/${slug}`);
+      if (dir.ok) {
+        const items = await dir.json();
+        for (const it of Array.isArray(items) ? items : []) {
+          if (it && it.type === 'file' && /^(finishers\.json|finish-[A-Za-z0-9_-]+\.(html|png))$/.test(it.name)) extra.push(it.path);
+        }
+      }
+    } catch (e) { /* the two below are still taken down */ }
+    for (const path of [stub, card, ...extra]) {
       const res = await githubGet(env, path);
       if (res.status === 404) continue;
       if (!res.ok) { left.push(path); continue; }
@@ -5925,6 +6046,7 @@ async function route(request, env, ctx) {
 
     if (request.method === 'GET'  && path === '/live')            return handleLive(request, env);
     if (request.method === 'GET'  && path === '/health')          return json({ ok: true, kv: !!env.AUTH_KV }, {}, env, request);
+    if (request.method === 'POST' && path === '/discord/flush')    return handleDiscordFlush(request, env);
     if (request.method === 'POST' && path === '/feedback')         return handleFeedback(request, env);
     if (request.method === 'GET'  && path === '/feedback-list')    return handleFeedbackList(request, env);
     if (request.method === 'GET'  && path === '/feedback-count')   return handleFeedbackCount(request, env);

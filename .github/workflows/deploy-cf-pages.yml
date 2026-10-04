@@ -81,3 +81,11 @@ jobs:
       - name: Deploy
         if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
         run: npx --yes wrangler@4 pages deploy dist --project-name=sendoff --branch=main --commit-dirty=true
+
+      # A finish posted to Discord waits for its finish card to be on the site,
+      # and this is the moment one can have arrived. The worker checks for
+      # itself and sends what is ready; asking when nothing is waiting costs it
+      # one read. Never worth failing a deploy over.
+      - name: Send finishes waiting for their cards
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: curl -fsS -m 30 -X POST https://api.sendoff.run/discord/flush || echo "::warning::Could not reach the worker to send waiting finish posts."
