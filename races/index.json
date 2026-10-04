@@ -61,7 +61,8 @@
       "runnerNames": [
         "Ronnie Reineke"
       ],
-      "cutoffHours": 30
+      "cutoffHours": 30,
+      "timezone": "America/Chicago"
     },
     {
       "slug": "000005-rio-del-lago-100",
@@ -82,5 +83,5 @@
       "timezone": "America/Los_Angeles"
     }
   ],
-  "lastUpdated": "2026-10-04T19:18:28.323Z"
+  "lastUpdated": "2026-10-04T19:21:07.917Z"
 }
