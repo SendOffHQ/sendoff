@@ -42,6 +42,7 @@ const SHELL_URLS = [
   '/vendor/leaflet-1.9.4/leaflet.js',
   '/vendor/leaflet-1.9.4/leaflet.css',
   '/lib/finish-card.js',
+  '/lib/course-view.js',
   '/brand/sendoffprimaryonDark.svg',
   '/brand/sendoff-favicon.svg',
   '/brand/icon-192.png',

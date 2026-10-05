@@ -34,7 +34,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=581f8462">
+<link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css" />
+<link rel="stylesheet" href="lib/race-theme.css?v=e22e8dc6">
 <style>
   body { padding: 20px 16px 32px; }
   .wrap { max-width: 860px; margin: 0 auto; }
@@ -251,6 +252,11 @@
 
 <section id="runners" class="runners"></section>
 
+<!-- The course, at the foot of the board: where each racer probably is and
+     what the ground ahead looks like, so the crew need not open the race page
+     for it. Filled by lib/course-view.js once the race has a course file. -->
+<section id="course-map-section"></section>
+
 <footer class="site">
   <!-- What the page is, the way the settings page's footer does it. It used
        to say "Pit times stored in this race's data.json", which named a file
@@ -264,7 +270,9 @@
 
 <div id="toast" style="display:none;"></div>
 
+<script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/race-core.js?v=abca3514"></script>
+<script src="lib/course-view.js?v=c1c49292"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -831,6 +839,12 @@
   // redraws regardless. The cost is that the whole board pauses while somebody
   // types, rather than just their card; with a full field of racers that is
   // worth splitting, but not days before a race.
+  // The course map and profile, under the cards. See lib/course-view.js.
+  let boardRunners = [];
+  const courseView = CourseView.mount(document.getElementById('course-map-section'), {
+    slug, cfg: () => cfg, runners: () => boardRunners
+  });
+
   function render(force) {
     if (!cfg || !data) return;
     if (!force && intakeDirty()) return;
@@ -840,6 +854,9 @@
       return { ...r, ...dr };
     });
     document.getElementById('runners').innerHTML = merged.map(renderRunner).join('');
+    boardRunners = merged;
+    courseView.load();
+    courseView.update();
     // What each field was drawn with. Anything different later is a person's
     // unsaved typing.
     document.querySelectorAll('#runners [data-intake]')
@@ -920,6 +937,8 @@
       const seconds = (Date.now() - new Date(since).getTime()) / 1000;
       if (valueEl) valueEl.textContent = Race.fmt.duration(seconds);
     });
+    // The racer dots on the course move with the clock, like the timers.
+    courseView.update();
   }
 
   function updateLastUpdatedLabel() {

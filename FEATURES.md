@@ -6,6 +6,7 @@ optional Cloudflare Worker auth proxy.
 ## Race tracking
 - Live race dashboard (`race.html`): per-runner progress, pace, cutoffs, predicted finish
 - Pit/leg logging (`pit.html`): leg start/end times, calories, fluid, sodium, gear changes, meds, issues, notes
+- The course on the pit board: the route map and elevation profile, with every aid station and each racer's estimated position, at the foot of `pit.html` as on `race.html`, so the crew need not switch pages. One copy, `lib/course-view.js`, drawn by both. `test/pit-course.mjs`.
 - Worker-routed reads for signed-in crew to avoid GitHub Pages publish lag
 - Predicted mileage / position for runners on course or in a pit
 - Photos on a leg (`pit.html` to add, `race.html` to look): crew attach photographs to a leg of the course, with an optional runner tag and a caption. The leg is chosen for them and defaults to where the race actually is. Resized to 1600px on the phone before sending, which is also what strips the EXIF, so a photo of somebody at an aid station does not publish their coordinates. Queued in IndexedDB when there is no signal and sent when there is. On the race page each leg with photos offers them behind a Media control, loaded only when opened, and one button shows all of them in leg order. Stored in R2 and served from the bucket rather than through the worker.

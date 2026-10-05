@@ -769,3 +769,42 @@ label.field > .hint {
 
 /* Part of this number is an AI crew's guess, until somebody types the real one. */
 .est-tag { color: var(--accent); font-size: 10px; letter-spacing: 0.04em; text-transform: none; white-space: nowrap; }
+
+/* ---------- the course: map and elevation profile ----------
+   lib/course-view.js, on the race page and the pit board. */
+.course-view { margin-bottom: 24px; }
+.course-map-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.course-map-title {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted);
+}
+.course-map-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); }
+.course-map { height: 380px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-card); }
+.course-map .leaflet-control-attribution { background: rgba(10, 15, 20, 0.8); color: var(--text-muted); }
+.course-map .leaflet-control-attribution a { color: var(--text-dim); }
+.aid-marker-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+.course-elev {
+  width: 100%; height: auto; display: block; margin-top: 10px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+}
+.course-elev .elev-area { fill: rgba(15, 184, 191, 0.16); stroke: none; }
+.course-elev .elev-line { fill: none; stroke: #0fb8bf; stroke-width: 1.6; }
+.course-elev .elev-aid-line { stroke-dasharray: 3 3; }
+.course-elev .elev-grid { stroke: var(--border); stroke-width: 1; }
+.course-elev .elev-axis-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; fill: var(--text-muted); }
+.course-elev .elev-axis-unit {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  fill: var(--text-muted); letter-spacing: 0.1em; text-transform: uppercase;
+}
+.course-elev .elev-aid-dot { cursor: pointer; }
+.course-elev .elev-popup-bg { fill: rgba(10, 15, 20, 0.94); stroke: var(--border-bright); }
+.course-elev .elev-popup-text { font-family: 'JetBrains Mono', monospace; font-size: 11px; fill: var(--text); }
+.course-elev .elev-runner-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; }
+/* Predicted racer positions, on the map and the profile. */
+.runner-dot { animation: runnerPulse 2s ease-in-out infinite; }
+@keyframes runnerPulse { 0%, 100% { stroke-opacity: 1; } 50% { stroke-opacity: 0.35; } }
+.leaflet-tooltip.runner-dot-label {
+  background: rgba(10, 15, 20, 0.85); border: none; box-shadow: none;
+  color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 11px;
+}
+.leaflet-tooltip.runner-dot-label::before { display: none; }

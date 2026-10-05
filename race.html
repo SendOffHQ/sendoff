@@ -38,7 +38,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=581f8462">
+<link rel="stylesheet" href="lib/race-theme.css?v=e22e8dc6">
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css" />
 <style>
   .cutoffs {
@@ -467,67 +467,7 @@
   }
   .share-banner .em { color: var(--blue); }
 
-  /* Course map */
-  #course-map-section { margin-bottom: 24px; }
-  .course-map-head {
-    display: flex; align-items: baseline; gap: 12px;
-    margin-bottom: 10px;
-  }
-  .course-map-title {
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
-    letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted);
-  }
-  .course-map-meta {
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
-    color: var(--text-dim);
-  }
-  #course-map {
-    height: 380px; border-radius: 6px;
-    border: 1px solid var(--border); background: var(--bg-card);
-  }
-  #course-map .leaflet-control-attribution {
-    background: rgba(10, 15, 20, 0.8); color: var(--text-muted);
-  }
-  #course-map .leaflet-control-attribution a { color: var(--text-dim); }
-  .aid-marker-label {
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
-  }
-  .course-elev {
-    width: 100%; height: auto; display: block; margin-top: 10px;
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: 6px;
-  }
-  .course-elev .elev-area { fill: rgba(15, 184, 191, 0.16); stroke: none; }
-  .course-elev .elev-line { fill: none; stroke: #0fb8bf; stroke-width: 1.6; }
-  .course-elev .elev-aid-line { stroke-dasharray: 3 3; }
-  .course-elev .elev-grid { stroke: var(--border); stroke-width: 1; }
-  .course-elev .elev-axis-label {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
-    fill: var(--text-muted);
-  }
-  .course-elev .elev-axis-unit {
-    font-family: 'JetBrains Mono', monospace; font-size: 9px;
-    fill: var(--text-muted); letter-spacing: 0.1em; text-transform: uppercase;
-  }
-  .course-elev .elev-aid-dot { cursor: pointer; }
-  .course-elev .elev-popup-bg { fill: rgba(10, 15, 20, 0.94); stroke: var(--border-bright); }
-  .course-elev .elev-popup-text {
-    font-family: 'JetBrains Mono', monospace; font-size: 11px; fill: var(--text);
-  }
-  .course-elev .elev-runner-label {
-    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
-  }
-  /* Predicted runner position dots (map + elevation profile) */
-  .runner-dot { animation: runnerPulse 2s ease-in-out infinite; }
-  @keyframes runnerPulse {
-    0%, 100% { stroke-opacity: 1; }
-    50% { stroke-opacity: 0.35; }
-  }
-  .leaflet-tooltip.runner-dot-label {
-    background: rgba(10, 15, 20, 0.85); border: none; box-shadow: none;
-    color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 11px;
-  }
-  .leaflet-tooltip.runner-dot-label::before { display: none; }
+  /* The course map and profile are styled in lib/race-theme.css, shared with the pit board. */
 </style>
 </head>
 <body>
@@ -566,14 +506,8 @@
 <div id="gallery-host"></div>
 <section id="runners" class="runners"></section>
 
-<section id="course-map-section" style="display:none;">
-  <div class="course-map-head">
-    <span class="course-map-title">Course</span>
-    <span class="course-map-meta" id="course-map-meta"></span>
-  </div>
-  <div id="course-map"></div>
-  <svg id="course-elev" class="course-elev" viewBox="0 0 1000 200"></svg>
-</section>
+<!-- Filled by lib/course-view.js once the race has a course file. -->
+<section id="course-map-section"></section>
 
 <footer class="site">
   <div class="legend">
@@ -590,6 +524,7 @@
      Esri's and will be missing offline; the map is useful without them. -->
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=779a41b4"></script>
+<script src="lib/course-view.js?v=c1c49292"></script>
 <script src="lib/race-core.js?v=abca3514"></script>
 <script>
   const slug = Race.qs('id');
@@ -1321,16 +1256,15 @@
     el.style.display = 'block';
   }
 
-  // ---------- course visuals (Leaflet map + elevation profile) ----------
-  // The route, aid markers and elevation profile are built once from
-  // course.gpx. Predicted runner positions are refreshed on every load.
-  const AID_END_COLOR = '#6ee7a8';
-  const AID_MID_COLOR = '#0fb8bf';
-  let courseVisualsReady = false;
-  let courseMap = null, courseGpxPts = null;
-  let mapRunnerMarkers = {};               // runnerId -> Leaflet marker
-  let elevX = null, elevY = null;          // elevation-SVG scale fns
+  // ---------- the course (map + elevation profile) ----------
+  // Drawn by lib/course-view.js, which the pit board shares. It reads
+  // course.gpx once there is one; the racer dots move on every tick.
   let mergedRunners = [];                  // set by load()
+  const courseView = CourseView.mount(document.getElementById('course-map-section'), {
+    slug, cfg: () => cfg, runners: () => mergedRunners
+  });
+  function initCourseVisuals() { courseView.load(); }
+  function updateTracking() { courseView.update(); }
 
   // Drawing the cards, split out from reading the race. Photos arrive on their
   // own slow timer and belong inside the leg log, so they need to be able to
@@ -1341,238 +1275,6 @@
     if (!container || !cfg) return;
     container.classList.toggle('single', mergedRunners.length === 1);
     container.innerHTML = mergedRunners.map(renderRunner).join('');
-  }
-
-  // The GPX point nearest a given cumulative mileage.
-  function nearestGpxPoint(pts, mi) {
-    let best = pts[0], bestDiff = Infinity;
-    for (const p of pts) {
-      const diff = Math.abs((p.dist || 0) - mi);
-      if (diff < bestDiff) { bestDiff = diff; best = p; }
-    }
-    return best;
-  }
-
-  async function initCourseVisuals() {
-    if (courseVisualsReady) return;
-
-    // Through the worker first, like config.json and data.json, so the course
-    // is not the one thing on the page still waiting for the Pages rebuild.
-    // Null means no GPX, or none reachable yet; the refresh loop tries again.
-    const gpxText = await Race.gh.readRaceText(slug, 'course.gpx', true);
-    if (!gpxText) return;
-
-    let pts;
-    try { pts = Race.gpx.parse(gpxText); } catch (e) { return; }
-    if (!pts.length) return;
-
-    courseGpxPts = pts;
-    courseVisualsReady = true;
-    document.getElementById('course-map-section').style.display = '';
-    const aids = Race.course.aidStations(cfg);
-
-    const dist = Race.gpx.totalDistanceMi(pts);
-    const elev = Race.gpx.totalElevation(pts);
-    document.getElementById('course-map-meta').textContent =
-      `${Race.units.distance(dist, cfg)} · +${Math.round(Race.units.elevationVal(elev.gainFt, cfg)).toLocaleString()} / -${Math.round(Race.units.elevationVal(elev.lossFt, cfg)).toLocaleString()} ${Race.units.elevationLabel(cfg)}`;
-
-    // Elevation profile: pure SVG, so it renders even if Leaflet didn't load.
-    try { renderElevationProfile(pts, aids); } catch (e) {}
-
-    // Leaflet map: skipped gracefully if the library is unavailable.
-    if (typeof L !== 'undefined') {
-      courseMap = L.map('course-map', { scrollWheelZoom: false });
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a> &mdash; Esri, HERE, Garmin, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 16
-      }).addTo(courseMap);
-
-      const line = L.polyline(pts.map(p => [p.lat, p.lon]), { color: AID_MID_COLOR, weight: 3, opacity: 0.9 }).addTo(courseMap);
-      courseMap.fitBounds(line.getBounds(), { padding: [24, 24] });
-
-      // One dot per place, not one per visit. A lapped course passes the same
-      // aid four times and drew four dots a few metres apart, which read as
-      // four stations. The passes are grouped and the dot sits at their median;
-      // the tooltip lists every visit, so nothing is hidden by the merge.
-      const placed = aids.map((aid, i) => {
-        const p = nearestGpxPoint(pts, aid.mileage);
-        return { name: aid.name, mileage: aid.mileage, isEnd: i === 0 || i === aids.length - 1,
-                 lat: p.lat, lon: p.lon };
-      });
-      Race.gpx.clusterStops(placed).forEach(group => {
-        // Start and finish share a field at most races, so a group holding
-        // either is drawn as an end.
-        const isEnd = group.members.some(m => m.isEnd);
-        const label = group.members
-          .map(m => `${escapeHtml(m.name)} · ${Race.units.distance(m.mileage, cfg)}`)
-          .join('<br>');
-        L.circleMarker([group.lat, group.lon], {
-          radius: isEnd ? 6 : 5, color: '#fff', weight: 2,
-          fillColor: isEnd ? AID_END_COLOR : AID_MID_COLOR, fillOpacity: 1
-        }).addTo(courseMap).bindTooltip(label, { className: 'aid-marker-label', direction: 'top' });
-      });
-
-    } else {
-      document.getElementById('course-map').style.display = 'none';
-    }
-
-    updateTracking();
-  }
-
-  // Elevation vs. distance SVG, with the same aid-station markers as the map.
-  // A trailing <g id="elev-runners"> is left empty for updateTracking().
-  function renderElevationProfile(pts, aids) {
-    const svg = document.getElementById('course-elev');
-    const W = 1000, H = 200, padL = 48, padR = 8, padT = 20, padB = 14;
-    const plotW = W - padL - padR, plotH = H - padT - padB;
-    const totalMi = pts[pts.length - 1].dist || 1;
-    let minE = Infinity, maxE = -Infinity;
-    for (const p of pts) {
-      if (p.ele < minE) minE = p.ele;
-      if (p.ele > maxE) maxE = p.ele;
-    }
-    if (maxE - minE < 1) maxE = minE + 1;
-    const x = mi => padL + (Math.min(mi, totalMi) / totalMi) * plotW;
-    const y = ele => padT + (1 - (ele - minE) / (maxE - minE)) * plotH;
-    const baseY = padT + plotH;
-    elevX = x; elevY = y;
-
-    // Elevation scale: gridlines + feet labels down the left edge.
-    let scale = `<text class="elev-axis-unit" x="${padL - 6}" y="11" text-anchor="end">${Race.units.elevationLabel(cfg)}</text>`;
-    const yTicks = 4;
-    for (let i = 0; i <= yTicks; i++) {
-      const ele = minE + (i / yTicks) * (maxE - minE);
-      const yy = y(ele).toFixed(1);
-      const ft = Math.round(Race.units.elevationVal(Race.gpx.metersToFeet(ele), cfg));
-      scale += `<line class="elev-grid" x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" />` +
-        `<text class="elev-axis-label" x="${padL - 6}" y="${yy}" text-anchor="end" dominant-baseline="middle">${ft.toLocaleString()}</text>`;
-    }
-
-    const linePts = pts.map(p => `${x(p.dist).toFixed(1)},${y(p.ele).toFixed(1)}`);
-    const linePath = 'M' + linePts.join(' L');
-    const areaPath = `M${x(0).toFixed(1)},${baseY.toFixed(1)} L${linePts.join(' L')} L${x(totalMi).toFixed(1)},${baseY.toFixed(1)} Z`;
-
-    // Aid markers: a dot per aid; the name shows on hover (<title>) or tap.
-    const marks = aids.map((aid, i) => {
-      const ax = x(aid.mileage);
-      const pt = nearestGpxPoint(pts, aid.mileage);
-      const ay = y(pt.ele);
-      const isEnd = i === 0 || i === aids.length - 1;
-      const color = isEnd ? AID_END_COLOR : AID_MID_COLOR;
-      const ft = Math.round(Race.units.elevationVal(Race.gpx.metersToFeet(pt.ele), cfg));
-      const label = `${aid.name} · ${Race.units.distance(aid.mileage, cfg)}`;
-      return `
-        <line class="elev-aid-line" x1="${ax.toFixed(1)}" y1="${padT}" x2="${ax.toFixed(1)}" y2="${baseY.toFixed(1)}"
-              stroke="${color}" stroke-opacity="0.3" />
-        <circle class="elev-aid-dot" cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="5"
-                fill="${color}" stroke="#0a0f14" stroke-width="1.5" data-label="${escapeHtml(label)}">
-          <title>${escapeHtml(label)} · ${ft.toLocaleString()} ${Race.units.elevationLabel(cfg)}</title>
-        </circle>`;
-    }).join('');
-
-    svg.innerHTML = `
-      ${scale}
-      <path class="elev-area" d="${areaPath}" />
-      <path class="elev-line" d="${linePath}" />
-      ${marks}
-      <g id="elev-aid-popup"></g>
-      <g id="elev-runners"></g>`;
-
-    // Tap an aid dot to show its name (in addition to the hover <title>).
-    const popup = svg.querySelector('#elev-aid-popup');
-    svg.addEventListener('click', (e) => {
-      const dot = e.target.closest('.elev-aid-dot');
-      if (!dot) { popup.innerHTML = ''; return; }
-      const text = dot.getAttribute('data-label') || '';
-      const cx = parseFloat(dot.getAttribute('cx'));
-      const cy = parseFloat(dot.getAttribute('cy'));
-      const h = 19, w = text.length * 6.3 + 16;
-      let bx = Math.max(padL, Math.min(cx - w / 2, W - padR - w));
-      let by = cy - h - 9;
-      if (by < padT) by = cy + 9;
-      popup.innerHTML =
-        `<rect class="elev-popup-bg" x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${w.toFixed(1)}" height="${h}" rx="3" />` +
-        `<text class="elev-popup-text" x="${(bx + w / 2).toFixed(1)}" y="${(by + h / 2 + 0.5).toFixed(1)}" text-anchor="middle" dominant-baseline="middle">${escapeHtml(text)}</text>`;
-    });
-  }
-
-  // ---------- predictive runner tracking ----------
-  // Position estimate comes from Race.compute.predictedMileage. Runners who
-  // haven't started yet get no dot.
-  function predictedPosition(runner) {
-    const pos = Race.compute.predictedMileage(runner, cfg);
-    return pos.state === 'idle' ? null : pos;
-  }
-
-  function trackingLabel(pos) {
-    if (pos.state === 'finished') return 'finished';
-    if (pos.state === 'in-pit') {
-      return pos.atAid ? `in pit at ${pos.atAid}` : `in pit · ${Race.units.distance(pos.courseMi, cfg)}`;
-    }
-    return `~${Race.units.distance(pos.courseMi, cfg)} (est)`;
-  }
-
-  // Refreshes the predicted runner dots on the map and elevation profile.
-  function updateTracking() {
-    if (!courseVisualsReady || !courseGpxPts) return;
-    const loopMode = cfg.courseType === 'loops';
-    const loopDist = loopMode ? Race.course.loopDistance(cfg) : 0;
-    // The GPX covers one lap for loops, the whole course for segments.
-    const trackMi = courseMi =>
-      (loopMode && loopDist > 0) ? (courseMi % loopDist) : courseMi;
-
-    // Map: markers are moved in place (not cleared/re-added) so the
-    // per-second updates don't flicker.
-    if (courseMap) {
-      const live = new Set();
-      mergedRunners.forEach(r => {
-        const pos = predictedPosition(r);
-        if (!pos) return;
-        live.add(r.id);
-        const p = nearestGpxPoint(courseGpxPts, trackMi(pos.courseMi));
-        const color = r.color || AID_MID_COLOR;
-        const label = `${r.name} · ${trackingLabel(pos)}`;
-        let m = mapRunnerMarkers[r.id];
-        if (m) {
-          m.setLatLng([p.lat, p.lon]);
-          m.setStyle({ fillColor: color });
-          m.setTooltipContent(label);
-        } else {
-          m = L.circleMarker([p.lat, p.lon], {
-            radius: 7, color: '#fff', weight: 2, fillColor: color, fillOpacity: 1,
-            className: 'runner-dot'
-          }).addTo(courseMap).bindTooltip(label, {
-            permanent: true, direction: 'right', offset: [8, 0], className: 'runner-dot-label'
-          });
-          mapRunnerMarkers[r.id] = m;
-        }
-      });
-      Object.keys(mapRunnerMarkers).forEach(id => {
-        if (!live.has(id)) {
-          courseMap.removeLayer(mapRunnerMarkers[id]);
-          delete mapRunnerMarkers[id];
-        }
-      });
-    }
-
-    const g = document.getElementById('elev-runners');
-    if (g && elevX && elevY) {
-      g.innerHTML = mergedRunners.map(r => {
-        const pos = predictedPosition(r);
-        if (!pos) return '';
-        const tmi = trackMi(pos.courseMi);
-        const pt = nearestGpxPoint(courseGpxPts, tmi);
-        const cx = elevX(tmi), cy = elevY(pt.ele);
-        const color = r.color || AID_MID_COLOR;
-        return `
-          <circle class="runner-dot" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="5"
-                  fill="${color}" stroke="#0a0f14" stroke-width="1.5">
-            <title>${escapeHtml(r.name)} · ${escapeHtml(trackingLabel(pos))}</title>
-          </circle>
-          <text class="elev-runner-label" x="${cx.toFixed(1)}" y="${(cy - 9).toFixed(1)}"
-                text-anchor="middle" fill="${color}">${escapeHtml(r.name)}</text>`;
-      }).join('');
-    }
   }
 
   // ---------- share banner (anonymous shared view) ----------
@@ -1598,7 +1300,7 @@
     if (!btn || !window.FinishCard) return;
     const runner = (mergedRunners || []).find(r => r.id === btn.dataset.card);
     if (!runner) return;
-    FinishCard.open({ cfg, runner, gpxPts: courseGpxPts });
+    FinishCard.open({ cfg, runner, gpxPts: courseView.points() });
   });
 
   // ---------- access ----------
