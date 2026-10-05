@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-10-05T21:50:30.261Z",
+  "lastUpdated": "2026-10-05T21:50:42.731Z",
   "runners": [
     {
       "id": "ronnie-reineke",
@@ -130,7 +130,7 @@
         },
         {
           "index": 14,
-          "startTime": "2026-10-04T00:11:11.359Z",
+          "startTime": "2026-10-04T01:12:14.000Z",
           "endTime": "2026-10-04T02:46:33.890Z",
           "preset_4": 1,
           "meds": "Advil"
