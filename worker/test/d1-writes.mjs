@@ -149,13 +149,19 @@ const read = async (path) => {
   return { sha: j.sha, doc: JSON.parse(Buffer.from(j.content, 'base64').toString('utf8')) };
 };
 
+// The race starts two hours before the test runs, not on a fixed date. The
+// worker calls a race over once its cutoff (36 hours by default) has passed,
+// and a fixed start turned the "still running" checks red the day after it.
+const T0 = Math.floor(Date.now() / 60e3) * 60e3 - 2 * 3600e3;
+const at = (minutes) => new Date(T0 + minutes * 60e3).toISOString();
+
 let bad = 0;
 const ok = (l, g, w) => { const p = JSON.stringify(g) === JSON.stringify(w); if (!p) bad++;
   console.log(`  ${p?'ok  ':'FAIL'} ${l.padEnd(54)} ${JSON.stringify(g)}${p?'':' expected '+JSON.stringify(w)}`); };
 
 const race = { name: 'CAS Race', visibility: 'public', courseType: 'segments',
   course: { segments: [{ name: 'A to B', distanceMi: 5 }] },
-  startTime: '2026-10-03T13:00:00.000Z', runners: [{ id: 'jd', name: 'Jason', bib: '1' }] };
+  startTime: at(0), runners: [{ id: 'jd', name: 'Jason', bib: '1' }] };
 
 console.log('\na race is created and written without touching git');
 gitPuts = [];
@@ -213,7 +219,7 @@ cur = await read('races/cas/data.json');
 // Out on the leg, not through it. This course has one segment, so a leg with
 // an endTime would already be a finish.
 await putW('races/cas/data.json', { runners: [{ id:'jd', legs: [
-  { index:1, startTime:'2026-10-03T13:00:00Z' } ] }] }, cur.sha);
+  { index:1, startTime:at(0) } ] }] }, cur.sha);
 await settle();
 ok('git is left alone while the race is running', gitPuts, []);
 
@@ -222,7 +228,7 @@ gitPuts = [];
 cur = await read('races/cas/data.json');
 // One segment on this course, so one completed leg is a finish.
 await putW('races/cas/data.json', { runners: [{ id:'jd', legs: [
-  { index:1, startTime:'2026-10-03T13:00:00Z', endTime:'2026-10-03T14:00:00Z' } ] }] }, cur.sha);
+  { index:1, startTime:at(0), endTime:at(60) } ] }] }, cur.sha);
 await settle();
 ok('both files are committed', gitPuts.sort(), ['races/cas/config.json','races/cas/data.json']);
 
@@ -241,7 +247,7 @@ console.log('\na correction after the finish still gets through');
 gitPuts = [];
 cur = await read('races/cas/data.json');
 await putW('races/cas/data.json', { runners: [{ id:'jd', legs: [
-  { index:1, startTime:'2026-10-03T13:00:00Z', endTime:'2026-10-03T14:05:00Z' } ] }] }, cur.sha);
+  { index:1, startTime:at(0), endTime:at(65) } ] }] }, cur.sha);
 await settle();
 ok('the corrected data is archived', gitPuts.includes('races/cas/data.json'), true);
 
@@ -273,12 +279,12 @@ console.log('\na press costs the same whatever the roster looks like');
 // and four was over, which is a limit on how many people a crew can follow.
 const bigRoster = { name: 'Big', visibility: 'public', courseType: 'segments',
   course: { segments: Array.from({ length: 16 }, (_, i) => ({ name: 'S' + i, distanceMi: 3 })) },
-  startTime: '2026-10-03T13:00:00.000Z',
+  startTime: at(0),
   runners: ['a','b','c','d','e'].map(id => ({ id, name: id, bib: id })) };
 const fullDoc = (extra) => ({ runners: ['a','b','c','d','e'].map(id => ({ id,
   legs: Array.from({ length: 16 }, (_, i) => ({ index: i + 1,
-    startTime: '2026-10-03T13:00:00Z',
-    endTime: (id === 'a' && i === 0 && extra) ? extra : '2026-10-03T14:00:00Z' })) })) });
+    startTime: at(0),
+    endTime: (id === 'a' && i === 0 && extra) ? extra : at(60) })) })) });
 
 await put('races/big/config.json', bigRoster);
 let c2 = await read('races/big/config.json');
@@ -287,7 +293,7 @@ await put('races/big/data.json', fullDoc());
 batchSizes = [];
 c2 = await read('races/big/data.json');
 // One runner's one leg corrected. Everything else is byte-identical.
-await put('races/big/data.json', fullDoc('2026-10-03T14:07:00Z'), c2.sha);
+await put('races/big/data.json', fullDoc(at(67)), c2.sha);
 ok('eighty legs on the roster, one changed', batchSizes, [3]);
 ok('which is well under the fifty-query ceiling', Math.max(...batchSizes) < 50, true);
 
@@ -305,7 +311,7 @@ gitPuts = [];
 await put('races/quiet/config.json', { ...race, name: 'Quiet', visibility: 'private' });
 cur = await read('races/quiet/data.json').catch(() => ({ sha: undefined }));
 await putW('races/quiet/data.json', { runners: [{ id:'jd', legs: [
-  { index:1, startTime:'2026-10-03T13:00:00Z', endTime:'2026-10-03T14:00:00Z' } ] }] }, cur.sha);
+  { index:1, startTime:at(0), endTime:at(60) } ] }] }, cur.sha);
 await settle();
 ok('a finished unlisted race commits nothing', gitPuts, []);
 
@@ -365,7 +371,7 @@ for (const [label, setting] of [['with the old setting missing', undefined], ['o
   }), env2, { waitUntil: () => {} });
   gitPuts = [];
   const a = await send(`races/${slug}/config.json`, { ...race, visibility: 'private', createdBy: ME });
-  const b = await send(`races/${slug}/data.json`, { runners: [{ id:'jd', legs: [{ index:1, startTime:'2026-10-03T13:00:00Z' }] }] });
+  const b = await send(`races/${slug}/data.json`, { runners: [{ id:'jd', legs: [{ index:1, startTime:at(0) }] }] });
   ok(`${label}: both writes land`, [a.status, b.status], [200, 200]);
   ok(`${label}: and git is never asked`, gitPuts, []);
   ok(`${label}: they are in the database`, !!(rows.get(slug) || {}).data, true);
