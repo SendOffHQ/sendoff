@@ -92,7 +92,9 @@
   }
   .where strong { color: var(--text); }
   .edit-time { display: grid; gap: 10px; }
-  .edit-time input[data-edit="time"] { font-family: 'JetBrains Mono', monospace; font-size: 18px; letter-spacing: 0.04em; }
+  .edit-time-clock { display: flex; gap: 8px; }
+  .edit-time input[data-edit="time"] { flex: 1 1 auto; min-width: 0; font-family: 'JetBrains Mono', monospace; font-size: 18px; letter-spacing: 0.04em; }
+  .edit-time select[data-edit="ampm"] { flex: 0 0 auto; width: auto; }
   .edit-time-other { margin: 0; font-size: 12px; color: var(--text-muted); }
   .where .stop { margin-top: 8px; line-height: 1.6; }
   .where .stop .k { color: var(--text-muted); }
@@ -403,14 +405,21 @@
         <label class="modal-field"><span>Date</span>
           <input type="date" data-edit="day" value="${dayOf(seedMs)}" />
         </label>
-        <label class="modal-field"><span>Time, 24-hour (${escapeHtml(Race.tz.label(cfg, seedMs))})</span>
-          <input type="text" data-edit="time" inputmode="numeric" autocomplete="off" spellcheck="false"
-                 placeholder="HH:MM:SS" value="${pad(seed.h)}:${pad(seed.mi)}:${pad(seed.s)}" />
+        <label class="modal-field"><span>Time (${escapeHtml(Race.tz.label(cfg, seedMs))})</span>
+          <div class="edit-time-clock">
+            <input type="text" data-edit="time" inputmode="numeric" autocomplete="off" spellcheck="false"
+                   placeholder="h:mm:ss" value="${(seed.h % 12) || 12}:${pad(seed.mi)}:${pad(seed.s)}" />
+            <select data-edit="ampm" aria-label="AM or PM">
+              <option value="AM"${seed.h < 12 ? ' selected' : ''}>AM</option>
+              <option value="PM"${seed.h >= 12 ? ' selected' : ''}>PM</option>
+            </select>
+          </div>
         </label>
-        ${otherMs != null ? `<p class="edit-time-other">${isStart ? 'Arrival' : 'Send-off'} on this leg: ${escapeHtml(Race.tz.format(otherMs, cfg, { weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }))}</p>` : ''}
+        ${otherMs != null ? `<p class="edit-time-other">${isStart ? 'Arrival' : 'Send-off'} on this leg: ${escapeHtml(Race.tz.format(otherMs, cfg, { weekday: 'short', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }))}</p>` : ''}
       </div>`;
     const daySel = m.body.querySelector('[data-edit="day"]');
     const timeIn = m.body.querySelector('[data-edit="time"]');
+    const ampmSel = m.body.querySelector('[data-edit="ampm"]');
     let dayTouched = false;
     daySel.addEventListener('change', () => { dayTouched = true; });
     let confirmed = null;
@@ -418,12 +427,18 @@
     setTimeout(() => { timeIn.focus(); timeIn.select(); }, 0);
 
     m.primary.addEventListener('click', async () => {
-      const t = timeIn.value.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+      // h:mm or h:mm:ss, with AM or PM from the picker. A 24-hour time typed
+      // anyway (19:11, 00:30) is taken as written rather than refused.
+      const t = timeIn.value.trim().toLowerCase().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm|a|p)?$/);
       if (!t || +t[1] > 23 || +t[2] > 59 || +(t[3] || 0) > 59) {
-        m.setMsg('Use 24-hour time: HH:MM or HH:MM:SS, like 19:11:11.', 'err');
+        m.setMsg('Use a time like 7:11:11, and pick AM or PM.', 'err');
         return;
       }
-      const at = (day) => Race.tz.fromInputs(day, `${pad(+t[1])}:${t[2]}`, cfg) + (+(t[3] || 0)) * 1000;
+      let hour = +t[1];
+      const half = t[4] ? (t[4][0] === 'p' ? 'PM' : 'AM') : ampmSel.value;
+      // 1 to 12 is a 12-hour time; 0 and 13 to 23 can only be 24-hour ones.
+      if (hour >= 1 && hour <= 12) hour = (hour % 12) + (half === 'PM' ? 12 : 0);
+      const at = (day) => Race.tz.fromInputs(day, `${pad(hour)}:${t[2]}`, cfg) + (+(t[3] || 0)) * 1000;
       if (!/^\d{4}-\d{2}-\d{2}$/.test(daySel.value)) { m.setMsg('Pick the date.', 'err'); return; }
       let next = at(daySel.value);
       // A time being set for the first time, after midnight, on a leg sent off

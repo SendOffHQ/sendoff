@@ -142,13 +142,20 @@ const openEdit = async (field, leg) => {
   await page.click(`[data-action="edit-time"][data-runner="${target.runner}"][data-field="${field}"]`);
   await page.waitForSelector('.edit-time [data-edit="time"]');
   return page.evaluate(() => ({
-    time: document.querySelector('.edit-time [data-edit="time"]').value,
+    time: document.querySelector('.edit-time [data-edit="time"]').value + ' ' + document.querySelector('.edit-time [data-edit="ampm"]').value,
     day: document.querySelector('.edit-time [data-edit="day"]').value,
     dayType: document.querySelector('.edit-time [data-edit="day"]').type,
     label: document.querySelector('.edit-time').textContent }));
 };
+// "7:38:59 PM" on the race clock, as the box shows and takes it.
+const twelve = (ms) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/Denver', hour: 'numeric', minute: '2-digit',
+  second: '2-digit', hour12: true }).format(new Date(ms));
 const save = async (time) => {
-  if (time != null) await page.fill('.edit-time [data-edit="time"]', time);
+  if (time != null) {
+    const [clock, half] = time.split(' ');
+    await page.fill('.edit-time [data-edit="time"]', clock);
+    if (half) await page.selectOption('.edit-time [data-edit="ampm"]', half);
+  }
   await page.click('.modal-primary');
   await page.waitForTimeout(900);
   return page.evaluate(() => { const o = document.querySelector('.modal-overlay'); return o ? o.querySelector('.modal-msg').textContent : null; });
@@ -156,11 +163,14 @@ const save = async (time) => {
 const before = await legNow();
 const later = Date.parse(before.endTime) + 10 * 60e3;
 let box = await openEdit('endTime');
-ok('it offers the time on the race clock, 24-hour, and says whose', [box.time, /MDT/.test(box.label), /AM|PM/.test(box.time)],
-  [wall(Date.parse(before.endTime), true), true, false]);
+ok('it offers the time on the race clock, with AM or PM, and says whose', [box.time, /MDT/.test(box.label)],
+  [twelve(Date.parse(before.endTime)), true]);
 ok('with a date picker, on the day it is already on', [box.dayType, box.day],
   ['date', new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Denver', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(before.endTime))]);
-ok('and a time typed in is read on the race clock', [await save(wall(later, true)), (await legNow()).endTime], [null, new Date(Math.floor(later / 1000) * 1000).toISOString()]);
+ok('and a time typed in is read on the race clock', [await save(twelve(later)), (await legNow()).endTime], [null, new Date(Math.floor(later / 1000) * 1000).toISOString()]);
+await openEdit('endTime');
+const later2 = later + 60e3;
+ok('a 24-hour time typed anyway is taken as written', [await save(wall(later2, true)), (await legNow()).endTime], [null, new Date(Math.floor(later2 / 1000) * 1000).toISOString()]);
 
 // The sequence that produced a 24:58:03 leg at the Hennepin 100: a missed
 // station fixed by correcting the send-off first, while the arrival still
@@ -180,11 +190,11 @@ await page.reload();
 await page.waitForSelector('[data-action="edit-time"][data-field="startTime"]', { state: 'attached', timeout: 20000 });
 const newStart = start0 + 10 * 60e3, newEnd = start0 + 68 * 60e3;
 await openEdit('startTime');
-const warned = await save(wall(newStart, true));
+const warned = await save(twelve(newStart));
 ok('a send-off after the stray arrival is asked about, not moved a day', /send-off after the arrival/.test(warned || ''), true);
 ok('and kept on its own day when saved again', [await save(), (await legNow()).startTime], [null, new Date(Math.floor(newStart / 1000) * 1000).toISOString()]);
 await openEdit('endTime');
-ok('then the arrival goes in', await save(wall(newEnd, true)), null);
+ok('then the arrival goes in', await save(twelve(newEnd)), null);
 const fixed = await legNow();
 ok('and the leg is 58 minutes, not 24:58', (Date.parse(fixed.endTime) - Date.parse(fixed.startTime)) / 60e3, 58);
 await page.context().close();
