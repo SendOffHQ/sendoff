@@ -91,6 +91,9 @@
     color: var(--text-dim);
   }
   .where strong { color: var(--text); }
+  .edit-time { display: grid; gap: 10px; }
+  .edit-time input[data-edit="time"] { font-family: 'JetBrains Mono', monospace; font-size: 18px; letter-spacing: 0.04em; }
+  .edit-time-other { margin: 0; font-size: 12px; color: var(--text-muted); }
   .where .stop { margin-top: 8px; line-height: 1.6; }
   .where .stop .k { color: var(--text-muted); }
   .stop-tag {
@@ -271,7 +274,7 @@
 <div id="toast" style="display:none;"></div>
 
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/race-core.js?v=abca3514"></script>
+<script src="lib/race-core.js?v=50d94e35"></script>
 <script src="lib/course-view.js?v=c1c49292"></script>
 <script>
   const slug = Race.qs('id');
@@ -372,43 +375,95 @@
   }
 
   // ---------- edit event time ----------
-  async function editEventTime(runnerId, legIndex, field) {
+  // A day and a 24-hour time, on the race's clock. It used to be a time alone,
+  // with the day guessed from the leg's other end, and the guess broke on the
+  // ordinary way a missed station gets fixed: the send-off corrected first,
+  // while the arrival still held the stray press it is about to replace.
+  // 19:11 looked later than that arrival, so it went on the day before, and
+  // the leg came out at 24:58:03. Nothing is guessed now: the day picker opens
+  // on the day the time already has, and a leg that would run backwards or
+  // past a day is asked about before it is saved.
+  function editEventTime(runnerId, legIndex, field) {
     const runner = (data.runners || []).find(r => r.id === runnerId);
     const leg = runner && (runner.legs || []).find(l => l.index === legIndex);
     if (!leg) return;
-    const other = field === 'startTime' ? leg.endTime : leg.startTime;
-    // A time that was never recorded still needs a day to sit on: the leg's
-    // other end if it has one, otherwise the race start, otherwise today.
-    const base = Date.parse(leg[field] || other || cfg.startTime) || Date.now();
+    const isStart = field === 'startTime';
+    const cur = leg[field] ? Date.parse(leg[field]) : null;
+    const otherMs = Date.parse(isStart ? leg.endTime : leg.startTime) || null;
     const pad = n => String(n).padStart(2, '0');
-    // Read and shown on the race's clock, not this phone's: a crew member
-    // still on home time types what the race clock said.
-    const seed = Race.tz.parts(leg[field] ? Date.parse(leg[field]) : Date.now(), cfg);
-    const input = prompt(
-      `${leg[field] ? 'Edit' : 'Set'} ${field === 'startTime' ? 'send-off' : 'arrival'} (24h, HH:MM or HH:MM:SS, ${Race.tz.label(cfg, base)}):`,
-      `${pad(seed.h)}:${pad(seed.mi)}:${pad(seed.s)}`
-    );
-    if (!input) return;
-    const m = input.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-    if (!m || +m[1] > 23 || +m[2] > 59 || +(m[3] || 0) > 59) { alert('Bad format. Use HH:MM or HH:MM:SS.'); return; }
-    let next = Race.tz.atClock(base, +m[1], +m[2], +(m[3] || 0), cfg);
-    // A clock time has no day on it, and this race runs through two nights.
-    // Leaving 00:30 on the day of a 23:50 send-off would read as a leg that
-    // finished twenty-three hours before it started, so the day follows the
-    // only reading that makes sense against the leg's other end.
-    if (field === 'endTime' && leg.startTime && next < Date.parse(leg.startTime)) {
-      next = Race.tz.atClock(base, +m[1], +m[2], +(m[3] || 0), cfg, 1);
-    } else if (field === 'startTime' && leg.endTime && next > Date.parse(leg.endTime)) {
-      next = Race.tz.atClock(base, +m[1], +m[2], +(m[3] || 0), cfg, -1);
+    const dayOf = ms => Race.tz.toInputs(ms, cfg).date;
+    // The race's days, and any day a time already sits on that is not one of
+    // them, so a time a day out can be seen and moved back.
+    const span = Math.ceil(((cfg.cutoffs && cfg.cutoffs.totalHours) || 48) / 24) + 2;
+    const days = cfg.startTime ? Race.tz.days(cfg.startTime, cfg, span) : [];
+    for (const ms of [cur, otherMs, Date.now()]) {
+      if (ms == null) continue;
+      const d = dayOf(ms);
+      if (!days.some(x => x.value === d)) {
+        days.push({ value: d, label: Race.tz.format(ms, cfg, { weekday: 'short', month: 'short', day: 'numeric' }) });
+      }
     }
-    const iso = new Date(next).toISOString();
-    try {
-      const r = await Race.queue.write(DATA_PATH, 'setLegTimes',
-        { runnerId, legs: { [legIndex]: { [field]: iso } } },
-        `pit: edit ${runnerId} leg ${legIndex} ${field}`);
-      toast(r.queued ? 'No signal · time saved on this phone' : 'Time saved', 'ok');
-      await load();
-    } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
+    days.sort((x, y) => x.value < y.value ? -1 : 1);
+    const seedMs = cur != null ? cur : (otherMs != null ? otherMs : Date.now());
+    const seed = Race.tz.parts(cur != null ? cur : Date.now(), cfg);
+
+    const m = Race.modal(`${cur != null ? 'Edit' : 'Set'} ${isStart ? 'send-off' : 'arrival'} · ${Race.course.legAt(cfg, legIndex)?.name || 'leg ' + legIndex}`, 'Save time');
+    m.body.innerHTML = `
+      <div class="edit-time">
+        <label class="modal-field"><span>Day</span>
+          <select data-edit="day">${days.map(d => `<option value="${d.value}"${d.value === dayOf(seedMs) ? ' selected' : ''}>${escapeHtml(d.label)}</option>`).join('')}</select>
+        </label>
+        <label class="modal-field"><span>Time, 24-hour (${escapeHtml(Race.tz.label(cfg, seedMs))})</span>
+          <input type="text" data-edit="time" inputmode="numeric" autocomplete="off" spellcheck="false"
+                 placeholder="HH:MM:SS" value="${pad(seed.h)}:${pad(seed.mi)}:${pad(seed.s)}" />
+        </label>
+        ${otherMs != null ? `<p class="edit-time-other">${isStart ? 'Arrival' : 'Send-off'} on this leg: ${escapeHtml(Race.tz.format(otherMs, cfg, { weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }))}</p>` : ''}
+      </div>`;
+    const daySel = m.body.querySelector('[data-edit="day"]');
+    const timeIn = m.body.querySelector('[data-edit="time"]');
+    let dayTouched = false;
+    daySel.addEventListener('change', () => { dayTouched = true; });
+    let confirmed = null;
+    timeIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); m.primary.click(); } });
+    setTimeout(() => { timeIn.focus(); timeIn.select(); }, 0);
+
+    m.primary.addEventListener('click', async () => {
+      const t = timeIn.value.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+      if (!t || +t[1] > 23 || +t[2] > 59 || +(t[3] || 0) > 59) {
+        m.setMsg('Use 24-hour time: HH:MM or HH:MM:SS, like 19:11:11.', 'err');
+        return;
+      }
+      const at = (day) => Race.tz.fromInputs(day, `${pad(+t[1])}:${t[2]}`, cfg) + (+(t[3] || 0)) * 1000;
+      let next = at(daySel.value);
+      // A time being set for the first time, after midnight, on a leg sent off
+      // the evening before: the one guess still worth making, and only while
+      // the day has been left alone.
+      if (cur == null && !dayTouched && !isStart && otherMs != null && next < otherMs) {
+        const later = days.map(d => at(d.value)).filter(ms => ms >= otherMs);
+        if (later.length) { next = Math.min(...later); daySel.value = dayOf(next); }
+      }
+      const legMs = otherMs == null ? null : (isStart ? otherMs - next : next - otherMs);
+      const odd = legMs != null && (legMs < 0 || legMs > 24 * 3600e3);
+      if (odd && confirmed !== next) {
+        confirmed = next;
+        m.setMsg(legMs < 0
+          ? `That puts the ${isStart ? 'send-off after the arrival' : 'arrival before the send-off'}. Check the day, or press Save time again to keep it.`
+          : `That makes this leg ${Race.fmt.duration(legMs / 1000)}. Check the day, or press Save time again to keep it.`, 'err');
+        return;
+      }
+      m.primary.disabled = true;
+      try {
+        const r = await Race.queue.write(DATA_PATH, 'setLegTimes',
+          { runnerId, legs: { [legIndex]: { [field]: new Date(next).toISOString() } } },
+          `pit: edit ${runnerId} leg ${legIndex} ${field}`);
+        m.close();
+        toast(r.queued ? 'No signal · time saved on this phone' : 'Time saved', 'ok');
+        await load();
+      } catch (err) {
+        m.primary.disabled = false;
+        m.setMsg(`Save failed: ${err.message}`, 'err');
+      }
+    });
   }
 
   async function deleteLastEvent(runnerId) {

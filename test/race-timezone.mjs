@@ -137,15 +137,54 @@ const legNow = async () => page.evaluate(async ([slug, t]) => {
   const d = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(r.content), c => c.charCodeAt(0))));
   return d.runners.find(x => x.id === t.runner).legs.find(l => l.index === t.leg);
 }, [SLUG, target]);
+// The box: a day and a 24-hour time, opened on the time already there.
+const openEdit = async (field, leg) => {
+  await page.click(`[data-action="edit-time"][data-runner="${target.runner}"][data-field="${field}"]`);
+  await page.waitForSelector('.edit-time [data-edit="time"]');
+  return page.evaluate(() => ({
+    time: document.querySelector('.edit-time [data-edit="time"]').value,
+    day: document.querySelector('.edit-time [data-edit="day"]').selectedOptions[0].textContent,
+    label: document.querySelector('.edit-time').textContent }));
+};
+const save = async (time) => {
+  if (time != null) await page.fill('.edit-time [data-edit="time"]', time);
+  await page.click('.modal-primary');
+  await page.waitForTimeout(900);
+  return page.evaluate(() => { const o = document.querySelector('.modal-overlay'); return o ? o.querySelector('.modal-msg').textContent : null; });
+};
 const before = await legNow();
-let asked = null;
-page.removeAllListeners('dialog');
 const later = Date.parse(before.endTime) + 10 * 60e3;
-page.once('dialog', d => { asked = [d.message(), d.defaultValue()]; d.accept(wall(later, true)); });
-await page.click(`[data-action="edit-time"][data-runner="${target.runner}"][data-field="endTime"]`);
-await page.waitForTimeout(1500);
-ok('it offers the time on the race clock, and says whose', asked && [asked[1], /MDT/.test(asked[0])], [wall(Date.parse(before.endTime), true), true]);
-ok('and a time typed in is read on the race clock', (await legNow()).endTime, new Date(Math.floor(later / 1000) * 1000).toISOString());
+let box = await openEdit('endTime');
+ok('it offers the time on the race clock, 24-hour, and says whose', [box.time, /MDT/.test(box.label), /AM|PM/.test(box.time)],
+  [wall(Date.parse(before.endTime), true), true, false]);
+ok('on the day it is already on', box.day, new Intl.DateTimeFormat('en-US', { timeZone: 'America/Denver', weekday: 'short', month: 'short', day: 'numeric' }).format(new Date(before.endTime)));
+ok('and a time typed in is read on the race clock', [await save(wall(later, true)), (await legNow()).endTime], [null, new Date(Math.floor(later / 1000) * 1000).toISOString()]);
+
+// The sequence that produced a 24:58:03 leg at the Hennepin 100: a missed
+// station fixed by correcting the send-off first, while the arrival still
+// held a stray press one second after the old send-off.
+console.log('\na missed station, fixed send-off first');
+const L = await legNow();
+const start0 = Date.parse(L.startTime);
+await page.evaluate(async ([slug, t, s0]) => {
+  const r = await (await fetch(`/api/get?path=races/${slug}/data.json`, { headers: { Authorization: 'Bearer stub' } })).json();
+  const d = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(r.content), c => c.charCodeAt(0))));
+  const leg = d.runners.find(x => x.id === t.runner).legs.find(l => l.index === t.leg);
+  leg.endTime = new Date(s0 + 1000).toISOString();
+  await fetch('/api/commit', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer stub' },
+    body: JSON.stringify({ path: `races/${slug}/data.json`, content: JSON.stringify(d), message: 'stray press' }) });
+}, [SLUG, target, start0]);
+await page.reload();
+await page.waitForSelector('[data-action="edit-time"][data-field="startTime"]', { state: 'attached', timeout: 20000 });
+const newStart = start0 + 10 * 60e3, newEnd = start0 + 68 * 60e3;
+await openEdit('startTime');
+const warned = await save(wall(newStart, true));
+ok('a send-off after the stray arrival is asked about, not moved a day', /send-off after the arrival/.test(warned || ''), true);
+ok('and kept on its own day when saved again', [await save(), (await legNow()).startTime], [null, new Date(Math.floor(newStart / 1000) * 1000).toISOString()]);
+await openEdit('endTime');
+ok('then the arrival goes in', await save(wall(newEnd, true)), null);
+const fixed = await legNow();
+ok('and the leg is 58 minutes, not 24:58', (Date.parse(fixed.endTime) - Date.parse(fixed.startTime)) / 60e3, 58);
 await page.context().close();
 
 // The wizard, from a laptop in New York, for a race in Colorado.
