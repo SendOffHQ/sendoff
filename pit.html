@@ -380,7 +380,7 @@
   // ordinary way a missed station gets fixed: the send-off corrected first,
   // while the arrival still held the stray press it is about to replace.
   // 19:11 looked later than that arrival, so it went on the day before, and
-  // the leg came out at 24:58:03. Nothing is guessed now: the day picker opens
+  // the leg came out at 24:58:03. Nothing is guessed now: the date field opens
   // on the day the time already has, and a leg that would run backwards or
   // past a day is asked about before it is saved.
   function editEventTime(runnerId, legIndex, field) {
@@ -392,26 +392,16 @@
     const otherMs = Date.parse(isStart ? leg.endTime : leg.startTime) || null;
     const pad = n => String(n).padStart(2, '0');
     const dayOf = ms => Race.tz.toInputs(ms, cfg).date;
-    // The race's days, and any day a time already sits on that is not one of
-    // them, so a time a day out can be seen and moved back.
-    const span = Math.ceil(((cfg.cutoffs && cfg.cutoffs.totalHours) || 48) / 24) + 2;
-    const days = cfg.startTime ? Race.tz.days(cfg.startTime, cfg, span) : [];
-    for (const ms of [cur, otherMs, Date.now()]) {
-      if (ms == null) continue;
-      const d = dayOf(ms);
-      if (!days.some(x => x.value === d)) {
-        days.push({ value: d, label: Race.tz.format(ms, cfg, { weekday: 'short', month: 'short', day: 'numeric' }) });
-      }
-    }
-    days.sort((x, y) => x.value < y.value ? -1 : 1);
+    // The calendar day after a YYYY-MM-DD, for the one guess below.
+    const nextDay = (d) => new Date(Date.parse(d + 'T12:00:00Z') + 864e5).toISOString().slice(0, 10);
     const seedMs = cur != null ? cur : (otherMs != null ? otherMs : Date.now());
     const seed = Race.tz.parts(cur != null ? cur : Date.now(), cfg);
 
     const m = Race.modal(`${cur != null ? 'Edit' : 'Set'} ${isStart ? 'send-off' : 'arrival'} · ${Race.course.legAt(cfg, legIndex)?.name || 'leg ' + legIndex}`, 'Save time');
     m.body.innerHTML = `
       <div class="edit-time">
-        <label class="modal-field"><span>Day</span>
-          <select data-edit="day">${days.map(d => `<option value="${d.value}"${d.value === dayOf(seedMs) ? ' selected' : ''}>${escapeHtml(d.label)}</option>`).join('')}</select>
+        <label class="modal-field"><span>Date</span>
+          <input type="date" data-edit="day" value="${dayOf(seedMs)}" />
         </label>
         <label class="modal-field"><span>Time, 24-hour (${escapeHtml(Race.tz.label(cfg, seedMs))})</span>
           <input type="text" data-edit="time" inputmode="numeric" autocomplete="off" spellcheck="false"
@@ -434,21 +424,22 @@
         return;
       }
       const at = (day) => Race.tz.fromInputs(day, `${pad(+t[1])}:${t[2]}`, cfg) + (+(t[3] || 0)) * 1000;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(daySel.value)) { m.setMsg('Pick the date.', 'err'); return; }
       let next = at(daySel.value);
       // A time being set for the first time, after midnight, on a leg sent off
       // the evening before: the one guess still worth making, and only while
       // the day has been left alone.
       if (cur == null && !dayTouched && !isStart && otherMs != null && next < otherMs) {
-        const later = days.map(d => at(d.value)).filter(ms => ms >= otherMs);
-        if (later.length) { next = Math.min(...later); daySel.value = dayOf(next); }
+        const day2 = nextDay(daySel.value);
+        if (at(day2) >= otherMs) { next = at(day2); daySel.value = day2; }
       }
       const legMs = otherMs == null ? null : (isStart ? otherMs - next : next - otherMs);
       const odd = legMs != null && (legMs < 0 || legMs > 24 * 3600e3);
       if (odd && confirmed !== next) {
         confirmed = next;
         m.setMsg(legMs < 0
-          ? `That puts the ${isStart ? 'send-off after the arrival' : 'arrival before the send-off'}. Check the day, or press Save time again to keep it.`
-          : `That makes this leg ${Race.fmt.duration(legMs / 1000)}. Check the day, or press Save time again to keep it.`, 'err');
+          ? `That puts the ${isStart ? 'send-off after the arrival' : 'arrival before the send-off'}. Check the date, or press Save time again to keep it.`
+          : `That makes this leg ${Race.fmt.duration(legMs / 1000)}. Check the date, or press Save time again to keep it.`, 'err');
         return;
       }
       m.primary.disabled = true;

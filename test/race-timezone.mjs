@@ -143,7 +143,8 @@ const openEdit = async (field, leg) => {
   await page.waitForSelector('.edit-time [data-edit="time"]');
   return page.evaluate(() => ({
     time: document.querySelector('.edit-time [data-edit="time"]').value,
-    day: document.querySelector('.edit-time [data-edit="day"]').selectedOptions[0].textContent,
+    day: document.querySelector('.edit-time [data-edit="day"]').value,
+    dayType: document.querySelector('.edit-time [data-edit="day"]').type,
     label: document.querySelector('.edit-time').textContent }));
 };
 const save = async (time) => {
@@ -157,7 +158,8 @@ const later = Date.parse(before.endTime) + 10 * 60e3;
 let box = await openEdit('endTime');
 ok('it offers the time on the race clock, 24-hour, and says whose', [box.time, /MDT/.test(box.label), /AM|PM/.test(box.time)],
   [wall(Date.parse(before.endTime), true), true, false]);
-ok('on the day it is already on', box.day, new Intl.DateTimeFormat('en-US', { timeZone: 'America/Denver', weekday: 'short', month: 'short', day: 'numeric' }).format(new Date(before.endTime)));
+ok('with a date picker, on the day it is already on', [box.dayType, box.day],
+  ['date', new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Denver', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(before.endTime))]);
 ok('and a time typed in is read on the race clock', [await save(wall(later, true)), (await legNow()).endTime], [null, new Date(Math.floor(later / 1000) * 1000).toISOString()]);
 
 // The sequence that produced a 24:58:03 leg at the Hennepin 100: a missed
