@@ -808,3 +808,8 @@ label.field > .hint {
   color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 11px;
 }
 .leaflet-tooltip.runner-dot-label::before { display: none; }
+
+/* How the racer said they felt, beside a leg's times. Race.feel. */
+.feel-face { display: inline-block; vertical-align: -3px; }
+.feel-tag { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); }

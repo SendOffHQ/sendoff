@@ -6,6 +6,7 @@ optional Cloudflare Worker auth proxy.
 ## Race tracking
 - Live race dashboard (`race.html`): per-runner progress, pace, cutoffs, predicted finish
 - Pit/leg logging (`pit.html`): leg start/end times, calories, fluid, sodium, gear changes, meds, issues, notes
+- How are you feeling: on the racer screen, for the 15 seconds the Undo is up after a check-in or send-off, three faces (good, getting by, rough). One tap is kept on that leg (`feelIn` arriving, `feelOut` leaving; `Race.feel`), shown beside the leg on the race page and the Out/In times on the pit board, and undone with the press. `test/feel.mjs`.
 - The course on the pit board: the route map and elevation profile, with every aid station and each racer's estimated position, at the foot of `pit.html` as on `race.html`, so the crew need not switch pages. One copy, `lib/course-view.js`, drawn by both. `test/pit-course.mjs`.
 - Worker-routed reads for signed-in crew to avoid GitHub Pages publish lag
 - Predicted mileage / position for runners on course or in a pit

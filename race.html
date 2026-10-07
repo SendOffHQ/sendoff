@@ -38,7 +38,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=e22e8dc6">
+<link rel="stylesheet" href="lib/race-theme.css?v=f65ffd21">
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css" />
 <style>
   .cutoffs {
@@ -298,6 +298,7 @@
   .seg-row .num { font-family: 'JetBrains Mono', monospace; color: var(--accent); font-weight: 700; }
   .seg-row .nm { color: var(--text); min-width: 0; overflow-wrap: anywhere; }
   .seg-row .nm .meta { color: var(--text-muted); font-size: 11px; font-family: 'JetBrains Mono', monospace; }
+  .seg-row .nm .feel-line { margin-top: 3px; display: flex; gap: 10px; }
   .seg-row .col-dur, .seg-row .col-cut, .seg-row .col-pit {
     font-family: 'JetBrains Mono', monospace; text-align: right;
   }
@@ -525,7 +526,7 @@
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=779a41b4"></script>
 <script src="lib/course-view.js?v=c1c49292"></script>
-<script src="lib/race-core.js?v=50d94e35"></script>
+<script src="lib/race-core.js?v=9780d1db"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -623,7 +624,10 @@
       const text = dur != null
         ? Race.fmt.durationShort(dur)
         : (isCurrent ? '···' : '–');
-      return `<div class="leg-cell ${cls}"><span class="n">L${idx1}</span><span class="t">${text}</span></div>`;
+      // How they felt finishing the lap, if they said.
+      const lap = (runner.legs || []).find(l => l.index === idx1);
+      const face = lap && Race.feel.valid(lap.feelIn) ? Race.feel.svg(lap.feelIn, 12) : '';
+      return `<div class="leg-cell ${cls}"><span class="n">L${idx1}${face ? ' ' + face : ''}</span><span class="t">${text}</span></div>`;
     }).join('');
   }
 
@@ -694,6 +698,7 @@
           <span class="nm">
             ${escapeHtml(s.name)}${stationTags(Race.stationAt(cfg, s.index))}
             <div class="meta">${Race.units.distance(s.distanceMi, cfg)} · ${Race.units.distance(s.cumulativeMi, cfg)} total${s.elevationGainFt != null ? ` · +${Math.round(Race.units.elevationVal(s.elevationGainFt, cfg))}/-${Math.round(Race.units.elevationVal(Math.abs(s.elevationLossFt || 0), cfg))} ${Race.units.elevationLabel(cfg)}` : ''}</div>
+            ${Race.feel.pair(entry) ? `<div class="meta feel-line">${Race.feel.pair(entry)}</div>` : ''}
           </span>
           ${durCell}
           <span class="col-cut">${cutoffText}</span>

@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=e22e8dc6">
+<link rel="stylesheet" href="lib/race-theme.css?v=f65ffd21">
 <style>
   /* The screen for the person running, when there is no crew at this aid
      station. One job: say where you stand, and take one press. Everything
@@ -198,8 +198,23 @@
 
   /* Undo takes the button's own place, so the fix for a pocket press is under
      the thumb that made it. */
-  .rundo { display: flex; align-items: center; gap: 12px; min-height: 88px; }
-  .rundo-msg { flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+  .rundo { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px 16px; min-height: 88px; }
+  .rundo-msg { grid-column: 1; min-width: 0; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+  .rundo-btn { grid-column: 3; }
+  /* How are you feeling: three faces, asked while the Undo is still up. On a
+     phone they take a row of their own under the press and the Undo. */
+  .rundo-feel { grid-column: 2; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .rundo-feel .q { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); }
+  .rundo-feel .faces { display: flex; gap: 10px; }
+  .feel-btn { background: transparent; border: 3px solid transparent; border-radius: 50%; padding: 2px;
+              cursor: pointer; line-height: 0; -webkit-tap-highlight-color: transparent; }
+  .feel-btn.on { border-color: var(--text); }
+  .rundo-feel.chosen .feel-btn:not(.on) { opacity: 0.35; }
+  @media (max-width: 560px) {
+    .rundo { grid-template-columns: 1fr auto; }
+    .rundo-btn { grid-column: 2; grid-row: 1; }
+    .rundo-feel { grid-column: 1 / -1; grid-row: 2; padding-bottom: 6px; }
+  }
   .rundo-msg .stamp { display: block; color: var(--green); font-size: 15px; font-weight: 700; }
   .rundo-msg .fade { display: block; color: var(--text-muted); font-size: 11px; margin-top: 4px; }
   .rundo-btn {
@@ -278,7 +293,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=50d94e35"></script>
+<script src="lib/race-core.js?v=9780d1db"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -306,6 +321,12 @@
   const UNDO_MS = 15000;
   let undoUntil = 0;
   let undoLabel = '';
+  // The feeling the bar is asking about: which leg, and whether it is the
+  // send-off (feelOut) or the arrival (feelIn). Null outside the Undo window.
+  let undoFeel = null;
+  // The press's own write. A feeling waits for it, so it never reaches the
+  // file before the leg it belongs to does.
+  let pressWrite = Promise.resolve();
 
   function toast(text, kind) {
     const el = document.getElementById('toast');
@@ -577,14 +598,28 @@
     const act = document.getElementById('act');
     if (Date.now() < undoUntil) {
       const left = Math.ceil((undoUntil - Date.now()) / 1000);
-      act.innerHTML = `<div class="rundo">
+      // Drawn once per press and then only the countdown moves: redrawing the
+      // whole bar every second would take a face out from under a thumb.
+      const bar = act.querySelector(`.rundo[data-undo="${undoUntil}"]`);
+      if (bar) {
+        bar.querySelector('.fade').textContent = `Undo for ${left}s`;
+        return;
+      }
+      const chosen = undoFeel && undoFeel.value;
+      act.innerHTML = `<div class="rundo" data-undo="${undoUntil}">
         <span class="rundo-msg">
           <span class="stamp">${esc(undoLabel)}</span>
           <span class="fade">Undo for ${left}s</span>
         </span>
+        ${undoFeel ? `<div class="rundo-feel${chosen ? ' chosen' : ''}" role="group" aria-label="How are you feeling?">
+          <span class="q">${chosen ? 'Noted. Tap another to change it.' : 'How are you feeling?'}</span>
+          <span class="faces">${Race.feel.KEYS.map(k => `<button type="button" class="feel-btn${chosen === k ? ' on' : ''}" data-feel="${k}"
+            aria-pressed="${chosen === k}" aria-label="${Race.feel.LABEL[k]}">${Race.feel.svg(k, 40)}</button>`).join('')}</span>
+        </div>` : ''}
         <button class="rundo-btn" type="button" id="undo">Undo</button>
       </div>`;
       document.getElementById('undo').addEventListener('click', undoLast);
+      act.querySelectorAll('[data-feel]').forEach(b => b.addEventListener('click', () => chooseFeel(b.dataset.feel)));
       return;
     }
     const runner = merged();
@@ -677,20 +712,51 @@
       ` ${Race.fmt.clockTime(now, cfg)}` +
       ((def && def.toAid) ? ` · ${def.toAid}` : '');
     undoUntil = Date.now() + UNDO_MS;
+    undoFeel = { legIndex: next.nextLegIndex, key: next.nextAction === 'out' ? 'feelOut' : 'feelIn', value: null };
     render();
 
     const legs = { [next.nextLegIndex]: { [next.nextAction === 'out' ? 'startTime' : 'endTime']: now } };
     if (through) legs[next.nextLegIndex + 1] = { startTime: now };
     try {
-      await Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId: meId, legs },
+      pressWrite = Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId: meId, legs },
         `racer: ${runner.name || meId} ${next.nextAction === 'out' ? 'out' : 'in'} leg ${next.nextLegIndex}`);
+      await pressWrite;
     } catch (err) {
       toast(`Save failed: ${err.message}`, 'error');
     }
   }
 
+  // One tap on a face: kept on the leg the press belonged to, through the same
+  // queue as the press, so with no signal it waits on the phone with it.
+  async function chooseFeel(v) {
+    if (!undoFeel || !Race.feel.valid(v) || Date.now() >= undoUntil) return;
+    undoFeel.value = v;
+    const dr = (data.runners || []).find(r => r.id === meId);
+    const leg = dr && (dr.legs || []).find(l => l.index === undoFeel.legIndex);
+    if (leg) leg[undoFeel.key] = v;
+    const group = document.querySelector('#act .rundo-feel');
+    if (group) {
+      group.classList.add('chosen');
+      group.querySelector('.q').textContent = 'Noted. Tap another to change it.';
+      group.querySelectorAll('[data-feel]').forEach(b => {
+        b.classList.toggle('on', b.dataset.feel === v);
+        b.setAttribute('aria-pressed', String(b.dataset.feel === v));
+      });
+    }
+    const { legIndex, key } = undoFeel;
+    try {
+      await pressWrite.catch(() => {});
+      await Race.queue.write(DATA_PATH, 'setLegFields',
+        { runnerId: meId, legIndex, fields: { [key]: v } },
+        `racer: feeling ${v} leg ${legIndex}`);
+    } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
+  }
+
   async function undoLast() {
     undoUntil = 0;
+    // The feeling went with the press, so it goes with the undo too.
+    const feltWith = undoFeel && undoFeel.value ? undoFeel : null;
+    undoFeel = null;
     const dr = (data.runners || []).find(r => r.id === meId);
     if (!dr || !(dr.legs || []).length) { render(); return; }
     const sorted = dr.legs.slice().sort((a, b) => a.index - b.index);
@@ -702,7 +768,14 @@
     else { render(); return; }
     if (whole) dr.legs = dr.legs.filter(l => l.index !== last.index);
     else delete last[field];
+    const feltLeg = feltWith && (dr.legs || []).find(l => l.index === feltWith.legIndex);
+    if (feltLeg) delete feltLeg[feltWith.key];
     render();
+    if (feltLeg) {
+      Race.queue.write(DATA_PATH, 'setLegFields',
+        { runnerId: meId, legIndex: feltWith.legIndex, fields: { [feltWith.key]: null } },
+        `racer: undo feeling leg ${feltWith.legIndex}`).catch(() => {});
+    }
     try {
       await (whole
         ? Race.queue.write(DATA_PATH, 'removeLeg', { runnerId: meId, legIndex: last.index }, `racer: undo leg ${last.index}`)
@@ -1026,7 +1099,7 @@
     // whole readout would take a chip out from under a thumb already on it.
     setInterval(() => {
       if (!cfg || !data || !meId) return;
-      if (undoUntil && Date.now() >= undoUntil) { undoUntil = 0; renderAct(); load(); }
+      if (undoUntil && Date.now() >= undoUntil) { undoUntil = 0; undoFeel = null; renderAct(); load(); }
       else if (undoUntil) renderAct();
       tickClocks();
     }, 1000);
