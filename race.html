@@ -889,7 +889,13 @@
       ? `<div class="legs-grid">${loopLegCells(runner, c)}</div>`
       : `<div class="seg-list">${segmentRows(runner, c)}</div>`;
 
-    const legUnit = isSimpleLoop() ? 'Laps' : (cfg.courseType === 'segments' ? 'Segments' : 'Legs');
+    // Distance covered against the whole course, which is what somebody
+    // following along wants. A count of segments said how the course was
+    // typed in, not how far the racer had come. A simple lapped race keeps
+    // its lap count, because there the laps are the race.
+    const doneDist = Race.units.distanceVal(c.milesDone, cfg) || 0;
+    const allDist = Race.units.distanceVal(totalDist, cfg) || 0;
+    const pctDone = allDist > 0 ? Math.min(100, Math.round(doneDist / allDist * 100)) : 0;
 
     return `
       <article class="runner" style="--runner-color: ${color};">
@@ -906,11 +912,17 @@
         </div>
 
         <div class="stats">
+          ${isSimpleLoop() ? `
           <div class="stat">
-            <span class="label">${legUnit}</span>
+            <span class="label">Laps</span>
             <span class="value">${c.legsDone}<span style="color: var(--text-muted); font-size: 14px;">/${c.totalLegs}</span></span>
-            <span class="sub">${Race.units.distanceVal(c.milesDone, cfg).toFixed(1)} / ${Race.units.distance(totalDist, cfg)}</span>
-          </div>
+            <span class="sub">${doneDist.toFixed(1)} / ${Race.units.distance(totalDist, cfg)}</span>
+          </div>` : `
+          <div class="stat stat-distance">
+            <span class="label">Distance</span>
+            <span class="value">${doneDist.toFixed(1)}<span style="color: var(--text-muted); font-size: 14px;">/${allDist.toFixed(1)} ${Race.units.distanceLabel(cfg)}</span></span>
+            <span class="sub">${pctDone}% of the course</span>
+          </div>`}
           <div class="stat">
             <span class="label">Race Time</span>
             <span class="value live-timer" data-base="${c.completedRaceSec}" data-since="${c.liveSince || ''}">${Race.fmt.duration(c.raceSec)}</span>

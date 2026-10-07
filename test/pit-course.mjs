@@ -71,6 +71,15 @@ await page.goto(BASE + `/race.html?id=${SLUG}`);
 await page.waitForSelector('#course-map-section .course-elev .elev-line', { state: 'attached', timeout: 20000 });
 c = await course();
 ok('still shows the course', [c.shown, c.map, c.profile, c.racerOnProfile], [true, true, true, ['Test Racer']]);
+// The first tile on a racer's card: how far they have come of the whole
+// course, not how many segments the course was typed in as.
+const tile = await page.$eval('.runner .stats .stat', el => ({
+  label: el.querySelector('.label').textContent.trim(),
+  value: el.querySelector('.value').textContent.replace(/\s+/g, ' ').trim(),
+  sub: el.querySelector('.sub').textContent.trim() }));
+ok('the first tile is distance, done of the whole course', [tile.label, /^\d+\.\d\/\d+\.\d mi$/.test(tile.value), /^\d+% of the course$/.test(tile.sub)],
+  ['Distance', true, true]);
+ok('with no segment count on it', /segment/i.test(JSON.stringify(tile)), false);
 
 ok('no page errors', errs, []);
 await b.close(); srv.kill('SIGKILL');
