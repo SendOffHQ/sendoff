@@ -124,6 +124,7 @@
      the same weight as a chip, and it keeps what was typed through a poll. */
   .rjot { padding: 14px 0; border-bottom: 1px solid var(--border); }
   .rjot-row { display: flex; gap: 8px; margin-top: 6px; }
+  .rjot-field { position: relative; flex: 1; min-width: 0; display: flex; }
   .rjot-row input {
     flex: 1; min-width: 0; min-height: 58px; padding: 10px 14px;
     background: var(--bg-card); color: var(--text);
@@ -131,6 +132,18 @@
     font-family: 'JetBrains Mono', monospace; font-size: 14px;
   }
   .rjot-row input:focus { outline: none; border-color: var(--accent); }
+  .rjot-field:has(.rjot-mic:not([hidden])) input { padding-right: 56px; }
+  /* Inside the box, at its right edge, so it reads as a way of filling it. */
+  .rjot-mic {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    width: 44px; height: 44px; border-radius: 50%; border: 0; padding: 0;
+    display: grid; place-items: center; background: transparent; color: var(--text-dim);
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .rjot-mic[hidden] { display: none; }
+  .rjot-mic:hover { color: var(--accent); }
+  .rjot-mic.on { color: #fff; background: var(--red); animation: micPulse 1.2s ease-in-out infinite; }
+  @keyframes micPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(229, 50, 45, 0.55); } 50% { box-shadow: 0 0 0 8px rgba(229, 50, 45, 0); } }
   .rjot-btn {
     flex: 0 0 76px; min-height: 58px;
     background: rgba(15,184,191,0.13); color: var(--accent);
@@ -274,8 +287,15 @@
   <form class="rjot" id="jot-form" autocomplete="off">
     <span class="rlbl">Anything else</span>
     <div class="rjot-row">
-      <input type="text" id="jot" maxlength="240" enterkeyhint="send"
-             placeholder="Half a quesadilla, new socks…" aria-label="Write in anything else" />
+      <span class="rjot-field">
+        <input type="text" id="jot" maxlength="240" enterkeyhint="send"
+               placeholder="Half a quesadilla, new socks…" aria-label="Write in anything else" />
+        <!-- Talk instead of type. Only drawn where the browser can do it. -->
+        <button type="button" class="rjot-mic" id="jot-mic" hidden aria-label="Talk instead of typing" aria-pressed="false">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/>
+            <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </span>
       <button type="submit" class="rjot-btn" id="jot-send">Log</button>
     </div>
     <div class="rjot-list" id="jot-list"></div>
@@ -928,6 +948,54 @@
   // and the printout, and read by whoever turns them into numbers later, an
   // AI crew included. Through the same queue as a tap, so with no signal it is
   // held on the phone and sent when there is some.
+  // ---------- talking instead of typing ----------
+  // The browser's own speech-to-text, where it has one: Chrome and Safari on a
+  // phone do. Tap the mic, talk, and the words land in the box to be read over
+  // and logged like anything typed, so a mis-heard word is caught before it
+  // reaches the crew or an AI crew turning it into numbers. The audio goes to
+  // whoever makes the browser (Google, Apple), never to SendOff: only the
+  // text that gets logged does. See privacy.html#voice.
+  (function voice() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const mic = document.getElementById('jot-mic');
+    const input = document.getElementById('jot');
+    if (!SR || !mic || !input) return;
+    mic.hidden = false;
+    let rec = null;
+    const stopLook = () => { mic.classList.remove('on'); mic.setAttribute('aria-pressed', 'false'); mic.setAttribute('aria-label', 'Talk instead of typing'); };
+    const WHY = {
+      'not-allowed': 'The microphone is off for this site. Turn it on in the browser to talk instead of type.',
+      'service-not-allowed': 'The microphone is off for this site. Turn it on in the browser to talk instead of type.',
+      'audio-capture': 'No microphone found.',
+      'network': 'Talking needs a signal. Type it instead, and it is kept on the phone until there is one.',
+      'no-speech': 'Did not catch that. Tap the mic and try again.'
+    };
+    mic.addEventListener('click', () => {
+      if (rec) { rec.stop(); return; }
+      try { rec = new SR(); } catch (e) { rec = null; return; }
+      rec.lang = navigator.language || 'en-US';
+      rec.interimResults = true;
+      rec.continuous = false;
+      rec.maxAlternatives = 1;
+      // Added to whatever is in the box already, so a word typed and then a
+      // sentence spoken make one note.
+      const base = input.value.trim() ? input.value.trim() + ' ' : '';
+      rec.onresult = (e) => {
+        let said = '';
+        for (let i = 0; i < e.results.length; i++) said += e.results[i][0].transcript;
+        input.value = (base + said.trim()).slice(0, 240);
+      };
+      rec.onerror = (e) => { if (e && WHY[e.error]) toast(WHY[e.error], e.error === 'no-speech' ? 'info' : 'error'); };
+      rec.onend = () => { rec = null; stopLook(); };
+      try {
+        rec.start();
+        mic.classList.add('on');
+        mic.setAttribute('aria-pressed', 'true');
+        mic.setAttribute('aria-label', 'Stop listening');
+      } catch (e) { rec = null; stopLook(); }
+    });
+  })();
+
   document.getElementById('jot-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = document.getElementById('jot');
