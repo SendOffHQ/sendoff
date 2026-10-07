@@ -341,7 +341,9 @@ ok('and is not the stale one', stub.text.includes('old stub'), false);
 ok('naming the race', stub.text.includes('<title>The Race Nobody Ran'), true);
 ok('pointing at that race', stub.text.includes('/races/' + SLUG + '/'), true);
 ok('carrying its preview card', stub.text.includes(`/races/${SLUG}/og.png`), true);
-ok('and forwarding into the app', stub.text.includes(`/race.html?id=${SLUG}`), true);
+ok('and forwarding into the app, at the address that serves it with no redirect', stub.text.includes(`location.replace('/race?id=${SLUG}'`), true);
+ok('which is the one it tells search engines to list',
+  stub.text.includes(`<link rel="canonical" href="https://sendoff.run/race?id=${SLUG}">`), true);
 ok('the date and the racers, for the description',
   /Jun 13, 2026 · San Marcos, TX · Jason/.test(stub.text), true);
 ok('but nobody\'s address', stub.text.includes('@'), false);

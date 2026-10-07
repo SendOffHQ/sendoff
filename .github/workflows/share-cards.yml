@@ -102,7 +102,7 @@ jobs:
           fi
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add races brand
+          git add races brand sitemap.xml
           git commit -m "hub: build share cards
 
           Drawn by .github/workflows/share-cards.yml after a change to the race

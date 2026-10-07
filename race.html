@@ -13,12 +13,14 @@
 <link rel="icon" href="brand/sendoff-favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0a0f14" />
 <meta name="description" content="Live splits, pace against cutoff, elevation and pit time, updated by the crew as the race runs.">
-<link rel="canonical" href="https://sendoff.run/race.html">
+<!-- No canonical here: one file serves every race off ?id=, so which race
+     this page is, and whether search engines may list it, is set once its
+     settings load. See searchTags(). -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SendOff">
 <meta property="og:title" content="SendOff · Follow live">
 <meta property="og:description" content="Live splits, pace against cutoff, elevation and pit time, updated by the crew as the race runs.">
-<meta property="og:url" content="https://sendoff.run/race.html">
+<meta property="og:url" content="https://sendoff.run/race">
 <meta property="og:image" content="https://sendoff.run/brand/og-default.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -549,6 +551,27 @@
       if (location.pathname === want) return;
       history.replaceState(history.state, '', want + location.hash);
     } catch (e) { /* the address bar is cosmetic; the page is not */ }
+  }
+  // What a search engine is told about this page. A public race is listed
+  // under the one address that serves it with no redirect, /race?id=<slug>,
+  // so its share page (/races/<slug>/, which forwards here) and any address
+  // with a share token in it count as the same page. An unlisted or private
+  // race asks not to be listed at all. Added rather than removed: a noindex
+  // in the HTML itself can stop a crawler before it runs this.
+  function searchTags(cfg) {
+    try {
+      const head = document.head;
+      const tag = (sel, make) => head.querySelector(sel) || head.appendChild(make());
+      if (cfg && cfg.visibility === 'public') {
+        tag('link[rel="canonical"]', () => Object.assign(document.createElement('link'), { rel: 'canonical' }))
+          .href = 'https://sendoff.run/race?id=' + encodeURIComponent(slug);
+        const og = head.querySelector('meta[property="og:url"]');
+        if (og) og.content = 'https://sendoff.run/races/' + encodeURIComponent(slug) + '/';
+      } else {
+        tag('meta[name="robots"]', () => Object.assign(document.createElement('meta'), { name: 'robots' }))
+          .content = 'noindex, nofollow';
+      }
+    } catch (e) { /* search tags are not worth breaking the page over */ }
   }
   if (!slug) { window.location = '/app/'; }
 
@@ -1144,6 +1167,7 @@
       lastFetchAt = new Date();
 
       useShareableAddress(cfg);
+      searchTags(cfg);
 
       document.title = `${cfg.name} · SendOff`;
       document.getElementById('race-title').innerHTML =
@@ -1203,6 +1227,9 @@
         e.textContent = 'Finishing setup. This takes a few seconds.';
         return false;
       }
+      // A race that will not load (private, deleted, never existed) is not
+      // a page to list. Not on a dropped connection, which says nothing.
+      if (!err.offline && !cfg) searchTags(null);
       e.className = 'error-banner';
       e.style.display = 'block';
       e.textContent = `Error loading race: ${err.message}`;

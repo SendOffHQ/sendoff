@@ -5606,7 +5606,7 @@ function sharePageHtml(env, slug, cfg) {
 <title>${title} · SendOff</title>
 <meta name="theme-color" content="#0a0f14">
 <meta name="description" content="${desc}">
-<link rel="canonical" href="${base}/races/${slug}/">
+<link rel="canonical" href="${base}/race?id=${slug}">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SendOff">
 <meta property="og:title" content="${title}">
@@ -5635,13 +5635,13 @@ function sharePageHtml(env, slug, cfg) {
 <script>
   // Forward into the app, carrying any share token through untouched.
   var q = location.search.replace(/^\?/, '');
-  location.replace('/race.html?id=${slug}' + (q ? '&' + q : '') + location.hash);
+  location.replace('/race?id=${slug}' + (q ? '&' + q : '') + location.hash);
 </script>
 </head>
 <body>
 <main>
   <p>Opening ${title}…</p>
-  <p><a href="/race.html?id=${slug}">Continue to the race &rarr;</a></p>
+  <p><a href="/race?id=${slug}">Continue to the race &rarr;</a></p>
 </main>
 </body>
 </html>

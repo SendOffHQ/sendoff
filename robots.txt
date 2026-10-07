@@ -1,0 +1,7 @@
+# Everything here may be crawled. Pages that should not be listed (the crew
+# board, settings, a private race) say so themselves with a robots meta tag,
+# which a crawler can only read if it is allowed to fetch the page.
+User-agent: *
+Allow: /
+
+Sitemap: https://sendoff.run/sitemap.xml

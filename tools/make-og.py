@@ -57,7 +57,7 @@ STUB = r"""<!DOCTYPE html>
 <title>{title} · SendOff</title>
 <meta name="theme-color" content="#0a0f14">
 <meta name="description" content="{desc}">
-<link rel="canonical" href="{base}/races/{slug}/">
+<link rel="canonical" href="{base}/race?id={slug}">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SendOff">
 <meta property="og:title" content="{title}">
@@ -86,13 +86,13 @@ STUB = r"""<!DOCTYPE html>
 <script>
   // Forward into the app, carrying any share token through untouched.
   var q = location.search.replace(/^\?/, '');
-  location.replace('/race.html?id={slug}' + (q ? '&' + q : '') + location.hash);
+  location.replace('/race?id={slug}' + (q ? '&' + q : '') + location.hash);
 </script>
 </head>
 <body>
 <main>
   <p>Opening {title}…</p>
-  <p><a href="/race.html?id={slug}">Continue to the race &rarr;</a></p>
+  <p><a href="/race?id={slug}">Continue to the race &rarr;</a></p>
 </main>
 </body>
 </html>
@@ -235,6 +235,7 @@ def race_stats(slug):
 
 
 SAFE_ID = re.compile(r'^[A-Za-z0-9_-]{1,40}$')
+SAFE_SLUG = re.compile(r'^[a-z0-9][a-z0-9-]{0,80}$')
 
 def finishers(slug):
     """Who has finished, from races/<slug>/finishers.json.
@@ -469,6 +470,27 @@ def main():
                 page.write_text(finish_page(STUB.format(slug=slug, title=esc(title), desc=esc(f"{where}: on SendOff."), base=BASE),
                                             slug, fid), encoding='utf-8')
                 print(f'  {page.relative_to(ROOT)}')
+
+    write_sitemap(index)
+
+
+# The pages a search engine should list, at the addresses that serve them with
+# no redirect: Cloudflare sends /privacy.html to /privacy, and a race's share
+# page forwards to /race?id=<slug>, which is where its canonical tag points.
+# Public races only, the same ones that get a share page.
+SITE_PAGES = ['/', '/roadmap', '/privacy', '/terms']
+
+
+def write_sitemap(index):
+    urls = [BASE + p for p in SITE_PAGES]
+    urls += [f"{BASE}/race?id={r['slug']}" for r in index.get('races', []) if SAFE_SLUG.match(r.get('slug', ''))]
+    body = ''.join(f'  <url><loc>{esc(u)}</loc></url>\n' for u in urls)
+    out = ROOT / 'sitemap.xml'
+    out.write_text('<?xml version="1.0" encoding="UTF-8"?>\n'
+                   '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + body + '</urlset>\n',
+                   encoding='utf-8')
+    print(f'  {out.relative_to(ROOT)}')
+
 
 if __name__ == '__main__':
     main()
