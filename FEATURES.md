@@ -27,6 +27,7 @@ optional Cloudflare Worker auth proxy.
 - Aid-station time per stop
 - Intake per hour: calories / fluid / sodium, with target lines
 - Cumulative progress with a pace-based projected-finish ray and cutoff line
+- Projected tile on the race page: the projected time, the finish as a time of day on the race's clock with its zone, and by how much it beats or misses the final cutoff. `test/projected.mjs`.
 
 ## Sharing
 - Finish card (`lib/finish-card.js`): a 1080x1350 image drawn on the finisher's own device at the end of a race, with the course elevation profile, the splits marked on it, finish time, margin inside the cutoff, and the day's numbers. Four shapes (4:5, 1:1, 4:3, 16:9), with the wide two laid out in two columns rather than a stretched portrait. Ten switches choose what is on it (location, cutoff margin, course profile, each stat, date); the layout reflows and the card crops to what it holds, and the choices are remembered on that device. Save, or share straight to another app where the browser supports it. Nothing is uploaded and it works with no signal.

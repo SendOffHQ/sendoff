@@ -198,6 +198,8 @@
     letter-spacing: -0.02em; color: var(--text);
   }
   .stat .sub { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+  .stat .sub.proj-margin { font-size: 9px; margin-top: -2px; }
+  .stat .sub.proj-margin.over { color: var(--red); }
 
   @media (max-width: 600px) {
     .stats { grid-template-columns: repeat(2, 1fr); }
@@ -986,11 +988,27 @@
             <span class="value">${Race.fmt.duration(c.avgLegSec)}</span>
             <span class="sub">last: ${Race.fmt.duration(c.lastLegSec)}</span>
           </div>
-          <div class="stat">
-            <span class="label">Projected</span>
-            <span class="value">${Race.fmt.duration(c.projectedFinishSec)}</span>
-            <span class="sub">${c.projectedFinishSec && totalCutSec ? (c.projectedFinishSec > totalCutSec ? 'over cutoff' : 'under cutoff') : '–'}</span>
-          </div>
+          ${(() => {
+            // The finish as a time of day on the race's clock, the way the
+            // cutoffs are shown, and by how much it beats or misses the final
+            // cutoff, small underneath. Counted from this racer's own start.
+            const proj = c.projectedFinishSec;
+            const first = (runner.legs || []).filter(l => l && l.startTime).sort((a, b) => a.index - b.index)[0];
+            const from = Date.parse((first && first.startTime) || cfg.startTime);
+            const at = proj && !isNaN(from) ? from + proj * 1000 : null;
+            const when = at ? `${Race.tz.dayClock(at, cfg)} ${Race.tz.label(cfg, at)}` : '–';
+            const hm = (sec) => { const m = Math.round(sec / 60); return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`; };
+            const margin = proj && totalCutSec
+              ? (proj > totalCutSec ? `${hm(proj - totalCutSec)} over cutoff` : `${hm(totalCutSec - proj)} under cutoff`)
+              : '';
+            return `
+              <div class="stat stat-projected">
+                <span class="label">Projected</span>
+                <span class="value">${Race.fmt.duration(proj)}</span>
+                <span class="sub proj-at">${escapeHtml(when)}</span>
+                ${margin ? `<span class="sub proj-margin${proj > totalCutSec ? ' over' : ''}">${margin}</span>` : ''}
+              </div>`;
+          })()}
         </div>
 
         ${(() => {
