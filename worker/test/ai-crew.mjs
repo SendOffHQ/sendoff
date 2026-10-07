@@ -97,6 +97,9 @@ const init = await rpc('initialize', { protocolVersion: '2025-06-18', capabiliti
 ok('initialize answers with tools and who it is crew for',
   [init.status, init.body.result.protocolVersion, !!init.body.result.capabilities.tools, /crew for Pat at Hennepin Test 100/.test(init.body.result.instructions)],
   [200, '2025-06-18', true, true]);
+ok('and told to check race status and log unread notes every time they message',
+  /Every time they message you, about anything, call race_status first/.test(init.body.result.instructions) &&
+  /log them before you answer/.test(init.body.result.instructions), true);
 ok('an initialized notification gets an empty 202', (await call(mcpPath, { body: { jsonrpc: '2.0', method: 'notifications/initialized' } })).status, 202);
 const list = await rpc('tools/list', {});
 ok('the tools', list.body.result.tools.map(t => t.name), ['race_status', 'log_intake', 'log_item', 'add_note', 'read_notes', 'mark_notes_read']);
@@ -118,6 +121,9 @@ ok('what they have had, and the plan', [st.intake.raceTotal['Calories (cal)'], s
 ok('their own notes for crew', st.racerNotesForCrew, 'Salt every hour');
 ok('the one-tap items', st.oneTapItems.map(i => i.name), ['Gel', 'Flask']);
 ok('and that two of their notes are unread', st.unreadNotes, 2);
+ok('with the notes themselves, so they are handled before any answer',
+  [st.notesToHandleFirst.map(n => [n.leg, n.station, n.line]), /^Before you answer, handle these/.test(st.doFirst)],
+  [[[1, 'Ridge', '8:30 AM: ate half a quesadilla'], [1, 'Ridge', '8:50 AM: blister left heel']], true]);
 ok('nothing about the other racer, or anybody\'s address',
   [JSON.stringify(st).includes('Sam'), JSON.stringify(st).includes('@example.com')], [false, false]);
 
@@ -137,6 +143,8 @@ ok('with a line saying who logged it', /^\d+:\d\d [AP]M: AI crew: half a quesadi
 await tool('mark_notes_read', { lines: ['8:50 AM: blister left heel'] });
 ok('handled notes are not handed back', (await tool('read_notes')).data.notes, []);
 ok('its own lines are never handed back either', (await tool('read_notes', { includeHandled: true })).data.notes.length, 2);
+const st2 = (await tool('race_status')).data;
+ok('and once handled, race status has nothing to do first', [st2.unreadNotes, 'notesToHandleFirst' in st2, 'doFirst' in st2], [0, false, false]);
 
 r = await tool('log_intake', { items: [{ what: 'Coke', calories: 100, fluidOz: 8 }] });
 d = dataOf('hen');

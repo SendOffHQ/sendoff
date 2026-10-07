@@ -1442,9 +1442,14 @@ below:
   page and the report and as "~ estimate" on the pit board, and a number a
   person types there replaces the guess. A save that only adds a tapped item
   keeps it.
-- **Notes** the racer typed with no signal come back through `read_notes`, and
-  the ones handled are remembered per leg in `aiNoted`. Every line the AI
-  writes says "AI crew:".
+- **Notes** the racer typed with no signal ride along in `race_status` (the
+  latest 20, as `notesToHandleFirst` with a `doFirst` hint), and the
+  connector's instructions say to call it first on every message and log them
+  before answering. So whatever the racer next says to their own AI, "how am I
+  doing?" included, the write-ins get turned into numbers. SendOff never sends
+  a note anywhere itself: the AI only sees them when the racer talks to it.
+  Older ones come back through `read_notes`, and the ones handled are
+  remembered per leg in `aiNoted`. Every line the AI writes says "AI crew:".
 - **Pro** as planned: `aiCrew` in `PLANS`, checked against the race owner when
   a link is made and on every call.
 - **The privacy page** has its own section, and the panel says what is shared

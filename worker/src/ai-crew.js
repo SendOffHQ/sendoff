@@ -285,11 +285,23 @@ export function raceStatus(cfg, data, runnerId, now) {
     out.oneTapItems = items.map(it => ({ name: it.name,
       adds: fmtVals(Object.fromEntries(ms.map(m => [m.key, num(it.values[m.key])]).filter(([, v]) => v))) }));
   }
-  out.unreadNotes = unreadNotes(cfg, data, runnerId).length;
+  // The notes come with the status, so handling them is part of every
+  // answer and not a second step the assistant might skip.
+  const unread = unreadNotes(cfg, data, runnerId);
+  out.unreadNotes = unread.length;
+  if (unread.length) {
+    out.notesToHandleFirst = unread.slice(-MAX_INLINE_NOTES).map(({ leg, station, line }) => ({ leg, station, line }));
+    if (unread.length > MAX_INLINE_NOTES) out.olderNotesNotShown = unread.length - MAX_INLINE_NOTES;
+    out.doFirst = 'Before you answer, handle these: food and drink go to log_intake or log_item with the lines in forNotes and the leg given here; ' +
+      'gear, problems and how they feel go to add_note with the lines in forNotes, or to mark_notes_read if they need nothing. Then answer, and say briefly what you logged.';
+  }
   return out;
 }
 
 // ---------- notes ----------
+// How many unread lines race_status carries. More than this means a long
+// stretch with no signal: the rest come through read_notes.
+const MAX_INLINE_NOTES = 20;
 function noteLines(leg) {
   return String((leg && leg.notes) || '').split('\n').map(s => s.trim()).filter(Boolean);
 }
@@ -437,13 +449,13 @@ export function tools(cfg) {
   const amount = {};
   for (const m of ms) amount[m.key] = { type: 'number', description: `${m.label}, in ${m.unit || 'units'}. Negative to take back a mistake.` };
   const leg = { type: 'integer', minimum: 1, description: 'Which leg to put it on. Leave out for the leg the racer is on now (or the one that ended at the aid station they are standing in).' };
-  const forNotes = { type: 'array', items: { type: 'string' }, description: 'The racer\'s note lines this turns into numbers, copied exactly from read_notes, so they are not handed to you again.' };
+  const forNotes = { type: 'array', items: { type: 'string' }, description: 'The racer\'s note lines this turns into numbers, copied exactly from race_status or read_notes, so they are not handed to you again.' };
   const items = presets(cfg).map(p => p.name);
   return [
     {
       name: 'race_status',
       title: 'Race status',
-      description: 'Where the racer is on the course, what the next aid station is called, how far and when its cutoff is, what they have eaten and drunk so far against their plan, the race\'s one-tap items, and how many of their notes you have not read. Times are on the race\'s own clock. Call this first, and whenever you are asked how they are doing.',
+      description: 'Where the racer is on the course, what the next aid station is called, how far and when its cutoff is, what they have eaten and drunk so far against their plan, the race\'s one-tap items, and the notes they typed that you have not handled yet. Times are on the race\'s own clock. Call this at the start of every reply, before anything else, and handle any notes it gives you before you answer.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
       annotations: { readOnlyHint: true, openWorldHint: false }
     },
@@ -490,14 +502,14 @@ export function tools(cfg) {
     {
       name: 'read_notes',
       title: 'Read the racer\'s notes',
-      description: 'What the racer typed into SendOff themselves, often with no signal, that you have not handled yet: food with no numbers, gear, problems. Turn food into log_intake calls, passing the lines in forNotes. Lines that need nothing from you go to mark_notes_read.',
+      description: 'Every note the racer typed into SendOff themselves, often with no signal, that you have not handled yet: food with no numbers, gear, problems. race_status already gives you the latest ones; this is for the rest after a long stretch with no signal. Turn food into log_intake calls, passing the lines in forNotes. Lines that need nothing from you go to mark_notes_read.',
       inputSchema: { type: 'object', properties: { includeHandled: { type: 'boolean', default: false } }, additionalProperties: false },
       annotations: { readOnlyHint: true, openWorldHint: false }
     },
     {
       name: 'mark_notes_read',
       title: 'Mark notes as read',
-      description: 'Notes from read_notes that need no numbers, so they are not handed to you again.',
+      description: 'Note lines from race_status or read_notes that need nothing logged, so they are not handed to you again.',
       inputSchema: { type: 'object', properties: { lines: { type: 'array', items: { type: 'string' }, minItems: 1 } }, required: ['lines'], additionalProperties: false },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     }
@@ -507,8 +519,10 @@ export function tools(cfg) {
 export function instructions(cfg, runnerName) {
   return `You are crew for ${runnerName || 'a racer'} at ${(cfg && cfg.name) || 'a race'}, through SendOff. ` +
     'The racer will tell you what they eat and drink, often in passing, and you log it with your best estimate of the numbers so their crew, family and the race page see it. ' +
-    'Call race_status before answering anything about where they are, what is next, their cutoff or their fueling, and use the aid station names it gives you. ' +
-    'When asked to check their notes, call read_notes. Keep replies short: they are running.';
+    'Every time they message you, about anything, call race_status first. ' +
+    'If it has notesToHandleFirst, those are lines they typed into SendOff, often with no signal: log them before you answer ' +
+    '(food and drink with log_intake or log_item, anything else with add_note or mark_notes_read, passing the lines in forNotes), then answer and say in a few words what you logged. ' +
+    'Use the aid station names race_status gives you. Keep replies short: they are running.';
 }
 
 // ---------- the protocol ----------
