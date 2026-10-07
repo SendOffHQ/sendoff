@@ -984,6 +984,11 @@
         let said = '';
         for (let i = 0; i < e.results.length; i++) said += e.results[i][0].transcript;
         input.value = (base + said.trim()).slice(0, 240);
+        // Keep the newest words in view as they come, the way typing does,
+        // without focusing the box and pulling up the keyboard.
+        const end = input.value.length;
+        try { input.setSelectionRange(end, end); } catch (err) {}
+        input.scrollLeft = input.scrollWidth;
       };
       rec.onerror = (e) => { if (e && WHY[e.error]) toast(WHY[e.error], e.error === 'no-speech' ? 'info' : 'error'); };
       rec.onend = () => { rec = null; stopLook(); };

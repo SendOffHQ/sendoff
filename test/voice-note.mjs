@@ -90,6 +90,20 @@ await page.waitForFunction(() => !document.getElementById('jot-mic').classList.c
 ok('talking adds to what was typed', await page.inputValue('#jot'), 'Coke at Ridge, two cups');
 
 await page.fill('#jot', '');
+await page.evaluate(() => { window.__said = ['ate two gels and a cup of broth at the river crossing,', ' left shoe rubbing', ' on the outside of the heel']; window.__seen = [];
+  const el = document.getElementById('jot'), d = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  // After each piece lands, note whether the end of the text is in view.
+  Object.defineProperty(el, 'value', { configurable: true, get() { return d.get.call(this); },
+    set(v) { d.set.call(this, v); setTimeout(() => window.__seen.push(Math.abs(el.scrollLeft - (el.scrollWidth - el.clientWidth)) <= 1), 0); } });
+});
+await page.click('#jot-mic');
+await page.waitForFunction(() => !document.getElementById('jot-mic').classList.contains('on'), null, { timeout: 5000 });
+const scroll = await page.$eval('#jot', el => [el.scrollWidth > el.clientWidth, el.scrollLeft > 0, document.activeElement === el]);
+ok('a long one scrolls along so the newest words show', [scroll[0], scroll[1], await page.evaluate(() => window.__seen.every(Boolean) && window.__seen.length >= 3)], [true, true, true]);
+ok('without pulling up the keyboard', scroll[2], false);
+await page.evaluate(() => { delete document.getElementById('jot').value; });
+
+await page.fill('#jot', '');
 await page.evaluate(() => { window.__fail = 'network'; });
 await page.click('#jot-mic');
 await page.waitForFunction(() => document.getElementById('toast').style.display === 'block', null, { timeout: 5000 });
