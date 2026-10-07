@@ -50,6 +50,9 @@ const openRacer = async () => {
   await page.waitForSelector('#go', { timeout: 20000 });
 };
 const leg = async (i) => (await readLegs()).find(l => l.index === i) || {};
+// Saves happen in the background: wait until the file says what is expected,
+// for up to six seconds, rather than sleeping a fixed time and hoping.
+const until = async (test) => { for (let i = 0; i < 40; i++) { if (await test()) return; await page.waitForTimeout(150); } };
 
 console.log('\nthe racer screen, after a press');
 await openRacer();
@@ -64,12 +67,12 @@ const before = await page.$('.rundo-feel [data-feel="ok"]');
 await page.waitForTimeout(1300);
 ok('the countdown ticks without redrawing the faces', await before.evaluate(el => el.isConnected), true);
 await page.click('.rundo-feel [data-feel="ok"]');
-await page.waitForTimeout(800);
+await until(async () => (await leg(2)).feelIn === 'ok');
 ok('a tap is kept on the leg they just finished, as the arrival', [(await leg(2)).feelIn, (await leg(2)).feelOut], ['ok', undefined]);
 ok('and shown as chosen', [await page.textContent('.rundo-feel .q'), await page.$$eval('.feel-btn.on', bs => bs.map(x => x.dataset.feel))],
   ['Noted. Tap another to change it.', ['ok']]);
 await page.click('.rundo-feel [data-feel="good"]');
-await page.waitForTimeout(800);
+await until(async () => (await leg(2)).feelIn === 'good');
 ok('tapping another changes it', (await leg(2)).feelIn, 'good');
 
 console.log('\nleaving the aid station');
@@ -78,12 +81,12 @@ await page.waitForSelector('#go');
 await page.click('#go');
 await page.waitForSelector('.rundo .rundo-feel');
 await page.click('.rundo-feel [data-feel="rough"]');
-await page.waitForTimeout(800);
+await until(async () => (await leg(3)).feelOut === 'rough');
 ok('is kept as how they felt leaving, on the next leg', (await leg(3)).feelOut, 'rough');
 
 console.log('\nundone');
 await page.click('#undo');
-await page.waitForTimeout(1000);
+await until(async () => !(await readLegs()).some(l => l.index === 3));
 ok('the send-off and its feeling go together', (await readLegs()).some(l => l.index === 3), false);
 ok('and the arrival keeps its own', (await leg(2)).feelIn, 'good');
 
@@ -91,6 +94,9 @@ console.log('\nanswered or not, the press stands');
 await openRacer();
 await page.click('#go');
 await page.waitForSelector('.rundo');
+// The press saves in the background, so wait for it to land rather than
+// reading the file the instant the bar appears.
+await until(async () => !!(await leg(3)).startTime);
 ok('a press with no face tapped is a press like any other', !!(await leg(3)).startTime, true);
 ok('with nothing stored for a feeling', (await leg(3)).feelOut, undefined);
 
