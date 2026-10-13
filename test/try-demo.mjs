@@ -57,8 +57,8 @@ const s0 = await store();
 ok('a race made for this visit, started a while ago', [!!s0, (await legs()).length,
   Math.round((s0.seededAt - Date.parse(JSON.parse(s0.files['races/try-sendoff/config.json'].text).startTime)) / 60000)], [true, 3, 170]);
 ok('three phones side by side', await page.$$eval('.phone', ps => ps.filter(p => getComputedStyle(p).display !== 'none').length), 3);
-await until(async () => /SendOff Demo 100/.test(await text('race')) && /Alex Rivera/.test(await text('pit')));
-ok('each the real page, on the demo race', [/Alex Rivera/.test(await text('pit')), /SendOff Demo 100/.test(await text('race'))], [true, true]);
+await until(async () => /SendOff Demo 100/.test(await text('race')) && /Jasmine Rivera/.test(await text('pit')));
+ok('each the real page, on the demo race', [/Jasmine Rivera/.test(await text('pit')), /SendOff Demo 100/.test(await text('race'))], [true, true]);
 
 console.log('\na press on the racer\'s phone');
 await fr('racer').click('#go');
@@ -95,10 +95,14 @@ const old = (await store()).seededAt;
 await page.reload();
 await until(async () => (await store()).seededAt !== old);
 ok('and it has started over by itself', Date.now() - (await store()).seededAt < 60000, true);
+await page.evaluate((ns) => { const s = JSON.parse(localStorage.getItem(ns + 'store')); s.version = 1; localStorage.setItem(ns + 'store', JSON.stringify(s)); }, NS);
+await page.reload();
+await until(async () => (await store()).version === 2);
+ok('a copy saved before the race last changed is replaced too', [(await store()).version, JSON.parse((await store()).files['races/try-sendoff/data.json'].text).runners[0].id], [2, 'jasmine']);
 
 console.log('\nopened on its own');
 const solo = await ctx.newPage();
-await solo.goto(BASE + '/racer?id=try-sendoff&runner=alex');
+await solo.goto(BASE + '/racer?id=try-sendoff&runner=jasmine');
 await solo.waitForSelector('#try-pill', { timeout: 10000 });
 ok('says it is the demo, with the way back', [await solo.getAttribute('#try-pill', 'href'), await solo.evaluate(() => document.body.style.paddingTop)], ['/try', '22px']);
 await solo.close();

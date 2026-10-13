@@ -1,5 +1,6 @@
 {
   "_": "The race /try runs. Times are minutes from when a visitor opens it; lib/demo.js turns them into real ones.",
+  "version": 2,
   "config": {
     "name": "SendOff Demo 100",
     "location": "Westcliffe, CO",
@@ -251,8 +252,8 @@
     },
     "runners": [
       {
-        "id": "alex",
-        "name": "Alex Rivera",
+        "id": "jasmine",
+        "name": "Jasmine Rivera",
         "bib": "100",
         "color": "#1bc318",
         "targets": {
@@ -495,7 +496,7 @@
     "crewNotes": "Warm, salty food works best late: broth, noodles, quesadillas.\n\nIf I stop eating or my stomach goes tight, it is usually salt and fluid, not calories. Hand me the electrolyte flask before a gel.\n\nRefill the ice bandana when it is hot, and ask me direct questions with numbers: how many gels this leg, when did I last drink."
   },
   "startMinutes": -170,
-  "runnerId": "alex",
+  "runnerId": "jasmine",
   "legs": [
     {
       "index": 1,

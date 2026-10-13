@@ -128,8 +128,8 @@
     <div>
       <p class="kicker">Try SendOff &middot; no account needed</p>
       <h1>Crew a race <em>from right here.</em></h1>
-      <p class="lede"><b>A demo race, already under way.</b> Alex is out on
-        the long leg to Colony Creek. You have Alex's phone, the crew's
+      <p class="lede"><b>A demo race, already under way.</b> Jasmine is out on
+        the long leg to Colony Creek. You have Jasmine's phone, the crew's
         phone and the race page family is watching from home: press something
         on one and watch the others catch up, the way they do on race day.</p>
       <p class="lede small">This race lives only in this browser. Nothing you do
@@ -138,11 +138,11 @@
     <div class="todo">
       <h2>Things to try</h2>
       <ol>
-        <li>On <b>Alex's phone</b>, press <b>Arrived at Colony Creek 1</b>, then tap how Alex is feeling.</li>
-        <li>On the <b>crew's phone</b>, log a <b>Gel</b> or an <b>Electrolyte flask</b> on the leg Alex just ran.</li>
-        <li>Back on Alex's phone, write a note, or press the mic and say one.</li>
-        <li>Send Alex back out with <b>Left Colony Creek 1</b>.</li>
-        <li>Check the <b>race page</b>: the split, the pace, the fueling against the plan, and when Alex should finish.</li>
+        <li>On <b>Jasmine's phone</b>, press <b>Arrived at Colony Creek 1</b>, then tap how Jasmine is feeling.</li>
+        <li>On the <b>crew's phone</b>, log a <b>Gel</b> or an <b>Electrolyte flask</b> on the leg Jasmine just ran.</li>
+        <li>Back on Jasmine's phone, write a note, or press the mic and say one.</li>
+        <li>Send Jasmine back out with <b>Left Colony Creek 1</b>.</li>
+        <li>Check the <b>race page</b>: the split, the pace, the fueling against the plan, and when Jasmine should finish.</li>
       </ol>
       <div class="row">
         <button class="btn primary" id="reset" type="button">Reset the race</button>
@@ -159,8 +159,8 @@
 
   <div class="phones">
     <section class="phone on" data-phone="racer" aria-label="The racer's phone">
-      <div class="phone-label"><div><b>Alex's phone</b> <span>the racer screen</span></div><a href="/racer?id=try-sendoff&amp;runner=alex" target="_blank" rel="noopener">Full screen &nearr;</a></div>
-      <div class="frame"><iframe title="Racer screen" data-src="/racer?id=try-sendoff&amp;runner=alex"></iframe></div>
+      <div class="phone-label"><div><b>Jasmine's phone</b> <span>the racer screen</span></div><a href="/racer?id=try-sendoff&amp;runner=jasmine" target="_blank" rel="noopener">Full screen &nearr;</a></div>
+      <div class="frame"><iframe title="Racer screen" data-src="/racer?id=try-sendoff&amp;runner=jasmine"></iframe></div>
     </section>
     <section class="phone" data-phone="pit" aria-label="The crew's phone">
       <div class="phone-label"><div><b>Crew's phone</b> <span>the pit board</span></div><a href="/pit?id=try-sendoff" target="_blank" rel="noopener">Full screen &nearr;</a></div>
@@ -174,7 +174,7 @@
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
 
-<script src="/lib/demo.js?v=4dc01922"></script>
+<script src="/lib/demo.js?v=4d692dc2"></script>
 <script>
 (async function () {
   const $ = (s) => document.querySelector(s);
@@ -204,7 +204,7 @@
   $('#reset').addEventListener('click', async () => {
     const btn = $('#reset');
     btn.disabled = true;
-    try { when(await SendOffDemo.reset()); toast('Started over: Alex is back on the leg to Colony Creek.'); }
+    try { when(await SendOffDemo.reset()); toast('Started over: Jasmine is back on the leg to Colony Creek.'); }
     catch (e) { toast('Could not reset. Reload the page to try again.'); }
     btn.disabled = false;
   });
