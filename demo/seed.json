@@ -1,6 +1,6 @@
 {
   "_": "The race /try runs. Times are minutes from when a visitor opens it; lib/demo.js turns them into real ones.",
-  "version": 2,
+  "version": 3,
   "config": {
     "name": "SendOff Demo 100",
     "location": "Westcliffe, CO",
@@ -253,7 +253,7 @@
     "runners": [
       {
         "id": "jasmine",
-        "name": "Jasmine Rivera",
+        "name": "Jasmine",
         "bib": "100",
         "color": "#1bc318",
         "targets": {
