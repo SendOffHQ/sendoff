@@ -478,7 +478,7 @@ def main():
 # no redirect: Cloudflare sends /privacy.html to /privacy, and a race's share
 # page forwards to /race?id=<slug>, which is where its canonical tag points.
 # Public races only, the same ones that get a share page.
-SITE_PAGES = ['/', '/roadmap', '/privacy', '/terms']
+SITE_PAGES = ['/', '/try', '/roadmap', '/privacy', '/terms']
 
 
 def write_sitemap(index):

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Try SendOff · a demo race you can crew</title>
+<link rel="icon" href="/brand/sendoff-favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0a0f14" />
+<meta name="description" content="A demo race, already under way. Be the racer and the crew: press Arrived on the racer's phone and watch the crew board and the race page catch up. No account needed.">
+<link rel="canonical" href="https://sendoff.run/try">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SendOff">
+<meta property="og:title" content="Try SendOff · a demo race you can crew">
+<meta property="og:description" content="A demo race, already under way. Be the racer and the crew, no account needed.">
+<meta property="og:url" content="https://sendoff.run/try">
+<meta property="og:image" content="https://sendoff.run/brand/og-default.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/lib/race-theme.css?v=f65ffd21">
+<style>
+  /* The demo: the three screens of a race, side by side, each the real page
+     running a race that lives in this browser (lib/demo.js). Wide enough for
+     all three, they sit in a row; narrower, a tab picks one, and all three
+     keep running underneath so a switch shows what the others did. */
+  body { padding: 0; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 16px 40px; }
+  .t-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 16px 0 12px; border-bottom: 1px solid var(--border);
+  }
+  .t-head img { height: 22px; width: auto; display: block; }
+  .t-link {
+    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent);
+    text-decoration: none; border: 1px solid var(--border-bright); border-radius: 6px; padding: 9px 12px;
+    white-space: nowrap;
+  }
+  .t-link:hover { border-color: var(--accent); }
+
+  .intro { display: grid; gap: 22px; padding: 26px 0 18px; }
+  .kicker {
+    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px;
+    letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    font-family: 'Barlow Condensed', 'IBM Plex Sans', sans-serif; font-weight: 800;
+    font-size: clamp(36px, 9vw, 60px); line-height: 0.96; text-transform: uppercase; margin-top: 10px;
+  }
+  h1 em { font-style: italic; color: var(--accent); }
+  .lede { font-size: 16px; line-height: 1.55; color: var(--text-dim); max-width: 58ch; margin-top: 14px; }
+  .lede b { color: var(--text); font-weight: 600; }
+  .todo { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
+  .todo h2 {
+    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;
+  }
+  .todo ol { margin: 0; padding-left: 20px; display: grid; gap: 7px; font-size: 14.5px; line-height: 1.45; color: var(--text-dim); }
+  .todo b { color: var(--text); font-weight: 600; }
+  .todo .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; }
+  .btn {
+    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; padding: 11px 16px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border-bright); background: transparent; color: var(--text); text-decoration: none;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+  .btn.primary:hover { background: var(--accent-hot); color: var(--accent-ink); }
+  .small { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
+
+  /* ---------- the phones ---------- */
+  .tabs { display: flex; gap: 6px; margin: 8px 0 14px; }
+  .tabs button {
+    flex: 1; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 11px 6px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--bg-card); color: var(--text-dim);
+  }
+  .tabs button[aria-selected="true"] { border-color: var(--accent); color: var(--accent); }
+  .phones { display: grid; gap: 22px; justify-content: center; }
+  .phone { display: none; }
+  .phone.on { display: block; }
+  .phone-label { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .phone-label b {
+    font-family: 'Barlow Condensed', 'IBM Plex Sans', sans-serif; font-size: 20px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.01em;
+  }
+  .phone-label span { font-size: 12.5px; color: var(--text-muted); }
+  .phone-label a { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10.5px; color: var(--accent); text-decoration: none; white-space: nowrap; }
+  .frame {
+    width: min(390px, calc(100vw - 32px)); height: min(780px, calc(100vh - 150px)); min-height: 520px;
+    border: 1px solid var(--border-bright); border-radius: 26px; overflow: hidden;
+    background: var(--bg, #0a0f14); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  }
+  .frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+
+  @media (min-width: 860px) {
+    .intro { grid-template-columns: 1.2fr 1fr; align-items: start; }
+  }
+  /* All three at once. */
+  @media (min-width: 1250px) {
+    .tabs { display: none; }
+    .phones { grid-template-columns: repeat(3, 390px); justify-content: space-between; }
+    .phone { display: block; }
+    .frame { width: 390px; height: 780px; }
+  }
+  .toast {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 10;
+    background: var(--bg-card); border: 1px solid var(--accent); border-radius: 10px; padding: 11px 16px;
+    font-size: 13.5px; color: var(--text);
+  }
+  .toast[hidden] { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="t-head">
+    <a href="/" aria-label="SendOff home"><img src="/brand/sendoffprimaryonDark.svg" alt="SendOff" width="3059" height="1066"></a>
+    <a class="t-link" href="/#beta">Get beta access &rarr;</a>
+  </header>
+
+  <div class="intro">
+    <div>
+      <p class="kicker">Try SendOff &middot; no account needed</p>
+      <h1>Crew a race <em>from right here.</em></h1>
+      <p class="lede"><b>A demo race, already under way.</b> Alex is out on
+        the long leg to Colony Creek. You have Alex's phone, the crew's
+        phone and the race page family is watching from home: press something
+        on one and watch the others catch up, the way they do on race day.</p>
+      <p class="lede small">This race lives only in this browser. Nothing you do
+        here is sent anywhere, and Reset starts it over.</p>
+    </div>
+    <div class="todo">
+      <h2>Things to try</h2>
+      <ol>
+        <li>On <b>Alex's phone</b>, press <b>Arrived at Colony Creek 1</b>, then tap how Alex is feeling.</li>
+        <li>On the <b>crew's phone</b>, log a <b>Gel</b> or an <b>Electrolyte flask</b> on the leg Alex just ran.</li>
+        <li>Back on Alex's phone, write a note, or press the mic and say one.</li>
+        <li>Send Alex back out with <b>Left Colony Creek 1</b>.</li>
+        <li>Check the <b>race page</b>: the split, the pace, the fueling against the plan, and when Alex should finish.</li>
+      </ol>
+      <div class="row">
+        <button class="btn primary" id="reset" type="button">Reset the race</button>
+        <span class="small" id="seeded"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Which phone">
+    <button role="tab" aria-selected="true" data-tab="racer">Racer</button>
+    <button role="tab" aria-selected="false" data-tab="pit">Crew</button>
+    <button role="tab" aria-selected="false" data-tab="race">Race page</button>
+  </div>
+
+  <div class="phones">
+    <section class="phone on" data-phone="racer" aria-label="The racer's phone">
+      <div class="phone-label"><div><b>Alex's phone</b> <span>the racer screen</span></div><a href="/racer?id=try-sendoff&amp;runner=alex" target="_blank" rel="noopener">Full screen &nearr;</a></div>
+      <div class="frame"><iframe title="Racer screen" data-src="/racer?id=try-sendoff&amp;runner=alex"></iframe></div>
+    </section>
+    <section class="phone" data-phone="pit" aria-label="The crew's phone">
+      <div class="phone-label"><div><b>Crew's phone</b> <span>the pit board</span></div><a href="/pit?id=try-sendoff" target="_blank" rel="noopener">Full screen &nearr;</a></div>
+      <div class="frame"><iframe title="Pit board" data-src="/pit?id=try-sendoff"></iframe></div>
+    </section>
+    <section class="phone" data-phone="race" aria-label="The race page">
+      <div class="phone-label"><div><b>Family at home</b> <span>the race page</span></div><a href="/race?id=try-sendoff" target="_blank" rel="noopener">Full screen &nearr;</a></div>
+      <div class="frame"><iframe title="Race page" data-src="/race?id=try-sendoff"></iframe></div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="/lib/demo.js?v=4dc01922"></script>
+<script>
+(async function () {
+  const $ = (s) => document.querySelector(s);
+  const frames = [...document.querySelectorAll('iframe[data-src]')];
+  const toast = (t) => { const el = $('#toast'); el.textContent = t; el.hidden = false;
+    clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, 2600); };
+  const when = (s) => {
+    const m = Math.round((Date.now() - s.seededAt) / 60000);
+    $('#seeded').textContent = m < 1 ? 'Started just now.' : `Started ${m} minute${m === 1 ? '' : 's'} ago.`;
+  };
+
+  // The race first, then the phones: three pages opening at once on an empty
+  // browser would each make a race of their own.
+  let store = null;
+  try { store = await SendOffDemo.ensureSeeded(); } catch (e) {}
+  if (store) when(store);
+  frames.forEach(f => { f.src = f.dataset.src; });
+
+  // Narrow screens: one phone at a time. The others keep running.
+  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+    document.querySelectorAll('.phone').forEach(p => p.classList.toggle('on', p.dataset.phone === b.dataset.tab));
+  }));
+
+  // Every phone hears the reset and reloads itself (lib/demo.js), including
+  // a demo page somebody opened full screen in another tab.
+  $('#reset').addEventListener('click', async () => {
+    const btn = $('#reset');
+    btn.disabled = true;
+    try { when(await SendOffDemo.reset()); toast('Started over: Alex is back on the leg to Colony Creek.'); }
+    catch (e) { toast('Could not reset. Reload the page to try again.'); }
+    btn.disabled = false;
+  });
+})();
+</script>
+</body>
+</html>

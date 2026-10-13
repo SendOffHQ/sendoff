@@ -36,6 +36,7 @@ const SHELL_URLS = [
   '/', '/index.html', '/app/', '/app/index.html',
   '/race.html', '/pit.html', '/racer.html', '/settings.html', '/setup.html',
   '/charts.html', '/print-report.html', '/profile.html', '/signup.html', '/reset.html', '/admin.html',
+  '/try.html',
   '/manifest.webmanifest',
   // Leaflet, so the course map draws without signal. Its tiles are not cached:
   // a blank ground under a real route line is the honest version of that.
@@ -43,6 +44,7 @@ const SHELL_URLS = [
   '/vendor/leaflet-1.9.4/leaflet.css',
   '/lib/finish-card.js',
   '/lib/course-view.js',
+  '/lib/demo.js',
   '/brand/sendoffprimaryonDark.svg',
   '/brand/sendoff-favicon.svg',
   '/brand/icon-192.png',

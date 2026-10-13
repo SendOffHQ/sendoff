@@ -27,6 +27,7 @@ optional Cloudflare Worker auth proxy.
 - Aid-station time per stop
 - Intake per hour: calories / fluid / sodium, with target lines
 - Cumulative progress with a pace-based projected-finish ray and cutoff line
+- Demo race at `/try`, linked from the home page: the real racer screen, pit board and race page side by side (tabs on a phone), running a race that lives only in the visitor's browser. `lib/demo.js` answers the pages' worker calls from localStorage under its own prefix, stands in for the live push with a BroadcastChannel, keeps the demo inside its three pages, and never touches a real sign-in. Seeded from `demo/seed.json` (the Sangre de Cristo course, a made-up racer) with times relative to the visit; Reset starts over, and so does six hours untouched. `test/try-demo.mjs`.
 - Projected tile on the race page: the projected time, the finish as a time of day on the race's clock with its zone, and by how much it beats or misses the final cutoff. `test/projected.mjs`.
 
 ## Sharing
