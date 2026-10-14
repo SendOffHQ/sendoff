@@ -73,6 +73,8 @@ await page.fill('[data-loop="1"][data-st="1"][data-k="mileage"]', '5');
 await page.check('[data-loop="1"][data-st="1"][data-k="checkpoint"]');
 await page.fill('[data-loop="1"][data-st="2"][data-k="mileage"]', '10');
 await page.setInputFiles('[data-loop-gpx="1"]', { name: 'short.gpx', mimeType: 'application/gpx+xml', buffer: Buffer.from(B) });
+// Read in the background: wait for the description rather than racing it.
+await page.waitForFunction(() => /short\.gpx/.test((document.querySelector('[data-loop-gpx="1"] + .hint') || {}).textContent || ''), null, { timeout: 5000 }).catch(() => {});
 ok('its file is read and described', /^short\.gpx · /.test((await page.textContent('[data-loop-gpx="1"] + .hint')).trim()), true);
 ok('the summary has the pattern', /Loop A<\/strong> ×6, then <strong>Short<\/strong> ×1, repeating · <strong>100\.0 mi/.test(await page.innerHTML('#loops-summary')), true);
 ok('nothing wider than the phone', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);

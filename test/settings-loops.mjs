@@ -105,6 +105,8 @@ await setStart(new Date(Date.now() + 3 * 864e5).toISOString());
 await open();
 ok('and each loop card takes a file', [await page.isVisible('[data-lgpx="0"]'), await page.isVisible('[data-lgpx="1"]')], [true, true]);
 await page.setInputFiles('[data-lgpx="1"]', { name: 'short.gpx', mimeType: 'application/gpx+xml', buffer: Buffer.from(gpx(0, 0.093, 40, 200)) });
+// The file is read in the background, so wait for the card to say so.
+await page.waitForFunction(() => /short\.gpx/.test(document.querySelector('[data-lgpx="1"]').closest('.loop-file').textContent), null, { timeout: 5000 }).catch(() => {});
 ok('the file is read and described', /short\.gpx · .*Saved with the loops/.test(await page.evaluate(() => document.querySelector('[data-lgpx="1"]').closest('.loop-file').textContent.replace(/\s+/g, ' '))), true);
 await page.click('#loops-save');
 ok('saved under the loop\'s own name', await until(async () => {
