@@ -100,12 +100,16 @@ const commit = async (path, doc, e = env) => {
   return r;
 };
 
-// A two-lap course of two segments, so four legs is a finish.
+// A two-lap course of two segments, so four legs is a finish. Started five
+// hours ago rather than on a fixed day: only a finish that just happened is
+// announced, so a fixed date would turn this test off as the calendar moved.
+const T0 = Math.floor((Date.now() - 5 * 3600e3) / 1000) * 1000;
+const T0_DAY = new Date(T0).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 const course = {
   courseType: 'loops',
   course: { loopCount: 2, loopDistanceMi: 5, loopSegments: [
     { name: 'Start to Ridge', distanceMi: 2.5 }, { name: 'Ridge to Start', distanceMi: 2.5 } ] },
-  startTime: '2026-10-03T13:00:00.000Z',
+  startTime: new Date(T0).toISOString(),
   runners: [{ id: 'jd', name: 'Jason Dupree', bib: '128' }],
 };
 const legs = (n) => ({ runners: [{ id: 'jd', legs: Array.from({ length: n }, (_, i) => ({
@@ -140,7 +144,7 @@ await commit('races/902-open/config.json',
   { ...course, name: 'Blood Root Ultra', location: 'Vermont', visibility: 'public', createdBy: ME });
 ok('is announced once', posts.length, 1);
 ok('with its name', /Blood Root Ultra/.test(posts[0].content), true);
-ok('where and when', /Vermont/.test(posts[0].content) && /October 3, 2026/.test(posts[0].content), true);
+ok('where and when', /Vermont/.test(posts[0].content) && posts[0].content.includes(T0_DAY), true);
 ok('and a link somebody can follow',
   /https:\/\/sendoff\.run\/race\.html\?id=902-open/.test(posts[0].content), true);
 
@@ -224,6 +228,34 @@ console.log('\nand only once');
 posts = [];
 await commit('races/902-open/data.json', legs(4));
 ok('a correction after the finish does not repost', posts.length, 0);
+
+console.log('\na timed race');
+posts = [];
+await commit('races/908-timed/config.json',
+  { ...course, name: 'Twenty Four', location: 'Texas', visibility: 'public', createdBy: ME, format: 'timed',
+    cutoffs: { totalHours: 24 },
+    course: { loopDistanceMi: 15, loops: [{ name: 'Loop A', distanceMi: 15, times: 6 }, { name: 'Loop B', distanceMi: 10, times: 1 }] } });
+posts = [];
+await commit('races/908-timed/data.json', legs(4));
+ok('four laps in, still racing: nothing is said', [posts.length, repo.has('races/908-timed/finishers.json')], [0, false]);
+const stoppedLegs = legs(4); stoppedLegs.runners[0].stoppedAt = new Date().toISOString();
+await commit('races/908-timed/data.json', stoppedLegs);
+ok('stopped, the result is the distance and the laps',
+  JSON.parse(repo.get('races/908-timed/finishers.json')).finishers, [{ id: 'jd', name: 'Jason Dupree', time: null, distance: '60.0 mi', laps: 4 }]);
+const timedHeld = JSON.parse(kvStore.get('dsc:finpend') || '[]').find(p => p.slug === '908-timed');
+ok('and the post says how far', timedHeld && timedHeld.text, '**Jason Dupree** ran 60.0 mi (4 laps) at Twenty Four.');
+kvStore.delete('dsc:finpend');
+
+console.log('\na race finished long ago, saved again');
+posts = [];
+const oldCourse = { ...course, startTime: '2026-09-01T13:00:00.000Z' };
+await commit('races/909-old/config.json', { ...oldCourse, name: 'Long Done', location: 'Utah', visibility: 'public', createdBy: ME });
+posts = [];
+const oldLegs = { runners: [{ id: 'jd', legs: Array.from({ length: 4 }, (_, i) => ({ index: i + 1,
+  startTime: new Date(Date.parse(oldCourse.startTime) + i * 3600e3).toISOString(),
+  endTime: new Date(Date.parse(oldCourse.startTime) + (i + 1) * 3600e3).toISOString() })) }] };
+await commit('races/909-old/data.json', oldLegs);
+ok('is not announced as if it had just happened', [posts.length, repo.has('races/909-old/finishers.json')], [0, false]);
 
 console.log('\na race cannot ping the server');
 posts = [];

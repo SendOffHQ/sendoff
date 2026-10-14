@@ -69,6 +69,11 @@
   }
 
   .radio-group { display: flex; gap: 10px; flex-wrap: wrap; }
+  #loops-table.single .col-times { display: none; }
+  /* Wide enough to read on a phone; the table scrolls sideways before the
+     boxes shrink to a character each. */
+  #loops-table input[data-k="name"] { min-width: 110px; }
+  #loops-table input[type="number"] { min-width: 72px; }
   .radio-group label {
     flex: 1; min-width: 200px; cursor: pointer;
     padding: 14px 16px; border: 1px solid var(--border-bright);
@@ -421,7 +426,7 @@
     </label>
     <div class="grid-2">
       <div class="field">
-        <span class="lbl">Finish cutoff</span>
+        <span class="lbl" id="race-cutoff-lbl">Finish cutoff</span>
         <div id="race-cutoff-pick"></div>
         <span class="hint" id="race-cutoff-hint">As the race publishes it: the day and the time.</span>
       </div>
@@ -458,7 +463,7 @@
         <input type="radio" name="ct" value="loops" />
         <div class="radio-content">
           <span class="title">Loops</span>
-          <span class="desc">N identical laps from one pit.</span>
+          <span class="desc">Laps from one pit: a set number, or as many as fit in the time.</span>
         </div>
       </label>
       <label>
@@ -472,24 +477,53 @@
 
     <!-- Loops sub-form -->
     <div id="loops-fields" style="display:none; margin-top: 20px;">
-      <div class="grid-3">
-        <label class="field">
-          <span class="lbl">Loop count</span>
-          <input type="number" id="loop-count" min="1" step="1" value="10" />
-        </label>
-        <label class="field">
-          <span class="lbl">Distance per loop (<span class="unit-d">mi</span>)</span>
-          <input type="number" id="loop-distance" min="0" step="0.1" value="10" />
-          <span class="hint">Used only when no loop aid stations are listed.</span>
-        </label>
-        <label class="field">
-          <span class="lbl">Elevation gain per loop (<span class="unit-e">ft</span>, optional)</span>
-          <input type="number" id="loop-gain" min="0" step="1" />
-          <span class="hint">Used only when no loop aid stations are listed.</span>
-        </label>
+      <div class="field">
+        <span class="lbl">Scored by</span>
+        <div class="radio-group" id="race-format">
+          <label>
+            <input type="radio" name="fmt" value="distance" checked />
+            <div class="radio-content">
+              <span class="title">Laps</span>
+              <span class="desc">A set number of laps. Done after the last one.</span>
+            </div>
+          </label>
+          <label>
+            <input type="radio" name="fmt" value="timed" />
+            <div class="radio-content">
+              <span class="title">Timed</span>
+              <span class="desc">As many laps as fit before the clock runs out. The race ends at the finish cutoff.</span>
+            </div>
+          </label>
+        </div>
       </div>
+      <label class="field" id="loop-count-field">
+        <span class="lbl">Number of laps</span>
+        <input type="number" id="loop-count" min="1" step="1" value="10" />
+      </label>
 
-      <div style="margin-top: 8px;">
+      <div class="seg-summary" id="loops-summary"></div>
+      <div class="table-scroll">
+      <table class="list" id="loops-table">
+        <thead>
+          <tr>
+            <th>Loop</th>
+            <th>Lap <span class="unit-d">mi</span></th>
+            <th>Climb <span class="unit-e">ft</span></th>
+            <th class="col-times">Laps in a row</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="loop-rows"></tbody>
+      </table>
+      </div>
+      <button type="button" class="add-row" id="add-loop">+ Add another loop</button>
+      <p class="hint" style="margin-top:8px; color: var(--text-muted); font-size:11px;">
+        One loop for a race that runs the same lap every time. Add another for a
+        course that changes: Loop A of 15 mi run 6 times, then Loop B of 10 mi
+        once, repeating, is 100 mi a round. Laps run in the order listed.
+      </p>
+
+      <div style="margin-top: 8px;" id="loop-aid-block">
         <div class="seg-summary" id="loop-aid-summary"></div>
         <div class="table-scroll">
         <table class="list" id="loop-aid-table">
@@ -690,13 +724,18 @@
 
 </div>
 
-<script src="lib/race-core.js?v=8bb92e0c"></script>
+<script src="lib/race-core.js?v=0050e6a9"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
   // ---------- state ----------
   const state = {
     courseType: 'segments',
+    // How a loop race is scored: a set number of laps, or timed.
+    format: 'distance',
+    // The loops of a loop course, run in order, each `times` laps in a row,
+    // the pattern repeating. One row is a race that runs the same lap.
+    loops: [{ name: 'Loop A', distance: '10', gain: '', times: 1 }],
     activity: 'trail-run',
     // The race's own zone; this device's until somebody picks another.
     timezone: Race.tz.device(),
@@ -886,6 +925,67 @@
     state.courseType = t;
     document.getElementById('loops-fields').style.display = t === 'loops' ? '' : 'none';
     document.getElementById('segments-fields').style.display = t === 'segments' ? '' : 'none';
+    setFormat(state.format);
+  }
+
+  // Timed or a set number of laps. Timed has no lap count, and its finish
+  // cutoff is when the race ends rather than a deadline to beat.
+  function setFormat(f) {
+    state.format = f === 'timed' ? 'timed' : 'distance';
+    const timed = state.courseType === 'loops' && state.format === 'timed';
+    document.getElementById('loop-count-field').style.display = timed ? 'none' : '';
+    document.getElementById('race-cutoff-lbl').textContent = timed ? 'Race ends' : 'Finish cutoff';
+    renderLoopsSummary();
+  }
+
+  // ---------- the loops ----------
+  function renderLoopRows() {
+    const tbody = document.getElementById('loop-rows');
+    const many = state.loops.length > 1;
+    document.getElementById('loops-table').classList.toggle('single', !many);
+    // Aid stations on the lap describe one loop; with several they would be
+    // the wrong shape for all but one, so they are offered with one loop only.
+    document.getElementById('loop-aid-block').style.display = many ? 'none' : '';
+    tbody.innerHTML = state.loops.map((l, i) => `
+      <tr>
+        <td><input type="text" data-loop="${i}" data-k="name" value="${escapeAttr(l.name)}" placeholder="Loop ${String.fromCharCode(65 + i)}" maxlength="40" /></td>
+        <td><input type="number" data-loop="${i}" data-k="distance" value="${escapeAttr(l.distance)}" step="0.1" min="0" placeholder="0.0" /></td>
+        <td><input type="number" data-loop="${i}" data-k="gain" value="${escapeAttr(l.gain)}" step="1" min="0" placeholder="optional" /></td>
+        <td class="col-times"><input type="number" data-loop="${i}" data-k="times" value="${escapeAttr(l.times)}" step="1" min="1" /></td>
+        <td>${many ? `<button type="button" class="row-del" data-del-loop="${i}" aria-label="Delete">×</button>` : ''}</td>
+      </tr>`).join('');
+    renderLoopsSummary();
+  }
+  function loopRowsAsConfig() {
+    return state.loops.map((l, i) => ({
+      name: String(l.name || '').trim() || 'Loop ' + String.fromCharCode(65 + i),
+      distanceMi: Race.units.toMiles(l.distance, { units: state.units }) || 0,
+      elevationGainFt: l.gain === '' || l.gain == null ? null : Race.units.toFeet(l.gain, { units: state.units }),
+      times: Math.max(1, parseInt(l.times, 10) || 1)
+    }));
+  }
+  function renderLoopsSummary() {
+    const el = document.getElementById('loops-summary');
+    if (!el) return;
+    const rows = loopRowsAsConfig();
+    const d = (mi) => Race.units.distance(mi, { units: state.units });
+    const round = rows.reduce((a, l) => a + l.distanceMi * (rows.length > 1 ? l.times : 1), 0);
+    const timed = state.format === 'timed';
+    const laps = parseInt(document.getElementById('loop-count').value, 10) || 0;
+    let text;
+    if (rows.length > 1) {
+      text = rows.map(l => `<strong>${escapeAttr(l.name)}</strong> ×${l.times}`).join(', then ') +
+        `, repeating · <strong>${escapeAttr(d(round))}</strong> a round`;
+      if (!timed && laps) {
+        const tmp = { courseType: 'loops', course: { loopCount: laps, loops: rows } };
+        text += ` · ${laps} laps is <strong>${escapeAttr(d(Race.course.totalDistanceMi(tmp)))}</strong>`;
+      }
+    } else {
+      text = `<strong>${escapeAttr(d(rows[0].distanceMi))}</strong> a lap` +
+        (!timed && laps ? ` · ${laps} laps is <strong>${escapeAttr(d(rows[0].distanceMi * laps))}</strong>` : '');
+    }
+    if (timed) text += ' · timed: as many laps as fit before the race ends';
+    el.innerHTML = text;
   }
 
   // ---------- aid stations ----------
@@ -1008,6 +1108,7 @@
 
   // Reflects the chosen units in every table header / field label.
   function renderUnitLabels() {
+    if (typeof renderLoopsSummary === "function") setTimeout(renderLoopsSummary, 0);
     document.querySelectorAll('.unit-d').forEach(e => e.textContent = state.units.distance);
     document.querySelectorAll('.unit-e').forEach(e => e.textContent = state.units.elevation);
   }
@@ -1384,8 +1485,10 @@
     const officialGainFt = Race.units.toFeet(document.getElementById('official-gain').value, { units: state.units });
 
     if (state.courseType === 'loops') {
-      const loopGainFt = Race.units.toFeet(document.getElementById('loop-gain').value, { units: state.units });
-      cfg.course = {
+      const timed = state.format === 'timed';
+      if (timed) cfg.format = 'timed';
+      const rows = loopRowsAsConfig();
+      cfg.course = timed ? {} : {
         loopCount: parseInt(document.getElementById('loop-count').value, 10) || 0
       };
       const loopAids = state.loopAidStations
@@ -1402,10 +1505,15 @@
         const laps = cfg.course.loopCount || 1;
         Race.course.fillSegmentElevation(cfg.course.loopSegments, state.gpxPts,
           officialGainFt != null ? officialGainFt / laps : null);
+      } else if (rows.length > 1) {
+        // Loops in a pattern. loopDistanceMi is the first, for anything that
+        // reads a loop course the old way.
+        cfg.course.loops = rows;
+        cfg.course.loopDistanceMi = rows[0].distanceMi;
       } else {
         // Simple lap-only loop.
-        cfg.course.loopDistanceMi = Race.units.toMiles(document.getElementById('loop-distance').value, { units: state.units }) || 0;
-        if (loopGainFt != null) cfg.course.loopElevationGainFt = loopGainFt;
+        cfg.course.loopDistanceMi = rows[0].distanceMi;
+        if (rows[0].elevationGainFt != null) cfg.course.loopElevationGainFt = rows[0].elevationGainFt;
       }
     } else {
       const aids = state.aidStations
@@ -1444,6 +1552,8 @@
       units: cfg.units,
       activity: cfg.activity,
       totalDistanceMi: +Race.course.totalDistanceMi(cfg).toFixed(2),
+      // A timed race has no distance to list; the hub says how long it runs.
+      ...(Race.course.isTimed(cfg) ? { format: 'timed' } : {}),
       runnerNames: cfg.runners.map(r => r.name),
       cutoffHours: cfg.cutoffs.totalHours
       // No createdBy. The hub manifest is a file anyone can read, and the
@@ -1462,8 +1572,12 @@
     }
     if (!cfg.runners.length) errs.push('At least one runner is required.');
     if (cfg.courseType === 'loops') {
-      if (!cfg.course.loopCount) errs.push('Loop count is required.');
-      if (!cfg.course.loopDistanceMi) errs.push('Loop distance is required (set a distance per loop, or list loop aid stations).');
+      if (cfg.format !== 'timed' && !cfg.course.loopCount) errs.push('Number of laps is required.');
+      if (cfg.course.loops && cfg.course.loops.some(l => !(l.distanceMi > 0))) errs.push('Each loop needs a distance.');
+      else if (!cfg.course.loopDistanceMi) errs.push('Loop distance is required (set a distance per loop, or list loop aid stations).');
+      if (state.loops.length > 1 && cfg.course.loopSegments) {
+        errs.push('Aid stations on the lap work with one loop. Remove the extra loops or the aid stations.');
+      }
       if (cfg.course.loopSegments && cfg.course.loopSegments.some(s => !(s.distanceMi > 0))) {
         errs.push('Each loop segment needs a positive distance (check loop aid mileages are strictly increasing).');
       }
@@ -1615,6 +1729,26 @@
     ensureRaceId().catch(() => {});
   });
 
+  document.querySelectorAll('input[name="fmt"]').forEach(r => {
+    r.addEventListener('change', e => setFormat(e.target.value));
+  });
+  document.getElementById('loop-count').addEventListener('input', renderLoopsSummary);
+  document.getElementById('add-loop').addEventListener('click', () => {
+    state.loops.push({ name: 'Loop ' + String.fromCharCode(65 + state.loops.length), distance: '', gain: '', times: 1 });
+    renderLoopRows();
+  });
+  document.getElementById('loop-rows').addEventListener('input', (e) => {
+    const i = e.target.dataset.loop, k = e.target.dataset.k;
+    if (i == null || !k) return;
+    state.loops[+i][k] = e.target.value;
+    renderLoopsSummary();
+  });
+  document.getElementById('loop-rows').addEventListener('click', (e) => {
+    const del = e.target.dataset.delLoop;
+    if (del == null || state.loops.length < 2) return;
+    state.loops.splice(+del, 1);
+    renderLoopRows();
+  });
   document.querySelectorAll('input[name="ct"]').forEach(r => {
     r.addEventListener('change', e => setCourseType(e.target.value));
   });
@@ -1927,6 +2061,7 @@
     renderBandRows();
     renderPresetRows();
     renderSeedPicker();
+    renderLoopRows();
     setCourseType(state.courseType);
     // Built from the one list rather than typed into the markup, so a picker
     // can never offer something the reader does not know.

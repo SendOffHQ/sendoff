@@ -272,6 +272,7 @@
     font-family: 'JetBrains Mono', monospace;
   }
   .leg-cell .n { font-size: 10px; color: var(--text-muted); margin-bottom: 2px; }
+  .leg-cell .n .lp { margin-left: 3px; color: var(--accent); }
   .leg-cell .t { font-size: 11px; font-weight: 700; }
   .leg-cell.done { background: rgba(110, 231, 168, 0.08); border-color: rgba(110, 231, 168, 0.4); }
   .leg-cell.done .t { color: var(--green); }
@@ -531,9 +532,9 @@
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=a1341ad0"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/finish-card.js?v=779a41b4"></script>
+<script src="lib/finish-card.js?v=04dcfd11"></script>
 <script src="lib/course-view.js?v=c1c49292"></script>
-<script src="lib/race-core.js?v=8bb92e0c"></script>
+<script src="lib/race-core.js?v=0050e6a9"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -601,9 +602,13 @@
     return 'low';
   }
 
-  function statusLabel(s) {
+  function statusLabel(s, c) {
+    // A timed race has no pace to be on or off: the clock is fixed and the
+    // distance is the result.
+    if (c && c.timed && s === 'onpace') return 'Racing';
     return { onpace: 'On Pace', tight: 'Tight', offpace: 'Off Pace', notstarted: 'Not Started', finished: 'Finished' }[s] || s;
   }
+  const hmLeft = (sec) => { const m = Math.round(sec / 60); return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`; };
 
   // A loop with no aid stations: rendered as the lap grid rather than rows.
   function isSimpleLoop() {
@@ -636,12 +641,13 @@
       <div></div>
       <div class="cutoff-item"><span class="v">${fmt(start)}</span><span class="l">Start</span></div>
       ${tightHtml}
-      <div class="cutoff-item danger"><span class="v">${fmt(final)}</span><span class="l">Final · ${cuts.totalHours}h</span></div>
+      <div class="cutoff-item danger"><span class="v">${fmt(final)}</span><span class="l">${Race.course.isTimed(cfg) ? 'Ends' : 'Final'} · ${cuts.totalHours}h</span></div>
     `;
   }
 
   function loopLegCells(runner, c) {
-    const totalLoops = cfg.course?.loopCount || 0;
+    // A timed race: the laps run so far and the one under way or next.
+    const totalLoops = c.timed ? c.totalLegs : (cfg.course?.loopCount || 0);
     return Array.from({ length: totalLoops }, (_, i) => {
       const idx1 = i + 1;
       const dur = c.legDurations[i];
@@ -655,7 +661,11 @@
       // How they felt finishing the lap, if they said.
       const lap = (runner.legs || []).find(l => l.index === idx1);
       const face = lap && Race.feel.valid(lap.feelIn) ? Race.feel.svg(lap.feelIn, 12) : '';
-      return `<div class="leg-cell ${cls}"><span class="n">L${idx1}${face ? ' ' + face : ''}</span><span class="t">${text}</span></div>`;
+      // Which loop, when the course has more than one.
+      const def = Race.course.legAt(cfg, idx1);
+      const which = def && def.loopName ? ` title="${escapeHtml(def.loopName)}, ${escapeHtml(Race.units.distance(def.distanceMi, cfg))}"` : '';
+      const tag = def && def.loopName ? `<span class="lp">${escapeHtml(def.loopName.replace(/^loop\s+/i, ''))}</span>` : '';
+      return `<div class="leg-cell ${cls}"${which}><span class="n">L${idx1}${tag}${face ? ' ' + face : ''}</span><span class="t">${text}</span></div>`;
     }).join('');
   }
 
@@ -676,7 +686,7 @@
   }
 
   function segmentRows(runner, c) {
-    const segs = Race.course.legs(cfg);
+    const segs = Race.course.legsFor(cfg, runner);
     // The start is not a leg, so it has no row of its own, but a bag left there
     // or a lot the crew parks in is worth saying before the race begins.
     const st = Race.course.startAidTags(cfg);
@@ -940,7 +950,7 @@
           <div class="runner-head-right">
             ${c.status === 'finished'
               ? `<button class="finish-card-btn" type="button" data-card="${escapeHtml(runner.id)}">Finish card</button>` : ''}
-            <span class="status-badge status-${c.status}">${statusLabel(c.status)}</span>
+            <span class="status-badge status-${c.status}">${statusLabel(c.status, c)}</span>
           </div>
         </div>
 
@@ -948,8 +958,15 @@
           ${isSimpleLoop() ? `
           <div class="stat">
             <span class="label">Laps</span>
+            ${c.timed ? `<span class="value">${c.legsDone}</span>
+            <span class="sub">${Race.units.distance(c.milesDone, cfg)}</span>` : `
             <span class="value">${c.legsDone}<span style="color: var(--text-muted); font-size: 14px;">/${c.totalLegs}</span></span>
-            <span class="sub">${doneDist.toFixed(1)} / ${Race.units.distance(totalDist, cfg)}</span>
+            <span class="sub">${doneDist.toFixed(1)} / ${Race.units.distance(totalDist, cfg)}</span>`}
+          </div>` : c.timed ? `
+          <div class="stat stat-distance">
+            <span class="label">Distance</span>
+            <span class="value">${doneDist.toFixed(1)}<span style="color: var(--text-muted); font-size: 14px;"> ${Race.units.distanceLabel(cfg)}</span></span>
+            <span class="sub">${Math.floor((c.legsDone || 0) / Math.max(1, Race.course.legsPerLoop(cfg)))} laps</span>
           </div>` : `
           <div class="stat stat-distance">
             <span class="label">Distance</span>
@@ -1014,7 +1031,20 @@
             <span class="value">${Race.fmt.duration(c.avgLegSec)}</span>
             <span class="sub">last: ${Race.fmt.duration(c.lastLegSec)}</span>
           </div>
-          ${(() => {
+          ${c.timed ? (() => {
+            // A timed race: where the pace so far puts them when it ends, in
+            // distance and whole laps; once they are done, where they ended.
+            const done = c.status === 'finished';
+            const mi = done ? c.milesDone : c.projectedMiles;
+            const end = c.endsAtMs;
+            return `
+              <div class="stat stat-projected">
+                <span class="label">${done ? 'Final' : 'At the end'}</span>
+                <span class="value">${mi != null ? escapeHtml(Race.units.distance(mi, cfg)) : '–'}</span>
+                <span class="sub proj-at">${(done ? c.legsDone : c.projectedLaps) != null ? `${done ? c.legsDone : c.projectedLaps} laps` : '–'}</span>
+                ${!done && end ? `<span class="sub proj-margin">${c.timeLeftSec > 0 ? hmLeft(c.timeLeftSec) + ' left' : 'time is up'}</span>` : ''}
+              </div>`;
+          })() : (() => {
             // The finish as a time of day on the race's clock, the way the
             // cutoffs are shown, and by how much it beats or misses the final
             // cutoff, small underneath. Counted from this racer's own start.
@@ -1080,7 +1110,9 @@
           <div class="legs-head">
             <span class="legs-title">${cfg.courseType === 'loops' ? 'Lap Status' : 'Segments'}</span>
             <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted);">
-              ${c.legsDone} done · ${c.totalLegs - c.legsDone} to go
+              ${c.timed
+                ? `${c.legsDone} done${c.status !== 'finished' && c.timeLeftSec ? ` · ${hmLeft(c.timeLeftSec)} left` : ''}`
+                : `${c.legsDone} done · ${c.totalLegs - c.legsDone} to go`}
             </span>
           </div>
           ${legsBlock}

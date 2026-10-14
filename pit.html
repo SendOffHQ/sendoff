@@ -279,7 +279,7 @@
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=a1341ad0"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/race-core.js?v=8bb92e0c"></script>
+<script src="lib/race-core.js?v=0050e6a9"></script>
 <script src="lib/course-view.js?v=c1c49292"></script>
 <script>
   const slug = Race.qs('id');
@@ -475,7 +475,32 @@
     });
   }
 
+  // A timed race has no finish line: a runner is done when the clock runs out
+  // or when they say so, and this is them saying so. Every lap so far counts.
+  async function stopRunner(runnerId) {
+    const who = ((cfg.runners || []).find(r => r.id === runnerId) || {}).name || 'this runner';
+    if (!confirm(`Stop ${who} here? Their laps so far are their result, and the board stops offering a send-off. Undo last takes it back.`)) return;
+    try {
+      const r = await Race.queue.write(DATA_PATH, 'setRunnerStopped', { runnerId, stoppedAt: new Date().toISOString() },
+        `pit: ${runnerId} stopped`);
+      toast(r.queued ? 'No signal · saved on this phone' : `${who} is done`, 'ok');
+      await load();
+    } catch (err) { toast(`Could not save: ${err.message}`, 'error'); }
+  }
+
   async function deleteLastEvent(runnerId) {
+    // In a timed race the last thing done may have been stopping: that is
+    // what an undo takes back first, before any lap.
+    const stopped = Race.course.isTimed(cfg) && ((data.runners || []).find(r => r.id === runnerId) || {}).stoppedAt;
+    if (stopped) {
+      if (!confirm('Take back the stop and put this runner back in the race?')) return;
+      try {
+        const r = await Race.queue.write(DATA_PATH, 'setRunnerStopped', { runnerId, stoppedAt: null }, `pit: ${runnerId} back in`);
+        toast(r.queued ? 'No signal · undo saved on this phone' : 'Back in the race', 'ok');
+        await load();
+      } catch (err) { toast(`Undo failed: ${err.message}`, 'error'); }
+      return;
+    }
     if (!confirm('Undo the last check-in or send-off for this runner?')) return;
     const runner = (data.runners || []).find(r => r.id === runnerId);
     if (!runner || !runner.legs?.length) return;
@@ -880,6 +905,8 @@
         <button class="big-btn ${buttonAction || ''}" data-action="press" data-runner="${runner.id}" ${buttonDisabled ? 'disabled' : ''}>${escapeHtml(buttonLabel)}</button>
         <div style="display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--bg-elevated);">
           <button class="btn" data-action="undo" data-runner="${runner.id}">Undo last</button>
+          ${Race.course.isTimed(cfg) && next.state === 'in-pit'
+            ? `<button class="btn" data-action="stop" data-runner="${runner.id}">Stopped: done for the race</button>` : ''}
         </div>
         ${intakePanel}
       </article>
@@ -1074,6 +1101,7 @@
     const action = t.dataset.action;
     if (action === 'press') press(t.dataset.runner);
     else if (action === 'undo') deleteLastEvent(t.dataset.runner);
+    else if (action === 'stop') stopRunner(t.dataset.runner);
     else if (action === 'save-intake') saveIntake(t.dataset.runner);
     else if (action === 'preset') applyPreset(t.dataset.runner, +t.dataset.preset);
     else if (action === 'edit-time') editEventTime(t.dataset.runner, +t.dataset.leg, t.dataset.field);
@@ -1136,7 +1164,7 @@
       if (next.state === 'on-course' && next.currentLegIndex) return next.currentLegIndex;
       if (next.nextLegIndex) return next.nextLegIndex;
     }
-    return Race.course.legCount(cfg) || 1;
+    return Race.course.isTimed(cfg) ? 1 : (Race.course.legCount(cfg) || 1);
   }
 
   function canWorkPit() { return Race.roles.canEdit(cfg, Race.auth.email()); }

@@ -2659,12 +2659,11 @@ async function commitToD1Inner(env, path, content, actor, expected) {
 // satisfies it, and a DNF is exactly the race whose data you most want kept,
 // so the clock running past the cutoff counts too.
 function raceIsDone(cfg, data) {
-  const total = totalLegs(cfg);
   const runners = (cfg && cfg.runners) || [];
-  if (total && runners.length) {
+  if (runners.length) {
     const every = runners.every(r => {
       const d = ((data && data.runners) || []).find(x => x && x.id === r.id);
-      return d && completedLegs(d) >= total;
+      return d && runnerFinished(cfg, d);
     });
     if (every) return true;
   }
@@ -3765,9 +3764,40 @@ function isPublicRace(cfg) {
 function totalLegs(cfg) {
   const c = (cfg && cfg.course) || {};
   if (cfg && cfg.courseType === 'loops') {
-    return (c.loopCount || 0) * ((c.loopSegments || []).length);
+    // A lap with no aid stations on it is one leg. This multiplied by the
+    // number of segments alone, so a plain loop race came to zero legs and
+    // nobody on one was ever announced as finished.
+    return (c.loopCount || 0) * ((c.loopSegments || []).length || 1);
   }
   return (c.segments || []).length;
+}
+
+// Done: every leg of a race with a set distance, or in a timed race stopped
+// by hand or out of time with no lap under way.
+function runnerFinished(cfg, runner) {
+  if (aiCrew.isTimed(cfg)) return aiCrew.runnerDone(cfg, runner);
+  const total = totalLegs(cfg);
+  return total > 0 && completedLegs(runner) >= total;
+}
+
+// When a runner finished: their last arrival, or when they were stopped.
+function finishedAt(runner) {
+  const ends = ((runner && runner.legs) || []).map(l => Date.parse(l && l.endTime)).filter(Number.isFinite);
+  const last = ends.length ? Math.max(...ends) : NaN;
+  const stop = Date.parse(runner && runner.stoppedAt);
+  return Number.isFinite(stop) && (!Number.isFinite(last) || stop > last) ? stop : last;
+}
+
+// A timed race's result: the distance and the laps.
+function timedResult(cfg, runner) {
+  const done = ((runner && runner.legs) || []).filter(l => l && l.endTime).map(l => l.index);
+  let mi = 0;
+  for (const i of done) { const d = aiCrew.legAt(cfg, i); mi += (d && d.distanceMi) || 0; }
+  const per = Math.max(1, ((cfg.course && cfg.course.loopSegments) || []).length);
+  const laps = Math.floor(done.length / per);
+  const km = cfg.units && cfg.units.distance === 'km';
+  const dist = `${(km ? mi * 1.609344 : mi).toFixed(1)} ${km ? 'km' : 'mi'}`;
+  return { distance: dist, laps };
 }
 
 function completedLegs(runner) {
@@ -3870,10 +3900,12 @@ async function announceNewRace(env, slug, cfg) {
 // the finish posted twice.
 async function announceFinishes(env, slug, cfg, data) {
   if (!isPublicRace(cfg) || !env.AUTH_KV) return;
-  const total = totalLegs(cfg);
-  if (!total) return;
-
-  const done = ((data && data.runners) || []).filter(r => completedLegs(r) >= total);
+  // Only a finish that just happened. A race finished last month is finished
+  // still, and correcting a typo on it must not announce it all over again,
+  // which would happen for any race whose finish was never recorded as seen.
+  const RECENT_MS = 6 * 3600e3;
+  const done = ((data && data.runners) || []).filter(r => runnerFinished(cfg, r)
+    && Date.now() - finishedAt(r) < RECENT_MS);
   if (!done.length) return;
 
   const key = 'dsc:fin:' + slug;
@@ -3885,9 +3917,14 @@ async function announceFinishes(env, slug, cfg, data) {
   if (!fresh.length) return;
 
   const byId = new Map(((cfg.runners) || []).map(r => [r.id, r]));
+  const timed = aiCrew.isTimed(cfg);
   const done_ = fresh.map(r => {
     const last = r.legs[r.legs.length - 1];
-    return { id: r.id, name: String((byId.get(r.id) || {}).name || r.id).slice(0, 80),
+    const name = String((byId.get(r.id) || {}).name || r.id).slice(0, 80);
+    // A timed race is scored by distance, so that is what the card and the
+    // post carry instead of a time.
+    if (timed) return { id: r.id, name, time: null, ...timedResult(cfg, r) };
+    return { id: r.id, name,
       time: cfg.startTime && last ? elapsedHms(cfg.startTime, last.endTime) : null };
   });
   // The post waits for its picture. The race's own card shows the cutoff,
@@ -3900,7 +3937,9 @@ async function announceFinishes(env, slug, cfg, data) {
   const pending = recorded ? await readFinishPending(env) : null;
   let url = null;
   for (const f of done_) {
-    const text = `**${forDiscord(f.name, 60)}** finished ${forDiscord(cfg.name) || 'the race'}${f.time ? ` in ${f.time}` : ''}.`;
+    const text = f.distance
+      ? `**${forDiscord(f.name, 60)}** ran ${f.distance} (${f.laps} lap${f.laps === 1 ? '' : 's'}) at ${forDiscord(cfg.name) || 'the race'}.`
+      : `**${forDiscord(f.name, 60)}** finished ${forDiscord(cfg.name) || 'the race'}${f.time ? ` in ${f.time}` : ''}.`;
     if (pending && FINISH_ID.test(f.id)) {
       pending.push({ slug, id: f.id, text, at: Date.now() });
     } else {
@@ -3942,7 +3981,7 @@ async function recordFinishers(env, slug, cfg, finishers) {
     for (const f of finishers) {
       if (!FINISH_ID.test(f.id)) continue;
       const i = list.findIndex(x => x && x.id === f.id);
-      const row = { id: f.id, name: f.name, time: f.time };
+      const row = { id: f.id, name: f.name, time: f.time, ...(f.distance ? { distance: f.distance, laps: f.laps } : {}) };
       if (i >= 0) list[i] = row; else list.push(row);
     }
     const text = JSON.stringify({ race: cfg.name || slug, finishers: list }, null, 2) + '\n';
@@ -5401,11 +5440,8 @@ async function handleMyRaces(req, env) {
       startTime: cfg.startTime,
       courseType: cfg.courseType,
       activity: cfg.activity,
-      totalDistanceMi: cfg.course
-        ? (cfg.courseType === 'loops'
-            ? +((cfg.course.loopCount || 0) * (cfg.course.loopDistanceMi || 0)).toFixed(2)
-            : +((cfg.course.segments || []).reduce((a, s) => a + (s.distanceMi || 0), 0)).toFixed(2))
-        : 0,
+      totalDistanceMi: cfg.course ? +aiCrew.totalDistanceMi(cfg).toFixed(2) : 0,
+      ...(aiCrew.isTimed(cfg) ? { format: 'timed' } : {}),
       runnerNames: (cfg.runners || []).map(r => r.name),
       cutoffHours: cfg.cutoffs && cfg.cutoffs.totalHours || null,
       visibility: cfg.visibility === 'private' ? 'private' : 'public',
@@ -5736,11 +5772,8 @@ function manifestEntry(slug, cfg) {
   // Same reading as Race.course.totalDistanceMi: a loop described by its aid
   // stations has no loopDistanceMi, and taking that at face value would list
   // the race at zero miles.
-  const sum = (xs) => (xs || []).reduce((a, x) => a + (x.distanceMi || 0), 0);
-  const loopMi = sum(crs.loopSegments) || (crs.loopDistanceMi || 0);
-  const total = cfg.courseType === 'loops'
-    ? +((crs.loopCount || 0) * loopMi).toFixed(2)
-    : +sum(crs.segments).toFixed(2);
+  // Loops in a pattern add up lap by lap, and a timed race has no distance.
+  const total = +aiCrew.totalDistanceMi(cfg).toFixed(2);
   const entry = {
     slug,
     name: cfg.name,
@@ -5750,6 +5783,7 @@ function manifestEntry(slug, cfg) {
     units: cfg.units,
     activity: cfg.activity,
     totalDistanceMi: total,
+    ...(aiCrew.isTimed(cfg) ? { format: 'timed' } : {}),
     runnerNames: (cfg.runners || []).map(r => r.name),
     cutoffHours: (cfg.cutoffs && cfg.cutoffs.totalHours) || null
   };

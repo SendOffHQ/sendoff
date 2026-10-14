@@ -205,6 +205,10 @@
     background: rgba(110,231,168,0.13); color: var(--green); border-color: rgba(110,231,168,0.5);
   }
   .rbtn.in:hover:not(:disabled) { background: rgba(110,231,168,0.2); border-color: var(--green); }
+  .rstop { display: block; width: 100%; margin-top: 8px; background: none; border: 1px solid var(--border);
+    color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 10px; border-radius: 8px; cursor: pointer; }
+  .rstop:hover { color: var(--text); border-color: var(--border-bright); }
   .rbtn:disabled { opacity: 0.55; cursor: default; }
   .rbtn .sub { display: block; font-size: 11px; font-weight: 400; letter-spacing: 0.03em;
                text-transform: none; color: var(--text-muted); margin-top: 7px; }
@@ -316,7 +320,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=a1341ad0"></script>
-<script src="lib/race-core.js?v=8bb92e0c"></script>
+<script src="lib/race-core.js?v=0050e6a9"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -404,7 +408,8 @@
     if (hours == null) {
       const total = cfg.cutoffs && cfg.cutoffs.totalHours;
       if (!total) return null;
-      hours = +total; what = 'the finish';
+      // A timed race has no finish line, only the end of the clock.
+      hours = +total; what = Race.course.isTimed(cfg) ? 'the race' : 'the finish';
     }
     const at = startMs + hours * 3600000;
     return { at, what, leftMs: at - Date.now() };
@@ -413,15 +418,26 @@
   function marginLine() {
     const runner = merged();
     const next = Race.compute.nextActionFor(runner, cfg);
-    if (next.state === 'finished') return '<div class="rmargin ok">Finished.</div>';
+    if (next.state === 'finished') {
+      if (!Race.course.isTimed(cfg)) return '<div class="rmargin ok">Finished.</div>';
+      const done = Race.compute.runner(runner, cfg);
+      return `<div class="rmargin ok">Done: ${done.legsDone} lap${done.legsDone === 1 ? '' : 's'}, ${esc(Race.units.distance(done.milesDone, cfg))}.</div>`;
+    }
     const c = cutoffFor(next);
     if (!c) return '<div class="rmargin none">No cutoff set for this race.</div>';
     const clock = Race.fmt.clockTime(c.at, cfg);
+    if (c.leftMs < 0 && Race.course.isTimed(cfg)) {
+      // Time is up. A lap under way still counts when it is finished.
+      return `<div class="rmargin tight">Time is up · finish this lap and it counts</div>`;
+    }
     if (c.leftMs < 0) {
       return `<div class="rmargin late">${Race.fmt.duration(-c.leftMs / 1000)} past ${esc(c.what)} · closed ${clock}</div>`;
     }
     // An hour of room is the point where this stops being a comfortable number.
     const cls = c.leftMs < 3600000 ? 'tight' : 'ok';
+    if (Race.course.isTimed(cfg)) {
+      return `<div class="rmargin ${cls}">${Race.fmt.duration(c.leftMs / 1000)} left in the race · ends ${clock}</div>`;
+    }
     return `<div class="rmargin ${cls}">${Race.fmt.duration(c.leftMs / 1000)} on ${esc(c.what)} · closes ${clock}</div>`;
   }
 
@@ -647,22 +663,46 @@
     }
     const runner = merged();
     const next = Race.compute.nextActionFor(runner, cfg);
+    const timed = Race.course.isTimed(cfg);
     if (!next.nextAction) {
-      act.innerHTML = `<button class="rbtn" type="button" disabled>Finished</button>`;
+      // A timed race stopped by hand can be taken back, in case of a slip.
+      act.innerHTML = `<button class="rbtn" type="button" disabled>${timed ? 'Done' : 'Finished'}</button>` +
+        (timed && runner.stoppedAt ? `<button class="rstop" type="button" id="unstop">Stopped by mistake? Back in the race</button>` : '');
+      const un = document.getElementById('unstop');
+      if (un) un.addEventListener('click', () => setStopped(false));
       return;
     }
     const def = Race.course.legAt(cfg, next.nextLegIndex);
+    // A lap has no aid station to name, so it is named for itself: "Lap 7 ·
+    // Loop B", which on a course of two loops is the thing worth knowing.
+    const lapName = def && !def.toAid && def.lap ? def.name : null;
     const label = next.nextAction === 'in'
-      ? `Arrived at ${(def && def.toAid) || 'the next aid'}`
+      ? (lapName ? `Lap done · ${lapName}` : `Arrived at ${(def && def.toAid) || 'the next aid'}`)
       : (next.state === 'idle'
-          ? `Start · ${(def && def.toAid) ? 'to ' + def.toAid : 'leg 1'}`
-          : `Leaving · to ${(def && def.toAid) || 'the next aid'}`);
+          ? `Start · ${(def && def.toAid) ? 'to ' + def.toAid : (lapName || 'leg 1')}`
+          : (lapName ? `Leaving · ${lapName}` : `Leaving · to ${(def && def.toAid) || 'the next aid'}`));
     const queued = Race.queue.pending().length;
     const sub = queued
       ? `${queued} saved on this phone · sends when you have signal`
       : (next.nextAction === 'in' ? 'Logs your arrival' : 'Starts the next leg');
-    act.innerHTML = `<button class="rbtn ${next.nextAction === 'in' ? 'in' : 'out'}" type="button" id="go">${esc(label)}<span class="sub">${esc(sub)}</span></button>`;
+    act.innerHTML = `<button class="rbtn ${next.nextAction === 'in' ? 'in' : 'out'}" type="button" id="go">${esc(label)}<span class="sub">${esc(sub)}</span></button>` +
+      // A timed race ends for a runner when they say so: from the pit, where
+      // a lap has just ended and every one so far counts.
+      (timed && next.state === 'in-pit' ? `<button class="rstop" type="button" id="stop">Done for the race: stop here</button>` : '');
     document.getElementById('go').addEventListener('click', pressGo);
+    const stop = document.getElementById('stop');
+    if (stop) stop.addEventListener('click', () => setStopped(true));
+  }
+
+  async function setStopped(on) {
+    if (on && !confirm('Stop here? The laps you have run are your result.')) return;
+    const dr = (data.runners || []).find(r => r.id === meId);
+    if (dr) { if (on) dr.stoppedAt = new Date().toISOString(); else delete dr.stoppedAt; }
+    render();
+    try {
+      await Race.queue.write(DATA_PATH, 'setRunnerStopped', { runnerId: meId, stoppedAt: on ? dr && dr.stoppedAt : null },
+        on ? 'racer: stopped' : 'racer: back in');
+    } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
   }
 
   function render() {
@@ -1119,7 +1159,7 @@
       if (next.state === 'on-course' && next.currentLegIndex) return next.currentLegIndex;
       if (next.nextLegIndex) return next.nextLegIndex;
     }
-    return Race.course.legCount(cfg) || 1;
+    return Race.course.isTimed(cfg) ? 1 : (Race.course.legCount(cfg) || 1);
   }
 
   function renderPhotos() {

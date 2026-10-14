@@ -50,7 +50,8 @@ After the race, in this order:
 **Reordered 2026-10-02**: time-based races and cheers and messages moved to
 the front, with usernames beside them as the start of following a racer.
 
-3. **Time-based races.** 24-hour obstacle races, backyard ultras and fixed-time
+3. **Time-based races.** *Partly built 2026-10-14: timed loop races, and loop
+   courses of more than one loop.* 24-hour obstacle races, backyard ultras and fixed-time
    loops, where the clock is fixed and the distance is the result. The pit
    board already fits; what changes is everything that counts the race. See
    "Time-based races" in section 1.
@@ -1518,7 +1519,35 @@ The offline queue holds a press on the phone; nothing yet holds a sentence.
 Item 3 of "Racing without a crew" above now does: the write-in holds a line
 on the phone like a press, and this reads it when the signal comes back.
 
-### Time-based races — *not built*
+### Time-based races — *partly built 2026-10-14*
+
+**Built.** A loop race can be scored by time (`cfg.format: 'timed'`): the
+finish cutoff is when it ends, and there is no lap count. A loop course can
+also be more than one loop (`course.loops`: name, distance, climb, laps in a
+row), run in order and repeating, which is how "a 15-mile out-and-back six
+times, then a 10-mile one once, so lap 7 lands on 100" is entered once.
+
+- `Race.course.legCountFor(cfg, runner)` is the runner's own count in a timed
+  race: what they have run plus the next lap, or what they ran once done.
+  `legCount(cfg)` is only a ceiling there (999 laps).
+- Done is `runner.stoppedAt` (the pit board's "Stopped" button, or the racer's
+  own "Done for the race"; Undo last takes it back), or the race over with no
+  lap under way. A lap under way at the horn counts once it is checked in.
+- The race page shows laps and distance with no total, "Racing" rather than a
+  pace, each lap cell saying which loop, and "At the end": the distance and
+  whole laps the pace so far reaches by the horn. The racer screen says the
+  time left in the race.
+- The worker reads it through `worker/src/ai-crew.js`, held to the page's
+  model by `worker/test/timed-race.mjs`. A timed finish posts the distance and
+  laps, and its finish card shows them. Finishes are only announced within
+  six hours of happening, which also let plain loop races be announced: they
+  had counted as zero legs and never finished.
+
+**Still to do:** backyard rules; a setting for whether the lap at the horn
+counts; laps per hour as the pace; and editing the loops and the format in
+settings, which has never edited a loop course.
+
+#### As first written
 
 Raised 2026-09-28, the day Obstacle course went on the discipline list. Every
 race SendOff can hold today is a fixed distance: a set of aid stations, or a

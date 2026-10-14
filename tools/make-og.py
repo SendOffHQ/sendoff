@@ -216,11 +216,36 @@ def race_stats(slug):
         return []
     co = cfg.get('course') or {}
     segs = co.get('segments') or co.get('loopSegments') or []
-    loops = co.get('loopCount', 1) if cfg.get('courseType') == 'loops' else 1
+    is_loops = cfg.get('courseType') == 'loops'
+    timed = is_loops and cfg.get('format') == 'timed'
+    loops = co.get('loopCount', 1) if is_loops else 1
+    cut = (cfg.get('cutoffs') or {}).get('totalHours')
     out = []
 
-    dist = cfg.get('totalDistanceMi') or (co.get('loopDistanceMi', 0) * loops) or \
-           sum(x.get('distanceMi') or 0 for x in segs) * loops
+    # Loops in a pattern (Loop A x6, then Loop B x1, repeating), lap by lap.
+    pattern = [l for l in (co.get('loops') or []) if (l.get('distanceMi') or 0) > 0] if is_loops and not segs else []
+    cycle = [l for l in pattern for _ in range(max(1, int(l.get('times') or 1)))]
+
+    if timed:
+        # Scored by time: how long it runs and how long a lap is. There is no
+        # distance until it is run, and no cutoff to beat.
+        if cut:
+            out.append((f'{cut:g}h', 'timed'))
+        if cycle and len(pattern) > 1:
+            out.append((f"{sum(l['distanceMi'] for l in cycle):g}", 'miles a round'))
+        else:
+            lap = co.get('loopDistanceMi') or sum(x.get('distanceMi') or 0 for x in segs)
+            if lap:
+                out.append((f'{lap:g}', 'miles a lap'))
+        return out
+
+    if cycle:
+        n = loops or 0
+        dist = sum(cycle[k % len(cycle)]['distanceMi'] for k in range(n))
+        dist = round(dist, 2)
+    else:
+        dist = cfg.get('totalDistanceMi') or (co.get('loopDistanceMi', 0) * loops) or \
+               sum(x.get('distanceMi') or 0 for x in segs) * loops
     if dist:
         out.append((f'{dist:g}', 'miles'))
 
@@ -228,7 +253,6 @@ def race_stats(slug):
     if gain:
         out.append((f'+{gain:,.0f}', 'ft of climb'))
 
-    cut = (cfg.get('cutoffs') or {}).get('totalHours')
     if cut:
         out.append((f'{cut:g}h', 'cutoff'))
     return out
@@ -460,12 +484,19 @@ def main():
             where = ' · '.join(b for b in [name, pretty_date(race.get('startTime')), race.get('location') or ''] if b)
             for f in done:
                 fid, who, time = f['id'], str(f.get('name') or f['id']), f.get('time')
+                # A timed race is scored by distance: that, and the laps.
+                dist, laps = f.get('distance'), f.get('laps')
+                mine = ([(str(dist).split(' ')[0], str(dist).split(' ')[-1] if ' ' in str(dist) else 'miles')] if dist else
+                        [(time, 'finish time')] if time else [])
+                if dist and laps is not None:
+                    mine.append((str(laps), 'laps'))
                 f_main, f_accent = split_accent(who)
                 render(card_html(f_main, f_accent, where, 'Finished',
                                  profile=elevation_path(slug, W, 210),
-                                 stats=([(time, 'finish time')] if time else []) + stats),
+                                 stats=mine + [s for s in stats if not dist or s[1] == 'timed']),
                        ROOT / 'races' / slug / f'finish-{fid}.png')
-                title = f"{who} finished {name}" + (f" in {time}" if time else '')
+                title = (f"{who} ran {dist} at {name}" if dist else
+                         f"{who} finished {name}" + (f" in {time}" if time else ''))
                 page = ROOT / 'races' / slug / f'finish-{fid}.html'
                 page.write_text(finish_page(STUB.format(slug=slug, title=esc(title), desc=esc(f"{where}: on SendOff."), base=BASE),
                                             slug, fid), encoding='utf-8')

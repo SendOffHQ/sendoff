@@ -40,12 +40,65 @@ const MAX_ITEMS = 12;
 const num = (v) => { const n = +v; return v === '' || v == null || !Number.isFinite(n) ? null : n; };
 
 // ---------- the course ----------
+// The same course as lib/race-core.js, read the same way: loops in a
+// repeating pattern, and timed races with no set number of laps. Kept in step
+// with that file by worker/test/timed-race.mjs.
 function loopSegments(cfg) { return (cfg && cfg.course && cfg.course.loopSegments) || []; }
+const TIMED_MAX_LAPS = 999;
+
+export function isTimed(cfg) { return !!(cfg && cfg.courseType === 'loops' && cfg.format === 'timed'); }
+export function endsAt(cfg) {
+  const start = cfg && cfg.startTime ? Date.parse(cfg.startTime) : NaN;
+  const h = num(cfg && cfg.cutoffs && cfg.cutoffs.totalHours);
+  return Number.isFinite(start) && h > 0 ? start + h * 3600e3 : null;
+}
+function lapCycle(cfg) {
+  const c = (cfg && cfg.course) || {};
+  const listed = Array.isArray(c.loops) ? c.loops.filter(l => l && +l.distanceMi > 0) : [];
+  const segs = loopSegments(cfg);
+  if (!listed.length || segs.length) {
+    const mi = segs.length ? segs.reduce((a, s) => a + (s.distanceMi || 0), 0)
+      : (c.loopDistanceMi || (listed[0] ? +listed[0].distanceMi : 0));
+    return [{ name: null, distanceMi: mi }];
+  }
+  const out = [];
+  listed.forEach((l, i) => {
+    const name = String(l.name || '').trim() || 'Loop ' + String.fromCharCode(65 + i);
+    for (let k = 0; k < Math.max(1, Math.floor(+l.times || 1)); k++) out.push({ name: listed.length > 1 || l.times > 1 ? name : null, distanceMi: +l.distanceMi });
+  });
+  return out;
+}
+export function lapsDistance(cfg, n) {
+  const cyc = lapCycle(cfg);
+  if (!(n > 0) || !cyc.length) return 0;
+  const round_ = cyc.reduce((a, l) => a + l.distanceMi, 0);
+  let mi = Math.floor(n / cyc.length) * round_;
+  for (let k = 0; k < n % cyc.length; k++) mi += cyc[k].distanceMi;
+  return +mi.toFixed(3);
+}
+export function totalDistanceMi(cfg) {
+  const c = (cfg && cfg.course) || {};
+  if (cfg && cfg.courseType === 'loops') {
+    if (isTimed(cfg)) return 0;
+    const segs = loopSegments(cfg);
+    if (segs.length) return (c.loopCount || 0) * segs.reduce((a, s) => a + (s.distanceMi || 0), 0);
+    return lapsDistance(cfg, c.loopCount || 0);
+  }
+  return (c.segments || []).reduce((a, s) => a + (s.distanceMi || 0), 0);
+}
+// Done in a timed race: stopped by hand, or the race over with no lap under way.
+export function runnerDone(cfg, runner, now) {
+  if (!isTimed(cfg) || !runner) return false;
+  if (runner.stoppedAt) return true;
+  const end = endsAt(cfg);
+  if (end == null || (now != null ? now : Date.now()) < end) return false;
+  return !((runner.legs || []).some(l => l && l.startTime && !l.endTime));
+}
 
 export function legCount(cfg) {
   if (!cfg) return 0;
   const c = cfg.course || {};
-  if (cfg.courseType === 'loops') return (c.loopCount || 0) * (loopSegments(cfg).length || 1);
+  if (cfg.courseType === 'loops') return (isTimed(cfg) ? TIMED_MAX_LAPS : (c.loopCount || 0)) * (loopSegments(cfg).length || 1);
   if (cfg.courseType === 'segments') return (c.segments || []).length;
   return 0;
 }
@@ -66,10 +119,12 @@ export function legAt(cfg, index) {
       for (let j = 0; j <= k; j++) cum += (segs[j] && segs[j].distanceMi) || 0;
       return { index, lap, from: s.fromAid || null, to: s.toAid || `Lap ${lap} end`, distanceMi: s.distanceMi || 0,
         cumulativeMi: (lap - 1) * lapMi + cum, station: s,
-        cutoffHours: index === legCount(cfg) ? num(cfg.cutoffs && cfg.cutoffs.totalHours) : null };
+        cutoffHours: index === legCount(cfg) && !isTimed(cfg) ? num(cfg.cutoffs && cfg.cutoffs.totalHours) : null };
     }
-    return { index, lap, from: 'Start', to: `Lap ${lap} end`, distanceMi: lapMi, cumulativeMi: lap * lapMi, station: {},
-      cutoffHours: index === legCount(cfg) ? num(cfg.cutoffs && cfg.cutoffs.totalHours) : null };
+    const cyc = lapCycle(cfg), lp = cyc[(lap - 1) % cyc.length] || { distanceMi: lapMi };
+    return { index, lap, from: 'Start', to: `Lap ${lap} end${lp.name ? ` (${lp.name})` : ''}`, distanceMi: lp.distanceMi,
+      cumulativeMi: lapsDistance(cfg, lap), station: {},
+      cutoffHours: index === legCount(cfg) && !isTimed(cfg) ? num(cfg.cutoffs && cfg.cutoffs.totalHours) : null };
   }
   const segs = c.segments || [];
   const s = segs[i];
@@ -96,7 +151,7 @@ export function whereIs(cfg, runner) {
   const last = events[events.length - 1];
   if (!last) return { state: 'not started', leg: 0, intakeLeg: null };
   if (last.action === 'out') return { state: 'on course', leg: last.idx, intakeLeg: last.idx, since: last.ts };
-  if (last.idx >= legCount(cfg)) return { state: 'finished', leg: last.idx, intakeLeg: null, since: last.ts };
+  if (isTimed(cfg) ? runnerDone(cfg, runner) : last.idx >= legCount(cfg)) return { state: 'finished', leg: last.idx, intakeLeg: null, since: last.ts };
   return { state: 'at aid station', leg: last.idx, intakeLeg: last.idx, since: last.ts };
 }
 
@@ -234,7 +289,8 @@ export function raceStatus(cfg, data, runnerId, now) {
       clock: `${clock(now, cfg, true)} ${zoneLabel(cfg, now)}`,
       start: isNaN(start) ? null : clock(start, cfg, true),
       elapsed: !isNaN(start) && now > start ? hm(now - start) : null,
-      legs: legCount(cfg),
+      legs: isTimed(cfg) ? null : legCount(cfg),
+      ...(isTimed(cfg) ? { scoredBy: 'time: as many laps as fit before the race ends; the finish cutoff below is when it ends' } : {}),
       distanceUnit: cfg && cfg.units && cfg.units.distance === 'km' ? 'km' : 'mi'
     },
     racer: { name: def.name || runnerId, bib: def.bib || null },
