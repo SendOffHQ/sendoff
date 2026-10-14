@@ -532,9 +532,9 @@
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=a1341ad0"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/finish-card.js?v=04dcfd11"></script>
+<script src="lib/finish-card.js?v=8a2565f0"></script>
 <script src="lib/course-view.js?v=c1c49292"></script>
-<script src="lib/race-core.js?v=0050e6a9"></script>
+<script src="lib/race-core.js?v=5a703b46"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -612,7 +612,7 @@
 
   // A loop with no aid stations: rendered as the lap grid rather than rows.
   function isSimpleLoop() {
-    return cfg && cfg.courseType === 'loops' && !((cfg.course && cfg.course.loopSegments) || []).length;
+    return cfg && cfg.courseType === 'loops' && !Race.course.hasLoopAid(cfg);
   }
 
   function loopCellClass(durationSec, status) {
@@ -966,7 +966,7 @@
           <div class="stat stat-distance">
             <span class="label">Distance</span>
             <span class="value">${doneDist.toFixed(1)}<span style="color: var(--text-muted); font-size: 14px;"> ${Race.units.distanceLabel(cfg)}</span></span>
-            <span class="sub">${Math.floor((c.legsDone || 0) / Math.max(1, Race.course.legsPerLoop(cfg)))} laps</span>
+            <span class="sub">${c.lapsDone || 0} lap${c.lapsDone === 1 ? '' : 's'}</span>
           </div>` : `
           <div class="stat stat-distance">
             <span class="label">Distance</span>
@@ -1041,7 +1041,7 @@
               <div class="stat stat-projected">
                 <span class="label">${done ? 'Final' : 'At the end'}</span>
                 <span class="value">${mi != null ? escapeHtml(Race.units.distance(mi, cfg)) : '–'}</span>
-                <span class="sub proj-at">${(done ? c.legsDone : c.projectedLaps) != null ? `${done ? c.legsDone : c.projectedLaps} laps` : '–'}</span>
+                <span class="sub proj-at">${(done ? c.lapsDone : c.projectedLaps) != null ? `${done ? c.lapsDone : c.projectedLaps} laps` : '–'}</span>
                 ${!done && end ? `<span class="sub proj-margin">${c.timeLeftSec > 0 ? hmLeft(c.timeLeftSec) + ' left' : 'time is up'}</span>` : ''}
               </div>`;
           })() : (() => {

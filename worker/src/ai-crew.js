@@ -52,21 +52,49 @@ export function endsAt(cfg) {
   const h = num(cfg && cfg.cutoffs && cfg.cutoffs.totalHours);
   return Number.isFinite(start) && h > 0 ? start + h * 3600e3 : null;
 }
-function lapCycle(cfg) {
+// Each loop, with its own aid stations (segments within one lap) when it has
+// any. A course with no loops list is one loop: loopSegments, or a plain lap.
+function loopPattern(cfg) {
   const c = (cfg && cfg.course) || {};
-  const listed = Array.isArray(c.loops) ? c.loops.filter(l => l && +l.distanceMi > 0) : [];
-  const segs = loopSegments(cfg);
-  if (!listed.length || segs.length) {
+  const segsOf = (l) => Array.isArray(l && l.segments) ? l.segments.filter(Boolean) : [];
+  const listed = Array.isArray(c.loops) ? c.loops.filter(l => l && (+l.distanceMi > 0 || segsOf(l).length)) : [];
+  if (!listed.length) {
+    const segs = loopSegments(cfg);
     const mi = segs.length ? segs.reduce((a, s) => a + (s.distanceMi || 0), 0)
-      : (c.loopDistanceMi || (listed[0] ? +listed[0].distanceMi : 0));
-    return [{ name: null, distanceMi: mi }];
+      : (c.loopDistanceMi || 0);
+    return [{ name: null, distanceMi: mi, times: 1, segments: segs }];
   }
-  const out = [];
-  listed.forEach((l, i) => {
-    const name = String(l.name || '').trim() || 'Loop ' + String.fromCharCode(65 + i);
-    for (let k = 0; k < Math.max(1, Math.floor(+l.times || 1)); k++) out.push({ name: listed.length > 1 || l.times > 1 ? name : null, distanceMi: +l.distanceMi });
+  return listed.map((l, i) => {
+    const segments = segsOf(l);
+    return { name: String(l.name || '').trim() || 'Loop ' + String.fromCharCode(65 + i),
+      distanceMi: segments.length ? +segments.reduce((a, s) => a + (s.distanceMi || 0), 0).toFixed(3) : +l.distanceMi,
+      times: Math.max(1, Math.floor(+l.times || 1)), segments };
   });
+}
+function lapCycle(cfg) {
+  const pat = loopPattern(cfg);
+  const named = pat.length > 1 || pat[0].times > 1;
+  const out = [];
+  for (const l of pat) for (let k = 0; k < l.times; k++) out.push(named ? l : { ...l, name: null });
   return out;
+}
+const legsOf = (l) => l.segments.length || 1;
+function legsThroughLap(cfg, n) {
+  const cyc = lapCycle(cfg);
+  if (!(n > 0) || !cyc.length) return 0;
+  const round_ = cyc.reduce((a, l) => a + legsOf(l), 0);
+  let legs = Math.floor(n / cyc.length) * round_;
+  for (let k = 0; k < n % cyc.length; k++) legs += legsOf(cyc[k]);
+  return legs;
+}
+function lapOfLeg(cfg, index) {
+  const cyc = lapCycle(cfg);
+  if (!cyc.length || !(index > 0)) return null;
+  const round_ = cyc.reduce((a, l) => a + legsOf(l), 0);
+  const r = Math.floor((index - 1) / round_);
+  let rem = (index - 1) % round_, k = 0;
+  while (rem >= legsOf(cyc[k])) { rem -= legsOf(cyc[k]); k++; }
+  return { lap: r * cyc.length + k + 1, loop: cyc[k], segInLap: rem };
 }
 export function lapsDistance(cfg, n) {
   const cyc = lapCycle(cfg);
@@ -78,27 +106,29 @@ export function lapsDistance(cfg, n) {
 }
 export function totalDistanceMi(cfg) {
   const c = (cfg && cfg.course) || {};
-  if (cfg && cfg.courseType === 'loops') {
-    if (isTimed(cfg)) return 0;
-    const segs = loopSegments(cfg);
-    if (segs.length) return (c.loopCount || 0) * segs.reduce((a, s) => a + (s.distanceMi || 0), 0);
-    return lapsDistance(cfg, c.loopCount || 0);
-  }
+  if (cfg && cfg.courseType === 'loops') return isTimed(cfg) ? 0 : lapsDistance(cfg, c.loopCount || 0);
   return (c.segments || []).reduce((a, s) => a + (s.distanceMi || 0), 0);
 }
-// Done in a timed race: stopped by hand, or the race over with no lap under way.
+// Done in a timed race: stopped by hand, or the race over with no lap under
+// way and the last leg ending a lap.
 export function runnerDone(cfg, runner, now) {
   if (!isTimed(cfg) || !runner) return false;
   if (runner.stoppedAt) return true;
   const end = endsAt(cfg);
   if (end == null || (now != null ? now : Date.now()) < end) return false;
-  return !((runner.legs || []).some(l => l && l.startTime && !l.endTime));
+  const legs = (runner.legs || []);
+  if (legs.some(l => l && l.startTime && !l.endTime)) return false;
+  const last = legs.filter(l => l && l.endTime).reduce((m, l) => Math.max(m, l.index || 0), 0);
+  // Never started is not finished: nothing ran, so there is no result.
+  if (!last) return false;
+  const d = legAt(cfg, last);
+  return !d || d.lapEnd !== false;
 }
 
 export function legCount(cfg) {
   if (!cfg) return 0;
   const c = cfg.course || {};
-  if (cfg.courseType === 'loops') return (isTimed(cfg) ? TIMED_MAX_LAPS : (c.loopCount || 0)) * (loopSegments(cfg).length || 1);
+  if (cfg.courseType === 'loops') return legsThroughLap(cfg, isTimed(cfg) ? TIMED_MAX_LAPS : (c.loopCount || 0));
   if (cfg.courseType === 'segments') return (c.segments || []).length;
   return 0;
 }
@@ -110,21 +140,21 @@ export function legAt(cfg, index) {
   if (!cfg || i < 0 || index > legCount(cfg)) return null;
   const c = cfg.course || {};
   if (cfg.courseType === 'loops') {
-    const segs = loopSegments(cfg), per = segs.length || 1;
-    const lap = Math.floor(i / per) + 1, k = i % per;
-    const lapMi = segs.length ? segs.reduce((a, s) => a + (s.distanceMi || 0), 0) : (c.loopDistanceMi || 0);
+    const at = lapOfLeg(cfg, index);
+    if (!at) return null;
+    const { lap, loop, segInLap } = at;
+    const cutoffHours = index === legCount(cfg) && !isTimed(cfg) ? num(cfg.cutoffs && cfg.cutoffs.totalHours) : null;
+    const segs = loop.segments;
     if (segs.length) {
-      const s = segs[k] || {};
+      const s = segs[segInLap] || {};
       let cum = 0;
-      for (let j = 0; j <= k; j++) cum += (segs[j] && segs[j].distanceMi) || 0;
-      return { index, lap, from: s.fromAid || null, to: s.toAid || `Lap ${lap} end`, distanceMi: s.distanceMi || 0,
-        cumulativeMi: (lap - 1) * lapMi + cum, station: s,
-        cutoffHours: index === legCount(cfg) && !isTimed(cfg) ? num(cfg.cutoffs && cfg.cutoffs.totalHours) : null };
+      for (let j = 0; j <= segInLap; j++) cum += (segs[j] && segs[j].distanceMi) || 0;
+      return { index, lap, loop: loop.name, from: s.fromAid || null, to: s.toAid || `Lap ${lap} end`, distanceMi: s.distanceMi || 0,
+        cumulativeMi: +(lapsDistance(cfg, lap - 1) + cum).toFixed(2), station: s, cutoffHours,
+        lapEnd: segInLap === segs.length - 1 };
     }
-    const cyc = lapCycle(cfg), lp = cyc[(lap - 1) % cyc.length] || { distanceMi: lapMi };
-    return { index, lap, from: 'Start', to: `Lap ${lap} end${lp.name ? ` (${lp.name})` : ''}`, distanceMi: lp.distanceMi,
-      cumulativeMi: lapsDistance(cfg, lap), station: {},
-      cutoffHours: index === legCount(cfg) && !isTimed(cfg) ? num(cfg.cutoffs && cfg.cutoffs.totalHours) : null };
+    return { index, lap, loop: loop.name, from: 'Start', to: `Lap ${lap} end${loop.name ? ` (${loop.name})` : ''}`, distanceMi: loop.distanceMi,
+      cumulativeMi: lapsDistance(cfg, lap), station: {}, cutoffHours, lapEnd: true };
   }
   const segs = c.segments || [];
   const s = segs[i];

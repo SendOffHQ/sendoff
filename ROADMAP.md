@@ -1543,9 +1543,19 @@ times, then a 10-mile one once, so lap 7 lands on 100" is entered once.
   six hours of happening, which also let plain loop races be announced: they
   had counted as zero legs and never finished.
 
+**Added the same day:** each loop can have aid stations and checkpoints of its
+own (`course.loops[i].segments`), so laps of different loops can have
+different numbers of legs; legs are numbered by walking the pattern
+(`legsThroughLap`, `lapOfLeg`) rather than dividing by a fixed count, and a
+leg says whether it ends a lap (`lapEnd`). Settings has a Loops section for
+loop races: scored by laps or timed, the lap count, and each loop with its
+distance, climb, laps in a row and stations. In a timed race a runner out of
+time at an aid station partway round is not done until the lap ends, and one
+who never started is not finished.
+
 **Still to do:** backyard rules; a setting for whether the lap at the horn
-counts; laps per hour as the pace; and editing the loops and the format in
-settings, which has never edited a loop course.
+counts; laps per hour as the pace; and stations per loop in the setup wizard,
+which takes them for a single loop only (settings takes them for any).
 
 #### As first written
 

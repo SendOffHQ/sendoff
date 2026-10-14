@@ -3764,10 +3764,10 @@ function isPublicRace(cfg) {
 function totalLegs(cfg) {
   const c = (cfg && cfg.course) || {};
   if (cfg && cfg.courseType === 'loops') {
-    // A lap with no aid stations on it is one leg. This multiplied by the
-    // number of segments alone, so a plain loop race came to zero legs and
-    // nobody on one was ever announced as finished.
-    return (c.loopCount || 0) * ((c.loopSegments || []).length || 1);
+    // Lap by lap, since each loop can have its own aid stations. This used to
+    // multiply by the number of segments alone, so a plain loop race came to
+    // zero legs and nobody on one was ever announced as finished.
+    return aiCrew.legCount(cfg);
   }
   return (c.segments || []).length;
 }
@@ -3791,10 +3791,12 @@ function finishedAt(runner) {
 // A timed race's result: the distance and the laps.
 function timedResult(cfg, runner) {
   const done = ((runner && runner.legs) || []).filter(l => l && l.endTime).map(l => l.index);
-  let mi = 0;
-  for (const i of done) { const d = aiCrew.legAt(cfg, i); mi += (d && d.distanceMi) || 0; }
-  const per = Math.max(1, ((cfg.course && cfg.course.loopSegments) || []).length);
-  const laps = Math.floor(done.length / per);
+  let mi = 0, laps = 0;
+  for (const i of done) {
+    const d = aiCrew.legAt(cfg, i);
+    mi += (d && d.distanceMi) || 0;
+    if (d && d.lapEnd) laps++;
+  }
   const km = cfg.units && cfg.units.distance === 'km';
   const dist = `${(km ? mi * 1.609344 : mi).toFixed(1)} ${km ? 'km' : 'mi'}`;
   return { distance: dist, laps };

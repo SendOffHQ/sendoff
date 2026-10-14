@@ -318,7 +318,7 @@
   <div>Auto-generated · race-dashboard hub</div>
 </footer>
 
-<script src="lib/race-core.js?v=0050e6a9"></script>
+<script src="lib/race-core.js?v=5a703b46"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -379,7 +379,7 @@
         : '';
       // Simple lap-only loops just show the index; segments and
       // loops-with-aids show the leg name beneath it.
-      const showName = def && def.name && !(cfg.courseType === 'loops' && !(cfg.course.loopSegments || []).length);
+      const showName = def && def.name && !(cfg.courseType === 'loops' && !Race.course.hasLoopAid(cfg));
       const legName = showName
         ? `<span style="font-size: 10px; color: var(--text-muted); display: block;">${escapeHtml(def.name)}</span>`
         : '';
@@ -404,7 +404,7 @@
             <div class="runner-bib">${escapeHtml(runner.bib || '')}</div>
           </div>
           <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.15em;">
-            ${c.timed ? c.legsDone : c.legsDone + '/' + c.totalLegs} ${cfg.courseType === 'loops' && !(cfg.course.loopSegments || []).length ? 'laps' : 'legs'} · ${Race.units.distance(c.milesDone, cfg)}
+            ${c.timed ? c.legsDone : c.legsDone + '/' + c.totalLegs} ${cfg.courseType === 'loops' && !Race.course.hasLoopAid(cfg) ? 'laps' : 'legs'} · ${Race.units.distance(c.milesDone, cfg)}
           </div>
         </div>
         <div class="summary-grid">
@@ -453,7 +453,7 @@
       <div><strong>${cfg.courseType === 'loops'
         ? (Race.course.isTimed(cfg) ? `${cfg.cutoffs?.totalHours || '?'}h timed` : cfg.course.loopCount + ' laps')
           + (Race.course.hasLoopPattern(cfg) ? ' · ' + Race.course.loopPattern(cfg).map(l => `${escapeHtml(l.name)} ×${l.times}`).join(', ') : '')
-          + ((cfg.course.loopSegments || []).length ? ` · ${cfg.course.loopSegments.length} aid seg` : '')
+          + (Race.course.hasLoopAid(cfg) ? ' · aid on the loop' : '')
         : (cfg.course.segments?.length || 0) + ' segments'}</strong></div>
     `;
 

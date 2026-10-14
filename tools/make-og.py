@@ -223,7 +223,10 @@ def race_stats(slug):
     out = []
 
     # Loops in a pattern (Loop A x6, then Loop B x1, repeating), lap by lap.
-    pattern = [l for l in (co.get('loops') or []) if (l.get('distanceMi') or 0) > 0] if is_loops and not segs else []
+    pattern = [l for l in (co.get('loops') or []) if (l.get('distanceMi') or 0) > 0 or l.get('segments')] if is_loops and not segs else []
+    for l in pattern:
+        if l.get('segments') and not l.get('distanceMi'):
+            l['distanceMi'] = sum(x.get('distanceMi') or 0 for x in l['segments'])
     cycle = [l for l in pattern for _ in range(max(1, int(l.get('times') or 1)))]
 
     if timed:
@@ -249,7 +252,14 @@ def race_stats(slug):
     if dist:
         out.append((f'{dist:g}', 'miles'))
 
-    gain = sum(x.get('elevationGainFt') or 0 for x in segs) * loops
+    if cycle:
+        # Each loop's climb: its own, or what its aid-to-aid legs add up to.
+        def loop_gain(l):
+            ls = l.get('segments') or []
+            return sum(x.get('elevationGainFt') or 0 for x in ls) if ls else (l.get('elevationGainFt') or 0)
+        gain = sum(loop_gain(cycle[k % len(cycle)]) for k in range(loops or 0))
+    else:
+        gain = sum(x.get('elevationGainFt') or 0 for x in segs) * loops
     if gain:
         out.append((f'+{gain:,.0f}', 'ft of climb'))
 

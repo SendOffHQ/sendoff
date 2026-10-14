@@ -73,6 +73,18 @@ ok('and 14 laps is 200', C.totalDistanceMi(pattern), 200);
 ok('seven laps is 100', C.totalDistanceMi({ ...pattern, course: { ...pattern.course, loopCount: 7 } }), 100);
 ok('each lap is one leg', C.legCount(pattern), 14);
 
+console.log('\neach loop with its own aid stations');
+const withAid = { courseType: 'loops', course: { loopCount: 7, loops: [
+  { name: 'Long', times: 6, segments: [{ fromAid: 'Pit', toAid: 'Turn 7.5', distanceMi: 7.5, checkpoint: true }, { fromAid: 'Turn 7.5', toAid: 'Pit', distanceMi: 7.5, crewAccess: true }] },
+  { name: 'Short', times: 1, segments: [{ fromAid: 'Pit', toAid: 'Turn 5', distanceMi: 5 }, { fromAid: 'Turn 5', toAid: 'Pit', distanceMi: 5 }] }] } };
+ok('two legs a lap, so 14 legs and 100 miles', [C.legCount(withAid), C.totalDistanceMi(withAid)], [14, 100]);
+const l13 = C.legAt(withAid, 13), l14 = C.legAt(withAid, 14), l1 = C.legAt(withAid, 1);
+ok('the first leg ends at a checkpoint on the long loop', [l1.name, l1.toAid, l1.checkpoint, l1.lapEnd], ['Lap 1 · Long · Pit → Turn 7.5', 'Turn 7.5', true, false]);
+ok('lap 7 turns at 5 and ends on 100', [l13.toAid, l13.cumulativeMi, l14.toAid, l14.cumulativeMi, l14.lapEnd], ['Turn 5', 95, 'Pit', 100, true]);
+ok('pages draw it as legs, not a lap grid', C.hasLoopAid(withAid), true);
+const half = { id: 'x', legs: [{ index: 1, startTime: '2026-01-01T00:00:00Z', endTime: '2026-01-01T01:00:00Z' }, { index: 2, startTime: '2026-01-01T01:00:00Z', endTime: '2026-01-01T02:00:00Z' }, { index: 3, startTime: '2026-01-01T02:00:00Z', endTime: '2026-01-01T03:00:00Z' }] };
+ok('three legs is one lap and a half: one lap done', Race.compute.runner(half, withAid).lapsDone, 1);
+
 console.log('\none loop, as it always was');
 const plain = { courseType: 'loops', course: { loopCount: 5, loopDistanceMi: 10, loopElevationGainFt: 300 } };
 ok('same lap every time, named as before', [C.legAt(plain, 3).name, C.legAt(plain, 3).cumulativeMi, C.legAt(plain, 3).elevationGainFt, C.totalDistanceMi(plain)],
