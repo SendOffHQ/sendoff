@@ -929,6 +929,17 @@
     document.getElementById('loops-fields').style.display = t === 'loops' ? '' : 'none';
     document.getElementById('segments-fields').style.display = t === 'segments' ? '' : 'none';
     setFormat(state.format);
+    syncGpxSection();
+  }
+
+  // The race's own course file, unless it is a loop race of several loops,
+  // where each loop takes its own. Asked of the course type as well as the
+  // loops: switching to Segments with two loops still listed left the file
+  // put away behind a note about loops the race no longer had.
+  function syncGpxSection() {
+    const perLoop = state.courseType === 'loops' && state.loops.length > 1;
+    document.getElementById('gpx-whole').style.display = perLoop ? 'none' : '';
+    document.getElementById('gpx-per-loop').style.display = perLoop ? '' : 'none';
   }
 
   // Timed or a set number of laps. Timed has no lap count, and its finish
@@ -953,8 +964,7 @@
     // With one loop, its aid stations are the table below and its course file
     // is the race's, under Course GPX. With several, each card has its own.
     document.getElementById('loop-aid-block').style.display = many ? 'none' : '';
-    document.getElementById('gpx-whole').style.display = many ? 'none' : '';
-    document.getElementById('gpx-per-loop').style.display = many ? '' : 'none';
+    syncGpxSection();
     const du = state.units.distance, eu = state.units.elevation;
     host.innerHTML = state.loops.map((l, i) => {
       const has = many && l.stations.length > 0;

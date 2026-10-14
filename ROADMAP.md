@@ -1558,7 +1558,8 @@ in a card per loop once there is more than one; and each loop can have a
 course file of its own (`loops[i].gpx`: Loop A's is the race's `course.gpx`,
 the others `course-<id>.gpx`, the only other names the worker accepts). An
 unlisted race keeps them all in private storage, they move with visibility and
-go when the race is deleted. The map draws every loop, the one a racer is on
+go when the race is deleted. A loop removed takes its file with it: the worker
+drops any loop course file a saved config stops naming (never course.gpx). The map draws every loop, the one a racer is on
 (or about to start from the pit) lit and the rest dim, with each racer's dot on
 their own loop and a chip per loop to pick the profile shown.
 

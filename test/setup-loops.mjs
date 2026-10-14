@@ -60,6 +60,11 @@ await page.click('#add-loop');
 ok('each card takes stations and a file now, and the race-wide file is put away',
   [await page.isVisible('[data-add-st="1"]'), await page.isVisible('[data-loop-gpx="1"]'), await page.isVisible('#gpx-file'), await page.isVisible('#gpx-per-loop')], [true, true, false, true]);
 ok('the file already picked is Loop A\'s', (await page.textContent('[data-loop-gpx="0"] + .hint')).trim(), 'The course file picked for the race.');
+console.log('\nswitching to segments and back');
+await page.click('#course-type input[value="segments"] + .radio-content');
+ok('segments take the race\'s own course file again', [await page.isVisible('#gpx-file'), await page.isVisible('#gpx-per-loop')], [true, false]);
+await page.click('#course-type input[value="loops"] + .radio-content');
+ok('and back on loops, each loop takes its own', [await page.isVisible('#gpx-file'), await page.isVisible('[data-loop-gpx="1"]')], [false, true]);
 await page.fill('[data-loop="0"][data-k="times"]', '6');
 await page.fill('[data-loop="1"][data-k="name"]', 'Short');
 await page.click('[data-add-st="1"]');

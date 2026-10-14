@@ -3200,6 +3200,7 @@ async function handleCommit(req, env, ctx) {
         ctx.waitUntil(announceCommit(env, path, content, liveCfg, isCreation));
         ctx.waitUntil(publishChange(env, path));
         ctx.waitUntil(archiveIfDone(env, creationSlug || racePathSlug(path)));
+        ctx.waitUntil(dropRemovedCourseFiles(env, path, liveCfg, content));
       }
       // The shape the client already knows. It reads the status and nothing
       // else: mutateJson returns the document it wrote, because reading a file
@@ -3288,6 +3289,7 @@ async function handleCommit(req, env, ctx) {
   if (res.ok && ctx && ctx.waitUntil) {
     ctx.waitUntil(announceCommit(env, path, content, liveCfg, isCreation));
     ctx.waitUntil(publishChange(env, path));
+    ctx.waitUntil(dropRemovedCourseFiles(env, path, liveCfg, content));
   }
   return new Response(text, {
     status: res.status,
@@ -5599,6 +5601,32 @@ async function gitDeleteRaw(env, path, sha, message) {
   });
   await purgeReadCache(env, path);
   return res;
+}
+
+// A loop removed, or given a file under another name, leaves a course file
+// nothing names any more. It goes when the config that stopped naming it is
+// saved: from the bucket for an unlisted race, from the repository for a
+// public one, since a course file is a list of coordinates either way.
+// course.gpx is the race's own and is never removed here.
+async function dropRemovedCourseFiles(env, path, before, content) {
+  if (!before || !/^races\/[^/]+\/config\.json$/.test(path)) return;
+  let after;
+  try { after = JSON.parse(content); } catch (e) { return; }
+  const keep = new Set(courseFilesOf(after));
+  const slug = racePathSlug(path);
+  for (const name of courseFilesOf(before)) {
+    if (name === 'course.gpx' || keep.has(name)) continue;
+    const file = `races/${slug}/${name}`;
+    if (env.MEDIA) { try { await env.MEDIA.delete(`course/${slug}/${name}`); } catch (e) {} }
+    try {
+      const res = await githubGet(env, file);
+      if (res.ok) {
+        const j = await res.json();
+        if (j && j.sha) await gitDeleteRaw(env, file, j.sha, `hub: ${slug}, ${name} is on no loop now`);
+      }
+    } catch (e) { /* a leftover file, not a failed save */ }
+    try { await purgeReadCache(env, file); } catch (e) {}
+  }
 }
 
 // Every course file the race has, one at a time, and the first reason one

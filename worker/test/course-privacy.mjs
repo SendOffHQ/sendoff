@@ -104,6 +104,19 @@ const put = async (path, content, tok = token) => {
   await settle();
   return r;
 };
+// A save of a file that exists, with the version it is replacing, the way the
+// pages send one.
+const save = async (path, content) => {
+  const cur = await (await get(path, token)).json();
+  const r = await worker.fetch(new Request('https://w/commit', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ path, content, sha: cur.sha, message: 'test' })
+  }), env, ctx);
+  await settle();
+  if (r.status !== 200) throw new Error(`save ${path}: ${r.status} ${await r.text()}`);
+  return r;
+};
 const get = (path, tok) => worker.fetch(new Request(
   'https://w/get?path=' + encodeURIComponent(path),
   { headers: tok ? { Authorization: 'Bearer ' + tok } : {} }), env, ctx);
@@ -193,10 +206,27 @@ await flip('open-loops', 'public');
 ok('listing it again puts them back', [repo.has('races/open-loops/course.gpx'), repo.has('races/open-loops/course-b.gpx'),
   bucket.has('course/open-loops/course-b.gpx')], [true, true, false]);
 
+console.log('\na loop removed');
+const threeLoops = (visibility, keepC) => JSON.stringify({ ...JSON.parse(race(visibility)), courseType: 'loops',
+  course: { loopCount: 7, loops: [{ id: 'a', name: 'Long', distanceMi: 15, times: 5, gpx: 'course.gpx' },
+    { id: 'b', name: 'Short', distanceMi: 10, times: 1, gpx: 'course-b.gpx' },
+    ...(keepC ? [{ id: 'c', name: 'Tiny', distanceMi: 5, times: 1, gpx: 'course-c.gpx' }] : [])] } }, null, 2) + '\n';
+await save('races/quiet-loops/config.json', threeLoops('private', true));
+await put('races/quiet-loops/course-c.gpx', GPX);
+ok('an unlisted race has the third loop\'s file', bucket.has('course/quiet-loops/course-c.gpx'), true);
+await save('races/quiet-loops/config.json', threeLoops('private', false));
+ok('saving the race without that loop deletes it', bucket.has('course/quiet-loops/course-c.gpx'), false);
+ok('and leaves the others alone', bucket.has('course/quiet-loops/course-b.gpx'), true);
+await save('races/open-loops/config.json', threeLoops('public', true));
+await put('races/open-loops/course-c.gpx', GPX);
+ok('a public race has it in git', repo.has('races/open-loops/course-c.gpx'), true);
+await save('races/open-loops/config.json', threeLoops('public', false));
+ok('and it is taken out of git the same way', [repo.has('races/open-loops/course-c.gpx'), repo.has('races/open-loops/course-b.gpx'), repo.has('races/open-loops/course.gpx')], [false, true, true]);
+
 console.log('\nand goes with it when the race is deleted');
 await put('races/quiet-loops/course.gpx', GPX);
-// A loop removed since: its file is no longer named in the config.
-await put('races/quiet-loops/course-c.gpx', GPX);
+// A file nothing names, left from before the cleanup existed.
+await put('races/quiet-loops/course-d.gpx', GPX);
 await worker.fetch(new Request('https://w/race/delete', {
   method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
   body: JSON.stringify({ slug: 'quiet-loops' }) }), env, ctx);
