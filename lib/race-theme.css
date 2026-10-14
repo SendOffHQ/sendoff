@@ -435,6 +435,10 @@ header.site { position: relative; }
   margin-bottom: 16px;
 }
 .modal-field { display: block; margin-bottom: 12px; }
+/* Adding SendOff to a home screen, where the browser gives a page no way to
+   ask: the taps that do it, in order. */
+.install-steps { margin: 0; padding-left: 20px; color: var(--text-dim); font-size: 14px; line-height: 1.6; }
+.install-steps li + li { margin-top: 8px; }
 .modal-field > span {
   display: block; font-family: 'JetBrains Mono', monospace; font-size: 10px;
   letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted);
