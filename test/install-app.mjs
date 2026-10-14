@@ -75,8 +75,10 @@ await page.click('.account-menu-btn');
 await page.click('.account-menu-item[data-act="install"]');
 await page.waitForSelector('.install-steps');
 const guide = await page.evaluate(() => ({ title: document.querySelector('.modal-title').textContent,
+  why: document.querySelector('.install-why').textContent,
   steps: [...document.querySelectorAll('.install-steps li')].map(li => li.textContent),
   cancel: document.querySelector('.modal-cancel').hidden, fits: document.documentElement.scrollWidth <= innerWidth }));
+ok('it says first why the button cannot do it', /Apple only lets a website be added from the Share menu/.test(guide.why), true);
 ok('it says the taps, in order', [guide.title, guide.steps.length, /Share/.test(guide.steps[0]), /Add to Home Screen/.test(guide.steps[1])],
   ['Add SendOff to your home screen', 3, true, true]);
 ok('with one button to close it, and it fits the phone', [guide.cancel, guide.fits], [true, true]);
@@ -104,7 +106,20 @@ console.log('\nan Android phone whose browser has not offered');
 await page.click('.account-menu-btn');
 await page.click('.account-menu-item[data-act="install"]');
 await page.waitForSelector('.install-steps');
-ok('it points at the browser\'s own menu', /Install app, or Add to Home screen/.test(await page.textContent('.install-steps')), true);
+ok('it says the browser has not offered, and points at its own menu',
+  [/has not offered to install/.test(await page.textContent('.install-why')), /Install app, or Add to Home screen/.test(await page.textContent('.install-steps'))], [true, true]);
+await ctx.close();
+
+console.log('\nan Android phone that already has it, opened in the browser');
+({ ctx, page } = await open({ ...devices['Pixel 7'] }, () => {
+  navigator.getInstalledRelatedApps = () => Promise.resolve([{ platform: 'webapp', url: location.origin + '/manifest.webmanifest' }]);
+}));
+await page.click('.account-menu-btn');
+await page.click('.account-menu-item[data-act="install"]');
+await page.waitForSelector('.install-why');
+ok('it says so, rather than giving steps for something done',
+  [await page.textContent('.modal-title'), /Open it from your home screen/.test(await page.textContent('.install-why')), await page.$('.install-steps')],
+  ['SendOff is already on this phone', true, null]);
 await ctx.close();
 
 ok('no page errors', errs, []);
