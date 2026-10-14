@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=f65ffd21">
+<link rel="stylesheet" href="lib/race-theme.css?v=c762fd4d">
 <style>
   body { padding: 20px 16px 32px; }
   .wrap { max-width: 860px; margin: 0 auto; }
@@ -561,7 +561,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=5a703b46"></script>
+<script src="lib/race-core.js?v=a5f1b88d"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -673,6 +673,9 @@
     fillActivity();
     document.getElementById('aid-editor').style.display = cfg.courseType === 'segments' ? '' : 'none';
     document.getElementById('loops-editor').style.display = cfg.courseType === 'loops' ? '' : 'none';
+    // With several loops, each loop's course file is in its card above.
+    const perLoop = cfg.courseType === 'loops' && Race.course.loopPattern(cfg).length > 1;
+    document.getElementById('course-editor').style.display = perLoop ? 'none' : '';
     if (cfg.courseType === 'loops' && !editingLoops) { editingLoops = loopsFromConfig(); renderLoopsEditor(); }
     if (cfg.courseType === 'segments' && !editingAid) {
       // Initialize the editor with current aid stations
@@ -1765,10 +1768,14 @@
   const eVal = (ft) => { const v = Race.units.elevationVal(ft, cfg); return v == null ? '' : Math.round(v); };
   function loopsFromConfig() {
     const pat = Race.course.loopPattern(cfg);
+    const listed = Array.isArray(cfg.course?.loops) ? cfg.course.loops : [];
     return {
       format: Race.course.isTimed(cfg) ? 'timed' : 'distance',
       count: cfg.course?.loopCount || '',
       loops: pat.map((l, i) => ({
+        // Kept through a save, so a loop's course file stays its own.
+        id: l.id, gpx: (listed[i] && listed[i].gpx) || (i === 0 && pat.length > 1 ? 'course.gpx' : null),
+        picked: null,
         name: l.name || (pat.length > 1 ? 'Loop ' + String.fromCharCode(65 + i) : 'Loop A'),
         times: l.times || 1,
         distance: l.segments.length ? '' : dVal(l.distanceMi),
@@ -1807,6 +1814,7 @@
           ${many ? `<label class="loop-field">Laps in a row <input type="number" data-l="${li}" data-k="times" min="1" step="1" value="${escapeAttr(l.times)}" /></label>
             <button class="row-del" type="button" data-del-loop="${li}" aria-label="Delete this loop">×</button>` : ''}
         </div>
+        ${many ? loopFileRow(l, li) : ''}
         <div class="loop-dims">
           <label class="loop-field">Lap ${du} <input type="number" data-l="${li}" data-k="distance" min="0" step="0.1"
             value="${escapeAttr(lapMi)}" ${has ? 'readonly title="The last station on the loop"' : ''} /></label>
@@ -1841,6 +1849,21 @@
     warn.style.display = anyLegs ? '' : 'none';
     warn.textContent = anyLegs ? 'Laps are already logged on this race. Changing the loops changes which loop each logged lap is and how far it counts. Renaming is safe.' : '';
   }
+  // A loop's course file, with several loops. The race's own course file
+  // section is for a race of one loop; with more, each is here. Locked while
+  // the race is run, like the course.
+  function loopFileRow(l, li) {
+    const why = courseLockedBecause();
+    const now = l.picked ? `${l.picked.name} · ${courseSummary(l.picked.pts)}. Saved with the loops.`
+      : l.pickNote ? l.pickNote
+      : l.gpx ? `On the race: ${l.gpx === 'course.gpx' ? "the race's course file" : l.gpx}. Picking a file replaces it.`
+      : 'No course file yet. One draws this loop on the map, with its profile.';
+    return `<div class="loop-dims loop-file">
+        <label class="loop-field">Course file <input type="file" data-lgpx="${li}" accept=".gpx,application/gpx+xml,text/xml" ${why ? 'disabled' : ''} /></label>
+        <span class="course-hint ${l.picked ? 'good' : (l.pickNote ? 'bad' : '')}" style="flex-basis:100%">${escapeHtml(why && !l.picked ? why : now)}</span>
+      </div>`;
+  }
+
   function loopsConfig() {
     const st = editingLoops;
     return st.loops.map((l, i) => {
@@ -1858,11 +1881,16 @@
         // a loop untouched never flattens the climb a course file gave its legs.
         if (Math.abs((eVal(have) || 0) - (+l.gain || 0)) >= 1) segments.forEach(s => { s.elevationGainFt = Math.round(gain * s.distanceMi / mi); s.elevationLossFt = s.elevationGainFt; });
       }
+      // A file picked for the loop: its legs' climb where they have none, and
+      // a plain loop's climb when none is typed.
+      if (l.picked && segments.length) Race.course.fillSegmentElevation(segments, l.picked.pts, gain);
+      const fileGain = l.picked && !segments.length && gain == null ? Math.round(Race.gpx.totalElevation(l.picked.pts).gainFt) : null;
       return {
+        id: l.id, gpx: l.gpx, picked: l.picked,
         name: String(l.name || '').trim() || 'Loop ' + String.fromCharCode(65 + i),
         times: Math.max(1, parseInt(l.times, 10) || 1),
         distanceMi: segments.length ? +segments.reduce((a, s) => a + s.distanceMi, 0).toFixed(3) : (Race.units.toMiles(l.distance, cfg) || 0),
-        elevationGainFt: gain,
+        elevationGainFt: gain != null ? gain : fileGain,
         segments, stations
       };
     });
@@ -1897,9 +1925,30 @@
         }
       } else if (!(l.distanceMi > 0)) { toast(`${l.name} needs a lap distance.`, 'error'); return; }
     }
+    // Every loop has an id once there are several, a letter none of the
+    // others has, and that is what its course file is named after.
+    if (loops.length > 1) {
+      const used = new Set(loops.map(l => l.id).filter(Boolean));
+      for (const l of loops) {
+        if (l.id) continue;
+        let k = 0; while (used.has(String.fromCharCode(97 + k))) k++;
+        l.id = String.fromCharCode(97 + k); used.add(l.id);
+      }
+      loops.forEach((l, i) => { if (l.picked && !l.gpx) l.gpx = i === 0 ? 'course.gpx' : `course-${l.id}.gpx`; });
+    }
+    const why = loops.some(l => l.picked) && courseLockedBecause();
+    if (why) { toast(why, 'error'); return; }
     const btn = document.getElementById('loops-save');
     Race.saveBtn.busy(btn);
     try {
+      // The files first: the config names them, and a config naming a file
+      // nobody stored is the worse half to be left with.
+      for (const l of loops.filter(x => x.picked && x.gpx)) {
+        const path = `races/${slug}/${l.gpx}`;
+        let sha = null;
+        try { const cur = await Race.gh.getFile(Race.auth.cfg(), path); if (!cur.missing) sha = cur.sha; } catch (e) {}
+        await Race.gh.putFile(Race.auth.cfg(), path, l.picked.text, sha, `pit: course for ${l.name} on ${slug}`);
+      }
       const writtenCfg = await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
         const c = remote.course = remote.course || {};
         if (timed) { remote.format = 'timed'; delete c.loopCount; } else { delete remote.format; c.loopCount = n; }
@@ -1913,9 +1962,10 @@
           c.loopDistanceMi = loops[0].distanceMi;
           c.startAid = Race.course.startAidFrom(loops[0].stations[0]);
         } else {
-          c.loops = loops.map(l => ({ name: l.name, times: l.times, distanceMi: l.distanceMi,
+          c.loops = loops.map(l => ({ id: l.id, name: l.name, times: l.times, distanceMi: l.distanceMi,
             ...(l.elevationGainFt != null ? { elevationGainFt: l.elevationGainFt } : {}),
-            ...(l.segments.length ? { segments: l.segments } : {}) }));
+            ...(l.segments.length ? { segments: l.segments } : {}),
+            ...(l.gpx ? { gpx: l.gpx } : {}) }));
           // The first loop's, for anything that reads a loop course the old way.
           c.loopDistanceMi = loops[0].distanceMi;
           const firstWithPit = loops.find(l => l.stations.length);
@@ -2073,7 +2123,10 @@
   document.getElementById('loops-count').addEventListener('input', (e) => { editingLoops.count = e.target.value; renderLoopsSummary(); });
   document.getElementById('add-loop').addEventListener('click', () => {
     const i = editingLoops.loops.length;
-    editingLoops.loops.push({ name: 'Loop ' + String.fromCharCode(65 + i), times: 1, distance: '', gain: '', segments: [], stations: [] });
+    editingLoops.loops.push({ name: 'Loop ' + String.fromCharCode(65 + i), times: 1, distance: '', gain: '', segments: [], stations: [],
+      id: null, gpx: null, picked: null });
+    // Going from one loop to two, the race's course file is Loop A's.
+    if (i === 1 && !editingLoops.loops[0].gpx) editingLoops.loops[0].gpx = 'course.gpx';
     renderLoopsEditor();
   });
   const loopsList = document.getElementById('loops-list');
@@ -2113,6 +2166,23 @@
         // Before the lap end, which stays last.
         loop.stations.splice(loop.stations.length - 1, 0, { name: '', mileage: '', crewAccess: true });
       }
+    }
+    renderLoopsEditor();
+  });
+  // A course file for one loop, read and described like the race's own.
+  loopsList.addEventListener('change', async (e) => {
+    const li = e.target.dataset.lgpx;
+    if (li == null) return;
+    const loop = editingLoops.loops[+li];
+    const file = e.target.files[0];
+    loop.picked = null; loop.pickNote = '';
+    if (file && file.size > COURSE_MAX_BYTES) {
+      loop.pickNote = `${file.name} is over 1 MB, and a bigger file can be written but never read back. Drop the per-point timestamps and it fits.`;
+    } else if (file) {
+      try {
+        const text = await file.text();
+        loop.picked = { name: file.name, text, pts: Race.gpx.parse(text) };
+      } catch (err) { loop.pickNote = `Could not parse GPX: ${err.message}`; }
     }
     renderLoopsEditor();
   });

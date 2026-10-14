@@ -35,6 +35,7 @@ const MEDIA = {
     return { etag: 'e-' + k, size: s.length, async text() { return s; } };
   },
   async delete(k) { bucket.delete(k); },
+  async list({ prefix } = {}) { return { objects: [...bucket.keys()].filter(k => !prefix || k.startsWith(prefix)).map(key => ({ key })) }; },
 };
 globalThis.caches = { default: { async match(){}, async put(){}, async delete(){ return true; } } };
 
@@ -45,8 +46,14 @@ globalThis.fetch = async (url, opts = {}) => {
   if ((opts.method || 'GET') === 'GET') {
     if (!repo.has(path)) return new Response('{"message":"Not Found"}', { status: 404 });
     return new Response(JSON.stringify({
-      sha: 'sha-' + path, content: Buffer.from(repo.get(path), 'utf8').toString('base64'),
+      sha: 'sha-' + path, encoding: 'base64', content: Buffer.from(repo.get(path), 'utf8').toString('base64'),
     }), { status: 200 });
+  }
+  // A delete, the way GitHub's contents API takes one: moving a course off
+  // the hub removes it from the repository.
+  if (opts.method === 'DELETE') {
+    const had = repo.delete(path);
+    return new Response('{}', { status: had ? 200 : 404 });
   }
   const body = JSON.parse(opts.body);
   repo.set(path, Buffer.from(body.content, 'base64').toString('utf8'));
@@ -157,6 +164,44 @@ r = await worker.fetch(new Request('https://w/race/delete', {
   body: JSON.stringify({ slug: 'quiet-race' }) }), env, ctx);
 await settle();
 ok('the bucket no longer holds it', bucket.has('course/quiet-race/course.gpx'), false);
+
+console.log('\na loop with a course of its own');
+const loopsRace = (visibility) => JSON.stringify({ ...JSON.parse(race(visibility)), courseType: 'loops',
+  course: { loopCount: 7, loops: [{ id: 'a', name: 'Long', distanceMi: 15, times: 6, gpx: 'course.gpx' },
+    { id: 'b', name: 'Short', distanceMi: 10, times: 1, gpx: 'course-b.gpx' }] } }, null, 2) + '\n';
+await put('races/quiet-loops/config.json', loopsRace('private'));
+ok('an unlisted race takes it', (await put('races/quiet-loops/course-b.gpx', GPX)).status, 200);
+ok('into the bucket, not git', [repo.has('races/quiet-loops/course-b.gpx'), bucket.has('course/quiet-loops/course-b.gpx')], [false, true]);
+r = await get('races/quiet-loops/course-b.gpx', token);
+ok('and hands it back to the owner', [r.status, Buffer.from((await r.json()).content, 'base64').toString('utf8')], [200, GPX]);
+ok('but not to a stranger', (await get('races/quiet-loops/course-b.gpx', other)).status, 403);
+ok('any other name is still refused', [(await put('races/quiet-loops/notes.gpx', GPX)).status,
+  (await put('races/quiet-loops/course-B.gpx', GPX)).status, (await put('races/quiet-loops/course-b.gpx.txt', GPX)).status], [403, 403, 403]);
+await put('races/open-loops/config.json', loopsRace('public'));
+await put('races/open-loops/course-b.gpx', GPX);
+ok('a public race commits it', repo.has('races/open-loops/course-b.gpx'), true);
+
+console.log('\nand moves with the race');
+const flip = async (slug, visibility) => { const res = await worker.fetch(new Request('https://w/race/visibility', {
+  method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+  body: JSON.stringify({ slug, visibility }) }), env, ctx); await settle(); return res; };
+await put('races/open-loops/course.gpx', GPX);
+await flip('open-loops', 'private');
+ok('unlisting takes every course file out of git', [repo.has('races/open-loops/course.gpx'), repo.has('races/open-loops/course-b.gpx')], [false, false]);
+ok('and into the bucket', [bucket.has('course/open-loops/course.gpx'), bucket.has('course/open-loops/course-b.gpx')], [true, true]);
+await flip('open-loops', 'public');
+ok('listing it again puts them back', [repo.has('races/open-loops/course.gpx'), repo.has('races/open-loops/course-b.gpx'),
+  bucket.has('course/open-loops/course-b.gpx')], [true, true, false]);
+
+console.log('\nand goes with it when the race is deleted');
+await put('races/quiet-loops/course.gpx', GPX);
+// A loop removed since: its file is no longer named in the config.
+await put('races/quiet-loops/course-c.gpx', GPX);
+await worker.fetch(new Request('https://w/race/delete', {
+  method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
+  body: JSON.stringify({ slug: 'quiet-loops' }) }), env, ctx);
+await settle();
+ok('no course file is left in the bucket, named or not', [...bucket.keys()].filter(k => k.startsWith('course/quiet-loops/')), []);
 
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

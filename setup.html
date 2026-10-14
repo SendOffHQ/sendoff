@@ -33,7 +33,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=f65ffd21">
+<link rel="stylesheet" href="lib/race-theme.css?v=c762fd4d">
 <style>
   .wrap { max-width: 860px; margin: 0 auto; }
   .section {
@@ -69,11 +69,22 @@
   }
 
   .radio-group { display: flex; gap: 10px; flex-wrap: wrap; }
-  #loops-table.single .col-times { display: none; }
-  /* Wide enough to read on a phone; the table scrolls sideways before the
-     boxes shrink to a character each. */
-  #loops-table input[data-k="name"] { min-width: 110px; }
-  #loops-table input[type="number"] { min-width: 72px; }
+  /* A loop: its name and laps in a row, its distance and climb, and with
+     more than one loop, its stations and its course file. */
+  .loop-card { border: 1px solid var(--border); border-radius: 6px; padding: 12px 12px 6px; margin: 10px 0; background: var(--bg-elevated); }
+  .loop-head, .loop-dims { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .loop-head input[data-k="name"] { flex: 1 1 140px; min-width: 0; font-weight: 600; }
+  .loop-field { display: inline-flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+  .loop-field input { width: 88px; }
+  .loop-field input[readonly] { opacity: 0.6; }
+  .loop-sub { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--text-muted); margin: 6px 0; }
+  .loop-note { font-size: 11px; color: var(--text-muted); margin: 0 0 8px; }
+  .loop-file { margin: 4px 0 8px; }
+  .loop-file .hint { display: block; margin-top: 4px; font-size: 11px; }
+  .loop-file .hint.good { color: var(--green); }
+  .loop-file .hint.bad { color: var(--red); }
   .radio-group label {
     flex: 1; min-width: 200px; cursor: pointer;
     padding: 14px 16px; border: 1px solid var(--border-bright);
@@ -131,13 +142,14 @@
   .aid-chip input { margin: 0; accent-color: var(--accent); }
   .aid-note { flex: 1 1 160px; min-width: 120px; font-size: 11px !important; padding: 5px 8px !important; }
   .aid-note:disabled { opacity: 0.35; }
-  table.list .row-del {
+  table.list .row-del, .loop-card .row-del {
     background: transparent; border: 1px solid var(--border);
     color: var(--text-muted); cursor: pointer;
     width: 30px; height: 30px; border-radius: 3px;
     font-size: 15px; line-height: 1;
   }
-  table.list .row-del:hover { color: var(--red); border-color: var(--red); }
+  table.list .row-del:hover, .loop-card .row-del:hover { color: var(--red); border-color: var(--red); }
+  .loop-head .row-del { margin-left: auto; }
   /* Same box as the delete button, so a row's controls read as one set. Up and
      down are ordinary actions and delete is the one that destroys something,
      which is the whole of the colour difference on hover. */
@@ -502,20 +514,7 @@
       </label>
 
       <div class="seg-summary" id="loops-summary"></div>
-      <div class="table-scroll">
-      <table class="list" id="loops-table">
-        <thead>
-          <tr>
-            <th>Loop</th>
-            <th>Lap <span class="unit-d">mi</span></th>
-            <th>Climb <span class="unit-e">ft</span></th>
-            <th class="col-times">Laps in a row</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="loop-rows"></tbody>
-      </table>
-      </div>
+      <div id="loop-cards"></div>
       <button type="button" class="add-row" id="add-loop">+ Add another loop</button>
       <p class="hint" style="margin-top:8px; color: var(--text-muted); font-size:11px;">
         One loop for a race that runs the same lap every time. Add another for a
@@ -686,12 +685,16 @@
   </section>
 
   <!-- GPX -->
-  <section class="section">
+  <section class="section" id="gpx-section">
     <div class="section-head"><div class="section-title">Course GPX (optional)</div></div>
+    <p class="hint" id="gpx-per-loop" style="display:none; color: var(--text-muted); font-size:12px;">
+      This race has more than one loop, so each loop takes its own course file, in its card under Course type.</p>
+    <div id="gpx-whole">
     <input type="file" id="gpx-file" accept=".gpx,application/gpx+xml,text/xml" />
     <p class="hint" style="margin-top:8px; color: var(--text-muted); font-size:11px;" id="gpx-status">
       Drives the course map, the elevation profile, and each segment's climb.
     </p>
+    </div>
     <div class="grid-2" style="margin-top:14px;">
       <label class="field">
         <span class="lbl">Official total climb (<span class="unit-e">ft</span>, optional)</span>
@@ -724,7 +727,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=5a703b46"></script>
+<script src="lib/race-core.js?v=a5f1b88d"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -735,7 +738,7 @@
     format: 'distance',
     // The loops of a loop course, run in order, each `times` laps in a row,
     // the pattern repeating. One row is a race that runs the same lap.
-    loops: [{ name: 'Loop A', distance: '10', gain: '', times: 1 }],
+    loops: [{ name: 'Loop A', distance: '10', gain: '', times: 1, stations: [], gpxText: null, gpxPts: null, gpxNote: '' }],
     activity: 'trail-run',
     // The race's own zone; this device's until somebody picks another.
     timezone: Race.tz.device(),
@@ -939,30 +942,108 @@
   }
 
   // ---------- the loops ----------
+  // A chip in a loop's station row, like the course's own aid table.
+  function loopStationToggle(li, si, key, label, on) {
+    return `<label class="aid-chip${on ? ' on' : ''}">
+      <input type="checkbox" data-loop="${li}" data-st="${si}" data-k="${key}" ${on ? 'checked' : ''} />${label}</label>`;
+  }
   function renderLoopRows() {
-    const tbody = document.getElementById('loop-rows');
+    const host = document.getElementById('loop-cards');
     const many = state.loops.length > 1;
-    document.getElementById('loops-table').classList.toggle('single', !many);
-    // Aid stations on the lap describe one loop; with several they would be
-    // the wrong shape for all but one, so they are offered with one loop only.
+    // With one loop, its aid stations are the table below and its course file
+    // is the race's, under Course GPX. With several, each card has its own.
     document.getElementById('loop-aid-block').style.display = many ? 'none' : '';
-    tbody.innerHTML = state.loops.map((l, i) => `
-      <tr>
-        <td><input type="text" data-loop="${i}" data-k="name" value="${escapeAttr(l.name)}" placeholder="Loop ${String.fromCharCode(65 + i)}" maxlength="40" /></td>
-        <td><input type="number" data-loop="${i}" data-k="distance" value="${escapeAttr(l.distance)}" step="0.1" min="0" placeholder="0.0" /></td>
-        <td><input type="number" data-loop="${i}" data-k="gain" value="${escapeAttr(l.gain)}" step="1" min="0" placeholder="optional" /></td>
-        <td class="col-times"><input type="number" data-loop="${i}" data-k="times" value="${escapeAttr(l.times)}" step="1" min="1" /></td>
-        <td>${many ? `<button type="button" class="row-del" data-del-loop="${i}" aria-label="Delete">×</button>` : ''}</td>
-      </tr>`).join('');
+    document.getElementById('gpx-whole').style.display = many ? 'none' : '';
+    document.getElementById('gpx-per-loop').style.display = many ? '' : 'none';
+    const du = state.units.distance, eu = state.units.elevation;
+    host.innerHTML = state.loops.map((l, i) => {
+      const has = many && l.stations.length > 0;
+      const lapLen = has ? l.stations[l.stations.length - 1].mileage : l.distance;
+      return `
+      <div class="loop-card">
+        ${many ? `<div class="loop-head">
+          <input type="text" data-loop="${i}" data-k="name" value="${escapeAttr(l.name)}" placeholder="Loop ${String.fromCharCode(65 + i)}" maxlength="40" />
+          <label class="loop-field">Laps in a row <input type="number" data-loop="${i}" data-k="times" value="${escapeAttr(l.times)}" step="1" min="1" /></label>
+          <button type="button" class="row-del" data-del-loop="${i}" aria-label="Delete this loop">×</button>
+        </div>` : ''}
+        <div class="loop-dims">
+          <label class="loop-field">Lap ${du} <input type="number" data-loop="${i}" data-k="distance" value="${escapeAttr(lapLen)}" step="0.1" min="0" placeholder="0.0"
+            ${has ? 'readonly title="The last station on the loop"' : ''} /></label>
+          <label class="loop-field">Climb ${eu} <input type="number" data-loop="${i}" data-k="gain" value="${escapeAttr(l.gain)}" step="1" min="0" placeholder="–" /></label>
+        </div>
+        ${many ? `
+        <div class="loop-sub">Stations on this loop</div>
+        ${l.stations.length ? `<div class="table-scroll"><table class="list"><tbody>
+          ${l.stations.map((a, si) => `
+          <tr>
+            <td style="font-family: 'JetBrains Mono', monospace; color: var(--text-muted); width: 24px;">${si + 1}</td>
+            <td><input type="text" data-loop="${i}" data-st="${si}" data-k="name" value="${escapeAttr(a.name)}" placeholder="Station" /></td>
+            <td style="width: 96px"><input type="number" data-loop="${i}" data-st="${si}" data-k="mileage" step="0.1" min="0" placeholder="${du}"
+              value="${a.mileage === '' || a.mileage == null ? '' : escapeAttr(a.mileage)}" ${si === 0 ? 'readonly style="opacity:0.6"' : ''} /></td>
+            <td style="width: 36px">${si > 0 && l.stations.length > 2 ? `<button type="button" class="row-del" data-del-st="${i}:${si}" aria-label="Delete">×</button>` : ''}</td>
+          </tr>
+          ${si === 0 ? '' : `<tr class="aid-opts-row"><td></td><td colspan="3"><div class="aid-opts">
+            ${loopStationToggle(i, si, 'checkpoint', 'Checkpoint only', !!a.checkpoint)}
+            ${loopStationToggle(i, si, 'crewAccess', 'Crew can meet', a.crewAccess !== false && !a.checkpoint)}
+            ${loopStationToggle(i, si, 'dropBag', 'Drop bag', !!a.dropBag)}
+            ${loopStationToggle(i, si, 'pacerEligible', 'Pacer pickup', !!a.pacerEligible)}
+          </div></td></tr>`}`).join('')}
+        </tbody></table></div>
+        <p class="loop-note">The last station is the end of the lap, back at the pit.</p>` : `<p class="loop-note">None: each lap is one split, pit to pit.</p>`}
+        <button type="button" class="add-row" data-add-st="${i}">+ Add ${l.stations.length ? 'a station or checkpoint' : 'stations or checkpoints on this loop'}</button>
+        <div class="loop-sub">Course file</div>
+        <div class="loop-file">
+          <input type="file" data-loop-gpx="${i}" accept=".gpx,application/gpx+xml,text/xml" />
+          <span class="hint ${l.gpxText ? 'good' : (l.gpxNote ? 'bad' : '')}">${escapeAttr(l.gpxNote || 'Optional. Draws this loop on the map and its profile, and its climb if none is typed.')}</span>
+        </div>` : ''}
+      </div>`;
+    }).join('');
     renderLoopsSummary();
   }
+  // From one loop to several, what was entered for the one becomes Loop A's;
+  // and back again when the second goes.
+  function toManyLoops() {
+    const a = state.loops[0];
+    if (!a.stations.length && state.loopAidStations.filter(x => x.name).length >= 2) {
+      a.stations = state.loopAidStations.map(x => ({ ...x, crewAccess: x.crewAccess !== false }));
+    }
+    if (!a.gpxText && state.gpxText) { a.gpxText = state.gpxText; a.gpxPts = state.gpxPts; a.gpxNote = 'The course file picked for the race.'; }
+  }
+  function toOneLoop() {
+    const a = state.loops[0];
+    if (a.stations.length >= 2) state.loopAidStations = a.stations.map(x => ({ ...x }));
+    if (a.gpxText) { state.gpxText = a.gpxText; state.gpxPts = a.gpxPts; }
+    renderLoopAidRows();
+  }
   function loopRowsAsConfig() {
-    return state.loops.map((l, i) => ({
-      name: String(l.name || '').trim() || 'Loop ' + String.fromCharCode(65 + i),
-      distanceMi: Race.units.toMiles(l.distance, { units: state.units }) || 0,
-      elevationGainFt: l.gain === '' || l.gain == null ? null : Race.units.toFeet(l.gain, { units: state.units }),
-      times: Math.max(1, parseInt(l.times, 10) || 1)
-    }));
+    const many = state.loops.length > 1;
+    return state.loops.map((l, i) => {
+      const id = String.fromCharCode(97 + i);
+      // Each loop's stations, in miles, and the legs between them, their
+      // climb from the loop's own course file when it has one.
+      const stations = many ? l.stations
+        .map(a => ({ ...a, name: String(a.name || '').trim(),
+          mileage: a.mileage === '' || a.mileage == null ? null : Race.units.toMiles(a.mileage, { units: state.units }) }))
+        .filter(a => a.name && a.mileage != null && !isNaN(a.mileage)) : [];
+      const typedGain = l.gain === '' || l.gain == null ? null : Race.units.toFeet(l.gain, { units: state.units });
+      const segments = stations.length >= 2 ? Race.course.segmentsFromAidStations(stations) : [];
+      if (segments.length) Race.course.fillSegmentElevation(segments, many ? l.gpxPts : null, typedGain);
+      // A plain loop with a course file and no climb typed takes the file's.
+      const fileGain = many && l.gpxPts && typedGain == null && !segments.length
+        ? Math.round(Race.gpx.totalElevation(l.gpxPts).gainFt) : null;
+      return {
+        id,
+        name: String(l.name || '').trim() || 'Loop ' + String.fromCharCode(65 + i),
+        distanceMi: segments.length ? +segments.reduce((a, s) => a + s.distanceMi, 0).toFixed(3)
+          : (Race.units.toMiles(l.distance, { units: state.units }) || 0),
+        elevationGainFt: typedGain != null ? typedGain : fileGain,
+        times: Math.max(1, parseInt(l.times, 10) || 1),
+        ...(segments.length ? { segments } : {}),
+        // Loop A's file is the race's course.gpx; the others are their own.
+        ...(many && l.gpxText ? { gpx: i === 0 ? 'course.gpx' : `course-${id}.gpx` } : {}),
+        _stations: stations
+      };
+    });
   }
   function renderLoopsSummary() {
     const el = document.getElementById('loops-summary');
@@ -1494,7 +1575,9 @@
       const loopAids = state.loopAidStations
         .map(a => ({ ...a, mileage: a.mileage === '' ? null : Race.units.toMiles(a.mileage, { units: state.units }) }))
         .filter(a => a.name && a.mileage != null && !isNaN(a.mileage));
-      if (loopAids.length >= 2) {
+      // The table of stations under one loop. With several loops each card
+      // has its own and this one is not shown, so it is not read either.
+      if (loopAids.length >= 2 && rows.length === 1) {
         // Loop with timed checkpoints: store one lap's segments.
         cfg.course.loopSegments = Race.course.segmentsFromAidStations(loopAids);
         cfg.course.loopDistanceMi = +loopAids[loopAids.length - 1].mileage;
@@ -1508,8 +1591,13 @@
       } else if (rows.length > 1) {
         // Loops in a pattern. loopDistanceMi is the first, for anything that
         // reads a loop course the old way.
-        cfg.course.loops = rows;
+        cfg.course.loops = rows.map(({ _stations, ...l }) => {
+          if (l.elevationGainFt == null) delete l.elevationGainFt;
+          return l;
+        });
         cfg.course.loopDistanceMi = rows[0].distanceMi;
+        const pit = rows.find(l => l._stations.length);
+        if (pit) cfg.course.startAid = Race.course.startAidFrom(pit._stations[0]);
       } else {
         // Simple lap-only loop.
         cfg.course.loopDistanceMi = rows[0].distanceMi;
@@ -1573,11 +1661,16 @@
     if (!cfg.runners.length) errs.push('At least one runner is required.');
     if (cfg.courseType === 'loops') {
       if (cfg.format !== 'timed' && !cfg.course.loopCount) errs.push('Number of laps is required.');
-      if (cfg.course.loops && cfg.course.loops.some(l => !(l.distanceMi > 0))) errs.push('Each loop needs a distance.');
-      else if (!cfg.course.loopDistanceMi) errs.push('Loop distance is required (set a distance per loop, or list loop aid stations).');
-      if (state.loops.length > 1 && cfg.course.loopSegments) {
-        errs.push('Aid stations on the lap work with one loop. Remove the extra loops or the aid stations.');
+      if (cfg.course.loops && cfg.course.loops.some(l => !(l.distanceMi > 0))) errs.push('Each loop needs a distance, or its stations.');
+      else if (!cfg.course.loops && !cfg.course.loopDistanceMi) errs.push('Loop distance is required (set a distance per loop, or list loop aid stations).');
+      for (const [i, l] of state.loops.entries()) {
+        if (state.loops.length < 2 || !l.stations.length) continue;
+        const named = l.stations.filter(a => String(a.name || '').trim() && a.mileage !== '' && a.mileage != null);
+        const label = String(l.name || '').trim() || 'Loop ' + String.fromCharCode(65 + i);
+        if (named.length < 2) errs.push(`${label}: list at least the pit and the end of the lap.`);
+        else if (named.some((a, k) => k > 0 && !(+a.mileage > +named[k - 1].mileage))) errs.push(`${label}: each station has to be further round the lap than the one before.`);
       }
+
       if (cfg.course.loopSegments && cfg.course.loopSegments.some(s => !(s.distanceMi > 0))) {
         errs.push('Each loop segment needs a positive distance (check loop aid mileages are strictly increasing).');
       }
@@ -1661,10 +1754,14 @@
       await Race.gh.putJson(cfg, `races/${slug}/data.json`, dataJson,
         null, `hub: create race ${slug} (data)`);
 
-      if (state.gpxText) {
-        progressLine(`Uploading races/${slug}/course.gpx…`);
-        await Race.gh.putFile(cfg, `races/${slug}/course.gpx`,
-          state.gpxText, null, `hub: create race ${slug} (course.gpx)`);
+      // One course file for the race, or with several loops one per loop
+      // that has one, Loop A's being the race's course.gpx.
+      const files = state.courseType === 'loops' && state.loops.length > 1
+        ? state.loops.map((l, i) => l.gpxText ? [i === 0 ? 'course.gpx' : `course-${String.fromCharCode(97 + i)}.gpx`, l.gpxText] : null).filter(Boolean)
+        : (state.gpxText ? [['course.gpx', state.gpxText]] : []);
+      for (const [name, text] of files) {
+        progressLine(`Uploading races/${slug}/${name}…`);
+        await Race.gh.putFile(cfg, `races/${slug}/${name}`, text, null, `hub: create race ${slug} (${name})`);
       }
 
       // Private races stay out of the public manifest. Logged-in viewers
@@ -1734,20 +1831,81 @@
   });
   document.getElementById('loop-count').addEventListener('input', renderLoopsSummary);
   document.getElementById('add-loop').addEventListener('click', () => {
-    state.loops.push({ name: 'Loop ' + String.fromCharCode(65 + state.loops.length), distance: '', gain: '', times: 1 });
+    if (state.loops.length === 1) toManyLoops();
+    state.loops.push({ name: 'Loop ' + String.fromCharCode(65 + state.loops.length), distance: '', gain: '', times: 1,
+      stations: [], gpxText: null, gpxPts: null, gpxNote: '' });
     renderLoopRows();
   });
-  document.getElementById('loop-rows').addEventListener('input', (e) => {
-    const i = e.target.dataset.loop, k = e.target.dataset.k;
+  const loopCards = document.getElementById('loop-cards');
+  loopCards.addEventListener('input', (e) => {
+    const i = e.target.dataset.loop, si = e.target.dataset.st, k = e.target.dataset.k;
     if (i == null || !k) return;
-    state.loops[+i][k] = e.target.value;
-    renderLoopsSummary();
+    const loop = state.loops[+i];
+    if (si == null) { loop[k] = e.target.value; renderLoopsSummary(); return; }
+    const a = loop.stations[+si];
+    if (e.target.type === 'checkbox') {
+      a[k] = e.target.checked;
+      // A checkpoint is a timing point, not a station: nothing to crew.
+      if (k === 'checkpoint' && e.target.checked) { a.crewAccess = false; a.dropBag = false; a.pacerEligible = false; }
+      if (k === 'crewAccess' && e.target.checked) a.checkpoint = false;
+      renderLoopRows();
+      return;
+    }
+    a[k] = e.target.value;
+    if (k === 'mileage') {
+      // The lap is as long as its last station is far round it.
+      if (+si === loop.stations.length - 1) {
+        const lap = loopCards.querySelector(`[data-loop="${i}"][data-k="distance"]`);
+        if (lap) lap.value = e.target.value;
+      }
+      renderLoopsSummary();
+    }
   });
-  document.getElementById('loop-rows').addEventListener('click', (e) => {
-    const del = e.target.dataset.delLoop;
-    if (del == null || state.loops.length < 2) return;
-    state.loops.splice(+del, 1);
+  loopCards.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-del-loop],[data-del-st],[data-add-st]');
+    if (!t) return;
+    if (t.dataset.delLoop != null) {
+      if (state.loops.length < 2) return;
+      state.loops.splice(+t.dataset.delLoop, 1);
+      if (state.loops.length === 1) toOneLoop();
+    } else if (t.dataset.delSt != null) {
+      const [li, si] = t.dataset.delSt.split(':').map(Number);
+      state.loops[li].stations.splice(si, 1);
+    } else {
+      const loop = state.loops[+t.dataset.addSt];
+      if (!loop.stations.length) {
+        // The pit, a station to name, and the pit again at the lap's end.
+        loop.stations = [{ name: 'Pit', mileage: 0, crewAccess: true }, { name: '', mileage: '', crewAccess: true },
+          { name: 'Pit', mileage: loop.distance === '' ? '' : loop.distance, crewAccess: true }];
+      } else {
+        loop.stations.splice(loop.stations.length - 1, 0, { name: '', mileage: '', crewAccess: true });
+      }
+    }
     renderLoopRows();
+  });
+  // A course file per loop, read and described the way the race's own is.
+  loopCards.addEventListener('change', async (e) => {
+    const i = e.target.dataset.loopGpx;
+    if (i == null) return;
+    const loop = state.loops[+i];
+    const file = e.target.files[0];
+    loop.gpxText = null; loop.gpxPts = null; loop.gpxNote = '';
+    if (file) {
+      if (file.size > 1024 * 1024) {
+        loop.gpxNote = `${file.name} is over 1 MB. Drop the per-point timestamps and it will fit.`;
+      } else {
+        try {
+          const text = await file.text();
+          const pts = Race.gpx.parse(text);
+          const elev = Race.gpx.totalElevation(pts);
+          loop.gpxText = text; loop.gpxPts = pts;
+          loop.gpxNote = `${file.name} · ${Race.units.distance(Race.gpx.totalDistanceMi(pts), { units: state.units })} · +${Math.round(Race.units.elevationVal(elev.gainFt, { units: state.units })).toLocaleString()} ${state.units.elevation}`;
+        } catch (err) { loop.gpxNote = `Could not read that file: ${err.message}`; }
+      }
+    }
+    const hint = e.target.parentElement.querySelector('.hint');
+    hint.className = 'hint ' + (loop.gpxText ? 'good' : (loop.gpxNote ? 'bad' : ''));
+    hint.textContent = loop.gpxNote || 'Optional. Draws this loop on the map and its profile, and its climb if none is typed.';
   });
   document.querySelectorAll('input[name="ct"]').forEach(r => {
     r.addEventListener('change', e => setCourseType(e.target.value));

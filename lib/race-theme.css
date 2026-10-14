@@ -780,6 +780,20 @@ label.field > .hint {
 }
 .course-map-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); }
 .course-map { height: 380px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-card); }
+/* A course of several loops: a chip per loop, which picks the profile shown.
+   The loop a racer is on is lit, as it is on the map. */
+.course-loops { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.course-loops[hidden] { display: none; }
+.course-loop-chip {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim);
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 999px; padding: 5px 11px;
+}
+.course-loop-chip .sw { width: 14px; height: 3px; border-radius: 2px; background: #5b6b78; }
+.course-loop-chip .mi { color: var(--text-muted); }
+.course-loop-chip.active .sw { background: #0fb8bf; height: 4px; }
+.course-loop-chip.active { color: var(--text); }
+.course-loop-chip.shown { border-color: var(--accent); }
 .course-map .leaflet-control-attribution { background: rgba(10, 15, 20, 0.8); color: var(--text-muted); }
 .course-map .leaflet-control-attribution a { color: var(--text-dim); }
 .aid-marker-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; }

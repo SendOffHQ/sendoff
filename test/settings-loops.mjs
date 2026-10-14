@@ -91,6 +91,32 @@ ok('and the finish cutoff is when the race ends', (await page.textContent('#race
 ok('nothing wider than the phone', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 if (process.argv[2]) await page.locator('#loops-editor').screenshot({ path: process.argv[2] + '/settings-loops.png' });
 
+console.log('\na course file for each loop');
+const gpx = (dLat, dLon, n, climb) => '<?xml version="1.0"?><gpx><trk><trkseg>' +
+  Array.from({ length: n }, (_, i) => { const f = i < n / 2 ? i / (n / 2) : (n - i) / (n / 2);
+    return `<trkpt lat="${(39 + dLat * f).toFixed(5)}" lon="${(-105 + dLon * f).toFixed(5)}"><ele>${(2000 + climb * f).toFixed(1)}</ele></trkpt>`; }).join('') +
+  '</trkseg></trk></gpx>';
+ok('with several loops the race-wide course section steps aside', await page.isVisible('#course-editor'), false);
+ok('and while the race is under way, a loop\'s file is locked like the course', await page.isDisabled('[data-lgpx="1"]'), true);
+// Before the start, as a course is only changed then.
+const pastStart = (await api(`races/${SLUG}/config.json`)).startTime;
+const setStart = async (iso) => { const c = await api(`races/${SLUG}/config.json`); delete c.myRole; c.startTime = iso; await api(`races/${SLUG}/config.json`, c); };
+await setStart(new Date(Date.now() + 3 * 864e5).toISOString());
+await open();
+ok('and each loop card takes a file', [await page.isVisible('[data-lgpx="0"]'), await page.isVisible('[data-lgpx="1"]')], [true, true]);
+await page.setInputFiles('[data-lgpx="1"]', { name: 'short.gpx', mimeType: 'application/gpx+xml', buffer: Buffer.from(gpx(0, 0.093, 40, 200)) });
+ok('the file is read and described', /short\.gpx · .*Saved with the loops/.test(await page.evaluate(() => document.querySelector('[data-lgpx="1"]').closest('.loop-file').textContent.replace(/\s+/g, ' '))), true);
+await page.click('#loops-save');
+ok('saved under the loop\'s own name', await until(async () => {
+  const c = await api(`races/${SLUG}/config.json`);
+  return c.course.loops && c.course.loops[1].gpx === 'course-b.gpx';
+}), true);
+const withFiles = await api(`races/${SLUG}/config.json`);
+ok('each loop has an id, and Loop A the race\'s own file', withFiles.course.loops.map(l => [l.id, l.gpx || null]), [['a', 'course.gpx'], ['b', 'course-b.gpx']]);
+ok('and the file is stored', await page.evaluate(async (slug) => (await fetch(`/api/get?path=races/${slug}/course-b.gpx`, { headers: { Authorization: 'Bearer stub' } })).status, SLUG), 200);
+ok('the turnaround\'s legs took their climb from it', withFiles.course.loops[1].segments.every(s => s.elevationGainFt != null), true);
+await setStart(pastStart);
+
 console.log('\non the race page');
 await page.goto(BASE + `/race?id=${SLUG}`);
 await page.waitForSelector('.seg-row', { state: 'attached', timeout: 20000 });

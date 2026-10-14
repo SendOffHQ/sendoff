@@ -891,10 +891,24 @@ async function mutateRaceConfig(env, slug, mutate, message, actor) {
 //
 // A whitelist and not a rule about visibility, deliberately: what a race is
 // made of is the same whoever can see it.
+//
+// Course files are the one family: course.gpx, and since loops could have
+// courses of their own, course-<id>.gpx for each loop. Same rules, every one.
 const RACE_FILES = new Set(['config.json', 'data.json', 'course.gpx']);
+const COURSE_FILE = /^course(-[a-z0-9]{1,8})?\.gpx$/;
 function isRacePath(path) {
   const m = /^races\/[^/]+\/([^/]+)$/.exec(path);
-  return !!m && RACE_FILES.has(m[1]);
+  return !!m && (RACE_FILES.has(m[1]) || COURSE_FILE.test(m[1]));
+}
+function isCoursePath(path) {
+  const m = /^races\/[^/]+\/([^/]+)$/.exec(path);
+  return !!m && COURSE_FILE.test(m[1]);
+}
+function courseFileName(path) { return String(path).split('/').pop(); }
+// Every course file a race has: its own, and one for each loop that names one.
+function courseFilesOf(cfg) {
+  const loops = (cfg && cfg.course && Array.isArray(cfg.course.loops)) ? cfg.course.loops : [];
+  return [...new Set(['course.gpx', ...loops.map(l => l && l.gpx).filter(n => COURSE_FILE.test(String(n || '')))])];
 }
 function racePathSlug(path) {
   const m = /^races\/([^/]+)\//.exec(path);
@@ -3211,13 +3225,13 @@ async function handleCommit(req, env, ctx) {
   // Hung on visibility, not on where the race's JSON goes: whether an
   // unlisted race's coordinates go into a public repository is its own
   // question, and worker/test/course-privacy.mjs holds it on its own.
-  if (isRacePath(path) && path.endsWith('/course.gpx') &&
+  if (isCoursePath(path) &&
       String((liveCfg && liveCfg.visibility) || 'public') !== 'public') {
     if (!env.MEDIA) {
       return json({ error: 'A private race needs the media bucket for its course.' },
         { status: 503 }, env, req);
     }
-    await env.MEDIA.put(`course/${racePathSlug(path)}/course.gpx`, content, {
+    await env.MEDIA.put(`course/${racePathSlug(path)}/${courseFileName(path)}`, content, {
       httpMetadata: { contentType: 'application/gpx+xml' }
     });
     await purgeReadCache(env, path);
@@ -3455,13 +3469,13 @@ async function handleGet(req, env) {
   // An unlisted race's course is in R2 rather than in a public repository: see
   // the write path in handleCommit. Checked before the mirror, because the
   // mirror has no column for it and git is exactly where it must not be.
-  if (path.endsWith('/course.gpx') && env.MEDIA) {
-    const obj = await env.MEDIA.get(`course/${racePathSlug(path)}/course.gpx`);
+  if (isCoursePath(path) && env.MEDIA) {
+    const obj = await env.MEDIA.get(`course/${racePathSlug(path)}/${courseFileName(path)}`);
     if (obj) {
       // The shape every other read of this endpoint hands back, so the client
       // needs to know nothing about where a course file lives.
       return json({
-        name: 'course.gpx', path, sha: obj.etag || '',
+        name: courseFileName(path), path, sha: obj.etag || '',
         size: obj.size || 0, encoding: 'base64',
         content: utf8ToBase64(await obj.text())
       }, { status: 200 }, env, req);
@@ -5587,9 +5601,20 @@ async function gitDeleteRaw(env, path, sha, message) {
   return res;
 }
 
-async function moveCourseForVisibility(env, slug, want, actor) {
-  const path = `races/${slug}/course.gpx`;
-  const key = `course/${slug}/course.gpx`;
+// Every course file the race has, one at a time, and the first reason one
+// could not be moved, or null.
+async function moveCourseForVisibility(env, slug, want, actor, cfg) {
+  let why = null;
+  for (const name of courseFilesOf(cfg)) {
+    const err = await moveCourseFile(env, slug, name, want);
+    if (err && !why) why = name === 'course.gpx' ? err : `${name}: ${err}`;
+  }
+  return why;
+}
+
+async function moveCourseFile(env, slug, name, want) {
+  const path = `races/${slug}/${name}`;
+  const key = `course/${slug}/${name}`;
 
   if (want === 'private') {
     const res = await githubGet(env, path);
@@ -5894,7 +5919,7 @@ async function handleRaceVisibility(req, env, ctx) {
   // not turn a config change that already landed into a 500 the caller reads
   // as "nothing happened".
   let courseErr = null, shareErr = null;
-  try { courseErr = await moveCourseForVisibility(env, slug, want, session.email); }
+  try { courseErr = await moveCourseForVisibility(env, slug, want, session.email, raceCfg); }
   catch (e) { courseErr = `could not move the course: ${e.message || e}`; }
   try { shareErr = await moveSharePageForVisibility(env, slug, want, raceCfg, session.email); }
   catch (e) { shareErr = `could not move the share page: ${e.message || e}`; }
@@ -6003,7 +6028,19 @@ async function handleRaceDelete(req, env) {
   // And the course, for an unlisted race whose GPX is in R2 rather than git.
   // A list of coordinates is not a thing to leave behind.
   if (env.MEDIA) {
-    try { await env.MEDIA.delete(`course/${slug}/course.gpx`); } catch (e) {}
+    // The files the config names, and anything else under the race's course
+    // prefix: a loop removed in settings leaves its file behind, and it is a
+    // list of coordinates all the same.
+    const keys = new Set(courseFilesOf(raceCfg).map(n => `course/${slug}/${n}`));
+    try {
+      if (typeof env.MEDIA.list === 'function') {
+        const listed = await env.MEDIA.list({ prefix: `course/${slug}/` });
+        for (const o of (listed && listed.objects) || []) keys.add(o.key);
+      }
+    } catch (e) { /* the named ones still go */ }
+    for (const key of keys) {
+      try { await env.MEDIA.delete(key); } catch (e) {}
+    }
   }
 
   // Then the manifest. If a file delete then fails we are left with

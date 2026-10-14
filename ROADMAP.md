@@ -1553,9 +1553,17 @@ distance, climb, laps in a row and stations. In a timed race a runner out of
 time at an aid station partway round is not done until the lap ends, and one
 who never started is not finished.
 
+**Added 2026-10-14, later:** the setup wizard takes stations per loop as well,
+in a card per loop once there is more than one; and each loop can have a
+course file of its own (`loops[i].gpx`: Loop A's is the race's `course.gpx`,
+the others `course-<id>.gpx`, the only other names the worker accepts). An
+unlisted race keeps them all in private storage, they move with visibility and
+go when the race is deleted. The map draws every loop, the one a racer is on
+(or about to start from the pit) lit and the rest dim, with each racer's dot on
+their own loop and a chip per loop to pick the profile shown.
+
 **Still to do:** backyard rules; a setting for whether the lap at the horn
-counts; laps per hour as the pace; and stations per loop in the setup wizard,
-which takes them for a single loop only (settings takes them for any).
+counts; laps per hour as the pace.
 
 #### As first written
 
