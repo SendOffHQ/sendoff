@@ -154,6 +154,20 @@
     color: var(--green);
   }
 
+  /* A check-in made for a station the runner went by an hour ago: for the
+     seconds after it, it can be made the arrival at the next one instead.
+     Quiet, since it is the rare case. */
+  .skip-slot { padding: 10px 16px 0; background: var(--bg-elevated); }
+  .skip-slot:empty { display: none; }
+  .skip-btn { display: block; width: 100%; background: none; border: 1px dashed var(--border-bright); border-radius: 8px;
+    color: var(--text-dim); padding: 9px 12px; cursor: pointer; text-align: left; font: inherit; }
+  .skip-btn .k { display: block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; }
+  .skip-btn .d { display: block; font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+  .skip-btn:hover { color: var(--yellow); border-color: var(--yellow); }
+  .skip-note { color: var(--yellow); font-family: 'JetBrains Mono', monospace; font-size: 11px; margin-bottom: 8px; }
+  .skip-note:last-child { margin-bottom: 0; }
+
   /* intake panel */
   .intake-panel {
     padding: 16px 20px; border-top: 1px solid var(--border);
@@ -279,7 +293,7 @@
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=a1341ad0"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/race-core.js?v=9613a480"></script>
+<script src="lib/race-core.js?v=b324a3b6"></script>
 <script src="lib/course-view.js?v=bb2e63e2"></script>
 <script>
   const slug = Race.qs('id');
@@ -328,6 +342,14 @@
 
   // ---------- connection ----------
   // ---------- press button (sign in/out) ----------
+  // A check-in made from this board, for the seconds after it, by runner: so
+  // it can be moved on to the station the runner is really at, the way the
+  // racer's own Undo bar does, and so Undo last takes back all of it. Which
+  // leg, when, where that leg began, how many stations were skipped, the
+  // furthest leg written, and when the offer goes.
+  const SKIP_MS = 15000;
+  const pitPress = {};
+
   async function press(runnerId) {
     // Working is the answer to "have you read this".
     Race.tutorial.dismiss();
@@ -357,9 +379,15 @@
       }
       return l;
     };
+    const began = next.nextAction === 'in' ? (legFor(next.nextLegIndex).startTime || null) : null;
     legFor(next.nextLegIndex)[next.nextAction === 'out' ? 'startTime' : 'endTime'] = now;
     if (throughCheckpoint) legFor(next.nextLegIndex + 1).startTime = now;
+    if (began) {
+      pitPress[runnerId] = { legIndex: next.nextLegIndex, at: now, began, skips: 0,
+        upTo: throughCheckpoint ? next.nextLegIndex + 1 : next.nextLegIndex, until: Date.now() + SKIP_MS };
+    } else delete pitPress[runnerId];
     render();
+    drawSkip();
 
     // Commit. Both halves of a checkpoint go in one entry so they can never be
     // split by a signal that drops between them.
@@ -377,6 +405,61 @@
       toast(`Save failed: ${err.message}`, 'error');
     }
     await load();
+  }
+
+  // The runner went by a station with nobody pressing, and the board still
+  // wanted it: the check-in just made is really the arrival at the next one.
+  // The station in between is marked missed and the time since the last
+  // check-in is one stretch (Race.skip). Another tap skips the next one too.
+  async function skipStation(runnerId) {
+    const p = pitPress[runnerId];
+    const runner = (data.runners || []).find(r => r.id === runnerId);
+    if (!p || !runner || Date.now() >= p.until || p.legIndex + p.skips + 1 > Race.course.legCount(cfg)) return;
+    p.skips++;
+    const at = p.legIndex + p.skips;
+    const legs = Race.skip.legs(cfg, p.legIndex, p.skips, p.began, p.at);
+    p.upTo = Math.max(p.upTo, ...Object.keys(legs).map(Number));
+    p.until = Date.now() + SKIP_MS;
+    for (const k of Object.keys(legs)) {
+      let l = (runner.legs || []).find(x => x.index === +k);
+      if (!l) { l = { index: +k }; runner.legs = (runner.legs || []).concat([l]).sort((a, b) => a.index - b.index); }
+      for (const f of Object.keys(legs[k])) { if (legs[k][f] === null) delete l[f]; else l[f] = legs[k][f]; }
+    }
+    render();
+    drawSkip();
+    const what = `${Race.skip.stopName(cfg, at - 1)} skipped · in at ${Race.skip.stopName(cfg, at)}`;
+    try {
+      const r = await Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId, legs },
+        `pit: ${runner.name || runnerId} skipped ${p.skips === 1 ? 'a station' : p.skips + ' stations'}, in leg ${at}`);
+      toast(r.queued ? `No signal · ${what} saved on this phone` : `Saved · ${what}`, 'ok');
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, 'error');
+    }
+    await load();
+  }
+
+  // The offer, drawn into its slot on the card by the clock rather than by a
+  // full redraw, which waits while somebody is typing in the intake boxes.
+  function skipSlotHtml(runnerId) {
+    const p = pitPress[runnerId];
+    if (!p || Date.now() >= p.until) return '';
+    const pressed = p.legIndex + p.skips;
+    const names = p.skips ? Race.skip.missed(cfg, { first: p.legIndex, last: pressed }) : [];
+    const more = pressed + 1 <= Race.course.legCount(cfg);
+    return (names.length ? `<div class="skip-note">Skipped: ${escapeHtml(names.join(', '))}. Undo last takes it back.</div>` : '') +
+      (more ? `<button class="skip-btn" type="button" data-action="skip" data-runner="${escapeAttr(runnerId)}">` +
+        `<span class="k">Skipped · check-in missed · <span data-skip-left></span></span>` +
+        `<span class="d">Past ${escapeHtml(Race.skip.stopName(cfg, pressed))}, at ${escapeHtml(Race.skip.stopName(cfg, pressed + 1))} now</span></button>` : '');
+  }
+  function drawSkip() {
+    document.querySelectorAll('[data-skip-slot]').forEach(slot => {
+      const p = pitPress[slot.dataset.skipSlot];
+      const live = p && Date.now() < p.until;
+      const key = live ? `${p.until}-${p.skips}` : '';
+      if (slot.dataset.key !== key) { slot.dataset.key = key; slot.innerHTML = skipSlotHtml(slot.dataset.skipSlot); }
+      const left = slot.querySelector('[data-skip-left]');
+      if (left && live) left.textContent = `${Math.ceil((p.until - Date.now()) / 1000)}s`;
+    });
   }
 
   // ---------- edit event time ----------
@@ -515,7 +598,23 @@
       } catch (err) { toast(`Undo failed: ${err.message}`, 'error'); }
       return;
     }
+    // A check-in from this board, still in its seconds: taken back whole, the
+    // leg after a checkpoint and any station skipped with it.
+    const p = pitPress[runnerId];
+    if (p && Date.now() < p.until) {
+      if (!confirm(p.skips ? 'Undo the check-in, and the stations skipped with it?' : 'Undo the last check-in for this runner?')) return;
+      delete pitPress[runnerId];
+      drawSkip();
+      try {
+        const r = await Race.queue.write(DATA_PATH, 'reopenLeg', { runnerId, legIndex: p.legIndex, upTo: p.upTo },
+          `pit: undo ${runnerId} leg ${p.legIndex}`);
+        toast(r.queued ? 'No signal · undo saved on this phone' : 'Undone', 'ok');
+        await load();
+      } catch (err) { toast(`Undo failed: ${err.message}`, 'error'); }
+      return;
+    }
     if (!confirm('Undo the last check-in or send-off for this runner?')) return;
+    delete pitPress[runnerId];
     const runner = (data.runners || []).find(r => r.id === runnerId);
     if (!runner || !runner.legs?.length) return;
     const sorted = runner.legs.slice().sort((a, b) => a.index - b.index);
@@ -926,6 +1025,7 @@
           <span class="value runner-timer">–</span>
         </div>
         <button class="big-btn ${buttonAction || ''}" data-action="press" data-runner="${runner.id}" ${buttonDisabled ? 'disabled' : ''}>${escapeHtml(buttonLabel)}</button>
+        <div class="skip-slot" data-skip-slot="${escapeAttr(runner.id)}"></div>
         <div style="display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--bg-elevated);">
           <button class="btn" data-action="undo" data-runner="${runner.id}">Undo last</button>
           ${Race.course.isTimed(cfg) && next.state === 'in-pit'
@@ -1055,6 +1155,7 @@
     });
     // The racer dots on the course move with the clock, like the timers.
     courseView.update();
+    drawSkip();
   }
 
   function updateLastUpdatedLabel() {
@@ -1123,6 +1224,7 @@
     if (!t) return;
     const action = t.dataset.action;
     if (action === 'press') press(t.dataset.runner);
+    else if (action === 'skip') skipStation(t.dataset.runner);
     else if (action === 'undo') deleteLastEvent(t.dataset.runner);
     else if (action === 'stop') stopRunner(t.dataset.runner);
     else if (action === 'save-intake') saveIntake(t.dataset.runner);

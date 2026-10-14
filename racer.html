@@ -330,7 +330,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=a1341ad0"></script>
-<script src="lib/race-core.js?v=9613a480"></script>
+<script src="lib/race-core.js?v=b324a3b6"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -815,13 +815,6 @@
     }
   }
 
-  // What a stop is called on the Skipped button: its aid station, or on a lap
-  // with none, the end of that lap.
-  function stopName(i) {
-    const d = Race.course.legAt(cfg, i) || {};
-    return d.toAid || (d.lap ? `the end of ${d.name}` : `leg ${i}`);
-  }
-
   // An arrival, still in its Undo window, at a station with another after
   // it: the press can be for the one past it instead. Null otherwise.
   function skipOffer() {
@@ -829,7 +822,7 @@
     if (!p || p.action !== 'in' || !p.began) return null;
     const pressed = p.legIndex + p.skips;
     if (pressed + 1 > Race.course.legCount(cfg)) return null;
-    return { past: stopName(pressed), at: stopName(pressed + 1) };
+    return { past: Race.skip.stopName(cfg, pressed), at: Race.skip.stopName(cfg, pressed + 1) };
   }
 
   // The racer left the phone behind and has just pressed a station they went

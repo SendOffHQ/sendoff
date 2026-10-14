@@ -201,6 +201,36 @@ await page.click('#skip');
 await until(async () => !!(await leg(16)).endTime);
 ok('which ends the race, with nothing past it to skip to', [!!(await leg(16)).endTime, !!(await leg(15)).skipped, await page.$('#skip')], [true, true, null]);
 
+console.log('\nfrom the pit board');
+page.on('dialog', d => d.accept());
+await setLegs([{ index: 1, startTime: START }]);
+await page.goto(BASE + `/pit.html?id=${SLUG}`);
+await page.waitForSelector('[data-action="press"]', { timeout: 20000 });
+ok('the crew\'s next press is Music Pass', /music pass/i.test(await page.textContent('[data-action="press"]')), true);
+ok('with nothing to skip before a press', await page.$('.skip-btn'), null);
+await page.click('[data-action="press"]');
+await page.waitForSelector('.skip-btn', { timeout: 5000 });
+ok('after it, the same offer as the racer\'s phone',
+  (await page.textContent('.skip-btn .d')).trim(), 'Past Music Pass, at Music Meadows 1 now');
+ok('counting down', /Skipped · check-in missed · 1\ds/.test((await page.textContent('.skip-btn .k')).replace(/\s+/g, ' ')), true);
+ok('and it fits a phone', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+await until(async () => !!(await leg(2)).startTime);
+await page.click('.skip-btn');
+ok('Skipped makes it the arrival at Music Meadows',
+  await until(async () => (await leg(1)).skipped === true && !!(await leg(2)).endTime && !(await leg(3)).startTime), true);
+await page.waitForSelector('.skip-note');
+ok('the card says what was skipped, and how to take it back', await page.textContent('.skip-note'), 'Skipped: Music Pass. Undo last takes it back.');
+ok('and offers the next one along', (await page.textContent('.skip-btn .d')).trim(), 'Past Music Meadows 1, at Colony Creek 1 now');
+await page.click('[data-action="undo"]');
+ok('Undo last takes the whole check-in back',
+  await until(async () => { const ls = await readLegs(); return ls.length === 1 && !ls[0].endTime && !ls[0].skipped; }), true);
+ok('and the offer with it', await until(async () => !(await page.$('.skip-btn')) && !(await page.$('.skip-note')), 20), true);
+await page.waitForFunction(() => /music pass/i.test(document.querySelector('[data-action="press"]').textContent));
+await page.click('[data-action="press"]');
+await page.waitForSelector('.skip-btn');
+ok('the offer goes after fifteen seconds', await until(async () => !(await page.$('.skip-btn')), 140), true);
+ok('leaving the press as it was', [(await leg(1)).skipped, !!(await leg(1)).endTime, !!(await leg(2)).startTime], [undefined, true, true]);
+
 console.log('\na lap with no tap at its end');
 const cfgNow = await page.evaluate(async (slug) => {
   const r = await (await fetch(`/api/get?path=races/${slug}/config.json`, { headers: { Authorization: 'Bearer stub' } })).json();

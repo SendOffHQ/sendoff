@@ -1630,8 +1630,9 @@ bar after an arrival has "Skipped · check-in missed": the press becomes the
 arrival at the next station, the one in between is marked missed, and the
 stretch shows as one time. The split between the legs is an estimate from
 distance and climb, so per-leg charts stay sane; the crew can replace it with
-a real time from the pit board. Still to do: the same button on the pit
-board's own check-in, for a crew that missed a racer going through.
+a real time from the pit board. The pit board has the same button for the
+seconds after a check-in made from it, for a crew whose board was still
+waiting on a station the runner had gone by.
 
 ## 2. Planning & history
 
