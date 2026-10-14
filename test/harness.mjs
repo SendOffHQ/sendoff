@@ -62,7 +62,7 @@ let myProfile = { email: ME, firstName: '', lastName: '', displayName: '', targe
 // older worker does not send one, and the page has to cope by not offering a
 // button that could only fail, which is a thing worth being able to ask for.
 let noMail = false;
-let LAST_INVITE = null, requestsOn = false;
+let LAST_INVITE = null, requestsOn = false, LAST_NAME = null;
 
 // Whether the roster names somebody else as the creator, for the check that
 // the creator-only sections stay hidden. And whether a visibility save is
@@ -538,6 +538,12 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/account-invite-nomail') { noMail = true; return send(200, '{"ok":true}'); }
   // The invite asked for last, so a test can see what the admin page sent;
   // and an opt-in requests queue with one row in it, for the same reason.
+  if (url.pathname === '/api/account/name') {
+    let body = ''; req.on('data', c => { body += c; });
+    return req.on('end', () => { try { LAST_NAME = JSON.parse(body); } catch (e) {}
+      send(200, JSON.stringify({ ok: true, ...(LAST_NAME || {}) }), 'application/json'); });
+  }
+  if (url.pathname === '/api/last-name') return send(200, JSON.stringify(LAST_NAME || {}), 'application/json');
   if (url.pathname === '/api/last-invite') return send(200, JSON.stringify(LAST_INVITE || {}), 'application/json');
   if (url.pathname === '/api/requests-on') { requestsOn = true; return send(200, '{"ok":true}'); }
   if (url.pathname === '/api/access-requests' && requestsOn) {
@@ -576,7 +582,7 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/accounts') {
     if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
     const mk = (email, name, role, plan, earlyAccess) => ({
-      email, name, role, plan, earlyAccess, source: 'kv', inEnv: false, removable: true
+      email, name, profileName: name, adminName: '', role, plan, earlyAccess, source: 'kv', inEnv: false, removable: true
     });
     return send(200, JSON.stringify({
       accounts: [

@@ -241,5 +241,26 @@ const plain = await (await call('/account-invite', { method: 'POST',
   body: JSON.stringify({ email: 'plain@example.com' }) })).json();
 ok('and with no name it reads as it always has', [/>You are in\.<\/h1>/.test(plain.mail.html), plain.name], [true, null]);
 
+console.log('\nthe name follows them onto the account');
+await open('/accept-account-invite', { method: 'POST',
+  body: JSON.stringify({ token: named.token, password: 'a-good-password' }) });
+const acctOf = async (e) => ((await (await call('/accounts')).json()).accounts || []).find(a => a.email === e) || {};
+ok('the accounts list knows who they are', [(await acctOf('sam@example.com')).name, (await acctOf('sam@example.com')).adminName], ['Sam Rivers', 'Sam Rivers']);
+
+console.log('\nan admin names an account');
+let nr = await call('/account/name', { method: 'POST', body: JSON.stringify({ email: 'sam@example.com', name: 'Sam R. (beta)' }) });
+ok('it is saved', [nr.status, (await acctOf('sam@example.com')).name], [200, 'Sam R. (beta)']);
+nr = await call('/account/name', { method: 'POST', body: JSON.stringify({ email: 'sam@example.com', name: '' }) });
+ok('blank clears it, leaving their profile name (none here)', [(await acctOf('sam@example.com')).name, (await acctOf('sam@example.com')).adminName], ['', '']);
+ok('their own profile is not touched', kvStore.has('profile:sam@example.com'), false);
+nr = await call('/account/name', { method: 'POST', body: JSON.stringify({ email: 'ghost@example.com', name: 'Nobody' }) });
+ok('an address with no account is refused', nr.status, 404);
+const notAdmin = await (await open('/accept-account-invite', { method: 'POST',
+  body: JSON.stringify({ token: plain.token, password: 'a-good-password' }) })).json();
+nr = await worker.fetch(new Request('https://w/account/name', { method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + notAdmin.token },
+  body: JSON.stringify({ email: 'sam@example.com', name: 'Mine now' }) }), env, { waitUntil: () => {} });
+ok('and so is anybody but an admin', nr.status, 403);
+
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

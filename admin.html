@@ -127,7 +127,11 @@
     background: var(--bg-input, #121820); color: var(--text, #F0ECE3);
     border: 1px solid var(--border); border-radius: 3px; padding: 2px 4px;
   }
-  .acct-row {
+  /* Block, not the theme's flex row: the theme gives .acct-row (the account
+     box's own rows) display:flex, which put an opened account's races beside
+     its header in a sliver of a column, one letter to a line. */
+  .acct-list .acct-row {
+    display: block; padding: 0;
     background: var(--bg-elevated); border: 1px solid var(--border);
     border-radius: 4px; overflow: hidden;
   }
@@ -171,8 +175,12 @@
     font-family: 'JetBrains Mono', monospace; font-size: 11px;
   }
   .acct-races .race-row {
-    display: flex; justify-content: space-between; gap: 10px; padding: 4px 0;
+    display: flex; justify-content: space-between; gap: 6px 10px; padding: 4px 0;
+    /* On a phone the role and the hub button drop under the name rather than
+       squeezing it. */
+    flex-wrap: wrap; align-items: baseline;
   }
+  .acct-races .race-row .row-end { margin-left: auto; }
   .acct-races a { color: var(--text-dim); text-decoration: none; word-break: break-all; }
   .acct-races a:hover { color: var(--accent); }
   .acct-races .role { color: var(--text-muted); white-space: nowrap; }
@@ -188,6 +196,13 @@
   .acct-races .vis-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
   .acct-races .vis-btn:disabled { opacity: 0.5; cursor: default; }
   .acct-races .vis-err { color: var(--red); padding: 2px 0 6px; white-space: normal; }
+  .acct-races .race-row a { min-width: 0; overflow-wrap: anywhere; word-break: normal; }
+  .acct-name-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 0 10px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .acct-name-edit .lbl { color: var(--text-muted); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; }
+  .acct-name-edit input { flex: 1 1 180px; min-width: 0; font-family: inherit; font-size: 12px; padding: 6px 8px;
+    background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 3px; }
+  .acct-name-edit input:focus { outline: none; border-color: var(--accent); }
+  .acct-name-edit .hint { flex-basis: 100%; color: var(--text-muted); font-size: 10px; }
   .pending {
     margin-top: 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
   }
@@ -217,6 +232,13 @@
   .areq-kind.is-reset { color: var(--yellow); border-color: var(--yellow); }
   .areq-kind.is-invite { color: var(--accent); border-color: var(--accent); }
   .areq-actions { display: flex; gap: 8px; align-items: flex-start; flex-shrink: 0; flex-wrap: wrap; }
+  /* The request and feedback rows are the theme's flex row, text beside the
+     buttons. On a phone that pushed the buttons off the right edge, so there
+     the buttons go under the text. */
+  @media (max-width: 560px) {
+    .acct-row:has(> .areq-actions) { flex-direction: column; align-items: stretch; }
+    .areq-actions { flex-shrink: 1; }
+  }
   .areq-out { margin-top: 8px; }
   .areq-out:empty { display: none; }
 </style>
@@ -344,7 +366,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=97ed7195"></script>
+<script src="lib/race-core.js?v=8bb92e0c"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -1098,13 +1120,61 @@
     box.className = 'acct-races';
     box.textContent = 'Loading…';
     row.appendChild(box);
+    const acct = allAccounts.find(a => a.email === row.dataset.email) || {};
     try {
       const r = await Race.api.accountRaces(row.dataset.email);
-      box.innerHTML = raceRows(r.races || []);
+      box.innerHTML = nameEditor(acct) + raceRows(r.races || []);
       wireVisButtons(box);
     } catch (err) {
-      box.innerHTML = '<span class="err">' + esc(err.message) + '</span>';
+      box.innerHTML = nameEditor(acct) + '<span class="err">' + esc(err.message) + '</span>';
     }
+    wireNameEditor(box, row, acct);
+  }
+
+  // The admin's own name for an account: how the list knows who an address
+  // is. Their profile is theirs to write, so this is a label kept beside the
+  // account, and the profile name shows through when it is blank.
+  function nameEditor(a) {
+    const hint = a.profileName
+      ? (a.adminName ? `Their profile says ${esc(a.profileName)}.` : `From their profile. Type here to use your own name for them.`)
+      : 'Only you see this. Their own profile name, if they set one, shows when this is blank.';
+    return `<div class="acct-name-edit">
+      <span class="lbl">Name</span>
+      <input type="text" maxlength="80" data-name-input value="${esc(a.adminName || a.profileName || a.name || '')}" placeholder="Who this is" />
+      <button type="button" class="vis-btn" data-name-save>Save</button>
+      <span class="hint" data-name-hint>${hint}</span>
+    </div>`;
+  }
+
+  function wireNameEditor(box, row, acct) {
+    const input = box.querySelector('[data-name-input]');
+    const save = box.querySelector('[data-name-save]');
+    const hint = box.querySelector('[data-name-hint]');
+    if (!input || !save) return;
+    const go = async () => {
+      let name = input.value.trim();
+      // Saving their profile name back unchanged is not a name of your own.
+      if (!acct.adminName && name === (acct.profileName || '')) name = '';
+      save.disabled = true; save.textContent = '…';
+      try {
+        await Race.api.setAccountName(acct.email, name);
+        acct.adminName = name;
+        acct.name = name || acct.profileName || '';
+        const head = row.querySelector('.acct-head');
+        let span = head.querySelector('.acct-name');
+        if (acct.name) {
+          if (!span) { span = document.createElement('span'); span.className = 'acct-name'; head.prepend(span); }
+          span.textContent = acct.name;
+        } else if (span) span.remove();
+        input.value = acct.name;
+        hint.textContent = 'Saved.';
+      } catch (err) {
+        hint.textContent = 'Could not save: ' + (err.message || err);
+      }
+      save.disabled = false; save.textContent = 'Save';
+    };
+    save.addEventListener('click', go);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
   }
 </script>
 

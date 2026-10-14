@@ -2090,6 +2090,9 @@ async function handleAcceptAccountInvite(req, env) {
   }
   try { await createUserInKv(env, rec.email, password, 'crew'); }
   catch (err) { return json({ error: err.message || 'Could not create account' }, { status: 500 }, env, req); }
+  // The name the invite was written out to follows them onto the account, so
+  // the accounts list still says who they are once the invite is gone.
+  if (rec.name) { try { await env.AUTH_KV.put('acctname:' + normalizeEmail(rec.email), clip(rec.name, 80)); } catch (e) {} }
   await env.AUTH_KV.delete('acct:' + token);
   const exp = Date.now() + SESSION_HOURS * 3600 * 1000;
   const sessionToken = await signJwt({ sub: rec.email, email: rec.email, role: 'crew', exp }, env.JWT_SECRET);
@@ -2113,6 +2116,26 @@ async function handleEntitlements(req, env) {
 
 // Admin-only: move an account between plans. This exists before billing does,
 // because the only way to see what a free account sees is to have one.
+// Admin-only: the admin's own name for an account, for the accounts list. Not
+// the person's profile, which is theirs alone to write: this is a label kept
+// beside the account, like the name on an invite. Blank clears it.
+async function handleAccountName(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Names require AUTH_KV KV namespace binding' }, { status: 503 }, env, req);
+  let body;
+  try { body = await req.json(); }
+  catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  const email = normalizeEmail(body && body.email);
+  if (!email) return json({ error: 'email required' }, { status: 400 }, env, req);
+  if (!(await lookupUser(env, email))) return json({ error: 'Account not found' }, { status: 404 }, env, req);
+  const name = clip(body && body.name, 80);
+  if (name) await env.AUTH_KV.put('acctname:' + email, name);
+  else await env.AUTH_KV.delete('acctname:' + email);
+  return json({ ok: true, email, name }, {}, env, req);
+}
+
 async function handleAccountPlan(req, env) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -2436,9 +2459,14 @@ async function handleAccounts(req, env) {
   //
   // Blank for anybody who has not filled their profile in. The page falls back
   // to the address, which is honest; a name guessed from an address is not.
-  const named = await Promise.all([...byEmail.values()].map(async (a) => ({
-    ...a, name: profileName(await loadProfile(env, a.email).catch(() => null))
-  })));
+  // An admin's own name for an account, set on this page or carried over
+  // from the invite, wins over the profile: it is how the admin knows them,
+  // and the profile is often blank. Their own profile is never written.
+  const named = await Promise.all([...byEmail.values()].map(async (a) => {
+    const profile = profileName(await loadProfile(env, a.email).catch(() => null));
+    const adminName = env.AUTH_KV ? ((await env.AUTH_KV.get('acctname:' + a.email).catch(() => null)) || '') : '';
+    return { ...a, name: adminName || profile, adminName, profileName: profile };
+  }));
 
   // removable: the worker can delete a KV account; accounts baked into the
   // USERS env var can only be removed by re-running `wrangler secret put`.
@@ -2469,6 +2497,7 @@ async function handleAccountDelete(req, env) {
   }
   await env.AUTH_KV.delete('user:' + email);
   await env.AUTH_KV.delete('profile:' + email);
+  await env.AUTH_KV.delete('acctname:' + email);
   // Everything else kept per account goes with it: the results and reports
   // from the profile page, and Google and Facebook sign-in links.
   await env.AUTH_KV.delete(RESULTS_KEY(email));
@@ -6120,6 +6149,7 @@ async function route(request, env, ctx) {
     if (request.method === 'POST' && path === '/d1-backfill')     return handleD1Backfill(request, env);
     if (request.method === 'GET'  && path === '/entitlements')    return handleEntitlements(request, env);
     if (request.method === 'POST' && path === '/account/plan')    return handleAccountPlan(request, env);
+    if (request.method === 'POST' && path === '/account/name')    return handleAccountName(request, env);
     if (request.method === 'GET'  && path === '/accounts')        return handleAccounts(request, env);
     if (request.method === 'POST' && path === '/account/delete')  return handleAccountDelete(request, env);
     if (request.method === 'GET'  && path === '/account-races')   return handleAccountRaces(request, env);

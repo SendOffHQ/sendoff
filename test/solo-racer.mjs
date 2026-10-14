@@ -251,7 +251,9 @@ srv.kill('SIGKILL');
 await waitFor(false);
 await page.fill('#jot', 'blister on left heel');
 await page.click('#jot-send');
-await page.waitForTimeout(600);
+// Waited for rather than slept on: a fixed 600ms failed once on a busy runner.
+await page.waitForFunction(() => [...document.querySelectorAll('#jot-list div')].some(d => /blister on left heel$/.test(d.textContent)),
+  null, { timeout: 5000 }).catch(() => {});
 ok('it still shows as written', await page.evaluate(() =>
   [...document.querySelectorAll('#jot-list div')].some(d => /blister on left heel$/.test(d.textContent))), true);
 ok('and is held on the phone', await page.evaluate(() => Race.queue.pending().length > 0), true);
