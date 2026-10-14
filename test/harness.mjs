@@ -62,6 +62,7 @@ let myProfile = { email: ME, firstName: '', lastName: '', displayName: '', targe
 // older worker does not send one, and the page has to cope by not offering a
 // button that could only fail, which is a thing worth being able to ask for.
 let noMail = false;
+let LAST_INVITE = null, requestsOn = false;
 
 // Whether the roster names somebody else as the creator, for the check that
 // the creator-only sections stay hidden. And whether a visibility save is
@@ -535,6 +536,14 @@ const server = http.createServer((req, res) => {
   // it was handed. /api/account-invite-nomail is how it asks what an older
   // worker, which returns the link alone, looks like.
   if (url.pathname === '/api/account-invite-nomail') { noMail = true; return send(200, '{"ok":true}'); }
+  // The invite asked for last, so a test can see what the admin page sent;
+  // and an opt-in requests queue with one row in it, for the same reason.
+  if (url.pathname === '/api/last-invite') return send(200, JSON.stringify(LAST_INVITE || {}), 'application/json');
+  if (url.pathname === '/api/requests-on') { requestsOn = true; return send(200, '{"ok":true}'); }
+  if (url.pathname === '/api/access-requests' && requestsOn) {
+    return send(200, JSON.stringify({ requests: [{ key: 'areq:stub-1', kind: 'invite', email: 'asker@example.com',
+      name: 'Avery Asker', race: 'Big Hill 100', note: '', requestedAt: '2026-10-10T12:00:00.000Z' }] }), 'application/json');
+  }
   if (url.pathname === '/api/account-invite' || url.pathname === '/api/reset-link') {
     const isReset = url.pathname === '/api/reset-link';
     let body = '';
@@ -544,6 +553,7 @@ const server = http.createServer((req, res) => {
       let j = {}; try { j = JSON.parse(body); } catch (e) {}
       const link = isReset ? 'http://localhost:8787/reset.html?reset=stub-reset'
                            : 'http://localhost:8787/signup.html?account=stub-account';
+      if (!isReset) LAST_INVITE = j;
       const out = { token: isReset ? 'stub-reset' : 'stub-account', url: link, email: j.email,
                     expiresAt: Date.now() + 14 * 24 * 3600e3, emailed: false, emailError: null };
       if (!noMail) {
@@ -575,7 +585,8 @@ const server = http.createServer((req, res) => {
         mk('jason@example.com', 'Jason Dupree', 'crew', 'free', true),
         mk('nameless@example.com', '', 'crew', 'free', false)
       ],
-      pendingInvites: [{ token: 'stub-pending', email: 'waiting@example.com',
+      pendingInvites: [{ token: 'stub-pending', email: 'waiting@example.com', name: 'Wren Waiting',
+                         createdBy: 'admin@example.com', createdAt: '2026-10-01T15:00:00.000Z',
                          expiresAt: Date.now() + 14 * 24 * 3600e3 }]
     }), 'application/json');
   }

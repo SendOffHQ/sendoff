@@ -145,6 +145,28 @@ ok('the branded button is disabled, not missing', await page.evaluate(() => {
 ok('and it says why', await page.evaluate(() =>
   /deploy the worker/i.test(document.querySelector('#inv-out [data-compose-help]').textContent)), true);
 
+console.log('\na name to go with it');
+await page.evaluate(base => fetch(base + '/api/requests-on'), BASE);
+await page.goto(BASE + '/admin.html');
+await page.waitForSelector('#inv-name', { timeout: 20000 });
+await page.fill('#inv-name', 'Sam Rivers');
+await page.fill('#inv-email', 'sam@example.com');
+await page.click('#inv-gen');
+await page.waitForSelector('#inv-out .ok', { timeout: 20000 });
+const sent = await page.evaluate(base => fetch(base + '/api/last-invite').then(r => r.json()), BASE);
+ok('goes to the worker with the invite', [sent.email, sent.name], ['sam@example.com', 'Sam Rivers']);
+ok('and the hand-sent draft says hi to them', decodeURIComponent(await inOut('a[href^="mailto:"]').getAttribute('href')).includes('Hi Sam,'), true);
+ok('the box is cleared for the next one', await page.inputValue('#inv-name'), '');
+await page.waitForSelector('.pending-row', { timeout: 10000 });
+const prow = await page.textContent('.pending-row .who');
+ok('pending invites show the name, who sent it and when',
+  [/Wren Waiting/.test(prow), /waiting@example\.com/.test(prow), /invited by admin@example\.com on Oct 1/.test(prow)], [true, true, true]);
+await page.waitForSelector('[data-act="areq:stub-1"]', { timeout: 10000 });
+await page.click('[data-act="areq:stub-1"]');
+await page.waitForFunction(() => /New invite/.test(document.querySelector('[data-act="areq:stub-1"]').textContent), null, { timeout: 10000 });
+const fromReq = await page.evaluate(base => fetch(base + '/api/last-invite').then(r => r.json()), BASE);
+ok('an invite raised from a request carries the name they gave', [fromReq.email, fromReq.name], ['asker@example.com', 'Avery Asker']);
+
 ok('nothing threw', errs, []);
 await b.close();
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');

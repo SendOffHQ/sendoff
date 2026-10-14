@@ -117,7 +117,7 @@ await type(''); await set('acct-plan-filter', '');
 console.log('\npending invites are left out of all of it');
 await type('zzz-matches-nothing');
 ok('still listed', await page.evaluate(() =>
-  [...document.querySelectorAll('#pending-list .pending-row .who')].map(e => e.textContent)),
+  [...document.querySelectorAll('#pending-list .pending-row .who')].map(e => (e.textContent.match(/[\w.+-]+@[\w.-]+\.[a-z]+/i) || [''])[0])),
   ['waiting@example.com']);
 await type('');
 

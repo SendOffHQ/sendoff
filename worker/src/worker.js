@@ -2020,13 +2020,16 @@ async function handleAccountInvite(req, env) {
   catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
   const email = normalizeEmail(body && body.email);
   if (!email) return json({ error: 'email required' }, { status: 400 }, env, req);
+  // Who it is for, as the admin knows them: the greeting in the mail, and the
+  // name beside the address in Pending account invites. Optional.
+  const name = clip(body && body.name, 80);
   if (await lookupUser(env, email)) {
     return json({ error: 'An account with that email already exists' }, { status: 409 }, env, req);
   }
   const token = randomToken(24);
   const expiresAt = Date.now() + INVITE_TTL_DAYS * 24 * 3600 * 1000;
   await env.AUTH_KV.put('acct:' + token, JSON.stringify({
-    email, createdBy: session.email, createdAt: new Date().toISOString(), expiresAt
+    email, name: name || null, createdBy: session.email, createdAt: new Date().toISOString(), expiresAt
   }), { expiration: Math.floor(expiresAt / 1000) });
   const base = publicBaseUrl(env, req);
   const url = (base ? base : '') + `/signup.html?account=${encodeURIComponent(token)}`;
@@ -2037,13 +2040,13 @@ async function handleAccountInvite(req, env) {
   // The rendered message goes back with the link. Sending it by hand is the
   // normal path right now, and building it a second time in the admin page is
   // how the two would drift into saying different things.
-  const mail = inviteMail(env, url, INVITE_TTL_DAYS);
+  const mail = inviteMail(env, url, INVITE_TTL_DAYS, name);
   let emailed = false, emailError = null;
   if (body && body.send) {
     const err = await sendMail(env, { to: email, from: mailFrom(env, 'invite'), ...mail });
     if (err) emailError = err; else emailed = true;
   }
-  return json({ token, url, email, expiresAt, emailed, emailError, mail }, {}, env, req);
+  return json({ token, url, email, name: name || null, expiresAt, emailed, emailError, mail }, {}, env, req);
 }
 
 // Public: metadata for an account-invite link.
@@ -2419,7 +2422,8 @@ async function handleAccounts(req, env) {
         // byEmail holds every account this deployment has, from USERS and from
         // KV both, and is complete by this point.
         if (byEmail.has(normalizeEmail(r.email))) continue;
-        pendingInvites.push({ token: k.name.slice(5), email: r.email, expiresAt: r.expiresAt || null });
+        pendingInvites.push({ token: k.name.slice(5), email: r.email, name: r.name || null,
+          createdBy: r.createdBy || null, createdAt: r.createdAt || null, expiresAt: r.expiresAt || null });
       } catch (e) {}
     }
   }
@@ -3657,9 +3661,12 @@ function mailButton(url, label) {
 // The two messages an admin sends from the requests queue. Each carries a
 // plain-text alternative: some clients prefer it, some people insist on it,
 // and a mail with only an HTML part looks worse to a spam filter.
-function inviteMail(env, url, days) {
+// `name` is whoever the admin wrote it out to, first name only in the
+// greeting: "Hi Sam," reads like a person sent it, which one did.
+function inviteMail(env, url, days, name) {
+  const first = String(name || '').trim().split(/\s+/)[0] || '';
   const h1 = `<h1 style="margin:0 0 14px;font-size:22px;line-height:1.25;color:${MAIL_INK}">` +
-             `You are in.</h1>`;
+             `${first ? escHtml(first) + ', you' : 'You'} are in.</h1>`;
   return {
     subject: 'Your SendOff invite',
     html: mailShell(env, `Set up your account. The link expires in ${days} days.`,
@@ -3668,7 +3675,7 @@ function inviteMail(env, url, days) {
       mailButton(url, 'Set up your account') +
       `<p style="margin:20px 0 0;font-size:13px;color:${MAIL_MUTED}">The link works once and ` +
       `expires in ${days} days. If you did not ask for this, you can ignore it.</p>`),
-    text: `You are in.\n\nYou asked for an invite to SendOff. Set up your account here:\n\n${url}\n\n` +
+    text: `${first ? first + ', you' : 'You'} are in.\n\nYou asked for an invite to SendOff. Set up your account here:\n\n${url}\n\n` +
           `The link works once and expires in ${days} days. If you did not ask for this, you can ignore it.\n\n` +
           `SendOff, live crew tracking for ultras. ${mailBase(env)}\n`
   };

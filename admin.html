@@ -200,6 +200,9 @@
     border-bottom: 1px solid var(--border);
   }
   .pending-row .who { flex: 1; color: var(--text-dim); word-break: break-all; }
+  .pending-row .pending-name { color: var(--text); font-weight: 700; }
+  label.field > .lbl .opt { color: var(--text-muted); text-transform: none; letter-spacing: 0; margin-left: 4px; }
+  .pending-row .pending-meta { display: block; color: var(--text-muted); font-size: 10px; margin-top: 2px; }
   .pending-row button {
     background: transparent; border: 1px solid var(--border);
     color: var(--text-muted); padding: 4px 8px; border-radius: 3px;
@@ -260,6 +263,10 @@
            guessing: a line claiming invites send themselves, on a deployment
            where they do not, is worse than no line. -->
       <p class="lead" id="mail-status"></p>
+      <label class="field">
+        <span class="lbl">Their name <span class="opt">optional</span></span>
+        <input type="text" id="inv-name" maxlength="80" placeholder="Sam Rivers" autocomplete="off" />
+      </label>
       <label class="field">
         <span class="lbl">Their email</span>
         <input type="email" id="inv-email" placeholder="friend@example.com" autocomplete="off" spellcheck="false" />
@@ -337,7 +344,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=9780d1db"></script>
+<script src="lib/race-core.js?v=97ed7195"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -650,12 +657,15 @@
 
   async function genInvite() {
     const email = document.getElementById('inv-email').value.trim();
+    // Greets them by it in the mail, and sits beside the address under
+    // Pending account invites so it is plain who an invite was for.
+    const name = document.getElementById('inv-name').value.trim();
     const out = document.getElementById('inv-out');
     if (!email) { out.innerHTML = '<div class="err">Email required.</div>'; return; }
     const btn = document.getElementById('inv-gen');
     btn.disabled = true; btn.textContent = 'Generating…';
     try {
-      const r = await Race.api.accountInvite(email, { send: canSendMail });
+      const r = await Race.api.accountInvite(email, { send: canSendMail, name });
       // The same four ways out the requests queue below already offers, and it
       // had them from the day it shipped while this panel had only Copy link.
       // The two generate the same invite, so an invite typed in by hand went
@@ -666,9 +676,10 @@
         sentHead(r, email, 'signup link', '14 days',
           'They set a password and can then create their own races.') +
         '<span class="url">' + esc(r.url) + '</span>' +
-        composeBtns('invite', '', email, r.url) + '</div>';
+        composeBtns('invite', name, email, r.url) + '</div>';
       wireCompose(out, r.mail);
       document.getElementById('inv-email').value = '';
+      document.getElementById('inv-name').value = '';
       loadAccounts();
     } catch (err) {
       out.innerHTML = '<div class="err">' + esc(err.message || 'Could not generate invite.') + '</div>';
@@ -732,7 +743,7 @@
             const label = b.textContent;
             b.disabled = true; b.textContent = canSendMail ? 'Sending…' : 'Composing…';
             try {
-              const opts = { send: canSendMail };
+              const opts = { send: canSendMail, name: row.name || '' };
               const r = isReset ? await Race.api.resetLink(row.email, opts)
                                 : await Race.api.accountInvite(row.email, opts);
               const days = isReset ? '2 days' : '14 days';
@@ -987,9 +998,14 @@
     if (!pending.length) { wrap.style.display = 'none'; return; }
     wrap.style.display = '';
     const host = document.getElementById('pending-list');
+    // Who it is for, and who sent it when: an address alone left an admin
+    // asking where an invite had come from.
+    const day = (iso) => { const d = iso ? new Date(iso) : null;
+      return d && !isNaN(d) ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''; };
     host.innerHTML = pending.map(p => `
       <div class="pending-row">
-        <span class="who">${esc(p.email)}</span>
+        <span class="who">${p.name ? `<b class="pending-name">${esc(p.name)}</b> ` : ''}${esc(p.email)}${
+          p.createdBy || p.createdAt ? ` <span class="pending-meta">invited${p.createdBy ? ' by ' + esc(p.createdBy) : ''}${day(p.createdAt) ? ' on ' + esc(day(p.createdAt)) : ''}</span>` : ''}</span>
         <button type="button" data-cancel="${esc(p.token)}">Cancel</button>
       </div>`).join('');
     host.querySelectorAll('[data-cancel]').forEach(b => {

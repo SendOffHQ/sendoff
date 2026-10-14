@@ -227,5 +227,19 @@ ok('with what the admin needs to chase it', await (async () => {
   return !!(row && row.email && row.token && row.expiresAt);
 })(), true);
 
+console.log('\nan invite with a name on it');
+const named = await (await call('/account-invite', { method: 'POST',
+  body: JSON.stringify({ email: 'sam@example.com', name: '  Sam Rivers  ' }) })).json();
+ok('the mail greets them by first name', [/>Sam, you are in\.<\/h1>/.test(named.mail.html), named.mail.text.startsWith('Sam, you are in.')], [true, true]);
+const row = ((await (await call('/accounts')).json()).pendingInvites || []).find(i => i.email === 'sam@example.com');
+ok('and the list says who it is for, who sent it and when',
+  [row && row.name, row && row.createdBy, /^\d{4}-\d\d-\d\dT/.test(row && row.createdAt || '')], ['Sam Rivers', ADMIN, true]);
+const sly = await (await call('/account-invite', { method: 'POST',
+  body: JSON.stringify({ email: 'sly@example.com', name: '<img src=x>' }) })).json();
+ok('a name is text in the mail, never markup', [sly.mail.html.includes('<img src=x>'), sly.mail.html.includes('&lt;img')], [false, true]);
+const plain = await (await call('/account-invite', { method: 'POST',
+  body: JSON.stringify({ email: 'plain@example.com' }) })).json();
+ok('and with no name it reads as it always has', [/>You are in\.<\/h1>/.test(plain.mail.html), plain.name], [true, null]);
+
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);
