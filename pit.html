@@ -279,7 +279,7 @@
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=a1341ad0"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/race-core.js?v=a5f1b88d"></script>
+<script src="lib/race-core.js?v=9613a480"></script>
 <script src="lib/course-view.js?v=bb2e63e2"></script>
 <script>
   const slug = Race.qs('id');
@@ -393,6 +393,14 @@
     const leg = runner && (runner.legs || []).find(l => l.index === legIndex);
     if (!leg) return;
     const isStart = field === 'startTime';
+    // A station the racer went by with no check-in, marked Skipped on their
+    // phone: the arrival there and the send-off after it are one estimate.
+    // A real time for either, from somebody who saw it, goes on both, and the
+    // station counts as checked in.
+    const nb = (i) => (runner.legs || []).find(l => l.index === i);
+    const joined = isStart
+      ? (nb(legIndex - 1) && nb(legIndex - 1).skipped && nb(legIndex - 1).endTime === leg.startTime ? legIndex - 1 : null)
+      : (leg.skipped && nb(legIndex + 1) && nb(legIndex + 1).startTime === leg.endTime ? legIndex + 1 : null);
     const cur = leg[field] ? Date.parse(leg[field]) : null;
     const otherMs = Date.parse(isStart ? leg.endTime : leg.startTime) || null;
     const pad = n => String(n).padStart(2, '0');
@@ -419,6 +427,7 @@
           </div>
         </label>
         ${otherMs != null ? `<p class="edit-time-other">${isStart ? 'Arrival' : 'Send-off'} on this leg: ${escapeHtml(Race.tz.format(otherMs, cfg, { weekday: 'short', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }))}</p>` : ''}
+        ${joined != null ? `<p class="edit-time-other">No check-in here, so this is an estimate. A time saved goes on both legs either side of the station.</p>` : ''}
       </div>`;
     const daySel = m.body.querySelector('[data-edit="day"]');
     const timeIn = m.body.querySelector('[data-edit="time"]');
@@ -462,8 +471,13 @@
       }
       m.primary.disabled = true;
       try {
-        const r = await Race.queue.write(DATA_PATH, 'setLegTimes',
-          { runnerId, legs: { [legIndex]: { [field]: new Date(next).toISOString() } } },
+        const iso = new Date(next).toISOString();
+        const legs = { [legIndex]: { [field]: iso } };
+        if (joined != null) {
+          if (isStart) legs[joined] = { endTime: iso, skipped: null };
+          else { legs[legIndex].skipped = null; legs[joined] = { startTime: iso }; }
+        }
+        const r = await Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId, legs },
           `pit: edit ${runnerId} leg ${legIndex} ${field}`);
         m.close();
         toast(r.queued ? 'No signal · time saved on this phone' : 'Time saved', 'ok');
@@ -720,7 +734,7 @@
   // The two times the selected leg actually holds, to the second. A press that
   // went in a minute late, or one that never went in at all, is the thing a
   // crew is scanning for, and neither shows up in a duration.
-  function legTimesLine(leg) {
+  function legTimesLine(leg, runner) {
     if (!leg) return '';
     const clock = ts => Race.fmt.clockTimeSec(ts, cfg);
     // With how the racer said they felt at that moment, when they said.
@@ -728,10 +742,19 @@
     const cell = (label, ts, v) => ts
       ? `<span><span class="k">${label}</span> ${escapeHtml(clock(ts))}${face(v)}</span>`
       : `<span class="missing"><span class="k">${label}</span> not recorded</span>`;
-    const dur = (leg.startTime && leg.endTime)
+    // A station skipped on the racer's phone has no check-in on either side
+    // of it, and the legs it joins are one time.
+    const legs = (runner && runner.legs) || [];
+    const before = legs.find(l => l.index === leg.index - 1);
+    const none = (label) => `<span class="missing"><span class="k">${label}</span> no check-in</span>`;
+    const span = Race.skip.span(legs, leg.index);
+    const dur = span
+      ? `<span><span class="k">Legs ${span.first} to ${span.last}</span> ${Race.fmt.duration(span.sec)}</span>`
+      : (leg.startTime && leg.endTime)
       ? `<span><span class="k">Leg</span> ${Race.fmt.duration((new Date(leg.endTime) - new Date(leg.startTime)) / 1000)}</span>`
       : (leg.startTime ? '<span class="k">still out</span>' : '');
-    return `<div class="intake-times">${cell('Out', leg.startTime, leg.feelOut)}${cell('In', leg.endTime, leg.feelIn)}${dur}</div>`;
+    return `<div class="intake-times">${before && before.skipped ? none('Out') : cell('Out', leg.startTime, leg.feelOut)}${
+      leg.skipped ? none('In') : cell('In', leg.endTime, leg.feelIn)}${dur}</div>`;
   }
 
   function renderRunner(runner) {
@@ -847,7 +870,7 @@
           <span class="intake-panel-title">Intake / notes</span>
           <select data-intake-leg data-runner="${runner.id}">${legOptions}</select>
         </div>
-        ${legTimesLine(selectedLeg)}
+        ${legTimesLine(selectedLeg, runner)}
         ${fuelMetrics.length ? `<div class="intake-grid">
           ${fuelMetrics.map(m => `
           <label class="field">

@@ -1622,6 +1622,17 @@ unchanged. What changes is everything that counts the race.
 
 ---
 
+### A station gone by with no check-in — *built 2026-10-14*
+A racer who leaves the phone at the pit for an out-and-back comes back to a
+screen asking for the turnaround. Pressed, that was a leg out of an hour and
+a half and a leg back of one second, and the race page said so. Now the Undo
+bar after an arrival has "Skipped · check-in missed": the press becomes the
+arrival at the next station, the one in between is marked missed, and the
+stretch shows as one time. The split between the legs is an estimate from
+distance and climb, so per-leg charts stay sane; the crew can replace it with
+a real time from the pit board. Still to do: the same button on the pit
+board's own check-in, for a crew that missed a racer going through.
+
 ## 2. Planning & history
 
 ### Load a course after the race is created — *built 2026-09-24*

@@ -427,6 +427,10 @@
   .st-tag.nocrew { color: var(--red); }
   .st-tag.bag    { color: var(--accent); }
   .st-tag.pacer  { color: var(--green); }
+  /* A station that went by with no check-in, and the legs either side of it
+     shown as one time: on the first of them, with the rest pointing back. */
+  .st-tag.skip   { color: var(--yellow); }
+  .joined { color: var(--text-muted); font-weight: 400; font-size: 11px; }
 
   /* On a phone the columns do not fit: the segment name wraps to four lines
      and the last fuel metric falls off the right edge, and a race is free to
@@ -534,7 +538,7 @@
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8a2565f0"></script>
 <script src="lib/course-view.js?v=bb2e63e2"></script>
-<script src="lib/race-core.js?v=a5f1b88d"></script>
+<script src="lib/race-core.js?v=9613a480"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -655,7 +659,11 @@
       let cls = '';
       if (dur != null) cls = loopCellClass(dur, c.status);
       if (isCurrent) cls = 'current';
-      const text = dur != null
+      // A lap whose end went by with no tap is one time with the lap after it.
+      const span = Race.skip.span(runner.legs, idx1);
+      const text = span
+        ? (idx1 === span.first ? Race.fmt.durationShort(span.sec) : `<span class="joined">with L${span.first}</span>`)
+        : dur != null
         ? Race.fmt.durationShort(dur)
         : (isCurrent ? '···' : '–');
       // How they felt finishing the lap, if they said.
@@ -663,7 +671,8 @@
       const face = lap && Race.feel.valid(lap.feelIn) ? Race.feel.svg(lap.feelIn, 12) : '';
       // Which loop, when the course has more than one.
       const def = Race.course.legAt(cfg, idx1);
-      const which = def && def.loopName ? ` title="${escapeHtml(def.loopName)}, ${escapeHtml(Race.units.distance(def.distanceMi, cfg))}"` : '';
+      const which = span ? ` title="${escapeHtml(`No tap at ${Race.skip.missed(cfg, span).join(', ')}: one time for laps ${span.first} to ${span.last}`)}"`
+        : def && def.loopName ? ` title="${escapeHtml(def.loopName)}, ${escapeHtml(Race.units.distance(def.distanceMi, cfg))}"` : '';
       const tag = def && def.loopName ? `<span class="lp">${escapeHtml(def.loopName.replace(/^loop\s+/i, ''))}</span>` : '';
       return `<div class="leg-cell ${cls}"${which}><span class="n">L${idx1}${tag}${face ? ' ' + face : ''}</span><span class="t">${text}</span></div>`;
     }).join('');
@@ -706,6 +715,9 @@
         ? (new Date(entry.endTime) - new Date(entry.startTime)) / 1000 : null;
       const isCurrent = entry && entry.startTime && !entry.endTime;
       const isDone = dur != null;
+      // A station passed with no check-in: the time from the one before it
+      // to the one after is a single stretch, shown on its first leg.
+      const span = Race.skip.span(runner.legs, s.index);
       let cls = '';
       if (isDone) cls = 'done';
       if (isCurrent) cls = 'current';
@@ -721,10 +733,14 @@
       // Current-leg duration ticks every second via the .live-timer class.
       const durCell = isCurrent
         ? `<span class="col-dur live-timer" data-base="0" data-since="${entry.startTime}" data-fmt="short">${Race.fmt.durationShort(c.currentLegSeconds)}</span>`
+        : span
+        ? `<span class="col-dur">${s.index === span.first ? Race.fmt.durationShort(span.sec) : `<span class="joined">with ${span.first}</span>`}</span>`
         : `<span class="col-dur">${isDone ? Race.fmt.durationShort(dur) : '–'}</span>`;
 
       let pitCell = '<span class="col-pit"></span>';
-      if (pitLive) {
+      if (entry && entry.skipped) {
+        // Nobody stopped there that anybody saw.
+      } else if (pitLive) {
         pitCell = `<span class="col-pit"><span class="live-timer" data-base="0" data-since="${entry.endTime}" data-fmt="short">${Race.fmt.durationShort(c.currentPitSeconds)}</span> pit</span>`;
       } else if (pitDone != null) {
         pitCell = `<span class="col-pit">${Race.fmt.durationShort(pitDone)} pit</span>`;
@@ -734,8 +750,9 @@
         <div class="seg-row ${cls}">
           <span class="num">${s.index}</span>
           <span class="nm">
-            ${escapeHtml(s.name)}${stationTags(Race.stationAt(cfg, s.index))}
+            ${escapeHtml(s.name)}${stationTags(Race.stationAt(cfg, s.index))}${entry && entry.skipped ? ' <span class="st-tag skip">No check-in</span>' : ''}
             <div class="meta">${Race.units.distance(s.distanceMi, cfg)} · ${Race.units.distance(s.cumulativeMi, cfg)} total${s.elevationGainFt != null ? ` · +${Math.round(Race.units.elevationVal(s.elevationGainFt, cfg))}/-${Math.round(Race.units.elevationVal(Math.abs(s.elevationLossFt || 0), cfg))} ${Race.units.elevationLabel(cfg)}` : ''}</div>
+            ${span && s.index === span.first ? `<div class="meta skip-line">One time for legs ${span.first} to ${span.last}</div>` : ''}
             ${Race.feel.pair(entry) ? `<div class="meta feel-line">${Race.feel.pair(entry)}</div>` : ''}
           </span>
           ${durCell}
@@ -858,9 +875,15 @@
       } else if (l.endTime && !next && c.inPit && i === arr.length - 1) {
         pitSec = c.currentPitSeconds;
       }
-      const pitCell = pitSec != null
+      const pitCell = l.skipped ? '–' : pitSec != null
         ? Race.fmt.durationShort(pitSec) + (next ? '' : ' <span style="color: var(--accent); font-size: 9px;">●</span>')
         : '–';
+      // A station gone by with no check-in: no time it was reached, and one
+      // time for the stretch, on its first leg.
+      const span = Race.skip.span(arr, l.index);
+      const legCell = span
+        ? (l.index === span.first ? Race.fmt.durationShort(span.sec) : `<span class="joined">with ${span.first}</span>`)
+        : (dur ? Race.fmt.durationShort(dur) : '–');
       // Items tapped on this leg first: they are the only record an item
       // with no numbers leaves, and a medicine is the thing somebody
       // reads this line looking for.
@@ -891,15 +914,15 @@
       // lap-only loop just shows the index.
       const showName = segDef && segDef.name && !isSimpleLoop();
       const st = Race.stationAt(cfg, l.index);
-      const tagHtml = stationTags(st);
+      const tagHtml = stationTags(st) + (l.skipped ? ' <span class="st-tag skip">No check-in</span>' : '');
       const legLabel = showName
         ? `${l.index} <span class="leg-seg">${escapeHtml(segDef.name)}${tagHtml}</span>`
         : `${l.index}${tagHtml}`;
       return `
         <tr class="leg-row${oldCls}">
           <td class="leg-num">${legLabel}</td>
-          <td class="num" data-label="Done">${Race.fmt.clockTime(l.endTime, cfg)}</td>
-          <td class="num" data-label="Leg">${dur ? Race.fmt.durationShort(dur) : '–'}</td>
+          <td class="num" data-label="Done">${l.skipped ? '–' : Race.fmt.clockTime(l.endTime, cfg)}</td>
+          <td class="num" data-label="Leg">${legCell}</td>
           <td class="num" data-label="Pit">${pitCell}</td>
           ${fuelMetrics().map(m => `<td class="num" data-label="${escapeHtml(m.short)}">${
             Race.fuel.cell(m, l)}</td>`).join('')}

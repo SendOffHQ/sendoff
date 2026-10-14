@@ -232,6 +232,16 @@
     .rundo-btn { grid-column: 2; grid-row: 1; }
     .rundo-feel { grid-column: 1 / -1; grid-row: 2; padding-bottom: 6px; }
   }
+  /* The check-in that went by with the phone left behind: the press just made
+     was for a station already passed. Quiet, under the rest, since it is the
+     rare case. */
+  .rundo-skip { grid-column: 1 / -1; background: none; border: 1px dashed var(--border-bright); border-radius: 8px;
+    color: var(--text-dim); padding: 9px 12px; cursor: pointer; text-align: left; font: inherit; }
+  .rundo-skip .k { display: block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; }
+  .rundo-skip .d { display: block; font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+  .rundo-skip:hover { color: var(--yellow); border-color: var(--yellow); }
+  .rundo-msg .skipped { display: block; color: var(--yellow); font-size: 11px; margin-top: 4px; }
   .rundo-msg .stamp { display: block; color: var(--green); font-size: 15px; font-weight: 700; }
   .rundo-msg .fade { display: block; color: var(--text-muted); font-size: 11px; margin-top: 4px; }
   .rundo-btn {
@@ -320,7 +330,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=a1341ad0"></script>
-<script src="lib/race-core.js?v=a5f1b88d"></script>
+<script src="lib/race-core.js?v=9613a480"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -354,6 +364,11 @@
   // The press's own write. A feeling waits for it, so it never reaches the
   // file before the leg it belongs to does.
   let pressWrite = Promise.resolve();
+  // The press the bar stands for, so Undo takes back exactly what it wrote,
+  // and an arrival can be moved on to the station the racer is really at:
+  // which leg, out or in, when, where the leg began, how many stations were
+  // skipped, and the furthest leg it wrote.
+  let undoPress = null;
 
   function toast(text, kind) {
     const el = document.getElementById('toast');
@@ -645,9 +660,13 @@
         return;
       }
       const chosen = undoFeel && undoFeel.value;
+      const skip = skipOffer();
+      const skipped = undoPress && undoPress.skips
+        ? Race.skip.missed(cfg, { first: undoPress.legIndex, last: undoPress.legIndex + undoPress.skips }) : [];
       act.innerHTML = `<div class="rundo" data-undo="${undoUntil}">
         <span class="rundo-msg">
           <span class="stamp">${esc(undoLabel)}</span>
+          ${skipped.length ? `<span class="skipped">Skipped: ${esc(skipped.join(', '))}</span>` : ''}
           <span class="fade">Undo for ${left}s</span>
         </span>
         ${undoFeel ? `<div class="rundo-feel${chosen ? ' chosen' : ''}" role="group" aria-label="How are you feeling?">
@@ -656,8 +675,12 @@
             aria-pressed="${chosen === k}" aria-label="${Race.feel.LABEL[k]}">${Race.feel.svg(k, 40)}</button>`).join('')}</span>
         </div>` : ''}
         <button class="rundo-btn" type="button" id="undo">Undo</button>
+        ${skip ? `<button class="rundo-skip" type="button" id="skip"><span class="k">Skipped · check-in missed</span>
+          <span class="d">Past ${esc(skip.past)}, at ${esc(skip.at)} now</span></button>` : ''}
       </div>`;
       document.getElementById('undo').addEventListener('click', undoLast);
+      const sk = document.getElementById('skip');
+      if (sk) sk.addEventListener('click', skipStation);
       act.querySelectorAll('[data-feel]').forEach(b => b.addEventListener('click', () => chooseFeel(b.dataset.feel)));
       return;
     }
@@ -767,8 +790,11 @@
       if (!l) { l = { index: idx }; dr.legs = (dr.legs || []).concat([l]).sort((a, b) => a.index - b.index); }
       return l;
     };
+    const began = next.nextAction === 'in' ? (legFor(next.nextLegIndex).startTime || null) : null;
     legFor(next.nextLegIndex)[next.nextAction === 'out' ? 'startTime' : 'endTime'] = now;
     if (through) legFor(next.nextLegIndex + 1).startTime = now;
+    undoPress = { legIndex: next.nextLegIndex, action: next.nextAction, at: now, began, skips: 0,
+                  upTo: through ? next.nextLegIndex + 1 : next.nextLegIndex };
 
     const def = Race.course.legAt(cfg, next.nextLegIndex);
     undoLabel = (next.nextAction === 'in' ? 'Arrived' : 'Out') +
@@ -783,6 +809,65 @@
     try {
       pressWrite = Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId: meId, legs },
         `racer: ${runner.name || meId} ${next.nextAction === 'out' ? 'out' : 'in'} leg ${next.nextLegIndex}`);
+      await pressWrite;
+    } catch (err) {
+      toast(`Save failed: ${err.message}`, 'error');
+    }
+  }
+
+  // What a stop is called on the Skipped button: its aid station, or on a lap
+  // with none, the end of that lap.
+  function stopName(i) {
+    const d = Race.course.legAt(cfg, i) || {};
+    return d.toAid || (d.lap ? `the end of ${d.name}` : `leg ${i}`);
+  }
+
+  // An arrival, still in its Undo window, at a station with another after
+  // it: the press can be for the one past it instead. Null otherwise.
+  function skipOffer() {
+    const p = undoPress;
+    if (!p || p.action !== 'in' || !p.began) return null;
+    const pressed = p.legIndex + p.skips;
+    if (pressed + 1 > Race.course.legCount(cfg)) return null;
+    return { past: stopName(pressed), at: stopName(pressed + 1) };
+  }
+
+  // The racer left the phone behind and has just pressed a station they went
+  // by an hour ago. Skipped makes the press the arrival at the next one, the
+  // station in between missed, and the time from the last check-in to now one
+  // stretch rather than a long leg and a one-second one. A second tap skips
+  // another. Undo still takes back the whole press.
+  async function skipStation() {
+    if (!skipOffer() || Date.now() >= undoUntil) return;
+    const p = undoPress;
+    const was = p.legIndex + p.skips;
+    p.skips++;
+    const at = p.legIndex + p.skips;
+    const legs = Race.skip.legs(cfg, p.legIndex, p.skips, p.began, p.at);
+    // How they felt was asked on arriving, and they arrived here.
+    if (undoFeel) {
+      if (undoFeel.value) { legs[was].feelIn = null; legs[at].feelIn = undoFeel.value; }
+      undoFeel.legIndex = at;
+    }
+    p.upTo = Math.max(p.upTo, ...Object.keys(legs).map(Number));
+    const dr = (data.runners || []).find(r => r.id === meId);
+    if (dr) {
+      for (const k of Object.keys(legs)) {
+        let l = (dr.legs || []).find(x => x.index === +k);
+        if (!l) { l = { index: +k }; dr.legs = (dr.legs || []).concat([l]).sort((a, b) => a.index - b.index); }
+        for (const f of Object.keys(legs[k])) { if (legs[k][f] === null) delete l[f]; else l[f] = legs[k][f]; }
+      }
+    }
+    const def = Race.course.legAt(cfg, at);
+    undoLabel = `Arrived ${Race.fmt.clockTime(p.at, cfg)}` + ((def && def.toAid) ? ` · ${def.toAid}` : '');
+    undoUntil = Date.now() + UNDO_MS;
+    render();
+    // Chained on the press, and set before anything waits, so a face tapped
+    // straight after lands on the leg this writes rather than ahead of it.
+    const msg = `racer: ${merged().name || meId} skipped ${p.skips === 1 ? 'a station' : p.skips + ' stations'}, in leg ${at}`;
+    pressWrite = pressWrite.catch(() => {}).then(() =>
+      Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId: meId, legs }, msg));
+    try {
       await pressWrite;
     } catch (err) {
       toast(`Save failed: ${err.message}`, 'error');
@@ -820,8 +905,27 @@
     // The feeling went with the press, so it goes with the undo too.
     const feltWith = undoFeel && undoFeel.value ? undoFeel : null;
     undoFeel = null;
+    const press = undoPress;
+    undoPress = null;
     const dr = (data.runners || []).find(r => r.id === meId);
     if (!dr || !(dr.legs || []).length) { render(); return; }
+    // An arrival is taken back whole: the leg open again, and anything the
+    // press opened past it gone, which for a checkpoint is the leg after it
+    // and for a skipped station the legs it was joined to. The feeling asked
+    // on arriving goes with it.
+    if (press && press.action === 'in') {
+      const leg = dr.legs.find(l => l.index === press.legIndex);
+      if (leg) { delete leg.endTime; delete leg.skipped; delete leg.feelIn; }
+      dr.legs = dr.legs.filter(l => !(l.index > press.legIndex && l.index <= press.upTo));
+      render();
+      try {
+        await pressWrite.catch(() => {});
+        await Race.queue.write(DATA_PATH, 'reopenLeg', { runnerId: meId, legIndex: press.legIndex, upTo: press.upTo },
+          `racer: undo leg ${press.legIndex}`);
+        toast('Undone', 'ok');
+      } catch (err) { toast(`Undo failed: ${err.message}`, 'error'); }
+      return;
+    }
     const sorted = dr.legs.slice().sort((a, b) => a.index - b.index);
     const last = sorted[sorted.length - 1];
     const hasIn = !!last.endTime, hasOut = !!last.startTime;
@@ -1215,7 +1319,7 @@
     // whole readout would take a chip out from under a thumb already on it.
     setInterval(() => {
       if (!cfg || !data || !meId) return;
-      if (undoUntil && Date.now() >= undoUntil) { undoUntil = 0; undoFeel = null; renderAct(); load(); }
+      if (undoUntil && Date.now() >= undoUntil) { undoUntil = 0; undoFeel = null; undoPress = null; renderAct(); load(); }
       else if (undoUntil) renderAct();
       tickClocks();
     }, 1000);
