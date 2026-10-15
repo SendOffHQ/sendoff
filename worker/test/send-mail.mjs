@@ -108,7 +108,7 @@ const STRANGER = 'someone@nowhere.example';
 console.log('\nwith only the routing binding, a stranger cannot be reached');
 sent = [];
 let j = await (await invite(routingOnly, STRANGER)).json();
-ok('the link is still made', /signup\.html\?account=/.test(j.url || ''), true);
+ok('the link is still made', /signup\?account=/.test(j.url || ''), true);
 ok('but it was not emailed', j.emailed, false);
 ok('and the reason says so', /not verified/.test(j.emailError || ''), true);
 
@@ -129,7 +129,7 @@ console.log('\nand it is the branded message, from the right address');
 ok('from invites@, because it is an invite', sent[0].body.from, 'SendOff <invites@sendoff.run>');
 ok('carrying the subject the template wrote', sent[0].body.subject, 'Your SendOff invite');
 ok('with the rendered markup', /wordmark-email\.png/.test(sent[0].body.html || ''), true);
-ok('and the plain-text part beside it', /signup\.html\?account=/.test(sent[0].body.text || ''), true);
+ok('and the plain-text part beside it', /signup\?account=/.test(sent[0].body.text || ''), true);
 
 // A reset is not an invite and must not read as though the wrong department
 // answered, which is what INFO_FROM exists for.
@@ -155,7 +155,7 @@ ok('nor in anything the worker answers with', JSON.stringify(j).includes(KEY), f
 console.log('\nwhen Resend refuses it');
 resendStatus = 422; resendBody = { message: 'The sendoff.run domain is not verified.' };
 j = await (await invite(withResend, STRANGER)).json();
-ok('the invite is still issued', /signup\.html\?account=/.test(j.url || ''), true);
+ok('the invite is still issued', /signup\?account=/.test(j.url || ''), true);
 ok('and nothing threw', j.error || null, null);
 ok('the reason is one an operator can act on', j.emailError,
    'Resend refused it (422): The sendoff.run domain is not verified.');
@@ -165,13 +165,13 @@ console.log('\nand when Resend cannot be reached at all');
 networkDown = true;
 j = await (await invite(withResend, STRANGER)).json();
 ok('that reads as a different fault', /Could not reach Resend/.test(j.emailError || ''), true);
-ok('and the invite still stands', /signup\.html\?account=/.test(j.url || ''), true);
+ok('and the invite still stands', /signup\?account=/.test(j.url || ''), true);
 networkDown = false;
 
 console.log('\nwith no transport at all');
 j = await (await invite(noTransport, STRANGER)).json();
 ok('it says what is missing', /RESEND_API_KEY|EMAIL/.test(j.emailError || ''), true);
-ok('and the link is still handed over', /signup\.html\?account=/.test(j.url || ''), true);
+ok('and the link is still handed over', /signup\?account=/.test(j.url || ''), true);
 
 // What the admin page asks before deciding whether to offer to send at all.
 console.log('\nand the page can ask which of those it is looking at');

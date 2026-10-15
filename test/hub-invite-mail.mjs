@@ -93,7 +93,7 @@ console.log('\nthe bare link still does its own job');
 await page.click('#inv-out [data-copy]');
 await page.waitForTimeout(400);
 ok('the plain link, alone', await page.evaluate(() => navigator.clipboard.readText()),
-   'http://localhost:8787/signup.html?account=stub-account');
+   'http://localhost:8787/signup?account=stub-account');
 
 // Gmail cannot be handed markup in a compose URL, so the branded message goes
 // to the clipboard on the way out and the draft it opens is empty, ready to

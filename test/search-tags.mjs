@@ -26,6 +26,14 @@ ok('and none names another page', pages.filter(f => {
   const m = html(f).match(/<link rel="canonical" href="https:\/\/sendoff\.run\/([^"]*)"/);
   return m && m[1] !== (f === 'index.html' ? '' : f.replace(/\.html$/, ''));
 }), []);
+// Cloudflare Pages answers every .html address with a 308 to the address
+// without it, so a link to one hands Google a "Page with redirect" to find.
+// The pages, and the links the app writes, use the address that serves.
+const scripts = ['lib/race-core.js'].map(f => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')]);
+const htmlLinks = pages.concat(['app/index.html']).map(f => [f, html(f)]).concat(scripts).flatMap(([f, src]) =>
+  [...src.replace(/<!--[\s\S]*?-->/g, '').matchAll(/(?:href=["'`]|location\.(?:href|replace)\(?\s*=?\s*["'`]|file: ')\/?[a-z-]+\.html\b[^"'`]*/g)]
+    .map(m => `${f}: ${m[0]}`));
+ok('no link to a .html address, which only redirects', htmlLinks, []);
 ok('the race page has none of its own until it knows the race', /<link rel="canonical"/.test(html('race.html').replace(/<!--[\s\S]*?-->/g, '')), false);
 const sitemap = fs.readFileSync(path.join(ROOT, 'sitemap.xml'), 'utf8');
 const listed = JSON.parse(fs.readFileSync(path.join(ROOT, 'races/index.json'), 'utf8')).races.map(r => r.slug);

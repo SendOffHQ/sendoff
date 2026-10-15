@@ -75,7 +75,7 @@ ok('none of them pressable, and nothing to type in',
 ok('saying when it arrives, for whom',
    (await page.textContent(`${card(first.id)} .intake-preview-note`)).includes(`once ${first.name} is sent off`), true);
 ok('with a way to change the items',
-   await page.getAttribute(`${card(first.id)} .intake-preview-note a`, 'href'), `settings.html?id=${SLUG}#items`);
+   await page.getAttribute(`${card(first.id)} .intake-preview-note a`, 'href'), `/settings?id=${SLUG}#items`);
 const box = await page.$eval(`${card(first.id)} [data-intake-preview]`, e => e.getBoundingClientRect().height);
 ok('and small: under 140px on a phone', box < 140, true);
 

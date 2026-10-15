@@ -146,7 +146,7 @@ ok('is announced once', posts.length, 1);
 ok('with its name', /Blood Root Ultra/.test(posts[0].content), true);
 ok('where and when', /Vermont/.test(posts[0].content) && posts[0].content.includes(T0_DAY), true);
 ok('and a link somebody can follow',
-  /https:\/\/sendoff\.run\/race\.html\?id=902-open/.test(posts[0].content), true);
+  /https:\/\/sendoff\.run\/race\?id=902-open/.test(posts[0].content), true);
 
 console.log('\nan evening start, announced on its own day');
 posts = [];
@@ -171,7 +171,7 @@ await commit('races/905-pretty/config.json',
     visibility: 'public', createdBy: ME });
 ok('that page is what gets posted',
   /https:\/\/sendoff\.run\/races\/905-pretty\/$/m.test(posts[0].content.trim()), true);
-ok('and not the generic app URL', /race\.html\?id=/.test(posts[0].content), false);
+ok('and not the generic app URL', /race\?id=/.test(posts[0].content), false);
 
 const flush = async (e = env) => (await (await worker.fetch(new Request('https://w/discord/flush', { method: 'POST' }), e, ctx)).json());
 posts = [];
@@ -192,7 +192,7 @@ await commit('races/906-fresh/config.json',
   { ...course, name: 'Made Five Minutes Ago', location: 'Texas',
     visibility: 'public', createdBy: ME });
 ok('it falls back rather than posting a 404',
-  /race\.html\?id=906-fresh/.test(posts[0].content), true);
+  /race\?id=906-fresh/.test(posts[0].content), true);
 
 console.log('\nfinishing it');
 posts = [];
@@ -207,7 +207,7 @@ await flush();
 ok('and goes anyway when the card is too long coming', posts.length, 1);
 ok('naming the racer', /Jason Dupree/.test(posts[0].content), true);
 ok('with the elapsed time', /04:00:00/.test(posts[0].content), true);
-ok('and the race\'s own address', /race\.html\?id=902-open/.test(posts[0].content), true);
+ok('and the race\'s own address', /race\?id=902-open/.test(posts[0].content), true);
 
 console.log('\na held finish for a race that is gone');
 posts = [];
@@ -222,7 +222,7 @@ await commit('races/907-nogit/config.json',
   { ...course, name: 'No Repo 50', location: 'Ohio', visibility: 'public', createdBy: ME }, noGit);
 posts = [];
 await commit('races/907-nogit/data.json', legs(4), noGit);
-ok('the finish is posted at once, with the race\'s card', [posts.length, /race\.html\?id=907-nogit/.test(posts[0] && posts[0].content)], [1, true]);
+ok('the finish is posted at once, with the race\'s card', [posts.length, /race\?id=907-nogit/.test(posts[0] && posts[0].content)], [1, true]);
 
 console.log('\nand only once');
 posts = [];

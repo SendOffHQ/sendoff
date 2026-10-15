@@ -557,8 +557,8 @@ const server = http.createServer((req, res) => {
     return req.on('end', () => {
       if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
       let j = {}; try { j = JSON.parse(body); } catch (e) {}
-      const link = isReset ? 'http://localhost:8787/reset.html?reset=stub-reset'
-                           : 'http://localhost:8787/signup.html?account=stub-account';
+      const link = isReset ? 'http://localhost:8787/reset?reset=stub-reset'
+                           : 'http://localhost:8787/signup?account=stub-account';
       if (!isReset) LAST_INVITE = j;
       const out = { token: isReset ? 'stub-reset' : 'stub-account', url: link, email: j.email,
                     expiresAt: Date.now() + 14 * 24 * 3600e3, emailed: false, emailError: null };

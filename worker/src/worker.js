@@ -1963,7 +1963,7 @@ async function handleResetLink(req, env) {
   }), { expiration: Math.floor(expiresAt / 1000) });
 
   const base = publicBaseUrl(env, req);
-  const url = (base ? base : '') + `/reset.html?reset=${encodeURIComponent(token)}`;
+  const url = (base ? base : '') + `/reset?reset=${encodeURIComponent(token)}`;
 
   const mail = resetMail(env, url, RESET_TTL_DAYS);
   let emailed = false, emailError = null;
@@ -2046,7 +2046,7 @@ async function handleAccountInvite(req, env) {
     email, name: name || null, createdBy: session.email, createdAt: new Date().toISOString(), expiresAt
   }), { expiration: Math.floor(expiresAt / 1000) });
   const base = publicBaseUrl(env, req);
-  const url = (base ? base : '') + `/signup.html?account=${encodeURIComponent(token)}`;
+  const url = (base ? base : '') + `/signup?account=${encodeURIComponent(token)}`;
 
   // The link is returned either way. Mail is the convenience, not the record:
   // if it fails the admin still has something to paste into their own client,
@@ -3884,7 +3884,7 @@ async function shareUrl(env, slug) {
     const res = await fetch(pretty, { method: 'HEAD' });
     if (res.ok) return pretty;
   } catch (e) { /* fall through */ }
-  return `${base}/race.html?id=${encodeURIComponent(slug)}`;
+  return `${base}/race?id=${encodeURIComponent(slug)}`;
 }
 
 // The day a race starts, where it starts. In its own zone when it has one;
@@ -4945,7 +4945,7 @@ async function handleInvite(req, env) {
   }), { expiration: Math.floor(expiresAt / 1000) });
 
   const base = publicBaseUrl(env, req);
-  const url = (base ? base : '') + `/signup.html?invite=${encodeURIComponent(token)}`;
+  const url = (base ? base : '') + `/signup?invite=${encodeURIComponent(token)}`;
   return json({ token, url, email, slug, role, expiresAt }, {}, env, req);
 }
 
@@ -5071,7 +5071,7 @@ async function handleShareLink(req, env) {
   }), { expiration: Math.floor(expiresAt / 1000) });
 
   const base = publicBaseUrl(env, req);
-  const url = (base ? base : '') + `/race.html?id=${encodeURIComponent(slug)}&t=${encodeURIComponent(token)}`;
+  const url = (base ? base : '') + `/race?id=${encodeURIComponent(slug)}&t=${encodeURIComponent(token)}`;
   return json({ token, url, slug, role, expiresAt }, {}, env, req);
 }
 

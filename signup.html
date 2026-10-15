@@ -135,7 +135,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=f90aa4c3"></script>
+<script src="lib/race-core.js?v=ca2ef68a"></script>
 <script>
   function escapeHtml(s) {
     return String(s == null ? '' : s)
@@ -236,11 +236,11 @@
         if (mode === 'account') {
           await Race.api.acceptAccountInvite(token, password);
           detail = 'Account created. You can now set up your own races.';
-          href = 'setup.html'; linkText = 'Create a race →';
+          href = '/setup'; linkText = 'Create a race →';
         } else {
           const r = await Race.api.acceptInvite(token, password);
           detail = `${r.accountCreated ? 'Account created' : 'Signed in'} · added to "${r.slug}" as ${r.raceRole}.`;
-          href = `race.html?id=${encodeURIComponent(r.slug)}`; linkText = 'Go to the race →';
+          href = `/race?id=${encodeURIComponent(r.slug)}`; linkText = 'Go to the race →';
         }
         document.getElementById('state-form').style.display = 'none';
         document.getElementById('state-done').style.display = '';

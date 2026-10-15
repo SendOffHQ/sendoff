@@ -90,7 +90,7 @@ const note = await page.evaluate(() => {
            href: a ? a.getAttribute('href') : null };
 });
 ok('a note is shown', !!note, true);
-ok('pointing at this race\'s settings', note && note.href, `settings.html?id=${SLUG}`);
+ok('pointing at this race\'s settings', note && note.href, `/settings?id=${SLUG}`);
 ok('and saying what to do there', /invited|invite/i.test((note && note.text) || ''), true);
 
 // Said once. The marker comes off the address on the same pass that shows the

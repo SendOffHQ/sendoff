@@ -331,7 +331,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=a1341ad0"></script>
-<script src="lib/race-core.js?v=f90aa4c3"></script>
+<script src="lib/race-core.js?v=ca2ef68a"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -595,7 +595,7 @@
       jot.style.display = 'none';
       if (next.state !== 'idle') return;
       const items = Race.fuel.presetsInOrder(cfg);
-      const link = `settings.html?id=${encodeURIComponent(slug)}#items`;
+      const link = `/settings?id=${encodeURIComponent(slug)}#items`;
       document.getElementById('intake-chips').innerHTML = `<div class="rblock rpreview">
         <span class="rlbl">Log what you took</span>
         ${items.length ? `<div class="rpreview-chips">${items.map(({ p }) =>

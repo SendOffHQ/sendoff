@@ -50,7 +50,7 @@ const help = (await page.textContent('#ax-ai')).replace(/\s+/g, ' ');
 ok('it says what an AI crew can and cannot do', [/logs its best guess/.test(help), /cannot check anybody in or out/.test(help)], [true, true]);
 ok('and what connecting one shares, and with whom, before it is made',
   [/sends this race's course and cutoffs/.test(help), /Anthropic for Claude/.test(help)], [true, true]);
-ok('with the full story a tap away', await page.getAttribute('#ax-ai .ax-ai-privacy a', 'href'), 'privacy.html#ai-crew');
+ok('with the full story a tap away', await page.getAttribute('#ax-ai .ax-ai-privacy a', 'href'), '/privacy#ai-crew');
 await page.fill('#ax-ai-label', 'Claude');
 await page.click('#ax-ai-make');
 await page.waitForSelector('#ax-ai-result .url', { timeout: 10000 });

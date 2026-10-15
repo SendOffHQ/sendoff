@@ -416,7 +416,7 @@
               Only the crew and viewers you invite can open it: SendOff checks who is asking on every
               read, so the address on its own gets a stranger nothing. Share links let somebody view
               without an account. Not end-to-end encrypted.
-              <a href="/privacy.html#public" target="_blank" rel="noopener">What private means</a>.</span>
+              <a href="/privacy#public" target="_blank" rel="noopener">What private means</a>.</span>
           </div>
         </label>
       </div>
@@ -752,7 +752,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=f90aa4c3"></script>
+<script src="lib/race-core.js?v=ca2ef68a"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -1847,7 +1847,7 @@
         // applies; a race nobody can read yet is not a settings page anybody
         // can use.
         const more = (raceConfig.runners || []).length > 1 ? '&invite=1' : '';
-        location.href = `race.html?id=${encodeURIComponent(slug)}&new=1${more}`;
+        location.href = `/race?id=${encodeURIComponent(slug)}&new=1${more}`;
       }, 800);
     } catch (err) {
       progressLine(err.message || String(err), 'fail');

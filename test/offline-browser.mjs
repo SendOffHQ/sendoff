@@ -258,7 +258,7 @@ await page.waitForTimeout(3000);
 // An unlisted race is not in the published manifest at all, so without the saved
 // list the hub silently drops the one race the crew member is here for.
 ok('the unlisted race is still listed', await page.evaluate((s) =>
-  [...document.querySelectorAll('a[href*="race.html"]')].some(a => a.href.includes(s)), SLUG), true);
+  [...document.querySelectorAll('a[href*="race?id="]')].some(a => a.href.includes(s)), SLUG), true);
 
 await browser.close();
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');

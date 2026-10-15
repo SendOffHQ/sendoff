@@ -293,7 +293,7 @@
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=a1341ad0"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/race-core.js?v=f90aa4c3"></script>
+<script src="lib/race-core.js?v=ca2ef68a"></script>
 <script src="lib/course-view.js?v=bb2e63e2"></script>
 <script>
   const slug = Race.qs('id');
@@ -951,7 +951,7 @@
     // pressable, and a line saying when the real thing arrives. With no items
     // set up yet it says so, which is a job best done before race day.
     const who = escapeHtml(runner.name || runner.id);
-    const itemsLink = `settings.html?id=${encodeURIComponent(slug)}#items`;
+    const itemsLink = `/settings?id=${encodeURIComponent(slug)}#items`;
     const intakePreview = `
       <div class="intake-panel intake-preview" data-intake-preview>
         <div class="intake-panel-head"><span class="intake-panel-title">Intake / notes</span></div>
@@ -1116,7 +1116,7 @@
       try { sessionStorage.setItem(`sendoff-bounced-${slug}`, '1'); } catch (e) {}
       // replace, not assign: the back button should not land back here and go
       // round again.
-      location.replace(`racer.html?id=${encodeURIComponent(slug)}`);
+      location.replace(`/racer?id=${encodeURIComponent(slug)}`);
       return;
     }
     showRacerSwitch(mine);
@@ -1133,7 +1133,7 @@
     anchorEl.parentNode.insertBefore(bar, anchorEl);
     document.getElementById('to-racer').addEventListener('click', () => {
       try { localStorage.setItem(MODE_KEY, 'racer'); } catch (e) {}
-      location.href = `racer.html?id=${encodeURIComponent(slug)}`;
+      location.href = `/racer?id=${encodeURIComponent(slug)}`;
     });
   }
 

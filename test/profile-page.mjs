@@ -181,7 +181,7 @@ console.log('\nthe menu goes here');
 await page.goto(BASE + '/app/');
 await page.waitForTimeout(1200);
 ok('Profile in the account menu is this page',
-   await page.$$eval('.account-menu-item', els => els.filter(e => e.textContent.trim() === 'Profile').map(e => e.getAttribute('href'))), ['/profile.html']);
+   await page.$$eval('.account-menu-item', els => els.filter(e => e.textContent.trim() === 'Profile').map(e => e.getAttribute('href'))), ['/profile']);
 
 ok('no page errors', errs, []);
 await b.close(); srv.kill('SIGKILL');

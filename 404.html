@@ -33,7 +33,7 @@
     var m = /^\/races\/([^/.]+)\/?$/.exec(location.pathname);
     if (!m) return;
     var q = location.search.replace(/^\?/, '');
-    location.replace('/race.html?id=' + m[1] + (q ? '&' + q : '') + location.hash);
+    location.replace('/race?id=' + m[1] + (q ? '&' + q : '') + location.hash);
   })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
