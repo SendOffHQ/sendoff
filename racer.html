@@ -66,6 +66,7 @@
   .rmargin.tight { color: var(--yellow); }
   .rmargin.late  { color: var(--red); }
   .rmargin.none  { color: var(--text-muted); }
+  .rmargin.rgoal { font-size: 12px; margin-top: 4px; }
 
   .raid {
     display: block; font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
@@ -330,7 +331,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=a1341ad0"></script>
-<script src="lib/race-core.js?v=598c0d3d"></script>
+<script src="lib/race-core.js?v=f90aa4c3"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -456,6 +457,28 @@
     return `<div class="rmargin ${cls}">${Race.fmt.duration(c.leftMs / 1000)} on ${esc(c.what)} · closes ${clock}</div>`;
   }
 
+  // Their own goal, under the cutoff: whether the pace so far makes it, and
+  // by how much, in the same colours. Just the goal until there is a pace.
+  function goalLine(c) {
+    if (!c.goal) return '';
+    const what = esc(Race.goal.text(c.goal, cfg));
+    const hm = (sec) => { const m = Math.round(Math.abs(sec) / 60); return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`; };
+    const mi = (v) => esc(Race.units.distance(Math.abs(v), cfg));
+    const cls = { onpace: 'ok', tight: 'tight', offpace: 'late' };
+    if (c.status === 'finished') {
+      if (c.goalMet == null) return '';
+      const by = c.goal.hours ? ` by ${hm(c.goalMarginSec)}` : '';
+      return `<div class="rmargin rgoal ${c.goalMet ? 'ok' : 'late'}">Goal ${what}: ${c.goalMet ? 'made it' + by
+        : (c.goal.hours ? 'missed' + by : mi(c.goalGapMi) + ' short')}</div>`;
+    }
+    if (!c.goalStatus) return `<div class="rmargin rgoal none">Goal ${what}</div>`;
+    const lead = c.goalStatus === 'offpace' ? 'Behind' : c.goalStatus === 'tight' ? 'Tight for' : 'On pace for';
+    const by = c.goal.hours
+      ? (c.goalMarginSec >= 0 ? `${hm(c.goalMarginSec)} under` : `${hm(c.goalMarginSec)} over`)
+      : (c.goalGapMi >= 0 ? `${mi(c.goalGapMi)} to spare` : `${mi(c.goalGapMi)} short`);
+    return `<div class="rmargin rgoal ${cls[c.goalStatus]}">${lead} your ${what} goal · ${by}</div>`;
+  }
+
   // ---------- readout ----------
   function fuelRows(runner) {
     const c = Race.compute.runner(runner, cfg);
@@ -505,6 +528,7 @@
       <span class="rlbl">Race time</span>
       <span class="rclock" id="rclock">${Race.fmt.duration(raceClockSec(next, c))}</span>
       ${marginLine()}
+      ${goalLine(c)}
     </div>`);
 
     if (next.state === 'in-pit') {

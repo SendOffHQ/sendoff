@@ -279,6 +279,20 @@ function distance(mi, cfg) {
   return `${(km ? mi * 1.609344 : mi).toFixed(1)} ${km ? 'km' : 'mi'}`;
 }
 
+// The racer's own goal, as a sentence, or null: a finish time in a race to a
+// finish, a distance or a number of laps in a timed one, the same reading
+// lib/race-core.js goal.of makes. One of the other kind is not used.
+export function goalText(cfg, def) {
+  const g = def && def.goal;
+  if (!g || typeof g !== 'object') return null;
+  if (isTimed(cfg)) {
+    if (+g.laps > 0) return `${Math.round(+g.laps)} laps before the race ends`;
+    if (+g.distanceMi > 0) return `${distance(+g.distanceMi, cfg)} before the race ends`;
+    return null;
+  }
+  return +g.hours > 0 ? `finish in ${hm(+g.hours * 3600e3)}` : null;
+}
+
 // ---------- the state, as the assistant is told it ----------
 export function findRunner(data, runnerId) {
   return ((data && data.runners) || []).find(r => r && r.id === runnerId) || { id: runnerId, legs: [] };
@@ -323,7 +337,7 @@ export function raceStatus(cfg, data, runnerId, now) {
       ...(isTimed(cfg) ? { scoredBy: 'time: as many laps as fit before the race ends; the finish cutoff below is when it ends' } : {}),
       distanceUnit: cfg && cfg.units && cfg.units.distance === 'km' ? 'km' : 'mi'
     },
-    racer: { name: def.name || runnerId, bib: def.bib || null },
+    racer: { name: def.name || runnerId, bib: def.bib || null, ...(goalText(cfg, def) ? { goal: goalText(cfg, def) } : {}) },
     state: where.state
   };
   const total_ = num(cfg && cfg.cutoffs && cfg.cutoffs.totalHours);

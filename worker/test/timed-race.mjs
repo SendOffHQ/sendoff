@@ -70,6 +70,12 @@ ok('the same answer on both sides', cases.map(([c, r]) => crew.runnerDone(c, r))
 ok('racing, stopped, out of time, on the last lap, at a turnaround, back at the pit, never started', cases.map(([c, r]) => crew.runnerDone(c, r)), [false, true, true, false, false, true, false]);
 ok('the assistant hears they are finished', crew.whereIs(timed, stopped).state, 'finished');
 ok('and that the race is scored by time', /scored|time/i.test(JSON.stringify(crew.raceStatus(timed, { runners: [running] }, 'sam', now).race)), true);
+// The racer's own goal goes with it: a distance or laps in a timed race, a
+// finish time in a race to a finish, and one of the other kind not at all.
+const withGoal = (goal, cfg) => crew.raceStatus({ ...cfg, runners: (cfg.runners || [{ id: 'sam', name: 'Sam' }]).map(r => ({ ...r, goal })) },
+  { runners: [running] }, 'sam', now).racer.goal;
+ok('the AI crew is told the racer\'s goal', [withGoal({ laps: 7 }, timed), withGoal({ distanceMi: 100 }, timed), withGoal({ hours: 24 }, timed)],
+  ['7 laps before the race ends', '100.0 mi before the race ends', undefined]);
 
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

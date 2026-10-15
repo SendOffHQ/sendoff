@@ -88,7 +88,9 @@ the front, with usernames beside them as the start of following a racer.
      from the saved result and carry no zone of their own.
 7. **Goal-time planner.** Target finish in, per-aid target times out, live
    delta against them. Self-contained, needs no billing, and it is what makes a
-   second race better than the first.
+   second race better than the first. *The first half built 2026-10-15: a goal
+   per racer, and on pace, tight or off pace against it. Left: the per-aid
+   target times.*
 8. **Printable crew sheet.** One sheet per crew member, two or three racers to
    a sheet: checkpoints, which of them crew can reach, cutoffs as clock times,
    racer details, and room to write. Printed the night before. Every number on it already exists, so it
@@ -1058,11 +1060,24 @@ today. Everything else in the free column is capability rather than scale.
 
 ## 1. Race day
 
-### Goal-time planner + ahead/behind delta — *not built*
+### Goal-time planner + ahead/behind delta — *partly built 2026-10-15*
 Target finish time in, per-aid target times out, with a live delta against
 them. The racer screen already computes a cutoff margin, which is the same
 shape of arithmetic against a different number, so this is closer than it
 looks.
+
+**Built: a goal per racer** (`runner.goal`, `Race.goal`), typed beside their
+name in the setup wizard and in settings: a finish time in a race to a finish
+(`{ hours }`), a distance or a number of laps in a timed race (`{ distanceMi }`
+or `{ laps }`). `compute.runner` holds the projection against it the way it
+holds it against the cutoff (on pace, tight inside the last 2.5%, off pace
+beyond); in a race to a finish the badge is the worse of the two, so a goal
+never hides the cutoff, and in a timed race it is what gives "Racing" a pace
+to be on. The race page's Projected tile and the racer screen say by how
+much, and whether it was made at the end; the AI crew is told it.
+`test/goal-pace.mjs`, `test/goal-pages.mjs`.
+
+**Left:** the per-aid target times from the goal, and the delta at each.
 
 ### Printable crew sheet — *not built*
 Raised 2026-09-09. A sheet you print the night before and hand to each crew

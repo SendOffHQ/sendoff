@@ -202,6 +202,11 @@
   .stat .sub { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
   .stat .sub.proj-margin { font-size: 9px; margin-top: -2px; }
   .stat .sub.proj-margin.over { color: var(--red); }
+  /* The racer's own goal, under the cutoff margin, in the badge's colours. */
+  .stat .sub.proj-goal { font-size: 9px; margin-top: 1px; }
+  .stat .sub.proj-goal.onpace { color: var(--green); }
+  .stat .sub.proj-goal.tight { color: var(--yellow); }
+  .stat .sub.proj-goal.offpace { color: var(--red); }
 
   @media (max-width: 600px) {
     .stats { grid-template-columns: repeat(2, 1fr); }
@@ -538,7 +543,7 @@
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8a2565f0"></script>
 <script src="lib/course-view.js?v=bb2e63e2"></script>
-<script src="lib/race-core.js?v=598c0d3d"></script>
+<script src="lib/race-core.js?v=f90aa4c3"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -607,12 +612,30 @@
   }
 
   function statusLabel(s, c) {
-    // A timed race has no pace to be on or off: the clock is fixed and the
-    // distance is the result.
-    if (c && c.timed && s === 'onpace') return 'Racing';
+    // A timed race has no pace to be on or off unless the racer has a goal:
+    // the clock is fixed and the distance is the result.
+    if (c && c.timed && s === 'onpace' && !c.goalStatus) return 'Racing';
     return { onpace: 'On Pace', tight: 'Tight', offpace: 'Off Pace', notstarted: 'Not Started', finished: 'Finished' }[s] || s;
   }
   const hmLeft = (sec) => { const m = Math.round(sec / 60); return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`; };
+
+  // The racer's goal on the Projected tile: what it is, and by how much the
+  // projection makes or misses it, coloured like the badge. Once they are
+  // done, whether they made it. Empty with no goal.
+  function goalLine(c) {
+    if (!c.goal) return '';
+    const what = escapeHtml(Race.goal.text(c.goal, cfg));
+    const done = c.status === 'finished';
+    let cls = c.goalStatus || (done ? (c.goalMet ? 'onpace' : 'offpace') : ''), how = '';
+    if (c.goal.hours && c.goalMarginSec != null) {
+      const by = hmLeft(Math.abs(c.goalMarginSec));
+      how = done ? (c.goalMet ? `made it by ${by}` : `missed by ${by}`) : (c.goalMarginSec >= 0 ? `${by} under` : `${by} over`);
+    } else if (!c.goal.hours && c.goalGapMi != null) {
+      const by = escapeHtml(Race.units.distance(Math.abs(c.goalGapMi), cfg));
+      how = done ? (c.goalMet ? 'made it' : `${by} short`) : (c.goalGapMi >= 0 ? `${by} to spare` : `${by} short`);
+    }
+    return `<span class="sub proj-goal ${cls}">Goal ${what}${how ? ' · ' + how : ''}</span>`;
+  }
 
   // A loop with no aid stations: rendered as the lap grid rather than rows.
   function isSimpleLoop() {
@@ -1066,6 +1089,7 @@
                 <span class="value">${mi != null ? escapeHtml(Race.units.distance(mi, cfg)) : '–'}</span>
                 <span class="sub proj-at">${(done ? c.lapsDone : c.projectedLaps) != null ? `${done ? c.lapsDone : c.projectedLaps} laps` : '–'}</span>
                 ${!done && end ? `<span class="sub proj-margin">${c.timeLeftSec > 0 ? hmLeft(c.timeLeftSec) + ' left' : 'time is up'}</span>` : ''}
+                ${goalLine(c)}
               </div>`;
           })() : (() => {
             // The finish as a time of day on the race's clock, the way the
@@ -1086,6 +1110,7 @@
                 <span class="value">${Race.fmt.duration(proj)}</span>
                 <span class="sub proj-at">${escapeHtml(when)}</span>
                 ${margin ? `<span class="sub proj-margin${proj > totalCutSec ? ' over' : ''}">${margin}</span>` : ''}
+                ${goalLine(c)}
               </div>`;
           })()}
         </div>

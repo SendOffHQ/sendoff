@@ -580,6 +580,7 @@
         <tr>
           <th>Name</th>
           <th>Bib / display</th>
+          <th>Goal</th>
           <th>Color</th>
           <th></th>
         </tr>
@@ -587,6 +588,9 @@
       <tbody id="runner-rows"></tbody>
     </table>
     <button type="button" class="add-row" id="add-runner">+ Add racer</button>
+    <p class="hint goal-hint" style="margin-top:8px; color: var(--text-muted); font-size:11px;">Goal is optional: the
+      finish time a racer is after, like 24:00, or in a timed race how far, like 100 mi or 7 laps. The race
+      page shows them on pace, tight or off pace for it, as it does for the cutoff.</p>
     <!-- Asked for directly: somebody set up a two-racer race here and went
          looking for where to put the second racer's account. There is nowhere,
          and there cannot be: linking a racer to an account offers the people
@@ -727,7 +731,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=598c0d3d"></script>
+<script src="lib/race-core.js?v=f90aa4c3"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -950,6 +954,7 @@
     document.getElementById('loop-count-field').style.display = timed ? 'none' : '';
     document.getElementById('race-cutoff-lbl').textContent = timed ? 'Race ends' : 'Finish cutoff';
     renderLoopsSummary();
+    syncGoalHints();
   }
 
   // ---------- the loops ----------
@@ -1233,12 +1238,26 @@
   }
 
   // ---------- runners ----------
+  // A goal is optional and the racer's own: a finish time in a race to a
+  // finish, a distance or a number of laps in a timed one. The race page
+  // holds them to it the way it holds them to the cutoff. Which it is follows
+  // the format, so the box says which as the format changes.
+  function goalCfg() {
+    return { courseType: state.courseType, format: state.courseType === 'loops' && state.format === 'timed' ? 'timed' : undefined,
+      units: state.units };
+  }
+  function goalHint() { return Race.goal.placeholder(goalCfg()); }
+  function syncGoalHints() {
+    document.querySelectorAll('#runner-rows [data-k="goal"]').forEach(el => { el.placeholder = goalHint(); });
+  }
   function renderRunnerRows() {
     const tbody = document.getElementById('runner-rows');
     tbody.innerHTML = state.runners.map((r, i) => `
       <tr>
         <td><input type="text" data-runner="${i}" data-k="name" value="${escapeAttr(r.name)}" placeholder="Racer name" /></td>
         <td><input type="text" data-runner="${i}" data-k="bib" value="${escapeAttr(r.bib)}" placeholder="e.g. #42 or display label" /></td>
+        <td><input type="text" data-runner="${i}" data-k="goal" value="${escapeAttr(r.goal || '')}" placeholder="${escapeAttr(goalHint())}"
+                   aria-label="Goal (optional)" class="goal-in" /></td>
         <td><input type="color" data-runner="${i}" data-k="color" value="${r.color || DEFAULT_COLORS[0]}" /></td>
         <td>${i > 0 ? `<button type="button" class="row-del" data-del-runner="${i}" aria-label="Delete">×</button>` : ''}</td>
       </tr>
@@ -1558,12 +1577,12 @@
       course: {},
       runners: state.runners
         .filter(r => r.name.trim())
-        .map(r => ({
-          id: Race.slug(r.name),
-          name: r.name.trim(),
-          bib: r.bib.trim() || r.name.trim(),
-          color: r.color
-        })),
+        .map(r => {
+          const out = { id: Race.slug(r.name), name: r.name.trim(), bib: r.bib.trim() || r.name.trim(), color: r.color };
+          const g = Race.goal.parse(r.goal, goalCfg()).goal;
+          if (g) out.goal = g;
+          return out;
+        }),
       fuelMetrics: fuelRows.metrics,
       fuelPresets: Race.fuel.presetsFromRows(state.fuelPresets, fuelRows.metrics),
       phaseTargets: Race.fuel.bandsFromRows(state.fuelBands, fuelRows.metrics),
@@ -1669,6 +1688,10 @@
       if (s.arriveCutoffHours != null && !(s.arriveCutoffHours > 0)) errs.push(`The cutoff for ${s.toAid || s.name} is before the start.`);
     }
     if (!cfg.runners.length) errs.push('At least one runner is required.');
+    for (const r of state.runners.filter(r => r.name.trim())) {
+      const g = Race.goal.parse(r.goal, goalCfg());
+      if (g.error) errs.push(`${r.name.trim()}'s goal: put ${g.error}, or leave it blank.`);
+    }
     if (cfg.courseType === 'loops') {
       if (cfg.format !== 'timed' && !cfg.course.loopCount) errs.push('Number of laps is required.');
       if (cfg.course.loops && cfg.course.loops.some(l => !(l.distanceMi > 0))) errs.push('Each loop needs a distance, or its stations.');
@@ -2161,6 +2184,7 @@
     renderUnitLabels();
     renderAidSummary();
     renderLoopAidSummary();
+    syncGoalHints();
   });
   document.getElementById('unit-elevation').addEventListener('change', (e) => {
     state.units.elevation = e.target.value;

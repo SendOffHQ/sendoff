@@ -430,11 +430,14 @@
     <div class="editor-warn" id="runner-warn" style="display:none;"></div>
     <table class="aid-list">
       <thead>
-        <tr><th>Name</th><th>Bib / label</th><th>Dot</th><th></th></tr>
+        <tr><th>Name</th><th>Bib / label</th><th>Goal</th><th>Dot</th><th></th></tr>
       </thead>
       <tbody id="runner-edit-rows"></tbody>
     </table>
     <button class="add-row" type="button" id="add-runner-edit">+ Add racer</button>
+    <p class="fuel-hint goal-hint">Goal is optional: the finish time a racer is after, like 24:00, or
+      in a timed race how far, like 100 mi or 7 laps. The race page shows them on pace, tight or off
+      pace for it, as it does for the cutoff.</p>
 
     <div class="fuel-editor">
       <div class="fuel-editor-title">Fueling</div>
@@ -561,7 +564,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=598c0d3d"></script>
+<script src="lib/race-core.js?v=f90aa4c3"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -697,7 +700,10 @@
     if (!editingRunners) {
       editingRunners = (cfg.runners || []).map(r => ({
         key: r.id, id: r.id, name: r.name || '', bib: r.bib || '',
-        color: r.color || RUNNER_COLORS[0], email: r.email || ''
+        color: r.color || RUNNER_COLORS[0], email: r.email || '',
+        // Only a goal this race can use: one of the other kind, left from
+        // before the format changed, is not offered back to be saved again.
+        goal: Race.goal.of(cfg, r) ? Race.goal.text(r.goal, cfg) : ''
       }));
       // Anyone without a plan of their own opens on the race's, which is what
       // they are already being held to on the board.
@@ -1341,6 +1347,8 @@
       <tr>
         <td>${runnerNameCell(r, i)}</td>
         <td><input type="text" data-runner="${i}" data-k="bib" value="${escapeAttr(r.bib)}" placeholder="#42 or label" /></td>
+        <td><input type="text" data-runner="${i}" data-k="goal" value="${escapeAttr(r.goal || '')}" placeholder="${escapeAttr(Race.goal.placeholder(cfg))}"
+                   aria-label="Goal (optional)" class="goal-in" /></td>
         <td class="color-cell"><input type="color" data-runner="${i}" data-k="color" value="${r.color || RUNNER_COLORS[0]}" /></td>
         <td>${editingRunners.length > 1 ? `<button class="row-del" data-del-runner="${i}" type="button" aria-label="Delete">×</button>` : ''}</td>
       </tr>
@@ -1379,6 +1387,10 @@
       used.add(id);
       const runner = { id, name, bib: (r.bib || '').trim() || name, color: r.color || RUNNER_COLORS[0],
                        planKey: r.key };
+      // Their own goal, held against the projection the way the cutoff is.
+      const g = Race.goal.parse(r.goal, cfg);
+      if (g.error) { toast(`${name}'s goal: put ${g.error}, or leave it blank.`, 'error'); return; }
+      if (g.goal) runner.goal = g.goal;
       // Which account is this person. What racer mode will read to know whose
       // splits it is looking at, and what picks their profile for their goals.
       const email = String(r.email || '').trim().toLowerCase();
