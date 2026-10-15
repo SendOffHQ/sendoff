@@ -292,3 +292,17 @@ When do they finish? ⏰
 The race page shows the projected finish as a time of day, on the race's own clock, with how far under or over the cutoff it is. Every cutoff is a day and a time in the race's time zone too, so family watching from three time zones away and the crew at the aid station read the same clock.
 
 #ultrarunning #100miler #crewlife #trailrunning #ultramarathon #sendoff
+
+---
+
+## 26. AI as crew (`sendoff-feature-ai-crew.png`)
+
+Your AI, on the crew. 🤖
+
+Racing with nobody at the aid stations, or want another pair of hands? Connect Claude, or any assistant that takes an MCP connector, as crew for one racer. Tell it what you ate and drank as you go and it logs its best guess onto your leg, marked with a ~ until somebody types the real number. Ask it where you are, what's next and how you're doing against your fueling plan. Notes you typed with no signal get logged the next time you talk to it.
+
+It can log food, drink, one-tap items and notes for that one racer, and nothing else: no check-ins, no changes to the course or the crew. Connecting it shares that racer's race data with whoever runs the assistant, under their terms. Remove it from Manage access and it stops at once.
+
+Part of Pro, and open to everyone during the beta. Link in bio.
+
+#ultrarunning #ai #claude #crewlife #trailrunning #sendoff

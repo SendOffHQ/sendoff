@@ -47,6 +47,7 @@ on:
           - voice
           - install
           - clock
+          - ai-crew
       dry_run:
         description: Dry run (check everything, post nothing)
         type: boolean

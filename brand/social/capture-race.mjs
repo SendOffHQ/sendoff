@@ -168,6 +168,34 @@ const SHOTS = {
   'install': { page: 'race.html', at: MID, signedIn: true, phone: 'iphone',
     prep: async page => { await click(page, '.account-menu-btn'); await click(page, '.account-menu-item[data-act="install"]');
       await page.waitForSelector('.install-steps'); } },
+  // Connecting an AI as crew, from Manage access, the moment the link is made:
+  // the link and the three steps for Claude. The worker is stood in for, as
+  // for the roster, with a made-up token on the worker's own address.
+  'ai-crew': { page: 'settings.html', at: MID, signedIn: true, email: 'jason@example.com', access: CREW, height: 820,
+    prep: async page => {
+      const links = [];
+      const token = 'p9Rk2vXq7LmT4wZa8NcE3hJs';
+      await page.route(/\/api\/ai-crew(\?|$)/, route => {
+        const req = route.request();
+        if (req.method() === 'POST') {
+          const j = JSON.parse(req.postData() || '{}');
+          links.push({ token, url: 'https://api.sendoff.run/mcp/' + token, label: j.label, runnerId: j.runnerId,
+            runnerName: 'Jason Dupree', createdAt: MID, expiresAt: Date.parse(DONE) + 7 * 864e5 });
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(links[0]) });
+        }
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ canManage: true, aiCrew: links }) });
+      });
+      page.on('dialog', d => d.accept());
+      await openSection(page, '#access .access-head');
+      await page.fill('#ax-ai-label', 'Claude');
+      await click(page, '#ax-ai-make');
+      await page.waitForSelector('.ax-ai-steps');
+      await page.evaluate(() => {
+        const el = document.querySelector('#ax-ai-result');
+        window.scrollTo(0, el.getBoundingClientRect().top + scrollY - 24);
+      });
+      await sleep(300);
+    } },
   // The finish as a clock time on the race's own clock, which for a race in
   // Westcliffe is Denver's, whoever is watching from wherever.
   'clock': { page: 'race.html', at: MID, cfg: { timezone: 'America/Denver' }, scrollTo: '#cutoffs', scrollPad: 20 }

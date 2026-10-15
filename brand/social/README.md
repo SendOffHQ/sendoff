@@ -16,7 +16,7 @@ hand somewhere else.
 | `sendoff-pin-1..3-of-3.png` | 1080x1350 | The wordmark split across three profile tiles |
 | `sendoff-announce-logo.png` | 1080x1350 | The wordmark on the gradient, 4:5 |
 | `sendoff-announce-card.png` | 1080x1350 | "Send them out, bring them home.", 4:5 |
-| `sendoff-feature-*.png` | 1080x1350 | Twenty-five posts, one per feature, 4:5, from `features.html`. Captions in `captions.md` |
+| `sendoff-feature-*.png` | 1080x1350 | Twenty-six posts, one per feature, 4:5, from `features.html`. Captions in `captions.md` |
 | `sendoff-feature-*.jpg` | 1080x1350 | The same posts as JPEG, the only format Instagram's API publishes. See `INSTAGRAM.md` |
 | `_strip.png`, `_pin-sheet.png` | working | The uncut strip and an assembled preview. Not for posting. |
 
