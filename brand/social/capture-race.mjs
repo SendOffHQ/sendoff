@@ -38,6 +38,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 //   phone     a phone's browser rather than a desktop one ('iphone')
 //   init      run in the page before its own scripts: a stand-in for
 //             something the phone has and a headless browser does not
+//   live      read the race from the live worker rather than races/, for a
+//             public race whose files are not in the repository
 const click = (page, sel) => page.click(sel).then(() => sleep(400));
 const openSection = (page, head) => page.evaluate(h => {
   const el = document.querySelector(h);
@@ -196,6 +198,13 @@ const SHOTS = {
       });
       await sleep(300);
     } },
+  // Ghost Train 30 Hour, the evening before it starts: the course as the
+  // race page draws it, both loops on the map with the first lit up.
+  'ghost-train': { page: 'race.html', slug: '000007-ghost-train-30-hour-ultra', live: true, at: '2026-10-16T22:00:00Z',
+    scrollTo: '.seg-list', scrollPad: 56, height: 760 },
+  // The same, closer: the map and the two loops under it, for the story.
+  'ghost-train-map': { page: 'race.html', slug: '000007-ghost-train-30-hour-ultra', live: true, at: '2026-10-16T22:00:00Z',
+    scrollTo: '#course-map-section', scrollPad: 8, height: 470 },
   // The finish as a clock time on the race's own clock, which for a race in
   // Westcliffe is Denver's, whoever is watching from wherever.
   'clock': { page: 'race.html', at: MID, cfg: { timezone: 'America/Denver' }, scrollTo: '#cutoffs', scrollPad: 20 }
@@ -244,7 +253,10 @@ for (const [name, s] of Object.entries(SHOTS)) {
   const at = new Date(s.at).getTime();
   // The race as it stood at `at`: legs not yet started are dropped, and a leg
   // under way loses the arrival it had not made yet.
-  const data = JSON.parse(fs.readFileSync(path.join(ROOT, 'races', slug, 'data.json'), 'utf8'));
+  // A public race, from the worker, the same read a spectator's page makes.
+  const remote = (file) => JSON.parse(Buffer.from(JSON.parse(execSync(
+    `curl -sS '${WORKER}/get?path=races/${slug}/${file}'`, { encoding: 'utf8' })).content, 'base64').toString('utf8'));
+  const data = s.live ? remote('data.json') : JSON.parse(fs.readFileSync(path.join(ROOT, 'races', slug, 'data.json'), 'utf8'));
   for (const r of data.runners) {
     r.legs = r.legs.filter(l => new Date(l.startTime).getTime() < at).map(l => {
       l = { ...l };
@@ -252,7 +264,8 @@ for (const [name, s] of Object.entries(SHOTS)) {
       return l;
     });
   }
-  const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'races', slug, 'config.json'), 'utf8'));
+  const cfg = s.live ? remote('config.json') : JSON.parse(fs.readFileSync(path.join(ROOT, 'races', slug, 'config.json'), 'utf8'));
+  delete cfg.myRole;
   if (s.cfg) Object.assign(cfg, s.cfg);
   if (s.signedIn) {
     // The stub is the owner, and the racer, so every page opens as it would

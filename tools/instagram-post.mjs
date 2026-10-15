@@ -19,7 +19,7 @@
 // URL and not a file from this checkout.
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseCaptions, captionProblems } from '../brand/social/captions.mjs';
+import { parsePosts, captionProblems, collaboratorProblems } from '../brand/social/captions.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const SOCIAL = path.join(ROOT, 'brand', 'social');
@@ -31,15 +31,15 @@ export function preparePost(id, { md } = {}) {
   if (!/^[a-z0-9-]+$/.test(String(id || ''))) throw new Error(`Not a post id: ${JSON.stringify(id)}`);
   const png = `sendoff-feature-${id}.png`;
   const jpg = `sendoff-feature-${id}.jpg`;
-  const captions = parseCaptions(md != null ? md : fs.readFileSync(path.join(SOCIAL, 'captions.md'), 'utf8'));
-  const caption = captions[png];
-  if (!caption) throw new Error(`No caption for ${png} in captions.md`);
-  const problems = captionProblems(caption);
+  const posts = parsePosts(md != null ? md : fs.readFileSync(path.join(SOCIAL, 'captions.md'), 'utf8'));
+  if (!posts[png]) throw new Error(`No caption for ${png} in captions.md`);
+  const { caption, collaborators } = posts[png];
+  const problems = captionProblems(caption).concat(collaboratorProblems(collaborators));
   if (problems.length) throw new Error(`Caption for ${id}: ${problems.join('; ')}`);
   if (md == null && !fs.existsSync(path.join(SOCIAL, jpg))) {
     throw new Error(`${jpg} is not in brand/social. Run shoot-features.js and commit it.`);
   }
-  return { id, caption, imageUrl: `${IMAGE_BASE}/${jpg}` };
+  return { id, caption, collaborators, imageUrl: `${IMAGE_BASE}/${jpg}` };
 }
 
 // Instagram's errors come back as { error: { message, code, ... } }. Only the
@@ -94,8 +94,11 @@ export async function publish(post, { userId, token, fetchImpl = fetch, force = 
     if (dup) throw new Error(`Already posted ${dup.timestamp}: ${dup.permalink}. Pass --force to post it again.`);
   }
 
+  // Collaborators are invited with the post, and it shows on their profile
+  // once they accept.
   const container = await call(fetchImpl, 'POST', `${API}/${userId}/media`,
-    { image_url: post.imageUrl, caption: post.caption, access_token: token });
+    { image_url: post.imageUrl, caption: post.caption, access_token: token,
+      ...(post.collaborators && post.collaborators.length ? { collaborators: JSON.stringify(post.collaborators) } : {}) });
   log(`container ${container.id} created`);
 
   // Instagram processes the image before it can be published. Usually
@@ -128,6 +131,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url
     const post = preparePost(id);
     console.log(`post:  ${post.id}`);
     console.log(`image: ${post.imageUrl}`);
+    if (post.collaborators.length) console.log(`with:  ${post.collaborators.map(u => '@' + u).join(', ')} (invited as collaborators)`);
     console.log(`caption (${[...post.caption].length} characters):\n\n${post.caption}\n`);
     if (dryRun) {
       const head = await fetch(post.imageUrl, { method: 'HEAD' });

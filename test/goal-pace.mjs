@@ -120,5 +120,9 @@ ok('130 is off pace, 10 short', [tc({ distanceMi: 130 }).status, tc({ distanceMi
 const stopped = Race.compute.runner({ id: 'r', goal: { distanceMi: 25 }, stoppedAt: new Date(t0 + 6.5 * H).toISOString(), legs: tl }, timed);
 ok('stopped: done, and the goal made', [stopped.status, stopped.goalMet, stopped.goalGapMi], ['finished', true, 5]);
 
+console.log('\nbefore a timed race starts');
+const early = { ...timed, startTime: new Date(Date.now() + 15 * H).toISOString(), cutoffs: { totalHours: 30 } };
+ok('the time left is the race, not the wait as well', Race.compute.runner({ id: 'r', legs: [] }, early).timeLeftSec / 3600, 30);
+
 console.log(bad ? `\n${bad} failed\n` : '\nall good\n');
 process.exit(bad ? 1 : 0);

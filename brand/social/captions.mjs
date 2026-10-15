@@ -5,15 +5,40 @@
 // A caption is the text between a heading of the form
 //   ## 3. Race photos (`sendoff-feature-photos.png`)
 // and the next "---" rule, trimmed. That is exactly what goes on the post.
+//
+// A post made with somebody else, shown on their profile as well as ours,
+// names them on a line of its own straight under the heading:
+//   Collaborators: @joe_rucco
+// That line is not part of the caption: Instagram sends them an invite to
+// accept, and the caption mentions them by name if it wants to.
 
-export function parseCaptions(md) {
+export function parsePosts(md) {
   const out = {};
   for (const block of String(md).split(/^---\s*$/m)) {
     const m = block.match(/^##\s.*\(`([^`]+)`\)\s*$/m);
     if (!m) continue;
-    out[m[1]] = block.slice(block.indexOf(m[0]) + m[0].length).trim();
+    let caption = block.slice(block.indexOf(m[0]) + m[0].length).trim();
+    let collaborators = [];
+    const c = caption.match(/^Collaborators:[ \t]*([^\n]*)(\n|$)/);
+    if (c) {
+      collaborators = c[1].split(/[\s,]+/).map(s => s.replace(/^@/, '')).filter(Boolean);
+      caption = caption.slice(c[0].length).trim();
+    }
+    out[m[1]] = { caption, collaborators };
   }
   return out;
+}
+
+export function parseCaptions(md) {
+  return Object.fromEntries(Object.entries(parsePosts(md)).map(([k, v]) => [k, v.caption]));
+}
+
+// Instagram takes up to three, by username.
+export function collaboratorProblems(list) {
+  const problems = [];
+  if (list.length > 3) problems.push(`${list.length} collaborators, over 3`);
+  for (const u of list) if (!/^[A-Za-z0-9._]{1,30}$/.test(u)) problems.push(`not an Instagram username: ${u}`);
+  return problems;
 }
 
 // What Instagram will refuse, checked before anything is sent: 2,200

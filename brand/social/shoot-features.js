@@ -8,10 +8,14 @@ const { chromium } = require('playwright');
 const path = require('path');
 const OUT = process.env.OUT || __dirname;
 const SRC = process.env.SRC || path.join(__dirname, 'features.html');
+// Stories are the same machinery at 9:16:
+//   SRC=stories.html PREFIX=sendoff-story- SIZE=1080x1920 node shoot-features.js
+const PREFIX = process.env.PREFIX || 'sendoff-feature-';
+const [W, H] = (process.env.SIZE || '1080x1350').split('x').map(Number);
 (async () => {
   const exe = process.env.CHROMIUM || undefined;
   const b = await chromium.launch(exe ? { executablePath: exe } : {});
-  const ctx = await b.newContext({ viewport: { width: 1200, height: 1400 }, deviceScaleFactor: 1 });
+  const ctx = await b.newContext({ viewport: { width: 1200, height: H + 50 }, deviceScaleFactor: 1 });
   const p = await ctx.newPage();
   p.on('pageerror', e => console.log('PAGEERROR:', e.message));
   await p.goto('file://' + SRC, { waitUntil: 'networkidle' });
@@ -51,17 +55,17 @@ const SRC = process.env.SRC || path.join(__dirname, 'features.html');
   for (const id of await p.$$eval('section.slide[id]', s => s.map(x => x.id))) {
     if (only && only !== id) continue;
     const el = await p.$('#' + id);
-    const name = 'sendoff-feature-' + id;
+    const name = PREFIX + id;
     await el.screenshot({ path: `${OUT}/${name}.png` });
     // And a JPEG, because that is the only image format Instagram's
     // publishing API takes. tools/instagram-post.mjs posts these.
     await el.screenshot({ path: `${OUT}/${name}.jpg`, type: 'jpeg', quality: 92 });
     const box = await el.boundingBox();
-    if (Math.round(box.width) !== 1080 || Math.round(box.height) !== 1350) {
+    if (Math.round(box.width) !== W || Math.round(box.height) !== H) {
       console.error('WRONG SIZE', name, JSON.stringify(box));
       process.exit(1);
     }
-    console.log(name, '1080x1350, png and jpg');
+    console.log(name, `${W}x${H}, png and jpg`);
   }
   await b.close();
 })();

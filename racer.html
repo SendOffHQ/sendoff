@@ -331,7 +331,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=a1341ad0"></script>
-<script src="lib/race-core.js?v=ca2ef68a"></script>
+<script src="lib/race-core.js?v=2d446fcc"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -452,7 +452,9 @@
     // An hour of room is the point where this stops being a comfortable number.
     const cls = c.leftMs < 3600000 ? 'tight' : 'ok';
     if (Race.course.isTimed(cfg)) {
-      return `<div class="rmargin ${cls}">${Race.fmt.duration(c.leftMs / 1000)} left in the race · ends ${clock}</div>`;
+      // Before the start it is the whole race that is left, not the wait too.
+      const left = Math.min(c.leftMs, (+(cfg.cutoffs && cfg.cutoffs.totalHours) || Infinity) * 3600000);
+      return `<div class="rmargin ${cls}">${Race.fmt.duration(left / 1000)} left in the race · ends ${clock}</div>`;
     }
     return `<div class="rmargin ${cls}">${Race.fmt.duration(c.leftMs / 1000)} on ${esc(c.what)} · closes ${clock}</div>`;
   }

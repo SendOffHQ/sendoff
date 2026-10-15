@@ -306,3 +306,21 @@ It can log food, drink, one-tap items and notes for that one racer, and nothing 
 Part of Pro, and open to everyone during the beta. Link in bio.
 
 #ultrarunning #ai #claude #crewlife #trailrunning #sendoff
+
+---
+
+## 27. Ghost Train 30 Hour (`sendoff-feature-ghost-train.png`)
+
+Collaborators: @joe_rucco
+
+Follow Joe on the Ghost Train. 🚂👻
+
+@joe_rucco takes on the Ghost Train 30 Hour in Brookline, NH this weekend, from 9 AM Saturday to 3 PM Sunday. It's a rail trail run in laps: 15 miles out and back six times, then a 10-mile one on the seventh, so lap 7 lands on 100. He's going for 100 miles.
+
+Follow him live on SendOff: every lap as it's logged, his miles and laps so far, and where his pace puts him when the clock stops.
+
+Timed races, and courses of loops that take turns, are new in SendOff. Built for races exactly like this one.
+
+Link in bio.
+
+#ghosttrain #ghosttrainultra #timedrace #ultrarunning #trailrunning #100miler #sendoff

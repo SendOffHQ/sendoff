@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { preparePost, publish, verify } from '../tools/instagram-post.mjs';
-import { parseCaptions, captionProblems } from '../brand/social/captions.mjs';
+import { parseCaptions, parsePosts, captionProblems, collaboratorProblems } from '../brand/social/captions.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const SOCIAL = path.join(ROOT, 'brand', 'social');
@@ -21,7 +21,7 @@ const ok = (l, g, w) => { const q = JSON.stringify(g) === JSON.stringify(w); if 
 console.log('\nevery feature post is ready to go');
 const ids = [...fs.readFileSync(path.join(SOCIAL, 'features.html'), 'utf8')
   .matchAll(/<section class="slide[^"]*" id="([^"]+)"/g)].map(m => m[1]);
-ok('twenty-six posts in features.html', ids.length, 26);
+ok('twenty-seven posts in features.html', ids.length, 27);
 const notReady = [];
 for (const id of ids) {
   try {
@@ -84,6 +84,24 @@ console.log('\na post goes out');
   ok('and the caption from captions.md, exactly', create.params.caption, post.caption);
   ok('publishes the container it made', ig.calls.find(c => c.path.endsWith('media_publish')).params.creation_id, 'C1');
   ok('and hands back the link', out.permalink, 'https://www.instagram.com/p/abc/');
+}
+
+console.log('\na post made with somebody');
+{
+  const md = '## 1. A (`sendoff-feature-a.png`)\n\nCollaborators: @joe_rucco\n\nHook line.\n\n#one\n\n---\n\n## 2. B (`sendoff-feature-b.png`)\n\nNo one else.\n';
+  const posts = parsePosts(md);
+  ok('names them on a line of its own, not in the caption', [posts['sendoff-feature-a.png'], posts['sendoff-feature-b.png'].collaborators],
+    [{ caption: 'Hook line.\n\n#one', collaborators: ['joe_rucco'] }, []]);
+  ok('the copy link copies just the caption', parseCaptions(md)['sendoff-feature-a.png'], 'Hook line.\n\n#one');
+  ok('four, or a username Instagram would refuse, is caught',
+    [collaboratorProblems(['a', 'b', 'c', 'd']).length, collaboratorProblems(['joe rucco!']).length, collaboratorProblems(['joe_rucco', 'j.r'])], [1, 1, []]);
+  const ig = fakeInstagram();
+  await publish({ ...post, collaborators: ['joe_rucco'] }, opts(ig));
+  const create = ig.calls.find(c => c.method === 'POST' && c.path.endsWith('/media'));
+  ok('they are invited with the post', create.params.collaborators, '["joe_rucco"]');
+  const plain = fakeInstagram();
+  await publish(post, opts(plain));
+  ok('and a post with nobody else asks for nobody', 'collaborators' in plain.calls.find(c => c.method === 'POST' && c.path.endsWith('/media')).params, false);
 }
 
 console.log('\nwhat stops a post');
