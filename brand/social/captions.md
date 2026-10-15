@@ -101,7 +101,7 @@ Built for canyons, ridgelines and aid stations in the middle of nowhere.
 
 Everyone gets the right keys. 🔑
 
-Invite your crew, your pacers and your family. Crew can log the race, pacers can log their stretch, viewers can follow along, and you decide who else can invite people.
+Invite your crew, your pacers and your family. Crew and pacers can log the race, viewers can follow along, and you decide whether your crew can invite people too.
 
 Link in bio.
 
