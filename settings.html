@@ -220,6 +220,27 @@
   /* The Name column holds a picker once there is a roster to pick from, so it
      takes the full cell the way the text field it replaces does. */
   .runner-who { width: 100%; padding: 8px 10px; font-size: 12px; }
+  /* On a phone the racers' table reads as a card per racer: the name across
+     the top at full width, bib and goal halving the row under it, and the
+     colour and delete under those, each with its own small label, so none of
+     them is squeezed down to four letters. Text at 16px, which is also what
+     stops an iPhone zooming in on a tap. */
+  @media (max-width: 600px) {
+    #runner-table thead { display: none; }
+    #runner-table tbody tr { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 10px;
+      align-items: end; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    #runner-table tbody td.color-cell, #runner-table tbody td[data-label="Color"] { width: 64px; }
+    #runner-table tbody td { display: block; padding: 0; border: 0; width: auto; }
+    #runner-table td.name-cell { grid-column: 1 / -1; }
+    #runner-table td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 5px;
+      font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--text-muted); }
+    #runner-table input[type="text"], #runner-table select { font-size: 16px; padding: 11px 12px; width: 100%; }
+    #runner-table input[type="color"] { height: 44px; }
+    #runner-table .runner-who { margin-bottom: 8px; }
+    #runner-table td:last-child { justify-self: end; padding-bottom: 4px; }
+  }
+
   .runner-shown { font-size: 12px; color: var(--text-muted); margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .runner-shown strong { color: var(--text); }
   .runner-use-name { background: none; border: 1px solid var(--accent); color: var(--accent); border-radius: 3px;
@@ -428,7 +449,7 @@
   </div>
   <div class="editor-body">
     <div class="editor-warn" id="runner-warn" style="display:none;"></div>
-    <table class="aid-list">
+    <table class="aid-list" id="runner-table">
       <thead>
         <tr><th>Name</th><th>Bib / label</th><th>Goal</th><th>Dot</th><th></th></tr>
       </thead>
@@ -1345,11 +1366,11 @@
     const tbody = document.getElementById('runner-edit-rows');
     tbody.innerHTML = editingRunners.map((r, i) => `
       <tr>
-        <td>${runnerNameCell(r, i)}</td>
-        <td><input type="text" data-runner="${i}" data-k="bib" value="${escapeAttr(r.bib)}" placeholder="#42 or label" /></td>
-        <td><input type="text" data-runner="${i}" data-k="goal" value="${escapeAttr(r.goal || '')}" placeholder="${escapeAttr(Race.goal.placeholder(cfg))}"
+        <td class="name-cell" data-label="Racer ${i + 1}">${runnerNameCell(r, i)}</td>
+        <td data-label="Bib / label"><input type="text" data-runner="${i}" data-k="bib" value="${escapeAttr(r.bib)}" placeholder="#42" /></td>
+        <td data-label="Goal"><input type="text" data-runner="${i}" data-k="goal" value="${escapeAttr(r.goal || '')}" placeholder="${escapeAttr(Race.goal.placeholder(cfg))}"
                    aria-label="Goal (optional)" class="goal-in" /></td>
-        <td class="color-cell"><input type="color" data-runner="${i}" data-k="color" value="${r.color || RUNNER_COLORS[0]}" /></td>
+        <td class="color-cell" data-label="Dot"><input type="color" data-runner="${i}" data-k="color" value="${r.color || RUNNER_COLORS[0]}" /></td>
         <td>${editingRunners.length > 1 ? `<button class="row-del" data-del-runner="${i}" type="button" aria-label="Delete">×</button>` : ''}</td>
       </tr>
     `).join('');

@@ -62,6 +62,14 @@ const openRacers = async () => {
 await openRacers();
 ok('a Goal box, asking for a finish time', await page.getAttribute('#runner-edit-rows [data-k="goal"]', 'placeholder'), '24:00');
 ok('and the racers table still fits a phone', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+// A card per racer on a phone: the name across the whole width, and bib and
+// goal each wide enough to read what is in them.
+const widths = () => page.evaluate(() => Object.fromEntries(['name', 'bib', 'goal'].map(k => {
+  const el = document.querySelector(`#runner-table [data-k="${k}"]`);
+  return [k, el ? Math.round(el.getBoundingClientRect().width) : 0];
+})));
+const w = await widths();
+ok('on a phone the name runs across, and bib and goal are full size', [w.name >= 300, w.bib >= 120, w.goal >= 120], [true, true, true]);
 await page.fill('#runner-edit-rows [data-k="goal"]', 'soon');
 await page.click('#runner-save');
 await page.waitForTimeout(800);
@@ -154,6 +162,8 @@ await page.click('#course-type input[value="segments"] + .radio-content');
 ok('a Goal box per racer that follows the format and the units', [before, timedHint, kmHint, await hint()],
   ['24:00', '100 mi or 7 laps', '100 km or 7 laps', '24:00']);
 ok('and fits a phone', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+const ws = await widths();
+ok('with the same card per racer', [ws.name >= 300, ws.bib >= 120, ws.goal >= 120], [true, true, true]);
 
 ok('no page errors', errs, []);
 await b.close(); srv.kill('SIGKILL');
