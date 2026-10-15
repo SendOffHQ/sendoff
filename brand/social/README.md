@@ -16,8 +16,8 @@ hand somewhere else.
 | `sendoff-pin-1..3-of-3.png` | 1080x1350 | The wordmark split across three profile tiles |
 | `sendoff-announce-logo.png` | 1080x1350 | The wordmark on the gradient, 4:5 |
 | `sendoff-announce-card.png` | 1080x1350 | "Send them out, bring them home.", 4:5 |
-| `sendoff-feature-*.png` | 1080x1350 | Eighteen posts, one per feature, 4:5, from `features.html`. Captions in `captions.md` |
-| `sendoff-feature-*.jpg` | 1080x1350 | The same eighteen as JPEG, the only format Instagram's API publishes. See `INSTAGRAM.md` |
+| `sendoff-feature-*.png` | 1080x1350 | Twenty-five posts, one per feature, 4:5, from `features.html`. Captions in `captions.md` |
+| `sendoff-feature-*.jpg` | 1080x1350 | The same posts as JPEG, the only format Instagram's API publishes. See `INSTAGRAM.md` |
 | `_strip.png`, `_pin-sheet.png` | working | The uncut strip and an assembled preview. Not for posting. |
 
 The announce pair has its own source and its own script, `announce.html` and
@@ -45,6 +45,9 @@ python3 cut.py
 node shoot-announce.js          # the two announce images
 node capture-race.mjs           # real app screenshots into shots/, from the repo root harness
 node shoot-features.js          # the feature posts
+# A new post is a section in features.html, its shot in capture-race.mjs, its
+# caption in captions.md, and its id in the contact sheet (index.html) and in
+# .github/workflows/instagram-post.yml, which test/instagram-post.mjs checks.
 node ../../tools/stamp-assets.mjs   # versions.json, so the gallery shows the new images at once
 ```
 
@@ -59,7 +62,7 @@ refuses to render if any text runs into a device frame.
 `shoot.js` reads `PLAYWRIGHT_BROWSERS_PATH` the usual way; if Chromium lives
 somewhere Playwright will not find on its own, set `CHROMIUM` to the binary.
 
-Outputs land in the same directory. The seventeen finished images are committed
+Outputs land in the same directory. The finished images are committed
 so they can be pulled from github.com or from
 `sendoff.run/brand/social/` without a local render; the working files
 (`_strip.png`, `_pin-sheet.png`, previews) are gitignored. Re-run the scripts

@@ -51,7 +51,8 @@ After the race, in this order:
 the front, with usernames beside them as the start of following a racer.
 
 3. **Time-based races.** *Partly built 2026-10-14: timed loop races, and loop
-   courses of more than one loop.* 24-hour obstacle races, backyard ultras and fixed-time
+   courses of more than one loop, each with its own stations and course file.
+   Left: backyard rules.* 24-hour obstacle races, backyard ultras and fixed-time
    loops, where the clock is fixed and the distance is the result. The pit
    board already fits; what changes is everything that counts the race. See
    "Time-based races" in section 1.
@@ -66,9 +67,9 @@ the front, with usernames beside them as the start of following a racer.
 6. ~~**Public racer profiles.**~~ **Built 2026-10-02.** The profile page,
    made public by choice, at sendoff.run/@username. See "Public racer
    profile" in section 2.
-6a. **Race time zone and cutoffs as clock times.** Asked for 2026-10-03.
-   **Built 2026-10-03 on the working branch, held there until the Hennepin
-   100 finishes** (it started that morning), and merged only once it has.
+6a. ~~**Race time zone and cutoffs as clock times.**~~ Asked for 2026-10-03.
+   **Built 2026-10-03, shipped once the Hennepin 100 had finished.** The
+   projected finish is a clock time on the race page too (2026-10-07).
    Decided:
    - **Each race gets a time zone**, chosen in setup and settings, and every
      time anybody types in (the start, cutoffs, a corrected split) is read
@@ -1418,10 +1419,11 @@ The race also found the racer-page clock bug, fixed the same day: the
 screenshot sent from the finish reads 51:27:47, which is the time since the
 start at the moment it was taken, not the 35:41:15 the runner actually ran.
 
-### Your AI as crew — *built 2026-10-03, Pro, held for the Hennepin 100*
+### Your AI as crew — *shipped after the Hennepin 100, Pro (everyone during the beta)*
 
 **Built 2026-10-03** on the working branch, alongside the race time zone, and
-merged with it once the Hennepin 100 is over. What was built, against the plan
+merged with it once the Hennepin 100 was over. Since 2026-10-07 it logs the
+racer's unread write-ins before it answers anything. What was built, against the plan
 below:
 
 - **The credential** is a KV record, `aicrew:<token>`, naming one race and one
@@ -1621,6 +1623,22 @@ check out at the start of the next, one-tap items, notes and photos, all
 unchanged. What changes is everything that counts the race.
 
 ---
+
+### Smaller race-day things — *built 2026-10-05 to 2026-10-14*
+Each is in `FEATURES.md`, with its test.
+- The course map and elevation profile at the foot of the pit board
+  (2026-10-05), and a corrected time there taken as a day and a 12-hour time.
+- How are you feeling: three faces in the racer's Undo bar after a press,
+  kept on the leg and shown beside it (2026-10-07).
+- Talk instead of type: a mic in the racer's write-in box, the browser's own
+  speech-to-text, text scrolling along as it comes (2026-10-07).
+- The projected finish as a clock time on the race's clock, with the margin
+  under or over the cutoff (2026-10-07).
+- The demo race at `/try`: the real racer, crew and race pages on a race that
+  lives in the visitor's browser (2026-10-13).
+- A name with each account invite, and an admin's own name for each account
+  (2026-10-14).
+- Install app in the menu (2026-10-14).
 
 ### A station gone by with no check-in — *built 2026-10-14*
 A racer who leaves the phone at the pit for an out-and-back comes back to a

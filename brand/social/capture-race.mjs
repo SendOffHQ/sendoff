@@ -13,7 +13,7 @@
 //   FULL=1 node brand/social/capture-race.mjs pit # whole page, for framing
 //
 // Outputs land in brand/social/shots/ at 3x, and features.html places them.
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { spawn, execSync, execFileSync } from 'node:child_process';
 import fs from 'node:fs'; import net from 'node:net'; import path from 'node:path';
 
@@ -34,12 +34,29 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 //   signedIn  as the harness's stub, who is made owner and the racer
 //   scrollTo  what sits at the top of the screen, less scrollPad
 //   prep      anything a person would have done first
+//   cfg       settings the race would have had, laid over its config
+//   phone     a phone's browser rather than a desktop one ('iphone')
+//   init      run in the page before its own scripts: a stand-in for
+//             something the phone has and a headless browser does not
 const click = (page, sel) => page.click(sel).then(() => sleep(400));
 const openSection = (page, head) => page.evaluate(h => {
   const el = document.querySelector(h);
   if (el) { el.scrollIntoView(); el.click(); }
 }, head).then(() => sleep(600));
 const PHOTOS_AT = '2026-09-27T16:30:00Z';  // leg 14, the morning after
+// In the aid station at Colony Creek 2, end of leg 7, before the send-off.
+const IN_PIT = '2026-09-26T22:38:30Z';
+// The phone's own speech-to-text, which a headless browser does not have:
+// it hears one sentence and keeps listening, the way it looks mid-sentence.
+const SPEECH = () => {
+  window.SpeechRecognition = window.webkitSpeechRecognition = class {
+    start() {
+      const said = 'Two cups of broth and half a banana';
+      if (this.onresult) this.onresult({ results: [[{ transcript: said }]] });
+    }
+    stop() {} abort() {}
+  };
+};
 
 // A roster that reads like a crew rather than the harness's one stub account.
 // Example addresses only; no real person is named here.
@@ -109,7 +126,51 @@ const SHOTS = {
     } },
   'hub': { page: 'app/index.html', at: DONE, noSlug: true, scrollText: 'Sangre de Cristo 100', scrollPad: 62 },
   'setup': { page: 'setup.html', at: DONE, signedIn: true, noSlug: true, scrollTo: '#visibility-field', scrollPad: 150 },
-  'finish-card': { page: 'race.html', at: DONE, prep: async page => { await click(page, '.finish-card-btn'); await sleep(1500); } }
+  'finish-card': { page: 'race.html', at: DONE, prep: async page => { await click(page, '.finish-card-btn'); await sleep(1500); } },
+  // The demo race at /try, as a computer shows it: the racer's phone, the
+  // crew's and the race page, side by side, all three live.
+  'try': { page: 'try', at: DONE, noSlug: true, width: 1280, height: 860,
+    prep: async page => {
+      await page.waitForFunction(() => [...document.querySelectorAll('iframe')].every(f => f.getAttribute('src')), null, { timeout: 20000 });
+      await page.clock.runFor(4000);
+      await sleep(4000);
+    } },
+  // A timed race of two loops, typed into the setup wizard the way it would
+  // be: 15 miles six times, 10 miles once, so every seventh lap lands on 100.
+  'timed': { page: 'setup.html', at: DONE, signedIn: true, noSlug: true, scrollTo: '#loops-fields', scrollPad: 16, height: 800,
+    prep: async page => {
+      await page.click('#course-type input[value="loops"] + .radio-content');
+      await page.click('#race-format input[value="timed"] + .radio-content');
+      // A loop's name and laps in a row only show once there are two.
+      await page.click('#add-loop');
+      await page.fill('[data-loop="0"][data-k="name"]:not([data-st])', 'Out and back');
+      await page.fill('[data-loop="0"][data-k="distance"]', '15');
+      await page.fill('[data-loop="0"][data-k="times"]', '6');
+      await page.fill('[data-loop="1"][data-k="name"]:not([data-st])', 'Short');
+      await page.fill('[data-loop="1"][data-k="distance"]', '10');
+      await page.locator('[data-loop="1"][data-k="distance"]').blur();
+      await sleep(400);
+    } },
+  // The phone left at the start for an out-and-back, and the press made on
+  // getting it back: the Undo bar's Skipped, before it is tapped.
+  'skipped': { page: 'racer.html', at: MID, signedIn: true, media: true,
+    prep: async page => { await page.click('#go'); await page.waitForSelector('.rundo #skip'); await sleep(300);
+      await page.evaluate(() => window.scrollTo(0, 0)); } },
+  // A send-off from Colony Creek, and the face tapped for it.
+  'feel': { page: 'racer.html', at: IN_PIT, signedIn: true, media: true,
+    prep: async page => { await page.click('#go'); await page.waitForSelector('.rundo-feel [data-feel="good"]');
+      await page.click('.rundo-feel [data-feel="good"]'); await sleep(300);
+      await page.evaluate(() => window.scrollTo(0, 0)); } },
+  // The mic in the write-in box, mid-sentence.
+  'voice': { page: 'racer.html', at: MID, signedIn: true, media: true, init: SPEECH,
+    scrollTo: '#jot-form', scrollPad: 330, prep: page => click(page, '#jot-mic') },
+  // Install app from the menu, on an iPhone, where it says the taps.
+  'install': { page: 'race.html', at: MID, signedIn: true, phone: 'iphone',
+    prep: async page => { await click(page, '.account-menu-btn'); await click(page, '.account-menu-item[data-act="install"]');
+      await page.waitForSelector('.install-steps'); } },
+  // The finish as a clock time on the race's own clock, which for a race in
+  // Westcliffe is Denver's, whoever is watching from wherever.
+  'clock': { page: 'race.html', at: MID, cfg: { timezone: 'America/Denver' }, scrollTo: '#cutoffs', scrollPad: 20 }
 };
 
 const listening = () => new Promise(r => { const s = net.connect(8787, '127.0.0.1');
@@ -164,6 +225,7 @@ for (const [name, s] of Object.entries(SHOTS)) {
     });
   }
   const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'races', slug, 'config.json'), 'utf8'));
+  if (s.cfg) Object.assign(cfg, s.cfg);
   if (s.signedIn) {
     // The stub is the owner, and the racer, so every page opens as it would
     // for the person who ran it.
@@ -171,8 +233,10 @@ for (const [name, s] of Object.entries(SHOTS)) {
     if (cfg.runners && cfg.runners[0] && !s.notRacer) cfg.runners[0].email = ME;
   }
 
-  const ctx = await b.newContext({ viewport: { width: s.width || 390, height: s.height || 760 },
+  const phone = s.phone === 'iphone' ? { userAgent: devices['iPhone 13'].userAgent, isMobile: true, hasTouch: true } : {};
+  const ctx = await b.newContext({ ...phone, viewport: { width: s.width || 390, height: s.height || 760 },
     deviceScaleFactor: 3, serviceWorkers: 'block' });
+  if (s.init) await ctx.addInitScript(s.init);
   await ctx.route(EXTERNAL, external);
   const page = await ctx.newPage();
   const errs = [];

@@ -40,6 +40,13 @@ on:
           - gpx
           - disciplines
           - private
+          - try
+          - timed
+          - skipped
+          - feel
+          - voice
+          - install
+          - clock
       dry_run:
         description: Dry run (check everything, post nothing)
         type: boolean

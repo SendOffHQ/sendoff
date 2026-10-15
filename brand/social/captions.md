@@ -216,3 +216,79 @@ Private races will be part of Pro. Sign up during the beta and you keep them.
 Decide before race day: you can take a public race private later, but anything shared while it was public stays out there.
 
 #fkt #trailrunning #ultrarunning #training #crewlife #sendoff
+
+---
+
+## 19. Try it now (`sendoff-feature-try.png`)
+
+Crew a race right now. 👀
+
+Open sendoff.run/try and you're in a demo race already under way: the racer's phone, the crew's phone and the race page family watches from home, side by side. Press something on one and watch the others catch up, the way they do on race day. No account, nothing you do leaves your browser, and Reset starts it over.
+
+Link in bio.
+
+#ultrarunning #crewlife #trailrunning #100miler #ultramarathon #sendoff
+
+---
+
+## 20. Timed races and loops (`sendoff-feature-timed.png`)
+
+Lap 7 lands on 100. ⏱️
+
+Timed races are here: as many laps as fit before the clock runs out. And a course can be more than one loop. Run a 15-mile out-and-back six times, then a 10-mile loop once, and every seventh lap hits 100. Each loop gets its own aid stations, checkpoints and GPX, and the map lights up the one your racer is on.
+
+The race page counts laps and miles and projects where they'll be when the clock stops.
+
+#timedrace #24hourrace #looprace #ultrarunning #backyardultra #sendoff
+
+---
+
+## 21. Missed check-in (`sendoff-feature-skipped.png`)
+
+Left your phone at the pit? 📱
+
+Out to the turnaround and back without it, and now the next button is the turnaround you passed an hour ago. Press it, then tap Skipped. It becomes your arrival back at the pit, the turnaround is marked as missed, and the race page shows one time for the whole stretch instead of a long leg out and a one-second leg back.
+
+Crew can do the same from the pit board, and put in the real time if somebody saw it.
+
+#ultrarunning #crewlife #trailrunning #100miler #outandback #sendoff
+
+---
+
+## 22. How are you feeling (`sendoff-feature-feel.png`)
+
+Good, getting by, or rough? 🙂😐☹️
+
+After every check-in and send-off, the racer screen asks with three faces. One tap and it's kept on that leg, beside the times on the race page and the pit board, so the crew knows what's coming into the aid station before they see it.
+
+#ultrarunning #crewlife #ultramarathon #trailrunning #100miler #sendoff
+
+---
+
+## 23. Talk instead of type (`sendoff-feature-voice.png`)
+
+Hands full? Say it. 🎙️
+
+The write-in box on the racer screen has a mic. Tap it, talk, and the words land in the box, scrolling along as you speak, so you can check them before you log them. Your phone's browser does the listening, in Chrome or Safari, so the recording goes to Google or Apple and never to SendOff.
+
+#ultrarunning #trailrunning #ultramarathon #crewlife #100miler #sendoff
+
+---
+
+## 24. On your home screen (`sendoff-feature-install.png`)
+
+SendOff, one tap away. 📲
+
+Install app is in the menu. On Android, Chrome usually puts it on your home screen in one tap. On an iPhone, it shows you the three taps Apple allows. Either way it opens full screen, straight to your races, with no app store.
+
+#ultrarunning #crewlife #trailrunning #100miler #ultramarathon #sendoff
+
+---
+
+## 25. Race-day clock (`sendoff-feature-clock.png`)
+
+When do they finish? ⏰
+
+The race page shows the projected finish as a time of day, on the race's own clock, with how far under or over the cutoff it is. Every cutoff is a day and a time in the race's time zone too, so family watching from three time zones away and the crew at the aid station read the same clock.
+
+#ultrarunning #100miler #crewlife #trailrunning #ultramarathon #sendoff
