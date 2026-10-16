@@ -201,7 +201,7 @@ const SHOTS = {
   // Ghost Train 30 Hour, the evening before it starts: the course as the
   // race page draws it, both loops on the map with the first lit up.
   'ghost-train': { page: 'race.html', slug: '000007-ghost-train-30-hour-ultra', live: true, at: '2026-10-16T22:00:00Z',
-    scrollTo: '.seg-list', scrollPad: 56, height: 760 },
+    scrollTo: '.seg-list', scrollPad: 76, height: 760 },
   // The same, closer: the map and the two loops under it, for the story.
   'ghost-train-map': { page: 'race.html', slug: '000007-ghost-train-30-hour-ultra', live: true, at: '2026-10-16T22:00:00Z',
     scrollTo: '#course-map-section', scrollPad: 8, height: 470 },

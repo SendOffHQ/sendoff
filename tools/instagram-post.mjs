@@ -39,7 +39,14 @@ export function preparePost(id, { md } = {}) {
   if (md == null && !fs.existsSync(path.join(SOCIAL, jpg))) {
     throw new Error(`${jpg} is not in brand/social. Run shoot-features.js and commit it.`);
   }
-  return { id, caption, collaborators, imageUrl: `${IMAGE_BASE}/${jpg}` };
+  // The image's own hash on the end, from versions.json, so a re-rendered
+  // image is fetched fresh: Cloudflare keeps the old one at some edges for a
+  // day, and Instagram would post whichever it was handed.
+  let v = '';
+  if (md == null) {
+    try { v = JSON.parse(fs.readFileSync(path.join(SOCIAL, 'versions.json'), 'utf8'))[jpg] || ''; } catch (e) {}
+  }
+  return { id, caption, collaborators, imageUrl: `${IMAGE_BASE}/${jpg}${v ? `?v=${v}` : ''}` };
 }
 
 // Instagram's errors come back as { error: { message, code, ... } }. Only the

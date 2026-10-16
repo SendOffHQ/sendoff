@@ -80,7 +80,8 @@ console.log('\na post goes out');
     ig.calls.map(c => `${c.method} ${c.path.split('/').pop()}`),
     ['HEAD sendoff-feature-live-race.jpg', 'GET media', 'POST media', 'GET C1', 'GET C1', 'POST media_publish', 'GET M1']);
   const create = ig.calls.find(c => c.method === 'POST' && c.path.endsWith('/media'));
-  ok('the container carries the public JPEG', create.params.image_url, 'https://sendoff.run/brand/social/sendoff-feature-live-race.jpg');
+  const v = JSON.parse(fs.readFileSync(path.join(SOCIAL, 'versions.json'), 'utf8'))['sendoff-feature-live-race.jpg'];
+  ok('the container carries the public JPEG, as it is now', create.params.image_url, `https://sendoff.run/brand/social/sendoff-feature-live-race.jpg?v=${v}`);
   ok('and the caption from captions.md, exactly', create.params.caption, post.caption);
   ok('publishes the container it made', ig.calls.find(c => c.path.endsWith('media_publish')).params.creation_id, 'C1');
   ok('and hands back the link', out.permalink, 'https://www.instagram.com/p/abc/');
