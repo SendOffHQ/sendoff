@@ -100,26 +100,7 @@
         "joe.rucco"
       ],
       "cutoffHours": 30
-    },
-    {
-      "slug": "000008-ghost-train-30hr",
-      "name": "Ghost Train 30HR",
-      "location": "Brookline, New Hampshire",
-      "startTime": "2026-10-17T09:00:00-04:00",
-      "timezone": "America/New_York",
-      "courseType": "loops",
-      "units": {
-        "distance": "mi",
-        "elevation": "ft"
-      },
-      "activity": "trail-run",
-      "totalDistanceMi": 0,
-      "format": "timed",
-      "runnerNames": [
-        "Alexander Golik"
-      ],
-      "cutoffHours": 30
     }
   ],
-  "lastUpdated": "2026-10-16T17:52:54.843Z"
+  "lastUpdated": "2026-10-16T18:05:16.728Z"
 }
