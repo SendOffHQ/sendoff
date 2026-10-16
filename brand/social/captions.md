@@ -324,3 +324,19 @@ Timed races, and courses of loops that take turns, are new in SendOff. Built for
 Link in bio.
 
 #ghosttrain #ghosttrainultra #timedrace #ultrarunning #trailrunning #100miler #sendoff
+
+---
+
+## 28. Ghost Train, both of them (`sendoff-feature-ghost-train-both.png`)
+
+Collaborators: @joe_rucco
+
+Two racers. One link. 🚂👻
+
+@joe_rucco and Alexander Golik are both running the Ghost Train 30 Hour in Brookline, NH this weekend, from 9 AM Saturday to 3 PM Sunday. 15-mile laps on the rail trail, a 10-mile one every seventh, so lap 7 lands on 100, repeated for 30 hours.
+
+No need to follow them in two places. One race page has them both: every lap as it's logged, miles and laps so far, and where each of them is headed when the clock stops.
+
+Link in bio.
+
+#ghosttrain #ghosttrainultra #timedrace #ultrarunning #trailrunning #100miler #sendoff

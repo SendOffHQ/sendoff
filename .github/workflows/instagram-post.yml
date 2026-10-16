@@ -49,6 +49,7 @@ on:
           - clock
           - ai-crew
           - ghost-train
+          - ghost-train-both
       dry_run:
         description: Dry run (check everything, post nothing)
         type: boolean
