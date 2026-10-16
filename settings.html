@@ -293,6 +293,7 @@
 
 <div id="error" class="error-banner" style="display:none;"></div>
 <div id="read-only" class="editor-warn" style="display:none; margin: 0 0 14px;"></div>
+<div id="held-note" class="info-banner" style="display:none; margin: 0 0 14px;"></div>
 
 <!-- Where the first-visit tutorial goes. See Race.tutorial. -->
 <div id="tut-host"></div>
@@ -585,7 +586,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=2d446fcc"></script>
+<script src="lib/race-core.js?v=121f5871"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -2078,6 +2079,11 @@
       data = Race.queue.applyTo(DATA_PATH, d);
       document.title = `Settings · ${cfg.name}`;
       document.getElementById('race-title').textContent = cfg.name;
+      // The note the race page shows, for a race whose name is held for review.
+      const held = document.getElementById('held-note');
+      held.textContent = cfg.held ? 'The name of this race is held for review, so it is not on the hub, ' +
+        'its share card or the announcements yet. Everything else works as normal. An admin will look at it soon.' : '';
+      held.style.display = cfg.held ? 'block' : 'none';
       document.getElementById('error').style.display = 'none';
       render();
       openFromHash();

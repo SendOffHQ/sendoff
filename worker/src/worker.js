@@ -82,6 +82,7 @@ const RESET_TTL_DAYS = 2;
 export { RaceHub } from './race-hub.js';
 import { RaceHub as _RaceHub } from './race-hub.js';
 import * as aiCrew from './ai-crew.js';
+import { nameProblems } from './moderation.js';
 
 // ---------- live push ----------
 // Off unless the RACE_HUB binding exists. A worker without it runs exactly the
@@ -3060,7 +3061,7 @@ async function handleCommit(req, env, ctx) {
   // Added by handleGet for the caller's benefit. A client that reads a config
   // and writes it back would otherwise persist one person's role into the file
   // everybody reads.
-  const INJECTED_FIELDS = ['myRole'];
+  const INJECTED_FIELDS = ['myRole', 'held'];
 
   let content = content0;
   // Set when this write is the config.json that brings a race into existence,
@@ -3071,6 +3072,10 @@ async function handleCommit(req, env, ctx) {
   let creationAcl = null;
   // An access list lifted off an ordinary config write, stored once it lands.
   let aclUpdate = null;
+  // A race name to hold for review, or a held race renamed to a name that
+  // passes and so to let go, once the write has landed.
+  let holdAfter = null;
+  let releaseAfter = null;
   // The race as it stands, lifted out of the ACL check below. The Discord
   // announcement needs the visibility and the course shape, and a data.json
   // write carries neither.
@@ -3081,6 +3086,32 @@ async function handleCommit(req, env, ctx) {
     // The hub manifest is editable by any signed-in user (the wizard writes
     // it when creating a public race). Private races are never registered
     // there; setup.html omits them from the entry it appends.
+    //
+    // Nor are races held for review, whoever writes the list: the entry is
+    // dropped here rather than trusted to every page that writes one. An
+    // entry naming a race with a name that trips the check is dropped too,
+    // and holds that race, because anybody signed in can write this file and
+    // the name on it is what the hub and the share card show.
+    let idx = null;
+    try { idx = JSON.parse(content); } catch (e) { idx = null; }
+    if (idx && Array.isArray(idx.races) && env.AUTH_KV) {
+      const held = new Set((await heldHolds(env)).map(h => h.slug));
+      const keep = [];
+      for (const e of idx.races) {
+        const s0 = e && typeof e.slug === 'string' ? e.slug : null;
+        if (s0 && held.has(s0)) continue;
+        const words = await nameHoldWords(env, s0, e && e.name);
+        if (words.length) {
+          if (s0) await holdRace(env, s0, e.name, words, session.email);
+          continue;
+        }
+        keep.push(e);
+      }
+      if (keep.length !== idx.races.length) {
+        idx.races = keep;
+        content = JSON.stringify(idx, null, 2) + '\n';
+      }
+    }
   } else if (isRacePath(path)) {
     const slug = racePathSlug(path);
     creationSlug = slug;
@@ -3124,6 +3155,8 @@ async function handleCommit(req, env, ctx) {
           const copy = Object.assign({}, r); delete copy.email; return copy;
         });
         content = JSON.stringify(created, null, 2) + '\n';
+        const words = await nameHoldWords(env, slug, created.name);
+        if (words.length) holdAfter = { name: created.name, words };
         const ent = entitlementsFor(await lookupUser(env, session.email));
         if (created.visibility === 'private' && !ent.privateRaces) {
           return json({
@@ -3178,10 +3211,28 @@ async function handleCommit(req, env, ctx) {
       });
       aclUpdate = Object.assign(aclFromConfig(raceCfg), { runnerEmails: links });
       content = JSON.stringify(submitted, null, 2) + '\n';
+      // A rename is checked as a new race's name is. One that passes lets go
+      // of a race held for its old name.
+      if (String(submitted.name || '') !== String(raceCfg.name || '')) {
+        const words = await nameHoldWords(env, slug, submitted.name);
+        if (words.length) holdAfter = { name: submitted.name, words };
+        else if (await loadHold(env, slug)) releaseAfter = submitted;
+      }
     }
   } else {
     return json({ error: 'Forbidden path' }, { status: 403 }, env, req);
   }
+
+  // After the write has landed, and before the Discord post is queued, which
+  // reads the hold. A race renamed to a name that does not pass comes off the
+  // hub at once, rather than whenever its settings page next writes the list.
+  const applyNameHold = async () => {
+    if (holdAfter) {
+      await holdRace(env, creationSlug, holdAfter.name, holdAfter.words, session.email);
+      if (!isCreation) await unlistHeld(env, creationSlug, session.email);
+    }
+    if (releaseAfter) await releaseHold(env, creationSlug, releaseAfter, session.email);
+  };
 
   // D1 as the authority, for a race file with a version column to guard. Everything after this point that matters, the
   // creation grant, the access list, the Discord post and the live push, runs
@@ -3200,6 +3251,7 @@ async function handleCommit(req, env, ctx) {
         try { await writeAcl(env, creationSlug, aclUpdate); } catch (e) { /* falls back to the file */ }
       }
       await purgeReadCache(env, path);
+      await applyNameHold();
       if (ctx && ctx.waitUntil) {
         ctx.waitUntil(announceCommit(env, path, content, liveCfg, isCreation));
         ctx.waitUntil(publishChange(env, path));
@@ -3208,8 +3260,9 @@ async function handleCommit(req, env, ctx) {
       }
       // The shape the client already knows. It reads the status and nothing
       // else: mutateJson returns the document it wrote, because reading a file
-      // back straight after writing it was never reliable anyway.
-      return json({ content: { path } }, { status: 200 }, env, req);
+      // back straight after writing it was never reliable anyway. Plus held,
+      // for the wizard to say why the race is not on the hub.
+      return json({ content: { path }, ...(holdAfter ? { held: true } : {}) }, { status: 200 }, env, req);
     }
     // passthrough: course.gpx and friends still go to git below.
   }
@@ -3283,6 +3336,7 @@ async function handleCommit(req, env, ctx) {
   let newSha = null;
   if (res.ok) { try { newSha = (JSON.parse(text).content || {}).sha || null; } catch (e) {} }
   if (res.ok) await mirrorToD1(env, path, content, session.email, newSha);
+  if (res.ok) await applyNameHold();
   // The cached copy is now wrong. Dropping it means a press is visible on the
   // next poll rather than up to CACHE_TTL_S later, at least in this colo.
   if (res.ok) await purgeReadCache(env, path);
@@ -3511,6 +3565,11 @@ async function handleGet(req, env) {
       // whose race it is: deleting it, and handing out access to it, stay with
       // them. The client reads this as a writing role and nothing more.
       if (cfg.myRole === null && asSiteAdmin(env, session)) cfg.myRole = 'admin';
+      // Held for review, told to the people who run the race so the page can
+      // say why it is not on the hub. Nobody else is told, or needs to be.
+      if (WRITING_ROLES.has(cfg.myRole) || cfg.myRole === 'admin') {
+        if (await loadHold(env, racePathSlug(path))) cfg.held = true;
+      }
       // Runner-to-account links come back only for somebody who works the
       // race. Crew need them to load a runner's goals and racer mode needs
       // them to know whose splits it is showing. A viewer does not, and an
@@ -3908,6 +3967,9 @@ function raceDay(iso, zone, opts) {
 
 async function announceNewRace(env, slug, cfg) {
   if (!isPublicRace(cfg)) return;
+  // Not the name of a race held for review. Discord is where a race is told
+  // to the most strangers at once, and a post cannot be taken back.
+  if (await loadHold(env, slug)) return;
   const name = forDiscord(cfg.name) || 'A race';
   const where = forDiscord(cfg.location, 80);
   const day = raceDay(cfg.startTime, cfg.timezone, { month: 'long', day: 'numeric', year: 'numeric' });
@@ -4088,6 +4150,160 @@ async function announceCommit(env, path, content, cfg, isCreation) {
     // Rule 2. A chat post is never worth failing a write over, and by the
     // time this runs the response has already gone.
   }
+}
+
+// ---------- race names held for review ----------
+// A race whose name trips the check in moderation.js is made, and works for
+// everybody on it, and is kept off everything that shows it to strangers: the
+// hub's list, and with it the share page and preview card built from that
+// list, and the Discord post. An admin looks and lets the name through, or
+// the owner renames the race to something that passes, and either puts a
+// public race back on the hub.
+//   held:<slug>    { slug, name, words, by, at } for as long as it is held
+//   nameok:<slug>  the exact name an admin let through, so the next write of
+//                  the same name is not held all over again
+// Without KV nothing is held: there is nowhere to keep the hold or the
+// admin's answer, and holding with no way to let go would hide races for good.
+const HELD_KEY = (slug) => 'held:' + slug;
+const NAME_OK_KEY = (slug) => 'nameok:' + slug;
+
+async function loadHold(env, slug) {
+  if (!env.AUTH_KV || !slug) return null;
+  try { const raw = await env.AUTH_KV.get(HELD_KEY(slug)); return raw ? JSON.parse(raw) : null; }
+  catch (e) { return null; }
+}
+
+// Every hold. A list that fails part way returns what it found: the names on
+// a manifest write are still checked one by one, so a race is not let onto the
+// hub because KV could not be listed, and a write is not refused for it either.
+async function heldHolds(env) {
+  const out = [];
+  if (!env.AUTH_KV || typeof env.AUTH_KV.list !== 'function') return out;
+  try {
+    let cursor;
+    do {
+      const page = await env.AUTH_KV.list({ prefix: 'held:', cursor });
+      for (const k of page.keys || []) {
+        try { const raw = await env.AUTH_KV.get(k.name); if (raw) out.push(JSON.parse(raw)); } catch (e) {}
+      }
+      cursor = page.list_complete === false ? page.cursor : undefined;
+    } while (cursor);
+  } catch (e) { /* what was found so far */ }
+  return out;
+}
+
+// The listed words a race's name trips, or [] when it passes or an admin has
+// already let this exact name through.
+async function nameHoldWords(env, slug, name) {
+  if (!env.AUTH_KV) return [];
+  const words = nameProblems(name);
+  if (!words.length) return [];
+  const ok = slug ? await env.AUTH_KV.get(NAME_OK_KEY(slug)).catch(() => null) : null;
+  return ok !== null && ok === String(name) ? [] : words;
+}
+
+async function holdRace(env, slug, name, words, by) {
+  if (!env.AUTH_KV || !slug) return;
+  const was = await loadHold(env, slug);
+  await env.AUTH_KV.put(HELD_KEY(slug), JSON.stringify({
+    slug, name: clip(String(name || ''), 200), words, by: normalizeEmail(by) || null,
+    at: (was && was.name === name && was.at) || new Date().toISOString()
+  }));
+  if (!was || was.name !== name) await notifyHeld(env, slug, name, words, by);
+}
+
+// Off the hub, for a race that was listed under a name that passed and has
+// just been renamed to one that does not. Read first, so a race that was never
+// listed costs no commit.
+async function unlistHeld(env, slug, actor) {
+  try {
+    const r = await githubGetJson(env, 'races/index.json');
+    if (r.missing || !r.data || !(r.data.races || []).some(e => e && e.slug === slug)) return null;
+    await mutateJsonAt(env, 'races/index.json', (data) => {
+      const out = data && Array.isArray(data.races) ? data : { races: [] };
+      out.races = out.races.filter(e => !e || e.slug !== slug);
+      out.lastUpdated = new Date().toISOString();
+      return out;
+    }, `hub: hold race ${slug} for review`, actor);
+    return null;
+  } catch (e) { return e.message || String(e); }
+}
+
+// Lets a race go, and puts it back on the hub if it is public. Returns what
+// went wrong with the hub, or null.
+async function releaseHold(env, slug, cfg, actor) {
+  if (env.AUTH_KV) await env.AUTH_KV.delete(HELD_KEY(slug));
+  if (!isPublicRace(cfg)) return null;
+  try {
+    await mutateJsonAt(env, 'races/index.json', (data) => {
+      const out = data && Array.isArray(data.races) ? data : { races: [] };
+      out.races = out.races.filter(e => !e || e.slug !== slug);
+      out.races.push(manifestEntry(slug, cfg));
+      out.lastUpdated = new Date().toISOString();
+      return out;
+    }, `hub: list race ${slug}, name let through`, actor, 'empty');
+    return null;
+  } catch (e) { return e.message || String(e); }
+}
+
+// The admin is told, because a hold nobody hears about is a race that never
+// gets listed. The name goes in the body, not the subject, which an inbox
+// shows to anybody glancing at the screen.
+async function notifyHeld(env, slug, name, words, by) {
+  if (!(env.EMAIL && env.NOTIFY_EMAIL && env.NOTIFY_FROM)) return;
+  try {
+    const rows = [['Race name', name], ['Caught', (words || []).join(', ')], ['Made by', by],
+      ['Race', `${mailBase(env)}/race?id=${encodeURIComponent(slug)}`]]
+      .filter(r => r[1])
+      .map(r => `<tr><td style="padding:2px 12px 2px 0;color:#7A8D99">${escHtml(r[0])}</td>` +
+                `<td style="padding:2px 0">${escHtml(r[1])}</td></tr>`).join('');
+    const err = await sendMail(env, {
+      to: env.NOTIFY_EMAIL,
+      from: mailFrom(env, 'notify'),
+      subject: 'SendOff: a race name is held for review',
+      html: mailShell(env, 'A race name is held for review',
+        `<h1 style="margin:0 0 14px;font-size:22px;line-height:1.25;color:${MAIL_INK}">A race name is held for review</h1>` +
+        `<p style="margin:0 0 14px;font-size:14px">It is off the hub until you let it through or it is renamed.</p>` +
+        `<table style="border-collapse:collapse;font-size:14px">${rows}</table>` +
+        mailButton(`${mailBase(env)}/admin.html`, 'Review it')),
+      text: `A race name is held for review: ${name}\nCaught: ${(words || []).join(', ')}\nMade by: ${by || ''}\n\n` +
+            `Review it: ${mailBase(env)}/admin.html\n`
+    });
+    if (err) throw new Error(err);
+  } catch (e) {
+    console.error('held-name notify failed:', e && e.message ? e.message : e);
+  }
+}
+
+async function handleHeldList(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
+  const held = (await heldHolds(env)).sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+  return json({ held }, {}, env, req);
+}
+
+// Lets the name through as the race has it now, and lists the race if it is
+// public. Nothing else about the race changes.
+async function handleHeldApprove(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (session.role !== 'admin') return json({ error: 'Admins only' }, { status: 403 }, env, req);
+  if (!env.AUTH_KV) return json({ error: 'Holds require AUTH_KV KV namespace binding' }, { status: 503 }, env, req);
+  let body;
+  try { body = await req.json(); }
+  catch (e) { return json({ error: 'Invalid JSON' }, { status: 400 }, env, req); }
+  const slug = clip(body && body.slug, 200);
+  if (!slug || !/^[a-z0-9][a-z0-9-]*$/i.test(slug)) return json({ error: 'Missing or invalid slug' }, { status: 400 }, env, req);
+  if (!(await loadHold(env, slug))) return json({ error: 'That race is not held' }, { status: 404 }, env, req);
+  const cfg = await loadRaceConfigNow(env, slug);
+  if (!cfg) {
+    await env.AUTH_KV.delete(HELD_KEY(slug));
+    return json({ error: 'Race not found; the hold is cleared' }, { status: 404 }, env, req);
+  }
+  await env.AUTH_KV.put(NAME_OK_KEY(slug), String(cfg.name || ''));
+  const hubErr = await releaseHold(env, slug, cfg, session.email);
+  return json({ ok: true, slug, listed: isPublicRace(cfg) && !hubErr, ...(hubErr ? { hubError: hubErr } : {}) }, {}, env, req);
 }
 
 // ---------- access requests ----------
@@ -5931,13 +6147,16 @@ async function handleRaceVisibility(req, env, ctx) {
       { status: 502 }, env, req);
   }
 
-  // Then the manifest, which is what the hub and every share card read.
+  // Then the manifest, which is what the hub and every share card read. A
+  // race held for review goes public without going on it, and without its
+  // share page: both carry the name. Letting the name through lists it.
+  const held = want === 'public' && !!(await loadHold(env, slug));
   let manifestErr = null;
   try {
     await mutateJsonAt(env, 'races/index.json', (data) => {
       const out = data && Array.isArray(data.races) ? data : { races: [] };
       out.races = (out.races || []).filter(r => r.slug !== slug);
-      if (want === 'public') out.races.push(manifestEntry(slug, raceCfg));
+      if (want === 'public' && !held) out.races.push(manifestEntry(slug, raceCfg));
       out.lastUpdated = new Date().toISOString();
       return out;
     }, `hub: ${want === 'private' ? 'unregister' : 'register'} race ${slug}`,
@@ -5953,14 +6172,17 @@ async function handleRaceVisibility(req, env, ctx) {
   let courseErr = null, shareErr = null;
   try { courseErr = await moveCourseForVisibility(env, slug, want, session.email, raceCfg); }
   catch (e) { courseErr = `could not move the course: ${e.message || e}`; }
-  try { shareErr = await moveSharePageForVisibility(env, slug, want, raceCfg, session.email); }
-  catch (e) { shareErr = `could not move the share page: ${e.message || e}`; }
+  if (!held) {
+    try { shareErr = await moveSharePageForVisibility(env, slug, want, raceCfg, session.email); }
+    catch (e) { shareErr = `could not move the share page: ${e.message || e}`; }
+  }
 
   // Reported rather than thrown. The race has changed, and an operator being
   // told which half did not finish can act on it; a 500 that hides a completed
   // config write cannot be acted on at all.
   return json({
     slug, visibility: want, changed: true,
+    ...(held ? { held: true } : {}),
     manifestErr: manifestErr || null,
     courseErr: courseErr || null,
     shareErr: shareErr || null
@@ -6022,8 +6244,9 @@ async function handleRaceDelete(req, env) {
   // of people's addresses, and it used to outlive the race it belonged to
   // forever. dsc:fin: is who has already been announced as finishing, which
   // would otherwise silence the announcements if the slug were ever reused.
+  // held: and nameok: are a review of this race's name, which goes with it.
   if (env.AUTH_KV) {
-    for (const key of [ACL_KEY(slug), 'dsc:fin:' + slug, 'created:' + slug]) {
+    for (const key of [ACL_KEY(slug), 'dsc:fin:' + slug, 'created:' + slug, HELD_KEY(slug), NAME_OK_KEY(slug)]) {
       try { await env.AUTH_KV.delete(key); } catch (e) { /* best effort */ }
     }
   }
@@ -6256,6 +6479,8 @@ async function route(request, env, ctx) {
     if (request.method === 'POST' && path === '/account/plan')    return handleAccountPlan(request, env);
     if (request.method === 'POST' && path === '/account/name')    return handleAccountName(request, env);
     if (request.method === 'GET'  && path === '/accounts')        return handleAccounts(request, env);
+    if (request.method === 'GET'  && path === '/held')            return handleHeldList(request, env);
+    if (request.method === 'POST' && path === '/held/approve')    return handleHeldApprove(request, env);
     if (request.method === 'POST' && path === '/account/delete')  return handleAccountDelete(request, env);
     if (request.method === 'GET'  && path === '/account-races')   return handleAccountRaces(request, env);
 

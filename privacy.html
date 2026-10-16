@@ -175,6 +175,13 @@
   loop), cutoffs, and the racers' names and bib numbers, and a racer's goal where one is set (a
   finish time, or in a timed race a distance or a number of laps), which the race page shows with
   how they are doing against it.</p>
+<p>A race's name is checked for foul language when the race is made and when it is renamed. The
+  check is a word list on SendOff's own server; the name is not sent anywhere else for it. A name
+  that trips it is held for review: the race is made and works as normal, and stays off the hub,
+  its share card and the Discord announcements until one of SendOff's admins lets the name
+  through. While it is held, the admins see the name, the words that tripped the check and the
+  email address of the account that made the race, and are emailed the same so that somebody
+  looks.</p>
 
 <h3>What the crew logs</h3>
 <p>Arrival and departure times at each aid station (for one marked as skipped, gone by with no
@@ -367,6 +374,7 @@
   <tr><td>Feedback</td><td>180 days</td></tr>
   <tr><td>Rate limit counters</td><td>1 hour, or a day for adding people by username</td></tr>
   <tr><td>A username given up</td><td>kept back from others for 30 days</td></tr>
+  <tr><td>A race name held for review</td><td>until it is let through, or the race is renamed or deleted; a name let through is remembered until the race is deleted</td></tr>
   <tr><td>Races and logged data</td><td>until deleted</td></tr>
 </table>
 
@@ -433,6 +441,6 @@
     <span aria-hidden="true"> &middot; </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=2d446fcc"></script>
+<script src="lib/race-core.js?v=121f5871"></script>
 </body>
 </html>

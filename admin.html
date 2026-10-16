@@ -197,6 +197,10 @@
   .acct-races .vis-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
   .acct-races .vis-btn:disabled { opacity: 0.5; cursor: default; }
   .acct-races .vis-err { color: var(--red); padding: 2px 0 6px; white-space: normal; }
+  /* A held race: its name, its link, what tripped it, and the one action. */
+  .held-row { flex-wrap: wrap; }
+  .held-row .who a { color: var(--accent); margin-left: 6px; }
+  .held-row .vis-err { flex-basis: 100%; color: var(--red); white-space: normal; }
   .acct-races .race-row a { min-width: 0; overflow-wrap: anywhere; word-break: normal; }
   .acct-name-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 0 10px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
   .acct-name-edit .lbl { color: var(--text-muted); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; }
@@ -335,6 +339,15 @@
       <div id="d1-out" class="acl-out"></div>
     </section>
 
+    <section class="card" id="held-card">
+      <h2>Held for review</h2>
+      <p class="lead">Races whose name tripped the foul-language check. Each one
+        is made and works for everybody on it, and is kept off the hub, its
+        share card and the announcements until you let the name through. A
+        public race goes on the hub when you do.</p>
+      <div id="held-list"><div class="acct-races muted">Loading…</div></div>
+    </section>
+
     <section class="card">
       <h2>Accounts</h2>
       <p class="lead">Everyone with a hub account. Tap a row to see the races
@@ -367,7 +380,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=2d446fcc"></script>
+<script src="lib/race-core.js?v=121f5871"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -596,6 +609,7 @@
       if (el) el.addEventListener('input', renderAccounts);
     }
     loadAccounts();
+    loadHeld();
     loadAccessRequests();
     loadFeedback();
     const aclBtn = document.getElementById('acl-check');
@@ -919,6 +933,44 @@
     // one of them in mind and should not have to know which this list holds.
     // The username with its @, so "@joe" finds it as well as "joe".
     return (a.email + ' ' + (a.name || '') + ' ' + (a.username ? '@' + a.username : '')).toLowerCase().includes(q);
+  }
+
+  // Race names held for review, newest first, each with what tripped it and
+  // who made it, and a button that lets the name through.
+  async function loadHeld() {
+    const list = document.getElementById('held-list');
+    try {
+      const r = await Race.api.heldRaces();
+      const held = r.held || [];
+      list.innerHTML = held.length ? held.map(h => `
+        <div class="pending-row held-row" data-slug="${esc(h.slug)}">
+          <span class="who"><b class="pending-name">${esc(h.name)}</b>
+            <a href="/race?id=${encodeURIComponent(h.slug)}">${esc(h.slug)}</a>
+            <span class="pending-meta">Caught: ${esc((h.words || []).join(', '))}${h.by ? ' · made by ' + esc(h.by) : ''}${
+              h.at ? ' · ' + esc(new Date(h.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })) : ''}</span></span>
+          <button type="button" data-approve="${esc(h.slug)}">Let it through</button>
+        </div>`).join('')
+        : '<div class="acct-races muted">Nothing is held.</div>';
+      list.querySelectorAll('[data-approve]').forEach(b => b.addEventListener('click', async () => {
+        const row = b.closest('.held-row');
+        const name = row.querySelector('.pending-name').textContent;
+        if (!confirm(`Let "${name}" through?\n\nIf the race is public, it goes on the hub under this name, with a share card.`)) return;
+        b.disabled = true;
+        row.querySelectorAll('.vis-err').forEach(e => e.remove());
+        const say = (text) => { const e = document.createElement('div'); e.className = 'vis-err'; e.textContent = text; row.appendChild(e); };
+        try {
+          const r = await Race.api.approveHeld(b.dataset.approve);
+          // Let through either way; the hub is the part that can lag.
+          if (r.hubError) { say('Let through, but not yet on the hub: ' + r.hubError); return; }
+          loadHeld();
+        } catch (err) {
+          b.disabled = false;
+          say(err.message || 'Could not let it through.');
+        }
+      }));
+    } catch (err) {
+      list.innerHTML = '<div class="err">' + esc(err.message || 'Could not load held races.') + '</div>';
+    }
   }
 
   async function loadAccounts() {

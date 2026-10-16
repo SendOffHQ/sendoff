@@ -752,7 +752,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=2d446fcc"></script>
+<script src="lib/race-core.js?v=121f5871"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -1801,8 +1801,11 @@
       const indexEntry = buildIndexEntry(raceConfig, slug);
 
       progressLine(`Writing races/${slug}/config.json…`);
-      await Race.gh.putJson(cfg, `races/${slug}/config.json`, raceConfig,
+      const made = await Race.gh.putJson(cfg, `races/${slug}/config.json`, raceConfig,
         null, `hub: create race ${slug} (config)`);
+      // The worker checks the name, and holds one with foul language in it
+      // for review: made, working, and off the hub until an admin looks.
+      const held = !!(made && made.held);
 
       progressLine(`Writing races/${slug}/data.json…`);
       await Race.gh.putJson(cfg, `races/${slug}/data.json`, dataJson,
@@ -1820,7 +1823,9 @@
 
       // Private races stay out of the public manifest. Logged-in viewers
       // see them via the worker's /my-races endpoint instead.
-      if (raceConfig.visibility !== 'private') {
+      if (held) {
+        progressLine(`The race name is held for review: it goes on the hub once an admin has looked.`);
+      } else if (raceConfig.visibility !== 'private') {
         progressLine(`Updating races/index.json…`);
         await Race.gh.mutateJson(cfg, 'races/index.json', (data) => {
           const out = data && Array.isArray(data.races) ? data : { races: [] };

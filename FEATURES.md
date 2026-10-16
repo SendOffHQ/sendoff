@@ -57,6 +57,7 @@ optional Cloudflare Worker auth proxy.
 - Remove accounts
 - A name per account, the admin's own label for who it is, shown in the account list in place of the name they gave themselves, and the races under each account. `test/admin-accounts.mjs`.
 - Each account's @username beside its name, and found by the search with or without the @. `test/accounts-filter.mjs`, `worker/test/usernames.mjs`.
+- Race names held for review: a name with foul language in it (checked through stand-ins like f*ck, sh!t and spaced-out letters) is held when a race is made or renamed. The race works; it stays off the hub, its share card and Discord until an admin lets it through from the Held for review list, and the people running it are told why. `worker/test/name-hold.mjs`, `test/name-hold-pages.mjs`.
 
 ## Hub
 - Race list home page (`index.html`); auto-tags races as done when complete

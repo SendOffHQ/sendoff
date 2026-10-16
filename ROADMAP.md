@@ -315,6 +315,24 @@ What is still not built is everything above this line: nothing detects a race
 that was never run, and nothing tells its creator. The lever exists; the hand
 on it is still a person.
 
+### Race names held for review — *built 2026-10-16*
+
+A race's name is the one thing about it that goes in front of strangers
+unasked: the hub, the share card, the Discord post. So it is checked when a
+race is made and when it is renamed, against a word list in
+`worker/src/moderation.js` read through the usual dodges (f*ck, sh!t, spaced
+letters, stretched letters). A name that trips it is **held, not refused**:
+the race is made and works for everybody on it, and stays off the hub, the
+share card and Discord until an admin lets the name through from the admin
+page, or it is renamed to one that passes. The admin is emailed. The hold is
+enforced on every write of `races/index.json`, not trusted to the wizard,
+because anybody signed in can write that file.
+
+The list leans towards the clearly foul and leaves the merely salty alone:
+Hellgate, Badass 50K and Dick Collins Firetrails are real races. A false alarm
+costs a race a few hours off the hub; a miss puts a slur on the front page.
+Runner names and the other free text on a race are not checked yet.
+
 ---
 
 ## Finding a race among many

@@ -517,6 +517,10 @@
      clears. See the ?invite=1 note in setup.html. -->
 <div id="new-note" class="info-banner" style="display:none;"></div>
 
+<!-- A race whose name is held for review, said to the people running it, who
+     are the only ones the worker tells. -->
+<div id="held-note" class="info-banner" style="display:none;"></div>
+
 <!-- Where the first-visit tutorial goes. See Race.tutorial. -->
 <div id="tut-host"></div>
 <div id="share-banner" class="share-banner" style="display:none;"></div>
@@ -549,7 +553,7 @@
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8a2565f0"></script>
 <script src="lib/course-view.js?v=bb2e63e2"></script>
-<script src="lib/race-core.js?v=2d446fcc"></script>
+<script src="lib/race-core.js?v=121f5871"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -1286,6 +1290,7 @@
 
       document.getElementById('error').style.display = 'none';
       renderShareBanner();
+      showHeldNote(document.getElementById('held-note'), cfg);
       // The other three pages of this race, and the hub. The pit board only
       // appears for someone who can actually work it.
       Race.nav.setRace(slug, 'race', canEdit);
@@ -1395,6 +1400,17 @@
   //
   // Said once and not stored: the marker is dropped from the URL on the same
   // pass, so a refresh is an ordinary visit to the race.
+  // Held for review: everything works, and the race is off the hub until an
+  // admin has looked. Settings shows the same note.
+  function showHeldNote(el, cfg) {
+    if (!el) return;
+    el.textContent = cfg && cfg.held ? HELD_NOTE : '';
+    el.style.display = cfg && cfg.held ? 'block' : 'none';
+  }
+  const HELD_NOTE = 'The name of this race is held for review, so it is not on the hub, ' +
+    'its share card or the announcements yet. Everything else works as normal: the link, ' +
+    'the crew and the racers. An admin will look at it soon.';
+
   function showInviteNote() {
     if (!Race.qs('invite')) return;
     const el = document.getElementById('new-note');

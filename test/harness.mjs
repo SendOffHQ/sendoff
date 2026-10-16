@@ -77,6 +77,9 @@ let aiCrewLinks = [];
 // Whether hub.json advertises the live push. Off by default: a page that
 // believes in it opens a websocket, and this server does not speak one.
 let livePush = false;
+let heldRaces = [{ slug: 'zz-held-race', name: 'Bullsh*t Backyard', words: ['shit'],
+  by: 'crew@example.com', at: '2026-10-16T18:00:00.000Z' }];
+const approvedHeld = [];
 // An account with no Pro entitlements, for the screens that have to say so
 // before somebody presses something that cannot work.
 let freePlan = false;
@@ -575,6 +578,26 @@ const server = http.createServer((req, res) => {
       send(200, JSON.stringify(out), 'application/json');
     });
   }
+
+  // Races whose names are held for review, with the shape the real endpoint
+  // returns, and letting one through, which takes it off the list.
+  if (url.pathname === '/api/held') {
+    if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+    return send(200, JSON.stringify({ held: heldRaces }), 'application/json');
+  }
+  if (url.pathname === '/api/held/approve') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+      let j = {}; try { j = JSON.parse(body || '{}'); } catch (e) {}
+      if (!heldRaces.some(h => h.slug === j.slug)) return send(404, '{"error":"That race is not held"}', 'application/json');
+      heldRaces = heldRaces.filter(h => h.slug !== j.slug);
+      approvedHeld.push(j.slug);
+      send(200, JSON.stringify({ ok: true, slug: j.slug, listed: true }), 'application/json');
+    });
+  }
+  if (url.pathname === '/held-approved') return send(200, JSON.stringify(approvedHeld), 'application/json');
 
   // Enough accounts to have something to search and filter, with the shape the
   // real endpoint returns: a name off the profile, blank for anybody who has
