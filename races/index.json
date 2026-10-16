@@ -97,10 +97,11 @@
       "totalDistanceMi": 0,
       "format": "timed",
       "runnerNames": [
-        "joe.rucco"
+        "joe.rucco",
+        "alexander.golik16"
       ],
       "cutoffHours": 30
     }
   ],
-  "lastUpdated": "2026-10-16T18:05:16.728Z"
+  "lastUpdated": "2026-10-16T19:09:25.316Z"
 }
