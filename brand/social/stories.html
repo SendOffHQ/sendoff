@@ -6,9 +6,11 @@
      Render with:
        SRC=$PWD/stories.html PREFIX=sendoff-story- SIZE=1080x1920 node shoot-features.js
 
-     Instagram covers about the top 250px with the progress bar and the
-     account name, and the bottom 300 with the reply bar, so nothing that has
-     to be read goes there. -->
+     Instagram puts its progress bar and the account name over the top, and
+     the reply bar over about the bottom 300, so nothing that has to be read
+     goes in that band. The words sit centred between the top edge and the
+     phone: as much space above the wordmark as between the last line and
+     the phone. -->
 <!DOCTYPE html><html><head><meta charset="utf-8">
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -84,8 +86,8 @@
   .cloud .chip.hot{background:var(--signal);color:#062226;border-color:var(--signal)}
 
   /* A story is a slide stretched to 9:16, text centred over a centred phone. */
-  .slide.story{width:1080px;height:1920px;padding:250px 88px 300px;text-align:center}
-  .story .wm svg{height:56px;margin:0 auto}
+  .slide.story{width:1080px;height:1920px;padding:131px 88px 300px;text-align:center}
+  .story .wm svg{height:96px;margin:0 auto}
   .story .kick{margin-top:48px}
   .story h1{font-size:118px}
   .story p.lead{margin:24px auto 0;max-width:30ch}
