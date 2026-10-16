@@ -329,11 +329,11 @@ Link in bio.
 
 ## 28. Ghost Train, both of them (`sendoff-feature-ghost-train-both.png`)
 
-Collaborators: @joe_rucco
+Collaborators: @joe_rucco, @alexandergolikk
 
 Two racers. One link. 🚂👻
 
-@joe_rucco and Alexander Golik are both running the Ghost Train 30 Hour in Brookline, NH this weekend, from 9 AM Saturday to 3 PM Sunday. 15-mile laps on the rail trail, a 10-mile one every seventh, so lap 7 lands on 100, repeated for 30 hours.
+@joe_rucco and @alexandergolikk are both running the Ghost Train 30 Hour in Brookline, NH this weekend, from 9 AM Saturday to 3 PM Sunday. 15-mile laps on the rail trail, a 10-mile one every seventh, so lap 7 lands on 100, repeated for 30 hours.
 
 No need to follow them in two places. One race page has them both: every lap as it's logged, miles and laps so far, and where each of them is headed when the clock stops.
 
