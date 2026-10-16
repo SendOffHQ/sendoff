@@ -92,18 +92,27 @@
   .story .phone{left:50%;right:auto;transform:translateX(-50%);width:600px;top:990px}
   .story .when{margin-top:26px;font-family:var(--mono);font-size:24px;letter-spacing:.14em;
     text-transform:uppercase;color:var(--signal)}
+  /* A racer's portrait beside the phone: the phone moves left and the
+     portrait, with the handle and the photo's credit, sits level with it. */
+  .story.with-portrait .phone{left:88px;transform:none;width:560px}
+  .portrait{position:absolute;right:88px;width:300px;z-index:2;text-align:center}
+  .portrait img{display:block;width:300px;height:300px;border-radius:50%;object-fit:cover;
+    border:6px solid var(--signal);box-shadow:0 0 0 10px rgba(15,184,191,.12), 0 0 80px rgba(15,184,191,.35), 0 30px 80px rgba(0,0,0,.55)}
+  .portrait figcaption{margin-top:20px;font-family:var(--mono);font-size:26px;color:var(--ink);letter-spacing:.04em}
+  .portrait figcaption small{display:block;margin-top:8px;font-size:16px;color:var(--mute);letter-spacing:.12em;text-transform:uppercase}
 </style></head><body>
 
-<section class="slide story grad glow" id="ghost-train">
+<section class="slide story with-portrait grad glow" id="ghost-train">
   <div class="top">
     <div class="wm"></div>
     <p class="kick">This weekend · Brookline, NH</p>
     <h1>Follow Joe<br>on the <em>Ghost<br>Train.</em></h1>
-    <p class="lead">30 hours of 15-mile laps, a 10-mile one every seventh, so lap 7 lands on 100. Every lap live on SendOff.</p>
+    <p class="lead" style="max-width:40ch;text-wrap:balance">15-mile laps, a 10-mile one every seventh, so lap 7 lands on 100, repeated for 30 hours.<br>Every lap live on SendOff.</p>
     <p class="when">Sat 9 AM to Sun 3 PM ET · sendoff.run</p>
   </div>
   <!-- From the map down to the loop chips: the course heading above it sits
        under the phone's notch. -->
+  <figure class="portrait" style="top:1110px"><img src="photos/joe-rucco-bust.jpg" alt=""><figcaption>@joe_rucco<small>Photo · Midstate Massive</small></figcaption></figure>
   <div class="phone"><img src="shots/ghost-train-map.png" alt="" style="object-fit:cover;object-position:50% 58%;aspect-ratio:1170/1255"></div>
 </section>
 

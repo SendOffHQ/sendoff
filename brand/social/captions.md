@@ -315,7 +315,7 @@ Collaborators: @joe_rucco
 
 Follow Joe on the Ghost Train. 🚂👻
 
-@joe_rucco takes on the Ghost Train 30 Hour in Brookline, NH this weekend, from 9 AM Saturday to 3 PM Sunday. It's a rail trail run in laps: 15 miles out and back six times, then a 10-mile one on the seventh, so lap 7 lands on 100. He's going for 100 miles.
+@joe_rucco takes on the Ghost Train 30 Hour in Brookline, NH this weekend, from 9 AM Saturday to 3 PM Sunday. It's a rail trail run in laps: 15 miles out and back six times, then a 10-mile one on the seventh, so lap 7 lands on 100, repeated for 30 hours. He's going for 100 miles.
 
 Follow him live on SendOff: every lap as it's logged, his miles and laps so far, and where his pace puts him when the clock stops.
 
