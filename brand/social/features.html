@@ -80,6 +80,22 @@
   .cloud{display:flex;flex-wrap:wrap;gap:16px;margin-top:56px;max-width:900px}
   .cloud .chip{font-size:30px;padding:16px 30px}
   .cloud .chip.hot{background:var(--signal);color:#062226;border-color:var(--signal)}
+
+  /* A photograph, full bleed, with the words over a shade that leaves the
+     right-hand edge clear: a race photo carries its photographer's or its
+     race's mark there, and it stays readable. */
+  .slide.photo{padding:0}
+  .photo .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+  .photo .shade{position:absolute;left:0;right:0;bottom:0;height:62%;z-index:1;
+    background:linear-gradient(180deg,rgba(10,15,20,0) 0%,rgba(10,15,20,.82) 48%,rgba(10,15,20,.9) 100%);
+    -webkit-mask-image:linear-gradient(90deg,#000 0%,#000 55%,transparent 86%);mask-image:linear-gradient(90deg,#000 0%,#000 55%,transparent 86%)}
+  .photo .shade-top{position:absolute;left:0;right:0;top:0;height:22%;z-index:1;
+    background:linear-gradient(180deg,rgba(10,15,20,.7),rgba(10,15,20,0))}
+  .photo .ptop{position:absolute;left:88px;top:80px;z-index:2}
+  .photo .pbottom{position:absolute;left:88px;right:300px;bottom:84px;z-index:2;text-shadow:0 2px 14px rgba(0,0,0,.65)}
+  .photo .pbottom .kick{margin-top:0}
+  .photo .pbottom p.lead{margin-top:20px;max-width:31ch}
+  .photo .chips.row{flex-direction:row;flex-wrap:wrap;margin-top:26px}
 </style></head><body>
 
 <section class="slide grad glow" id="live-race">
@@ -390,16 +406,16 @@
   <div class="foot">sendoff.run</div>
 </section>
 
-<section class="slide grad glow" id="ghost-train">
-  <div class="top">
-    <div class="wm"></div>
-    <p class="kick">This weekend · Ghost Train 30 Hour</p>
-    <h1>Follow<br>Joe on the<br><em>Ghost<br>Train.</em></h1>
-    <p class="lead" style="max-width:21ch">30 hours of 15-mile laps, a 10-mile one every seventh, so lap 7 lands on 100.</p>
-    <div class="chips"><span class="chip">Sat 9 AM to Sun 3 PM</span><span class="chip">Timed race</span><span class="chip">Loops that take turns</span></div>
+<section class="slide photo" id="ghost-train">
+  <img class="bg" src="photos/joe-rucco-midstate.jpg" alt="">
+  <div class="shade-top"></div><div class="shade"></div>
+  <div class="ptop"><div class="wm"></div></div>
+  <div class="pbottom">
+    <p class="kick">This weekend · Brookline, NH</p>
+    <h1>Follow Joe<br>on the <em>Ghost<br>Train.</em></h1>
+    <p class="lead">30 hours of 15-mile laps, a 10-mile one every seventh. Live on SendOff.</p>
+    <div class="chips row"><span class="chip">Timed race</span><span class="chip">Loops that take turns</span></div>
   </div>
-  <div class="phone" style="top:470px"><img src="shots/ghost-train.png" alt="" style="object-fit:cover;object-position:top;aspect-ratio:1170/2110"></div>
-  <div class="foot">sendoff.run</div>
 </section>
 
 <template id="wm-src"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" width="3059" height="1066" viewBox="-130 -130 3781.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 544.24 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 489.41 469.6 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></template>
