@@ -72,7 +72,7 @@ await page.goto(BASE + '/admin.html');
 await page.waitForSelector('#held-list .held-row', { timeout: 20000 });
 const row = await page.evaluate(() => {
   const r = document.querySelector('#held-list .held-row');
-  return { name: r.querySelector('.pending-name').textContent, meta: r.querySelector('.pending-meta').textContent,
+  return { name: r.querySelector('.held-name').textContent, meta: r.querySelector('.held-meta').textContent,
     link: r.querySelector('a').getAttribute('href') };
 });
 ok('sees the held race by name, with a link to it', [row.name, row.link], ['Bullsh*t Backyard', '/race?id=zz-held-race']);

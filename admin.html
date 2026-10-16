@@ -197,9 +197,22 @@
   .acct-races .vis-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
   .acct-races .vis-btn:disabled { opacity: 0.5; cursor: default; }
   .acct-races .vis-err { color: var(--red); padding: 2px 0 6px; white-space: normal; }
-  /* A held race: its name, its link, what tripped it, and the one action. */
-  .held-row { flex-wrap: wrap; }
-  .held-row .who a { color: var(--accent); margin-left: 6px; }
+  /* A held race: its name, its link, what tripped it, and the one action.
+     Laid out like a pending invite, under classes of its own: the invite
+     rows are found by theirs. */
+  .held-row {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .held-row .held-who { flex: 1; min-width: 0; color: var(--text-dim); word-break: break-all; }
+  .held-row .held-name { color: var(--text); font-weight: 700; }
+  .held-row .held-who a { color: var(--accent); margin-left: 6px; }
+  .held-row .held-meta { display: block; color: var(--text-muted); font-size: 10px; margin-top: 2px; }
+  .held-row button {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text-muted); padding: 4px 8px; border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; cursor: pointer;
+  }
   .held-row .vis-err { flex-basis: 100%; color: var(--red); white-space: normal; }
   .acct-races .race-row a { min-width: 0; overflow-wrap: anywhere; word-break: normal; }
   .acct-name-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 0 10px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
@@ -943,17 +956,17 @@
       const r = await Race.api.heldRaces();
       const held = r.held || [];
       list.innerHTML = held.length ? held.map(h => `
-        <div class="pending-row held-row" data-slug="${esc(h.slug)}">
-          <span class="who"><b class="pending-name">${esc(h.name)}</b>
+        <div class="held-row" data-slug="${esc(h.slug)}">
+          <span class="held-who"><b class="held-name">${esc(h.name)}</b>
             <a href="/race?id=${encodeURIComponent(h.slug)}">${esc(h.slug)}</a>
-            <span class="pending-meta">Caught: ${esc((h.words || []).join(', '))}${h.by ? ' · made by ' + esc(h.by) : ''}${
+            <span class="held-meta">Caught: ${esc((h.words || []).join(', '))}${h.by ? ' · made by ' + esc(h.by) : ''}${
               h.at ? ' · ' + esc(new Date(h.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })) : ''}</span></span>
           <button type="button" data-approve="${esc(h.slug)}">Let it through</button>
         </div>`).join('')
         : '<div class="acct-races muted">Nothing is held.</div>';
       list.querySelectorAll('[data-approve]').forEach(b => b.addEventListener('click', async () => {
         const row = b.closest('.held-row');
-        const name = row.querySelector('.pending-name').textContent;
+        const name = row.querySelector('.held-name').textContent;
         if (!confirm(`Let "${name}" through?\n\nIf the race is public, it goes on the hub under this name, with a share card.`)) return;
         b.disabled = true;
         row.querySelectorAll('.vis-err').forEach(e => e.remove());
