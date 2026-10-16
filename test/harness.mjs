@@ -578,18 +578,20 @@ const server = http.createServer((req, res) => {
 
   // Enough accounts to have something to search and filter, with the shape the
   // real endpoint returns: a name off the profile, blank for anybody who has
-  // not filled one in, and the role and plan the filters work on.
+  // not filled one in, a username for those who picked one, and the role and
+  // plan the filters work on.
   if (url.pathname === '/api/accounts') {
     if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
-    const mk = (email, name, role, plan, earlyAccess) => ({
-      email, name, profileName: name, adminName: '', role, plan, earlyAccess, source: 'kv', inEnv: false, removable: true
+    const mk = (email, name, role, plan, earlyAccess, username) => ({
+      email, name, profileName: name, adminName: '', role, plan, earlyAccess, source: 'kv', inEnv: false, removable: true,
+      username: username || null
     });
     return send(200, JSON.stringify({
       accounts: [
-        mk('admin@example.com', 'Ada Lovelace', 'admin', 'pro', true),
+        mk('admin@example.com', 'Ada Lovelace', 'admin', 'pro', true, 'ada'),
         mk('crew@example.com', 'Casey Kim', 'crew', 'pro', true),
-        mk('jason@example.com', 'Jason Dupree', 'crew', 'free', true),
-        mk('nameless@example.com', '', 'crew', 'free', false)
+        mk('jason@example.com', 'Jason Dupree', 'crew', 'free', true, 'jd_runs'),
+        mk('nameless@example.com', '', 'crew', 'free', false, 'quiet.one')
       ],
       pendingInvites: [{ token: 'stub-pending', email: 'waiting@example.com', name: 'Wren Waiting',
                          createdBy: 'admin@example.com', createdAt: '2026-10-01T15:00:00.000Z',

@@ -88,11 +88,12 @@
     letter-spacing: 0.12em; text-transform: uppercase;
     color: var(--text-muted); margin-bottom: 8px;
   }
-  /* The person, then the address. A name is what an admin is scanning for and
-     an address is how the row is identified, so both are shown rather than one
-     replacing the other. */
+  /* The person, their username, then the address. A name is what an admin is
+     scanning for and an address is how the row is identified, so both are
+     shown rather than one replacing the other. */
   .acct-name { font-weight: 600; color: var(--text); }
-  .acct-name + .acct-email { color: var(--text-muted); }
+  .acct-user { color: var(--accent); overflow-wrap: anywhere; }
+  .acct-name ~ .acct-email, .acct-user ~ .acct-email { color: var(--text-muted); }
   /* The report itself, which is the part worth reading, so it gets the room. */
   .panel-count {
     font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em;
@@ -341,7 +342,7 @@
       <!-- Filtering happens here and not on the worker: the whole list is
            already in hand, so it is instant and costs no requests. -->
       <div class="acct-filters">
-        <input type="search" id="acct-search" placeholder="Search name or email"
+        <input type="search" id="acct-search" placeholder="Name, @username or email"
                autocomplete="off" spellcheck="false" aria-label="Search accounts" />
         <select id="acct-role" aria-label="Filter by role">
           <option value="">Any role</option>
@@ -914,9 +915,10 @@
       if (plan === 'free-capped' && !(isFree && !a.earlyAccess)) return false;
     }
     if (!q) return true;
-    // Name and address both, because an admin looking for somebody has one or
-    // the other in mind and should not have to know which this list holds.
-    return (a.email + ' ' + (a.name || '')).toLowerCase().includes(q);
+    // Name, username and address, because an admin looking for somebody has
+    // one of them in mind and should not have to know which this list holds.
+    // The username with its @, so "@joe" finds it as well as "joe".
+    return (a.email + ' ' + (a.name || '') + ' ' + (a.username ? '@' + a.username : '')).toLowerCase().includes(q);
   }
 
   async function loadAccounts() {
@@ -952,6 +954,7 @@
             <div class="acct-row" data-email="${esc(a.email)}">
               <div class="acct-head">
                 ${a.name ? `<span class="acct-name">${esc(a.name)}</span>` : ''}
+                ${a.username ? `<span class="acct-user">@${esc(a.username)}</span>` : ''}
                 <span class="acct-email">${esc(a.email)}</span>
                 <span class="acct-tag ${a.role === 'admin' ? 'admin' : ''}">${esc(a.role)}</span>
                 <span class="acct-tag plan ${a.plan === 'free' ? 'free' : ''}">${esc(a.plan || 'pro')}${a.earlyAccess ? ' · early' : ''}</span>

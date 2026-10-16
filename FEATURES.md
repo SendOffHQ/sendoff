@@ -56,6 +56,7 @@ optional Cloudflare Worker auth proxy.
 - Send account invites and password-reset links
 - Remove accounts
 - A name per account, the admin's own label for who it is, shown in the account list in place of the name they gave themselves, and the races under each account. `test/admin-accounts.mjs`.
+- Each account's @username beside its name, and found by the search with or without the @. `test/accounts-filter.mjs`, `worker/test/usernames.mjs`.
 
 ## Hub
 - Race list home page (`index.html`); auto-tags races as done when complete

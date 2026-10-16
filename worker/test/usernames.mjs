@@ -97,6 +97,12 @@ ok('nor a name nobody has', (await call('/access/add', { token: me, body: { slug
 for (let i = 0; i < 25; i++) await call('/access/add', { token: me, body: { slug: 'mine', username: 'nobody_' + i, role: 'viewer' } });
 ok('and adds by username are capped per day', (await call('/access/add', { token: me, body: { slug: 'mine', username: 'jasmine_r', role: 'viewer' } })).status, 429);
 
+console.log('\nthe admin\'s accounts list');
+const listed = Object.fromEntries(((await (await call('/accounts', { token: me })).json()).accounts || []).map(a => [a.email, a.username]));
+ok('shows each username', [listed[ME], listed[YOU]], ['jd_runs', 'jasmine_r']);
+ok('including one its owner keeps from searches', listed[SHY], 'jasper');
+ok('and the list is the admin\'s alone', (await call('/accounts', { token: you })).status, 403);
+
 console.log('\nwhen an account is deleted');
 await call('/account/delete', { token: me, body: { email: YOU } });
 ok('its username goes, and is kept back', [kv.has('handle:' + YOU), JSON.parse(kv.get('uname:jasmine_r')).held], [false, true]);

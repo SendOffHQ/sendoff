@@ -60,6 +60,13 @@ ok('and the address is still there to identify them', await page.evaluate(() =>
 ok('nothing invented for somebody who has not', await page.evaluate(() =>
   document.querySelectorAll('[data-email="nameless@example.com"] .acct-name').length), 0);
 
+console.log('\nthe username beside it, for those who picked one');
+const user = (e) => page.evaluate(e => (document.querySelector(`[data-email="${e}"] .acct-user`) || {}).textContent || null, e);
+ok('with its @', await user('jason@example.com'), '@jd_runs');
+ok('for somebody with no name on their profile too', await user('nameless@example.com'), '@quiet.one');
+ok('and none for somebody who has not picked one', await user('crew@example.com'), null);
+ok('the row still fits a phone', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+
 console.log('\nsearching by name, which is what you have in mind');
 await type('dupree');
 ok('finds them', await shown(), ['jason@example.com']);
@@ -68,6 +75,12 @@ ok('and says what it narrowed', await count(), '1 of 4 accounts');
 console.log('\nand by address, because sometimes that is what you have');
 await type('crew@');
 ok('finds them too', await shown(), ['crew@example.com']);
+
+console.log('\nand by username, with the @ or without it');
+await type('jd_r');
+ok('finds them', await shown(), ['jason@example.com']);
+await type('@quiet');
+ok('and so does the @', await shown(), ['nameless@example.com']);
 
 console.log('\nit does not care about case');
 await type('ADA');

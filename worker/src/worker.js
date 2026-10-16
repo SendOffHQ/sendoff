@@ -2476,10 +2476,14 @@ async function handleAccounts(req, env) {
   // An admin's own name for an account, set on this page or carried over
   // from the invite, wins over the profile: it is how the admin knows them,
   // and the profile is often blank. Their own profile is never written.
+  // Their username too, if they picked one, whether or not they let people
+  // find them by it: finding is about other users, and the admin already has
+  // the address.
   const named = await Promise.all([...byEmail.values()].map(async (a) => {
     const profile = profileName(await loadProfile(env, a.email).catch(() => null));
     const adminName = env.AUTH_KV ? ((await env.AUTH_KV.get('acctname:' + a.email).catch(() => null)) || '') : '';
-    return { ...a, name: adminName || profile, adminName, profileName: profile };
+    const handle = env.AUTH_KV ? await loadHandle(env, a.email).catch(() => null) : null;
+    return { ...a, name: adminName || profile, adminName, profileName: profile, username: (handle && handle.username) || null };
   }));
 
   // removable: the worker can delete a KV account; accounts baked into the
