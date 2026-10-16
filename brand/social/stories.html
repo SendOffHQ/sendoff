@@ -138,6 +138,19 @@
   .night .kick{font-weight:500}
   /* Night: the same ground, darker, the glow kept to the top. */
   .story.night{background:linear-gradient(180deg,#0A4650 0%,#08232B 34%,#060B10 78%)}
+  /* Two phones side by side, a racer's card on each, from the live race,
+     both running off the bottom; and the live map beside both portraits. */
+  .duo{position:absolute;left:72px;right:72px;top:760px;display:flex;gap:24px;z-index:1}
+  .duo > div{flex:1;min-width:0}
+  .duo .who{font-family:var(--mono);font-size:24px;color:var(--ink);text-align:center;margin-bottom:22px}
+  .duo .phone{position:relative;left:auto;right:auto;top:auto;transform:none;width:100%;padding:12px;border-radius:54px}
+  .duo .phone img{border-radius:42px}
+  .duo .phone::before{top:22px;width:96px;height:26px}
+  .story.with-pair .phone{left:88px;transform:none;width:560px;top:860px}
+  .side-pair{position:absolute;right:88px;width:300px;z-index:2;display:flex;flex-direction:column;gap:44px;text-align:center}
+  .side-pair img{display:block;width:240px;height:240px;margin:0 auto;border-radius:50%;object-fit:cover;
+    border:5px solid var(--signal);box-shadow:0 0 0 9px rgba(15,184,191,.12), 0 0 70px rgba(15,184,191,.3), 0 26px 70px rgba(0,0,0,.55)}
+  .side-pair figcaption{margin-top:16px;font-family:var(--mono);font-size:22px;color:var(--ink)}
 </style></head><body>
 
 <section class="slide story with-portrait grad glow" id="ghost-train">
@@ -183,6 +196,34 @@
     <p class="lead" style="max-width:32ch;text-wrap:balance;margin-top:84px">Laps through the dark on the Ghost Train. Every lap so far is on one race page, live to the finish.</p>
     <p class="when">Follow live · sendoff.run</p>
   </div>
+</section>
+
+<section class="slide story night grad glow" id="ghost-train-live-cards">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Ghost Train 30 Hour · Live</p>
+    <h1>Where are<br><em>they now?</em></h1>
+    <p class="when">Every lap, live · sendoff.run</p>
+  </div>
+  <div class="duo">
+    <div><p class="who">@joe_rucco</p><div class="phone"><img src="shots/ghost-train-card-1.png" alt=""></div></div>
+    <div><p class="who">@alexandergolikk</p><div class="phone"><img src="shots/ghost-train-card-2.png" alt=""></div></div>
+  </div>
+</section>
+
+<section class="slide story night with-pair grad glow" id="ghost-train-live-map">
+  <div class="top">
+    <div class="wm"></div>
+    <p class="kick">Ghost Train 30 Hour · Live</p>
+    <h1>Find them<br><em>on the trail.</em></h1>
+    <p class="lead" style="max-width:34ch;text-wrap:balance">Both of them on the course map, live, with every lap so far on the same page.</p>
+    <p class="when">Follow live · sendoff.run</p>
+  </div>
+  <div class="side-pair" style="top:930px">
+    <figure><img src="photos/joe-rucco-bw-bust.jpg" alt=""><figcaption>@joe_rucco</figcaption></figure>
+    <figure><img src="photos/alexander-golik-bust.jpg" alt=""><figcaption>@alexandergolikk</figcaption></figure>
+  </div>
+  <div class="phone"><img src="shots/ghost-train-live-map.png" alt="" style="object-fit:cover;object-position:50% 100%;aspect-ratio:1170/2400"></div>
 </section>
 
 <template id="wm-src"><svg role="img" aria-label="SendOff" xmlns="http://www.w3.org/2000/svg" width="3059" height="1066" viewBox="-130 -130 3781.0 1317.6"><title>SendOff</title><g transform="translate(0,700) skewX(-16.0) translate(0,-700)"><g><g transform="translate(2006.0,0)"><circle cx="350.0" cy="350.0" r="294.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="112" /></g></g><circle cx="2370.0" cy="350.0" r="80" fill="var(--wm-signal, #0FB8BF)" /><g transform="translate(0.0,0)"><path d="M 374.0 168 C 374.0 44 56.0 44 56.0 190 C 56.0 322 374.0 368 374.0 506 C 374.0 656 56.0 656 56.0 528" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(446.0,0)"><path d="M 56.0 425.0 L 544.24 425.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 489.41 469.6 A 219.0 219.0 0 1 0 419.5 589.2" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1024.0,0)"><path d="M 56.0 700 L 56.0 150" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 340 C 56.0 158 444.0 158 444.0 340 L 444.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(1552.0,0)"><circle cx="275.0" cy="425.0" r="219.0" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" /><path d="M 494.0 56.0 L 494.0 700" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><g transform="translate(2730.0,0)"><path d="M 152.0 700 L 152.0 150 C 152.0 34 264 6 332.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 482.0 700 L 482.0 150 C 482.0 34 594 6 662.0 62" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /><path d="M 56.0 208 L 600.0 208" fill="none" stroke="var(--wm-letter, #F0ECE3)" stroke-width="112" stroke-linecap="butt" stroke-linejoin="round" /></g><path d="M -20.0 870.0 L 1224.0 870.0 L 1304.0 818.8 L 1384.0 850.8 L 1474.0 742.0 L 1554.0 793.2 L 1664.0 550.0 L 1754.0 927.6 L 1844.0 729.2 L 1934.0 806.0 L 2024.0 774.0 L 2124.0 844.4 L 2224.0 870.0 L 3468.0 870.0" fill="none" stroke="var(--wm-signal, #0FB8BF)" stroke-width="62.7" stroke-linecap="round" stroke-linejoin="round" /></g></svg></template>

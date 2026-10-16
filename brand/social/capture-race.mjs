@@ -30,7 +30,8 @@ const DONE = '2026-09-28T02:00:00Z';      // the night after the finish
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // One entry per shot.
-//   at        the moment the page believes it is; data after it is cut
+//   at        the moment the page believes it is; data after it is cut.
+//             'now' for a live race as it stands when the shot is taken
 //   signedIn  as the harness's stub, who is made owner and the racer
 //   scrollTo  what sits at the top of the screen, less scrollPad
 //   prep      anything a person would have done first
@@ -206,6 +207,15 @@ const SHOTS = {
   // enough after them for the phone to run off the bottom.
   'ghost-train-map': { page: 'race.html', slug: '000007-ghost-train-30-hour-ultra', live: true, at: '2026-10-16T22:00:00Z',
     scrollTo: '.leaflet-container', height: 820 },
+  // The race as it stands, for the stories posted while it is on: each
+  // racer's card from the name down to where they are headed at the end,
+  // one per phone, and the map with where they both are.
+  'ghost-train-card-1': { page: 'race.html', slug: '000007-ghost-train-30-hour-ultra', live: true, at: 'now',
+    scrollTo: 'article.runner', scrollPad: 76, height: 1100 },
+  'ghost-train-card-2': { page: 'race.html', slug: '000007-ghost-train-30-hour-ultra', live: true, at: 'now',
+    scrollTo: 'article.runner ~ article.runner', scrollPad: 76, height: 1100 },
+  'ghost-train-live-map': { page: 'race.html', slug: '000007-ghost-train-30-hour-ultra', live: true, at: 'now',
+    scrollTo: '.leaflet-container', height: 820 },
   // The finish as a clock time on the race's own clock, which for a race in
   // Westcliffe is Denver's, whoever is watching from wherever.
   'clock': { page: 'race.html', at: MID, cfg: { timezone: 'America/Denver' }, scrollTo: '#cutoffs', scrollPad: 20 }
@@ -251,7 +261,8 @@ for (const [name, s] of Object.entries(SHOTS)) {
   for (let i = 0; i < 40 && !(await listening()); i++) await sleep(150);
 
   const slug = s.slug || SANGRE;
-  const at = new Date(s.at).getTime();
+  const when = s.at === 'now' ? new Date() : new Date(s.at);
+  const at = when.getTime();
   // The race as it stood at `at`: legs not yet started are dropped, and a leg
   // under way loses the arrival it had not made yet.
   // A public race, from the worker, the same read a spectator's page makes.
@@ -283,7 +294,7 @@ for (const [name, s] of Object.entries(SHOTS)) {
   const page = await ctx.newPage();
   const errs = [];
   page.on('pageerror', e => errs.push(e.message));
-  await page.clock.install({ time: new Date(s.at) });
+  await page.clock.install({ time: when });
   await page.goto(BASE + '/index.html');
   await page.evaluate(async ([slug, cfg, data, signedIn, base, me]) => {
     const put = (file, doc) => fetch('/api/commit', { method: 'POST',
