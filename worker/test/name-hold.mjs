@@ -20,6 +20,7 @@ const KV = {
 };
 globalThis.caches = { default: { async match(){}, async put(){}, async delete(){ return true; } } };
 let posts = [];
+const mails = [];
 globalThis.fetch = async (url, opts = {}) => {
   const u = String(url);
   if (/^https:\/\/sendoff\.run\/races\/[^/]+\/$/.test(u)) return new Response('', { status: 404 });
@@ -48,6 +49,8 @@ const env = {
   DB: fakeD1(), GITHUB_OWNER: 'o', GITHUB_REPO: 'r', GITHUB_TOKEN: 't', GITHUB_BRANCH: 'main',
   AUTH_KV: KV, ALLOWED_ORIGINS: '*', JWT_SECRET: 's', PUBLIC_BASE_URL: 'https://sendoff.run',
   DISCORD_WEBHOOK: 'https://discord.test/hook',
+  // Cloudflare's send binding, standing in for whichever way mail goes out.
+  EMAIL: { async send(m) { mails.push(m); } }, NOTIFY_EMAIL: 'ops@example.com', NOTIFY_FROM: 'invites@example.com',
   USERS: JSON.stringify([{ email: OWNER, ...await cred('pw') }, { email: ADMIN, role: 'admin', ...await cred('pw') }]),
 };
 const waited = [];
@@ -98,6 +101,8 @@ await repo.set('races/index.json', JSON.stringify({ races: [] }));
 const made = await put(owner, 'races/foul/config.json', race('Fuck It 50'));
 ok('is made, and the wizard is told it is held', [made.status, made.held], [200, true]);
 ok('held, with what tripped it and who made it', [held('foul').name, held('foul').words, held('foul').by], ['Fuck It 50', ['fuck'], OWNER]);
+ok('the admin is emailed', mails.map(m => m.to), ['ops@example.com']);
+ok('with the name in the body, not the subject an inbox shows', [/Fuck/i.test(mails[0].subject), mails[0].html.includes('Fuck It 50')], [false, true]);
 await put(owner, 'races/index.json', { races: [{ slug: 'foul', name: 'Fuck It 50' }] });
 ok('is kept off the hub when the wizard lists it', hub(), []);
 await settle();
@@ -114,6 +119,7 @@ ok('a stranger does not', (await readCfg('foul')).held, undefined);
 ok('an ordinary save goes through', (await edit('foul', { units: 'km' })).status, 200);
 ok('and writing the config back does not store it', (await readCfg('foul')).held, undefined);
 ok('nor does an ordinary save let it go', !!held('foul'), true);
+ok('nor email the admin again', mails.length, 1);
 
 console.log('\nanybody writing the hub list');
 await put(owner, 'races/index.json', { races: [{ slug: 'nice', name: 'Nice Run 50' }, { slug: 'sneaky', name: 'Shit Show' }] });

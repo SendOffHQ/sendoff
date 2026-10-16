@@ -358,6 +358,7 @@
         is made and works for everybody on it, and is kept off the hub, its
         share card and the announcements until you let the name through. A
         public race goes on the hub when you do.</p>
+      <p class="lead" id="held-mail" hidden></p>
       <div id="held-list"><div class="acct-races muted">Loading…</div></div>
     </section>
 
@@ -445,6 +446,16 @@
         : 'No sending service is configured, so these go out by hand: copy the branded message and paste it into your mail client. ' +
           'Set RESEND_API_KEY on the worker and they will send themselves.';
       note.className = canSendMail ? 'lead mail-ok' : 'lead mail-manual';
+      // Whether a held race name reaches the admin's inbox, which is the
+      // same address invite and reset requests go to.
+      const held = document.getElementById('held-mail');
+      if (held) {
+        const told = !!(r.notifies && r.transport && r.transport !== 'none' && r.from && r.from.invite);
+        held.textContent = told
+          ? 'You are emailed when a race is held, at the address invite and reset requests go to.'
+          : 'Nobody is emailed when a race is held. Set NOTIFY_EMAIL on the worker, to an address verified in Email Routing, and you will be.';
+        held.hidden = false;
+      }
     } catch (e) { /* the copy buttons do not depend on knowing */ }
   }
 

@@ -68,7 +68,17 @@ ok('and nothing once it is let through', await note(`/settings.html?id=${SLUG}`)
 
 console.log('\nthe admin');
 await signIn('admin');
+// The worker's answer about mail, as it is for a hub that tells its admin.
+let notifies = true;
+await page.route('**/api/mail-status', route => route.fulfill({ status: 200, contentType: 'application/json',
+  body: JSON.stringify({ transport: 'routing', canSendToAnyone: false, from: { invite: 'invites@example.com' }, notifies }) }));
 await page.goto(BASE + '/admin.html');
+await page.waitForFunction(() => !document.getElementById('held-mail').hidden, null, { timeout: 10000 });
+ok('is told a held race is emailed to them', /You are emailed when a race is held/.test(await page.textContent('#held-mail')), true);
+notifies = false;
+await page.reload();
+await page.waitForFunction(() => !document.getElementById('held-mail').hidden, null, { timeout: 10000 });
+ok('or how to be, when nobody is', /Set NOTIFY_EMAIL on the worker/.test(await page.textContent('#held-mail')), true);
 await page.waitForSelector('#held-list .held-row', { timeout: 20000 });
 const row = await page.evaluate(() => {
   const r = document.querySelector('#held-list .held-row');

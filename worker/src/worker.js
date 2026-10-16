@@ -4250,7 +4250,7 @@ async function releaseHold(env, slug, cfg, actor) {
 // gets listed. The name goes in the body, not the subject, which an inbox
 // shows to anybody glancing at the screen.
 async function notifyHeld(env, slug, name, words, by) {
-  if (!(env.EMAIL && env.NOTIFY_EMAIL && env.NOTIFY_FROM)) return;
+  if (mailTransport(env) === 'none' || !env.NOTIFY_EMAIL || !env.NOTIFY_FROM) return;
   try {
     const rows = [['Race name', name], ['Caught', (words || []).join(', ')], ['Made by', by],
       ['Race', `${mailBase(env)}/race?id=${encodeURIComponent(slug)}`]]
