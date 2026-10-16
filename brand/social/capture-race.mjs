@@ -202,9 +202,10 @@ const SHOTS = {
   // race page draws it, both loops on the map with the first lit up.
   'ghost-train': { page: 'race.html', slug: '000007-ghost-train-30-hour-ultra', live: true, at: '2026-10-16T22:00:00Z',
     scrollTo: '.seg-list', scrollPad: 76, height: 760 },
-  // The same, closer: the map and the two loops under it, for the story.
+  // The same, from the map down, for the story: the two loops under it, and
+  // enough after them for the phone to run off the bottom.
   'ghost-train-map': { page: 'race.html', slug: '000007-ghost-train-30-hour-ultra', live: true, at: '2026-10-16T22:00:00Z',
-    scrollTo: '#course-map-section', scrollPad: 8, height: 470 },
+    scrollTo: '.leaflet-container', height: 820 },
   // The finish as a clock time on the race's own clock, which for a race in
   // Westcliffe is Denver's, whoever is watching from wherever.
   'clock': { page: 'race.html', at: MID, cfg: { timezone: 'America/Denver' }, scrollTo: '#cutoffs', scrollPad: 20 }
