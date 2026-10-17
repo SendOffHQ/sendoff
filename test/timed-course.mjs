@@ -132,5 +132,20 @@ ok('and taking it back clears it', 'stoppedAt' in replay([
   { path: 'races/x/data.json', op: 'setRunnerStopped', args: { runnerId: 'sam', stoppedAt: '2026-10-14T20:00:00Z' } },
   { path: 'races/x/data.json', op: 'setRunnerStopped', args: { runnerId: 'sam', stoppedAt: null } }]), false);
 
+// Left the turnaround the moment they reached it: the next leg starts at the
+// very millisecond the last one ended. That is out on the course, and only
+// the course clock runs. Reported from the Ghost Train, where the pit total
+// said "in pit now" and ticked beside the course total for a whole leg.
+console.log('\nstraight through a turnaround');
+const through = { courseType: 'loops', format: 'timed', startTime: new Date(now - 3 * H).toISOString(),
+  cutoffs: { totalHours: 30 }, course: withAid.course, runners: [{ id: 'joe', name: 'Joe' }] };
+const turnAt = new Date(now - 1.5 * H).toISOString();
+const joe = { id: 'joe', legs: [{ index: 1, startTime: new Date(now - 3 * H).toISOString(), endTime: turnAt }, { index: 2, startTime: turnAt }] };
+const jc = Race.compute.runner(joe, through);
+ok('on the course, not in the pit', [jc.inProgressLeg, jc.inPit], [true, false]);
+ok('with no pit time running', Math.round(jc.totalPitSec), 0);
+const jp = Race.compute.runner({ id: 'joe', legs: [joe.legs[0]] }, through);
+ok('and in the pit before they have left it', jp.inPit, true);
+
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);
