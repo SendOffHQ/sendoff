@@ -113,6 +113,39 @@ ok('the racer is told the time left in the race', /left in the race/.test(await 
 ok('and that the next lap is the short one', (await page.textContent('#go')).replace(/\s+/g, ' ').trim().startsWith('Leaving · Lap 7 · Loop B'), true);
 ok('with a way to stop here', await page.isVisible('#stop'), true);
 
+// The cumulative chart was drawn against the course's length, which a timed
+// race does not have: everything sat on a zero-high axis, the line shot off
+// the top, and a "cutoff" lay along the bottom at nought miles. Reported
+// 2026-10-17 from the Ghost Train.
+console.log('\nthe charts');
+await page.goto(BASE + `/charts?id=${SLUG}`);
+await page.waitForSelector('#chart-cum .data-line', { timeout: 20000 });
+const cum = await page.evaluate(() => {
+  const svg = document.getElementById('chart-cum');
+  const top = Math.max(...[...svg.querySelectorAll('.axis text')].map(t => t.textContent)
+    .filter(t => /mi$/.test(t)).map(t => parseFloat(t)));
+  const proj = svg.querySelector('.projection-dot');
+  const projMi = proj ? (() => { // back from the dot's height to miles, on the chart's own scale
+    const ys = [...svg.querySelectorAll('.grid line')].map(l => +l.getAttribute('y1'));
+    const y0 = Math.max(...ys), yTop = Math.min(...ys);
+    return Math.round((y0 - +proj.getAttribute('cy')) / (y0 - yTop) * top);
+  })() : null;
+  const inside = [...svg.querySelectorAll('.data-line')].every(l => !/NaN|Infinity/.test(l.getAttribute('d')));
+  return { top, cutoff: !!svg.querySelector('.cutoff'), projMi, inside,
+    sub: svg.closest('.chart-card').querySelector('.chart-sub').textContent };
+});
+const atEnd = await page.evaluate(async ([slug]) => {
+  const get = async (f) => { const r = await (await fetch(`/api/get?path=races/${slug}/${f}`, { headers: { Authorization: 'Bearer stub' } })).json();
+    return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(r.content), c => c.charCodeAt(0)))); };
+  const [cfg, data] = [await get('config.json'), await get('data.json')];
+  return Math.round(Race.compute.runner({ ...cfg.runners[0], ...data.runners[0] }, cfg).projectedMiles);
+}, [SLUG]);
+ok('cumulative progress has room for the 90 miles run', cum.top >= 90, true);
+ok('and no cutoff drawn at a distance', cum.cutoff, false);
+ok('the dashed line ends where the race page says, at the clock', Math.abs(cum.projMi - atEnd) <= Math.max(2, atEnd * 0.02), true);
+ok('it says so', /when the clock stops/.test(cum.sub), true);
+ok('and every line is on the chart', cum.inside, true);
+
 console.log('\nstopping');
 await page.goto(BASE + `/pit?id=${SLUG}`);
 await page.waitForSelector('[data-action="stop"]', { timeout: 20000 });
