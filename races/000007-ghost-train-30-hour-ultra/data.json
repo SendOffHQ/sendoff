@@ -1,0 +1,144 @@
+{
+  "lastUpdated": "2026-10-18T15:07:58.639Z",
+  "runners": [
+    {
+      "id": "joe-rucco",
+      "legs": [
+        {
+          "index": 1,
+          "startTime": "2026-10-17T13:00:00.887Z",
+          "endTime": "2026-10-17T14:04:20.677Z"
+        },
+        {
+          "index": 2,
+          "startTime": "2026-10-17T14:04:20.677Z",
+          "calories": 120,
+          "sodiumMg": 1000,
+          "preset_1": 1,
+          "preset_0": 2,
+          "endTime": "2026-10-17T15:12:19.418Z"
+        },
+        {
+          "index": 3,
+          "startTime": "2026-10-17T15:15:15.816Z",
+          "calories": 90,
+          "sodiumMg": 800,
+          "preset_0": 1,
+          "preset_1": 1,
+          "endTime": "2026-10-17T16:20:27.671Z"
+        },
+        {
+          "index": 4,
+          "startTime": "2026-10-17T16:20:27.671Z",
+          "calories": 238,
+          "sodiumMg": 2020,
+          "preset_0": 3,
+          "preset_1": 2,
+          "endTime": "2026-10-17T17:26:39.930Z",
+          "preset_2": 1
+        },
+        {
+          "index": 5,
+          "startTime": "2026-10-17T17:34:41.229Z",
+          "endTime": "2026-10-17T18:33:09.797Z"
+        },
+        {
+          "index": 6,
+          "startTime": "2026-10-17T18:33:09.797Z",
+          "calories": 210,
+          "sodiumMg": 1800,
+          "preset_0": 3,
+          "preset_1": 2,
+          "endTime": "2026-10-17T19:35:35.222Z"
+        },
+        {
+          "index": 7,
+          "startTime": "2026-10-17T19:39:34.200Z",
+          "calories": 28,
+          "sodiumMg": 220,
+          "preset_2": 1,
+          "endTime": "2026-10-17T20:49:40.003Z"
+        },
+        {
+          "index": 8,
+          "startTime": "2026-10-17T20:49:40.003Z",
+          "calories": 210,
+          "sodiumMg": 1800,
+          "preset_0": 3,
+          "preset_1": 2,
+          "endTime": "2026-10-17T22:01:16.931Z"
+        },
+        {
+          "index": 9,
+          "startTime": "2026-10-17T22:20:30.362Z",
+          "calories": 60,
+          "sodiumMg": 600,
+          "preset_1": 1,
+          "endTime": "2026-10-17T23:53:47.615Z"
+        },
+        {
+          "index": 10,
+          "startTime": "2026-10-17T23:53:47.615Z",
+          "endTime": "2026-10-18T01:56:48.267Z"
+        }
+      ],
+      "stoppedAt": "2026-10-18T01:57:09.752Z"
+    },
+    {
+      "id": "alexander-golik16",
+      "legs": [
+        {
+          "index": 1,
+          "startTime": "2026-10-17T13:00:00.887Z",
+          "endTime": "2026-10-17T14:04:20.677Z"
+        },
+        {
+          "index": 2,
+          "startTime": "2026-10-17T14:04:20.677Z",
+          "endTime": "2026-10-17T15:12:19.418Z"
+        },
+        {
+          "index": 3,
+          "startTime": "2026-10-17T15:15:15.816Z",
+          "endTime": "2026-10-17T16:20:27.671Z"
+        },
+        {
+          "index": 4,
+          "startTime": "2026-10-17T16:20:27.671Z",
+          "endTime": "2026-10-17T17:26:39.930Z"
+        },
+        {
+          "index": 5,
+          "startTime": "2026-10-17T17:34:41.229Z",
+          "endTime": "2026-10-17T18:33:09.797Z"
+        },
+        {
+          "index": 6,
+          "startTime": "2026-10-17T18:33:09.797Z",
+          "endTime": "2026-10-17T19:35:35.222Z"
+        },
+        {
+          "index": 7,
+          "startTime": "2026-10-17T19:39:34.200Z",
+          "endTime": "2026-10-17T20:49:40.003Z"
+        },
+        {
+          "index": 8,
+          "startTime": "2026-10-17T20:49:40.003Z",
+          "endTime": "2026-10-17T22:01:16.931Z"
+        },
+        {
+          "index": 9,
+          "startTime": "2026-10-17T22:20:30.362Z",
+          "endTime": "2026-10-17T23:53:47.615Z"
+        },
+        {
+          "index": 10,
+          "startTime": "2026-10-17T23:53:47.615Z",
+          "endTime": "2026-10-18T01:56:48.267Z"
+        }
+      ],
+      "stoppedAt": "2026-10-18T01:57:09.752Z"
+    }
+  ]
+}
