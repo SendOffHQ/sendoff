@@ -17,6 +17,7 @@ export function fakeD1() {
   const people = new Map();      // slug -> [{ email, role }]
   const legs = new Map();        // slug -> Map(runner\0idx -> row)
   const media = new Map();       // id -> row
+  const reactions = new Map();   // media_id\0email\0emoji -> row
   const row = slug => races.get(slug) ||
     races.set(slug, { slug, name: '', location: null, start_time: null, visibility: 'public',
       created_by: '', config: '{}', config_sha: null, data: '{}', data_sha: null }).get(slug);
@@ -90,6 +91,22 @@ export function fakeD1() {
       for (const [id, r] of media) if (r.slug === a[0]) media.delete(id);
       return { changes: 1 };
     }
+    // ---- media_reactions
+    if (/^INSERT OR IGNORE INTO media_reactions /.test(sql)) {
+      const [media_id, slug, email, emoji, created_at] = a;
+      const k = [media_id, email, emoji].join('\0');
+      if (!reactions.has(k)) reactions.set(k, { media_id, slug, email, emoji, created_at });
+      return { changes: 1 };
+    }
+    if (sql === 'DELETE FROM media_reactions WHERE media_id = ? AND email = ? AND emoji = ?') {
+      reactions.delete(a.join('\0')); return { changes: 1 };
+    }
+    for (const col of ['media_id', 'slug', 'email']) {
+      if (sql === `DELETE FROM media_reactions WHERE ${col} = ?`) {
+        for (const [k, r] of reactions) if (r[col] === a[0]) reactions.delete(k);
+        return { changes: 1 };
+      }
+    }
     return null;
   }
 
@@ -118,6 +135,9 @@ export function fakeD1() {
         .sort((x, y) => (x.leg_idx - y.leg_idx) || String(x.created_at).localeCompare(String(y.created_at)));
     }
     if (sql === 'SELECT * FROM media WHERE id = ?') return media.has(a[0]) ? [media.get(a[0])] : [];
+    if (sql === 'SELECT media_id, emoji, email FROM media_reactions WHERE slug = ?') {
+      return [...reactions.values()].filter(r => r.slug === a[0]).map(({ media_id, emoji, email }) => ({ media_id, emoji, email }));
+    }
     if (sql === 'SELECT r2_key FROM media WHERE slug = ?') return [...media.values()].filter(m => m.slug === a[0]).map(m => ({ r2_key: m.r2_key }));
     return null;
   }
@@ -144,7 +164,7 @@ export function fakeD1() {
   });
 
   return {
-    races, people, legs, media,
+    races, people, legs, media, reactions,
     prepare: sql => statement(norm(sql)),
     async batch(stmts) { const out = []; for (const s of stmts) out.push(await s.run()); return out; }
   };

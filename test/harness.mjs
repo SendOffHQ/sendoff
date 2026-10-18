@@ -45,6 +45,15 @@ const raceFile = (slug, file) => fileAt(path.posix.join('races', slug, file));
 // Photos uploaded during a run. Reset by restarting the harness, which every
 // test does.
 const MEDIA = [];
+// Reactions on those photos: photo id -> emoji -> the set of who reacted,
+// where who is the Authorization header, which stands in for an account.
+const REACTED = new Map();
+const reactionsOf = (id, who) => {
+  const byEmoji = REACTED.get(id) || new Map();
+  const reactions = {}, mine = [];
+  for (const [e, set] of byEmoji) { if (set.size) reactions[e] = set.size; if (who && set.has(who)) mine.push(e); }
+  return { reactions, mine };
+};
 // What the profile page has written down, for this run only.
 const RESULTS = { bySlug: {}, manual: [], notMine: [] };
 let googleOn = false, facebookOn = false;
@@ -516,8 +525,23 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/media' && req.method === 'GET') {
     const slug = url.searchParams.get('id');
     return send(200, JSON.stringify({
-      media: MEDIA.filter(m => m.slug === slug), configured: true
+      media: MEDIA.filter(m => m.slug === slug).map(m => ({ ...m, ...reactionsOf(m.id, req.headers.authorization) })), configured: true
     }), 'application/json');
+  }
+  // A reaction, which takes an account, as the worker's does.
+  if (url.pathname === '/api/media/react') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      const who = req.headers.authorization;
+      if (!who) return send(401, '{"error":"Sign in to react to a photo."}', 'application/json');
+      let j = {}; try { j = JSON.parse(body || '{}'); } catch (e) {}
+      if (!MEDIA.some(m => m.id === j.id)) return send(404, '{"error":"That photo is gone"}', 'application/json');
+      const byEmoji = REACTED.get(j.id) || REACTED.set(j.id, new Map()).get(j.id);
+      const set = byEmoji.get(j.emoji) || byEmoji.set(j.emoji, new Set()).get(j.emoji);
+      if (j.on === false) set.delete(who); else set.add(who);
+      send(200, JSON.stringify({ id: j.id, ...reactionsOf(j.id, who) }), 'application/json');
+    });
   }
   if (url.pathname === '/api/media/delete') {
     const chunks = [];

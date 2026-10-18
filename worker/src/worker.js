@@ -2528,6 +2528,10 @@ async function handleAccountDelete(req, env) {
   if (gone.username) await holdUsername(env, gone.username, email);
   await env.AUTH_KV.delete(HANDLE_KEY(email));
   await env.AUTH_KV.delete(PUB_KEY(email));
+  // Their reactions on race photos, which are theirs and carry their address.
+  if (env.DB) {
+    try { await env.DB.prepare('DELETE FROM media_reactions WHERE email = ?').bind(email).run(); } catch (e) {}
+  }
   return json({ ok: true }, {}, env, req);
 }
 
@@ -2798,6 +2802,11 @@ const MEDIA_MAX_BYTES = 3 * 1024 * 1024;
 // something other than our own uploader.
 const MEDIA_MAX_PER_RACE = 400;
 const MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+// The reactions a photo can have. A fixed few rather than any emoji: there is
+// nothing to moderate in a heart, and a row of six fits under a thumbnail.
+const REACTIONS = ['❤️', '🔥', '👏', '💪', '😂', '😮'];
+// Generous for a person and nothing like enough to be a nuisance with.
+const REACTIONS_PER_HOUR = 300;
 
 function mediaEnabled(env) { return !!(env.MEDIA && env.DB); }
 
@@ -2952,9 +2961,72 @@ async function handleMediaList(req, env) {
   const rows = await env.DB.prepare(
     'SELECT * FROM media WHERE slug = ? ORDER BY leg_idx ASC, created_at ASC'
   ).bind(slug).all();
-  return json({ media: (rows.results || []).map(r => mediaRow(env, r)), configured: true }, {
-    headers: { 'Cache-Control': 'public, max-age=5' }
+  const reacted = await raceReactions(env, slug, seen.email);
+  return json({ media: (rows.results || []).map(r => ({ ...mediaRow(env, r), ...reactionsFor(reacted, r.id) })), configured: true }, {
+    // Private once there is somebody asking: the answer then carries which
+    // reactions are theirs, and a shared cache must not hand that on.
+    headers: { 'Cache-Control': seen.email ? 'private, max-age=5' : 'public, max-age=5' }
   }, env, req);
+}
+
+// Every reaction on a race in one read, counted per photo and emoji, with the
+// caller's own picked out. Counts only for everybody else: who reacted is
+// never sent. A deployment whose migration has not run yet answers with none
+// rather than failing the photo list.
+async function raceReactions(env, slug, email) {
+  const out = new Map();
+  let rows;
+  try {
+    rows = (await env.DB.prepare('SELECT media_id, emoji, email FROM media_reactions WHERE slug = ?').bind(slug).all()).results || [];
+  } catch (e) { return out; }
+  const me = email ? normalizeEmail(email) : null;
+  for (const r of rows) {
+    if (!REACTIONS.includes(r.emoji)) continue;
+    const m = out.get(r.media_id) || out.set(r.media_id, { reactions: {}, mine: [] }).get(r.media_id);
+    m.reactions[r.emoji] = (m.reactions[r.emoji] || 0) + 1;
+    if (me && normalizeEmail(r.email) === me) m.mine.push(r.emoji);
+  }
+  return out;
+}
+function reactionsFor(reacted, id) {
+  const m = reacted.get(id);
+  return { reactions: m ? m.reactions : {}, mine: m ? m.mine : [] };
+}
+
+// POST /media/react  { id, emoji, on, t? }
+// An account is required: a reaction is somebody's, and is theirs to take
+// back. Anybody signed in who may see the race may react, which on a public
+// race is anybody with an account.
+async function handleMediaReact(req, env, ctx) {
+  if (!mediaEnabled(env)) return json({ error: 'Photos are not configured.' }, { status: 503 }, env, req);
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Sign in to react to a photo.' }, { status: 401 }, env, req);
+  let body; try { body = await req.json(); } catch (e) { body = null; }
+  const id = body && typeof body.id === 'string' ? body.id : null;
+  const emoji = body && body.emoji;
+  if (!id) return json({ error: 'Missing id' }, { status: 400 }, env, req);
+  if (!REACTIONS.includes(emoji)) return json({ error: 'Not one of the reactions', reactions: REACTIONS }, { status: 400 }, env, req);
+
+  const row = (await env.DB.prepare('SELECT * FROM media WHERE id = ?').bind(id).all()).results[0];
+  if (!row) return json({ error: 'That photo is gone' }, { status: 404 }, env, req);
+  const seen = await mediaViewer(req, env, row.slug, body && body.t);
+  if (seen.error) return seen.error;
+
+  if (env.AUTH_KV && !(await countAndLimit(env, 'react:' + normalizeEmail(session.email), REACTIONS_PER_HOUR, 3600))) {
+    return json({ error: 'That is a lot of reactions. Try again in a while.' }, { status: 429 }, env, req);
+  }
+  const email = normalizeEmail(session.email);
+  if (body.on === false) {
+    await env.DB.prepare('DELETE FROM media_reactions WHERE media_id = ? AND email = ? AND emoji = ?')
+      .bind(id, email, emoji).run();
+  } else {
+    await env.DB.prepare('INSERT OR IGNORE INTO media_reactions (media_id, slug, email, emoji, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind(id, row.slug, email, emoji, new Date().toISOString()).run();
+  }
+  // Everybody else watching the race sees it on their next photo refresh,
+  // which a push brings forward.
+  if (ctx && ctx.waitUntil) ctx.waitUntil(publishToRace(env, row.slug, 'media'));
+  return json({ id, ...reactionsFor(await raceReactions(env, row.slug, email), id) }, {}, env, req);
 }
 
 // POST /media/delete  { id, slug }
@@ -2975,6 +3047,7 @@ async function handleMediaDelete(req, env, ctx) {
   // The row first. An orphaned object is invisible and costs a fraction of a
   // penny; an orphaned row is a broken image on the race page.
   await env.DB.prepare('DELETE FROM media WHERE id = ?').bind(id).run();
+  try { await env.DB.prepare('DELETE FROM media_reactions WHERE media_id = ?').bind(id).run(); } catch (e) {}
   try { await env.MEDIA.delete(row.r2_key); } catch (e) {}
   // A photo taken down should leave the race pages as quickly as it arrived.
   if (ctx && ctx.waitUntil) ctx.waitUntil(publishToRace(env, row.slug, 'media'));
@@ -3017,6 +3090,7 @@ async function deleteRaceMedia(env, slug) {
       try { await env.MEDIA.delete(r.r2_key); } catch (e) {}
     }
     await env.DB.prepare('DELETE FROM media WHERE slug = ?').bind(slug).run();
+    try { await env.DB.prepare('DELETE FROM media_reactions WHERE slug = ?').bind(slug).run(); } catch (e) {}
     return null;
   } catch (e) {
     return e.message || String(e);
@@ -6447,6 +6521,7 @@ async function route(request, env, ctx) {
     if (request.method === 'POST' && path === '/media')           return handleMediaUpload(request, env, ctx);
     if (request.method === 'GET'  && path === '/media')           return handleMediaList(request, env);
     if (request.method === 'POST' && path === '/media/delete')    return handleMediaDelete(request, env, ctx);
+    if (request.method === 'POST' && path === '/media/react')     return handleMediaReact(request, env, ctx);
     if (request.method === 'GET'  && path === '/media-file')      return handleMediaFile(request, env);
     if (request.method === 'POST' && path === '/invite')          return handleInvite(request, env);
     if (request.method === 'POST' && path === '/share-link')      return handleShareLink(request, env);

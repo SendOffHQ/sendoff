@@ -347,6 +347,21 @@
      it before it shipped, which is the whole of why that test exists. */
   .media-strip[hidden] { display: none; }
   .media-shot { margin: 0; max-width: 180px; }
+  /* Reactions under a photo: the ones given, with counts, the viewer's own
+     lit, and a button that opens the six to pick from. */
+  .react-bar { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; align-items: center; }
+  .react-chip, .react-add, .react-pick button {
+    font: inherit; font-size: 13px; line-height: 1; padding: 5px 7px; border-radius: 999px;
+    border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer;
+  }
+  .react-chip span { font-family: 'JetBrains Mono', monospace; font-size: 11px; margin-left: 3px; color: var(--text-muted); }
+  .react-chip.mine, .react-pick button.mine { border-color: var(--accent); background: rgba(15,184,191,0.14); }
+  .react-chip.mine span { color: var(--accent); }
+  .react-add { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .react-pick { display: flex; flex-wrap: wrap; gap: 4px; flex-basis: 100%; }
+  .react-pick[hidden] { display: none; }
+  .react-pick button { font-size: 17px; padding: 4px 6px; }
+  .react-err { flex-basis: 100%; color: var(--red); font-size: 11px; }
   .media-shot img {
     width: 100%; height: auto; display: block; border-radius: 4px;
     border: 1px solid var(--border); background: var(--bg-elevated);
@@ -553,7 +568,7 @@
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8a2565f0"></script>
 <script src="lib/course-view.js?v=bb2e63e2"></script>
-<script src="lib/race-core.js?v=20bbe6e0"></script>
+<script src="lib/race-core.js?v=e555ad91"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -820,8 +835,18 @@
       lastPhotoCount = photos.length;
       if (mergedRunners.length) drawRunners();
       renderGalleryButton();
+    } else {
+      // The same photos, maybe with new reactions: the bars that changed,
+      // in place, and no others, so a refresh never takes the focus off a
+      // button somebody is on.
+      for (const p of photos) {
+        const sig = JSON.stringify([p.reactions || {}, p.mine || []]);
+        if (reactionSig.get(p.id) !== sig) redrawReactions(p.id);
+      }
     }
+    reactionSig = new Map(photos.map(p => [p.id, JSON.stringify([p.reactions || {}, p.mine || []])]));
   }
+  let reactionSig = new Map();
   let lastPhotoCount = -1;
 
   function photoFigure(m) {
@@ -831,8 +856,75 @@
       `<a href="${escapeHtml(m.url)}" target="_blank" rel="noopener">` +
       `<img loading="lazy" decoding="async" alt="${escapeHtml(cap || 'Race photo')}" src="${escapeHtml(m.url)}"></a>` +
       (cap ? `<figcaption>${escapeHtml(cap)}</figcaption>` : '') +
+      `<div class="react-bar" data-react-for="${escapeHtml(m.id)}">${reactBar(m)}</div>` +
       `</figure>`;
   }
+
+  // ---------- reactions on photos ----------
+  // Anybody can see the counts; reacting takes an account, and a tap while
+  // signed out opens the sign-in box. Who reacted is never shown, only how
+  // many and which are yours.
+  function reactBar(m, open) {
+    const counts = m.reactions || {}, mine = new Set(m.mine || []);
+    const label = new Map(Race.media.REACTIONS);
+    const chips = Race.media.REACTIONS.filter(([e]) => counts[e] > 0).map(([e, name]) =>
+      `<button type="button" class="react-chip${mine.has(e) ? ' mine' : ''}" data-react="${e}" data-id="${escapeHtml(m.id)}" ` +
+      `aria-pressed="${mine.has(e)}" aria-label="${name}, ${counts[e]}${mine.has(e) ? ', yours' : ''}">${e}<span>${counts[e]}</span></button>`).join('');
+    return chips +
+      `<button type="button" class="react-add" data-react-add="${escapeHtml(m.id)}" aria-expanded="${!!open}" aria-label="React to this photo">+ react</button>` +
+      `<div class="react-pick"${open ? '' : ' hidden'}>` +
+        Race.media.REACTIONS.map(([e, name]) =>
+          `<button type="button" class="${mine.has(e) ? 'mine' : ''}" data-react="${e}" data-id="${escapeHtml(m.id)}" aria-pressed="${mine.has(e)}" aria-label="${label.get(e)}">${e}</button>`).join('') +
+      `</div>`;
+  }
+  // Every bar showing this photo, in the leg strip and the gallery both.
+  function redrawReactions(id) {
+    const m = photos.find(p => p.id === id);
+    if (!m) return;
+    document.querySelectorAll('[data-react-for]').forEach(bar => {
+      if (bar.dataset.reactFor !== id) return;
+      const open = bar.querySelector('.react-pick') && !bar.querySelector('.react-pick').hidden;
+      bar.innerHTML = reactBar(m, open);
+    });
+  }
+  document.addEventListener('click', async (e) => {
+    const add = e.target.closest('[data-react-add]');
+    if (add) {
+      const pick = add.parentElement.querySelector('.react-pick');
+      pick.hidden = !pick.hidden;
+      add.setAttribute('aria-expanded', String(!pick.hidden));
+      return;
+    }
+    const btn = e.target.closest('[data-react]');
+    if (!btn) return;
+    const id = btn.dataset.id, emoji = btn.dataset.react;
+    const m = photos.find(p => p.id === id);
+    if (!m) return;
+    if (!Race.auth.email()) { Race.openSigninModal(); return; }
+    // Picked from the six: the picker has done its job.
+    const pick = btn.closest('.react-pick');
+    if (pick) pick.hidden = true;
+    const was = { reactions: { ...(m.reactions || {}) }, mine: [...(m.mine || [])] };
+    const on = !was.mine.includes(emoji);
+    // Shown at once and put right by the answer, so a tap on one bar of
+    // signal still feels like it took.
+    m.reactions = { ...was.reactions, [emoji]: Math.max(0, (was.reactions[emoji] || 0) + (on ? 1 : -1)) };
+    if (!m.reactions[emoji]) delete m.reactions[emoji];
+    m.mine = on ? [...was.mine, emoji] : was.mine.filter(x => x !== emoji);
+    redrawReactions(id);
+    try {
+      const r = await Race.media.react(slug, id, emoji, on);
+      m.reactions = r.reactions || {}; m.mine = r.mine || [];
+      redrawReactions(id);
+    } catch (err) {
+      Object.assign(m, was);
+      redrawReactions(id);
+      if (err.status === 401) { Race.openSigninModal(); return; }
+      document.querySelectorAll(`[data-react-for="${CSS.escape(id)}"]`).forEach(bar => {
+        bar.insertAdjacentHTML('beforeend', `<span class="react-err">${escapeHtml(err.message)}</span>`);
+      });
+    }
+  });
 
   // Opened on demand, and the images are only put in the DOM at that point.
   // A race with two hundred photos on it would otherwise be two hundred
