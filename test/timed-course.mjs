@@ -167,5 +167,19 @@ const ticks = (lo, hi) => { const a = Race.charts.legAxis(lo, hi);
 ok('nine legs tick every leg', ticks(1, 9), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
 ok('thirty legs every few, never a half', ticks(1, 30).every(Number.isInteger) && ticks(1, 30).length <= 11 && ticks(1, 30).pop() >= 30, true);
 
+// One racer's laps onto another who ran beside them untracked: the times,
+// and nothing that was logged for the first one.
+console.log('\nran together');
+const joeRan = { id: 'joe', stoppedAt: T(0.2), legs: [
+  { index: 1, startTime: T(3), endTime: T(2.5), calories: 120, sodiumMg: 800, preset_0: 2, notes: 'gel' },
+  { index: 2, startTime: T(2.5), endTime: T(2), skipped: true },
+  { index: 3, startTime: T(1.9) }] };
+const alex = Race.laps.copy(joeRan, { id: 'alex', legs: [{ index: 1, startTime: T(9) }], color: '#0f0' });
+ok('the same legs, at the same times', alex.legs.map(l => [l.index, l.startTime, l.endTime || null]), joeRan.legs.map(l => [l.index, l.startTime, l.endTime || null]));
+ok('a missed station stays missed', alex.legs[1].skipped, true);
+ok('and none of what Joe ate, drank or noted', alex.legs.some(l => 'calories' in l || 'sodiumMg' in l || 'preset_0' in l || 'notes' in l), false);
+ok('stopped when he stopped, and still their own record', [alex.stoppedAt, alex.id, alex.color], [joeRan.stoppedAt, 'alex', '#0f0']);
+ok('Joe is left as he was', joeRan.legs[0].calories, 120);
+
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

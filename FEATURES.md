@@ -52,6 +52,8 @@ optional Cloudflare Worker auth proxy.
 - Password reset flow (`reset.html`)
 - Direct PAT mode as an alternative to the worker
 
+- Ran together (`settings.html`, Racers): give a racer who went the whole way beside another, untracked, that racer's laps. Times, skipped stations and a timed race's stop only; what was eaten and drunk stays with whoever it was logged for. Replaces their own laps, so copying again later brings them up to date. `test/copy-laps.mjs`, `test/timed-course.mjs`.
+
 ## Admin panel (`admin.html`)
 - Account list with per-account race roles (editor/viewer)
 - Send account invites and password-reset links
