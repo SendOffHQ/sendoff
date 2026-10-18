@@ -328,7 +328,11 @@
     configWrittenUntil = Date.now() + CONFIG_SETTLE_MS;
     render();
   }
-  let stickyIntakeLegByRunner = {}; // runnerId -> selected legIndex
+  // runnerId -> selected legIndex. Kept for the tab, so a reload comes back
+  // to the leg somebody picked rather than jumping to the latest one.
+  const STICKY_KEY = 'pit-intake-leg:' + slug;
+  let stickyIntakeLegByRunner = {};
+  try { stickyIntakeLegByRunner = JSON.parse(sessionStorage.getItem(STICKY_KEY) || '{}') || {}; } catch (e) {}
 
   // ---------- toast ----------
   function toast(text, kind) {
@@ -1036,6 +1040,24 @@
     `;
   }
 
+  // True while somebody has the leg dropdown open; see render().
+  let renderWaiting = false, legPickAt = 0;
+  function pickingLeg() {
+    const a = document.activeElement;
+    return !!(a && a.matches && a.matches('#runners select[data-intake-leg]')) && Date.now() - legPickAt < 30000;
+  }
+  document.getElementById('runners').addEventListener('focusin', (e) => {
+    if (e.target.matches('select[data-intake-leg]')) legPickAt = Date.now();
+  });
+  document.getElementById('runners').addEventListener('focusout', (e) => {
+    if (e.target.matches('select[data-intake-leg]') && renderWaiting) {
+      renderWaiting = false;
+      // After the focus has gone wherever it is going, so the redraw does not
+      // land on the element being left.
+      setTimeout(() => render(), 0);
+    }
+  });
+
   // True when anything in an intake panel has been typed into and not yet
   // saved. Worked out from the DOM rather than tracked with a flag, so it
   // clears itself the moment the text goes back to what was rendered, and
@@ -1064,6 +1086,12 @@
   function render(force) {
     if (!cfg || !data) return;
     if (!force && intakeDirty()) return;
+    // Nor while somebody is choosing a leg. Rebuilding the card swaps the
+    // dropdown for a new one, which shut the list in their hand every time a
+    // poll landed: every five seconds during a race. Held until it closes,
+    // and no longer than half a minute, so a dropdown left focused on a laptop
+    // cannot freeze the board.
+    if (!force && pickingLeg()) { renderWaiting = true; return; }
     const runnersById = new Map((cfg.runners || []).map(r => [r.id, r]));
     const merged = (cfg.runners || []).map(r => {
       const dr = (data.runners || []).find(d => d.id === r.id) || { id: r.id, legs: [] };
@@ -1235,6 +1263,8 @@
   document.getElementById('runners').addEventListener('change', (e) => {
     if (e.target.matches('[data-intake-leg]')) {
       stickyIntakeLegByRunner[e.target.dataset.runner] = +e.target.value;
+      try { sessionStorage.setItem(STICKY_KEY, JSON.stringify(stickyIntakeLegByRunner)); } catch (e) {}
+      renderWaiting = false;
       // Asked for by hand, so it redraws even over an unsaved edit: choosing
       // another leg is choosing to look at another leg.
       render(true);
