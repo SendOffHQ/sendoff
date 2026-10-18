@@ -367,7 +367,9 @@
 <p>Signing in stores a session that lasts seven days. Opening a race stores a copy of it so the
   page still works when the signal goes, which for a crew at an aid station is the point. Feedback
   written with no signal is held until it can be sent. Signing out deletes all of it, and so does
-  clearing your browser's data for the site.</p>
+  clearing your browser's data for the site. The crew page also remembers which leg you last picked
+  for each racer, so a reload comes back to it; that is only a leg number, it is never sent
+  anywhere, and it goes when you close the tab.</p>
 <p id="demo"><strong>The demo race.</strong> The race at <a href="/try">sendoff.run/try</a> lives
   only in your browser's local storage. Nothing you press or type in it is sent to SendOff or anybody
   else, it needs no account, and it does not touch a sign-in or a race you already have on this
