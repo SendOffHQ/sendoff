@@ -76,7 +76,7 @@ ok('the race rendered', await page.evaluate(() =>
 // A token grants reading, not a role: no pit board, no settings.
 ok('with no crew pages offered', await page.evaluate(() =>
   [...document.querySelectorAll('nav a, .nav a')].map(a => a.textContent.trim())
-    .filter(t => t === 'Pit Board' || t === 'Settings')), []);
+    .filter(t => t === 'Crew' || t === 'Settings')), []);
 await page.context().close();
 
 // charts and print-report read their own race files. They used to fetch the

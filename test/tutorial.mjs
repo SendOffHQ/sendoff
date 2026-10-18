@@ -100,7 +100,7 @@ console.log('\nand every screen that should have one, does');
 const SCREENS = [
   ['/setup.html', 'setup', 'Setting up a race'],
   ['/race.html?id=' + SLUG, 'race', 'Following the race'],
-  ['/pit.html?id=' + SLUG, 'pit', 'Working the pit board'],
+  ['/pit.html?id=' + SLUG, 'pit', 'Working the crew page'],
   ['/racer.html?id=' + SLUG, 'racer', 'Your race'],
   ['/settings.html?id=' + SLUG, 'settings', 'Race settings'],
   ['/charts.html?id=' + SLUG, 'charts', 'Reading the charts'],
@@ -158,7 +158,7 @@ ok('and the last one offers the way in', /Sign in/.test(anon[3]), true);
 console.log('\nand a crew member at the pages they came for');
 const crew = await say({ email:'crew@example.com', role:'crew' }, '/race.html?id=' + SLUG);
 ok('no sign-in prompt for somebody signed in', /Sign in/.test(crew[3]), false);
-ok('the pit board is named', /Pit Board/.test(crew[3]), true);
+ok('the crew page is named', /Your Crew, Racer and Settings pages/.test(crew[3]), true);
 
 console.log('\nthe crew screens say what the plan actually gives them');
 ok('with offline logging, the plain fact', await page.evaluate(

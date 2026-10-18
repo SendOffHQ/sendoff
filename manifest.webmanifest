@@ -17,7 +17,7 @@
     { "src": "/brand/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Pit board", "short_name": "Pit", "url": "/pit.html" },
+    { "name": "Crew page", "short_name": "Crew", "url": "/pit.html" },
     { "name": "Race hub", "short_name": "Hub", "url": "/app/" }
   ]
 }

@@ -87,7 +87,7 @@ const page = await ctx.newPage();
 
 const navLinks = () => page.evaluate(() =>
   [...document.querySelectorAll('a')].map(a => a.textContent.trim())
-    .filter(t => /Pit Board|Racer|Settings|Charts|Print/i.test(t)));
+    .filter(t => /^(Crew|Racer|Settings|Charts|Print)$/i.test(t)));
 
 // Before signing in, because signed out is the state being tested.
 console.log('\na stranger with no account');
@@ -155,7 +155,7 @@ await page.evaluate(([me, base]) => {
 console.log('\nonline: the race, then the pit board, then back to the hub');
 await page.goto(`${BASE}/race.html?id=${SLUG}`);
 await page.waitForTimeout(2200);
-ok('the crew member has their pages', await navLinks(), ['Pit Board', 'Racer', 'Settings', 'Charts', 'Print']);
+ok('the crew member has their pages', await navLinks(), ['Crew', 'Racer', 'Settings', 'Charts', 'Print']);
 await page.goto(`${BASE}/pit.html?id=${SLUG}`);
 await page.waitForTimeout(1500);
 await page.goto(BASE + '/app/');
@@ -218,7 +218,7 @@ ok('the course drew', await page.evaluate(() => {
 // The one that matters: with no signal a crew member must still be able to
 // reach the pages they log from.
 ok('and the pit and racer pages are still reachable',
-  await navLinks(), ['Pit Board', 'Racer', 'Settings', 'Charts', 'Print']);
+  await navLinks(), ['Crew', 'Racer', 'Settings', 'Charts', 'Print']);
 // The address bar now leaves /races/<slug>/ behind, so that is the address a
 // crew member reloads at an aid station. It is not precached and never can be
 // (there is one per race), so the worker serves the precached race page for it

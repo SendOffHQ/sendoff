@@ -1,7 +1,7 @@
 # race-dashboard
 
 A static, multi-race dashboard hub for ultra crew. Each race gets a live
-dashboard, charts, printable report, and a phone-friendly pit board.
+dashboard, charts, printable report, and a phone-friendly crew page.
 No server, no backend: every race is just a folder of files in this
 repo, edited live via the GitHub Contents API.
 
@@ -45,7 +45,7 @@ In the wizard, the segments course type collects aid stations as
 `{ name, mileage, arriveCutoffHours? }`, and saves them as `segments[]`
 derived from consecutive aid pairs. Per-segment elevation gain/loss is
 computed from the uploaded GPX. Aid stations can be edited later from
-the pit board.
+the crew page.
 
 ## Use this template
 
@@ -126,7 +126,7 @@ iteration.
   app/index.html          race hub (moved from / when the landing page took it)
   setup.html              new-race wizard
   race.html               per-race dashboard (?id=<slug>)
-  pit.html                per-race pit board
+  pit.html                per-race crew page
   charts.html             per-race charts
   print-report.html       per-race printable
   hub.json                optional hub-wide config (login proxy URL)

@@ -5,21 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="theme-color" content="#0a0f14" />
-<meta name="description" content="The crew board: send the racer off, log arrivals, pits, nutrition and notes from the aid station.">
+<meta name="description" content="Race settings: the course, the racers and their fueling, and the race details.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="canonical" href="https://sendoff.run/settings">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SendOff">
-<meta property="og:title" content="SendOff · Pit Board">
-<meta property="og:description" content="The crew board: send the racer off, log arrivals, pits, nutrition and notes from the aid station.">
+<meta property="og:title" content="SendOff · Race Settings">
+<meta property="og:description" content="Race settings: the course, the racers and their fueling, and the race details.">
 <meta property="og:url" content="https://sendoff.run/settings">
 <meta property="og:image" content="https://sendoff.run/brand/og-default.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="SendOff · live crew tracking for ultras">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="SendOff · Pit Board">
-<meta name="twitter:description" content="The crew board: send the racer off, log arrivals, pits, nutrition and notes from the aid station.">
+<meta name="twitter:title" content="SendOff · Race Settings">
+<meta name="twitter:description" content="Race settings: the course, the racers and their fueling, and the race details.">
 <meta name="twitter:image" content="https://sendoff.run/brand/og-default.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
@@ -534,7 +534,7 @@
       <div class="fuel-editor-title" id="items" style="margin-top:18px;">One-tap items</div>
       <p class="fuel-hint">
         The things handed over by the item rather than by the number: a flask,
-        a gel, a pill. Each becomes a button on the pit board and the racer
+        a gel, a pill. Each becomes a button on the crew page and the racer
         page. One tap logs one, two taps two, so the crew counts flasks instead
         of doing arithmetic at an aid station.
       </p>
@@ -604,7 +604,7 @@
 
 <div id="toast" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=c1c986a0"></script>
+<script src="lib/race-core.js?v=783d6b2f"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -1854,7 +1854,7 @@
     document.getElementById('loops-count').value = st.count;
     document.getElementById('loops-count-row').style.display = st.format === 'timed' ? 'none' : '';
     document.getElementById('loops-format-hint').textContent = st.format === 'timed'
-      ? 'The race ends at the finish cutoff under Race details. Each runner runs as many laps as fit, and the crew can stop them early from the pit board.'
+      ? 'The race ends at the finish cutoff under Race details. Each runner runs as many laps as fit, and the crew can stop them early from the crew page.'
       : 'Done after the last lap.';
     const many = st.loops.length > 1;
     document.getElementById('loops-list').innerHTML = st.loops.map((l, li) => {

@@ -308,7 +308,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=c1c986a0"></script>
+<script src="lib/race-core.js?v=783d6b2f"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
@@ -516,7 +516,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
             <h2>No races yet</h2>
             <p>${isAuthed
               ? "Set up your first race with the wizard. You'll be its only editor; you can invite crew and generate share links from the race page after creation."
-              : "Set up your first race with the wizard: it'll handle the GitHub commits for you, then you'll have a live dashboard and pit board ready for race day."}</p>
+              : "Set up your first race with the wizard: it'll handle the GitHub commits for you, then you'll have a live dashboard and crew page ready for race day."}</p>
             <a class="cta" href="/setup">Set up a race →</a>
             ${isProxy && !isAuthed ? `<p style="margin-top: 18px; font-size: 12px;"><a href="/setup" style="color: var(--accent);">Sign in</a> to see private races you've been invited to.</p>` : ''}
           </div>
@@ -601,7 +601,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
           course, and everyone at home sees it land.</p>
         <ol class="intro-steps">
           <li><b>Set up the race.</b> Lay out the course leg by leg, add your racers, set the cutoffs.</li>
-          <li><b>Work the pit board.</b> Check them in when they arrive, send them off when they
+          <li><b>Work the crew page.</b> Check them in when they arrive, send them off when they
             leave. That is all it asks of you while your hands are full. Fluids, food and
             notes go in afterwards.</li>
           <li><b>Send the link.</b> Family and friends follow live splits, pace against cutoff and
@@ -610,7 +610,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
         <p class="intro-beta"><span class="beta-badge">Beta</span> SendOff is new, and it is
             being built while it is being used. It has run real races and the crew work is
             solid, but things move week to week and you will find rough edges. If something
-            looks wrong on race day, the pit board keeps working with no signal and sends
+            looks wrong on race day, the crew page keeps working with no signal and sends
             what you logged once you have bars again.
             <button type="button" class="intro-link intro-note-link" data-feedback>Tell us what breaks</button>.</p>
         <p class="intro-beta-warn">One thing worth knowing before you put a race in: a race you

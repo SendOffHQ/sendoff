@@ -564,11 +564,11 @@
      Esri's and will be missing offline; the map is useful without them. -->
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
-<script src="lib/demo.js?v=a1341ad0"></script>
+<script src="lib/demo.js?v=ef20f88a"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8a2565f0"></script>
 <script src="lib/course-view.js?v=bb2e63e2"></script>
-<script src="lib/race-core.js?v=c1c986a0"></script>
+<script src="lib/race-core.js?v=783d6b2f"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -1631,14 +1631,14 @@
     const last = canEdit()
       // Crew and racers. The pit board is the point of the whole thing and it
       // is behind a menu they have no reason to have opened.
-      ? 'Crewing or racing this one? Your <b>Pit Board</b>, <b>Racer</b> and ' +
+      ? 'Crewing or racing this one? Your <b>Crew</b>, <b>Racer</b> and ' +
         '<b>Settings</b> pages are all in the menu, top right.'
       : (signedIn
           // Signed in, but not on this race's roster. Pointing them at a pit
           // board they cannot open would be worse than saying nothing.
           ? 'Charts and a printable report are in the menu, top right.'
           : 'Crewing or racing this one? <b>Sign in</b> from the menu, top ' +
-            'right, and the pit board and settings open up. Watching needs no ' +
+            'right, and the crew page and settings open up. Watching needs no ' +
             'account at all.');
     Race.tutorial.register({
       key: 'race',
