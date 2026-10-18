@@ -81,6 +81,7 @@ const asFan = (await list('pub', fan)).media[0];
 ok('counts for each, and which are mine', [asFan.reactions, asFan.mine], [{ '🔥': 2, '❤️': 1 }, ['🔥']]);
 const anon = await list('pub');
 ok('a spectator with no account sees the counts', [anon.media[0].reactions, anon.media[0].mine], [{ '🔥': 2, '❤️': 1 }, []]);
+ok('nor who took the photo: no address at all goes to a spectator', JSON.stringify(anon).includes('@'), false);
 const said = (l) => JSON.stringify(l.media.map(m => [m.reactions, m.mine]));
 ok('and never who reacted', [said(anon), said(await list('pub', fan))].some(t => t.includes('@')), false);
 ok('a list with somebody\'s own reactions in it is not shared-cacheable', [(await list('pub', fan)).cache, anon.cache], ['private, max-age=5', 'public, max-age=5']);

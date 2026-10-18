@@ -2824,7 +2824,10 @@ function mediaRow(env, r) {
     width: r.width || null,
     height: r.height || null,
     bytes: r.bytes || null,
-    createdBy: r.created_by || null,
+    // Not who took it. The row keeps created_by, for knowing whose a photo is
+    // on the server, but the list goes to anybody who can see the race, which
+    // on a public race is anybody at all, and no page shows it. It used to be
+    // sent anyway: every uploader's email address, to every spectator.
     createdAt: r.created_at,
     url: base ? `${base}/${r.r2_key}` : `${apiBase(env)}/media-file?k=${encodeURIComponent(r.r2_key)}`
   };
