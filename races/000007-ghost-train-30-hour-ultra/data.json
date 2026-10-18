@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-10-18T15:12:51.245Z",
+  "lastUpdated": "2026-10-18T15:13:26.230Z",
   "runners": [
     {
       "id": "joe-rucco",
@@ -104,7 +104,11 @@
         {
           "index": 3,
           "startTime": "2026-10-17T15:15:15.816Z",
-          "endTime": "2026-10-17T16:20:27.671Z"
+          "endTime": "2026-10-17T16:20:27.671Z",
+          "calories": 210,
+          "sodiumMg": 1800,
+          "preset_0": 3,
+          "preset_1": 2
         },
         {
           "index": 4,
