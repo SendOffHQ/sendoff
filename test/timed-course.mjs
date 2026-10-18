@@ -147,5 +147,25 @@ ok('with no pit time running', Math.round(jc.totalPitSec), 0);
 const jp = Race.compute.runner({ id: 'joe', legs: [joe.legs[0]] }, through);
 ok('and in the pit before they have left it', jp.inPit, true);
 
+// A checkpoint is a timing point, gone straight through: not a stop. The
+// aid station chart drew one at every turnaround, a 0 each lap, and the card's
+// average pit time counted them too. Reported from the Ghost Train.
+console.log('\nstops, not checkpoints');
+const T = (h) => new Date(now - h * H).toISOString();
+const lapper = { id: 'joe', legs: [
+  { index: 1, startTime: T(3), endTime: T(2.5) },            // to the turnaround, a checkpoint
+  { index: 2, startTime: T(2.5), endTime: T(2) },            // straight back out, to the pit
+  { index: 3, startTime: T(2 - 0.1), endTime: T(1.5) },      // six minutes in the pit
+  { index: 4, startTime: T(1.5) }] };                        // through the turnaround again
+ok('the chart has the pit stop and not the turnarounds', Race.charts.pitStops(lapper, through).map(p => [p.x, Math.round(p.y)]), [[2, 6]]);
+const lc = Race.compute.runner(lapper, through);
+ok('the average stop is the stop, not the stop and two nothings', [Math.round(lc.avgPitSec), Math.round(lc.lastPitSec)], [360, 360]);
+ok('and the pit total is the same either way', Math.round(lc.totalPitSec), 360);
+// Ticks on whole legs, so no leg number is printed twice.
+const ticks = (lo, hi) => { const a = Race.charts.legAxis(lo, hi);
+  return Array.from({ length: a.xTicks + 1 }, (_, i) => a.xMin + i * (a.xMax - a.xMin) / a.xTicks); };
+ok('nine legs tick every leg', ticks(1, 9), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+ok('thirty legs every few, never a half', ticks(1, 30).every(Number.isInteger) && ticks(1, 30).length <= 11 && ticks(1, 30).pop() >= 30, true);
+
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);
