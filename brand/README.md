@@ -79,7 +79,7 @@ things that actually change during a race:
 | `--accent` | `#0fb8bf` | brand, current, live |
 | `--green` | `#6ee7a8` | on pace, leg done clean |
 | `--yellow` | `#ffb07a` | tight against a cutoff |
-| `--red` | `#e5484d` | cutoff blown |
+| `--red` | `#ff7377` | cutoff blown |
 | `--blue` | `#8aa9d0` | low emphasis: upcoming, finished, viewer |
 
 Keep the two files in step: change a value here, mirror it there, and bump

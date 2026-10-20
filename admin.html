@@ -33,7 +33,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=6a95c972">
+<link rel="stylesheet" href="lib/race-theme.css?v=5da9761b">
 <style>
   .wrap { max-width: 620px; margin: 0 auto; }
   .panel {
@@ -219,7 +219,7 @@
   .acct-name-edit .lbl { color: var(--text-muted); font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; }
   .acct-name-edit input { flex: 1 1 180px; min-width: 0; font-family: inherit; font-size: 12px; padding: 6px 8px;
     background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 3px; }
-  .acct-name-edit input:focus { outline: none; border-color: var(--accent); }
+  .acct-name-edit input:focus { outline: 2px solid transparent; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
   .acct-name-edit .hint { flex-basis: 100%; color: var(--text-muted); font-size: 11px; }
   .pending {
     margin-top: 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
@@ -274,7 +274,7 @@
 </header>
 
 <div class="wrap">
-  <div id="error" class="error-banner" style="display:none;"></div>
+  <div id="error" class="error-banner" role="alert" style="display:none;"></div>
   <div class="gate" id="gate">Checking…</div>
 
   <div id="panels" style="display:none;">
@@ -394,7 +394,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=4e37575c"></script>
+<script src="lib/race-core.js?v=6f5dd06e"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)

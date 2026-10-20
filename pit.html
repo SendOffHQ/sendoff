@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="theme-color" content="#0a0f14" />
 <meta name="description" content="The crew page: send the racer off, log arrivals, pits, nutrition and notes from the aid station.">
@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css" />
-<link rel="stylesheet" href="lib/race-theme.css?v=6a95c972">
+<link rel="stylesheet" href="lib/race-theme.css?v=5da9761b">
 <style>
   body { padding: 20px 16px 32px; }
   .wrap { max-width: 860px; margin: 0 auto; }
@@ -93,7 +93,7 @@
   .where strong { color: var(--text); }
   .edit-time { display: grid; gap: 10px; }
   .edit-time-clock { display: flex; gap: 8px; }
-  .edit-time input[data-edit="time"] { flex: 1 1 auto; min-width: 0; font-family: 'JetBrains Mono', monospace; font-size: 18px; letter-spacing: 0.04em; }
+  .edit-time input[data-edit="time"] { flex: 1 1 auto; min-width: 0; font-family: 'JetBrains Mono', monospace; font-size: 18px !important; letter-spacing: 0.04em; }
   .edit-time select[data-edit="ampm"] { flex: 0 0 auto; width: auto; }
   .edit-time-other { margin: 0; font-size: 12px; color: var(--text-muted); }
   .where .stop { margin-top: 8px; line-height: 1.6; }
@@ -260,7 +260,7 @@
   </div>
 </header>
 
-<div id="error" class="error-banner" style="display:none;"></div>
+<div id="error" class="error-banner" role="alert" style="display:none;"></div>
 
 <!-- Where the first-visit tutorial goes. See Race.tutorial. -->
 <div id="tut-host"></div>
@@ -287,13 +287,13 @@
 
 </div>
 
-<div id="toast" style="display:none;"></div>
+<div id="toast" role="status" aria-live="polite" style="display:none;"></div>
 
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/race-core.js?v=4e37575c"></script>
+<script src="lib/race-core.js?v=6f5dd06e"></script>
 <script src="lib/course-view.js?v=9a7a055a"></script>
 <script>
   const slug = Race.qs('id');
@@ -971,7 +971,7 @@
       <div class="intake-panel">
         <div class="intake-panel-head">
           <span class="intake-panel-title">Intake / notes</span>
-          <select data-intake-leg data-runner="${runner.id}">${legOptions}</select>
+          <select data-intake-leg data-runner="${runner.id}" aria-label="Leg">${legOptions}</select>
         </div>
         ${legTimesLine(selectedLeg, runner)}
         ${fuelMetrics.length ? `<div class="intake-grid">
@@ -979,26 +979,26 @@
           <label class="field">
             <span class="lbl">${escapeHtml(Race.fuel.fieldLabel(m))}${Race.fuel.estimated(selectedLeg, m.key)
               ? ' <span class="est-tag" title="Part of this is an AI crew\'s estimate. Type the real number to replace it.">~ estimate</span>' : ''}</span>
-            <input type="number" data-intake="${escapeAttr(m.key)}" min="0" step="${m.step}" value="${selectedLeg?.[m.key] ?? ''}" />
+            <input type="number" inputmode="decimal" data-intake="${escapeAttr(m.key)}" min="0" step="${m.step}" value="${selectedLeg?.[m.key] ?? ''}" />
           </label>`).join('')}
         </div>` : ''}
         ${presetBtns}
         <label class="field intake-notes">
           <span class="lbl">Notes</span>
-          <textarea data-intake="notes">${escapeHtml(selectedLeg?.notes ?? '')}</textarea>
+          <textarea data-intake="notes" autocomplete="off">${escapeHtml(selectedLeg?.notes ?? '')}</textarea>
         </label>
         <div class="grid-3" style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
           <label class="field">
             <span class="lbl">Issues</span>
-            <input type="text" data-intake="issues" value="${escapeAttr(selectedLeg?.issues ?? '')}" />
+            <input type="text" data-intake="issues" autocomplete="off" value="${escapeAttr(selectedLeg?.issues ?? '')}" />
           </label>
           <label class="field">
             <span class="lbl">Meds</span>
-            <input type="text" data-intake="meds" value="${escapeAttr(selectedLeg?.meds ?? '')}" />
+            <input type="text" data-intake="meds" autocomplete="off" value="${escapeAttr(selectedLeg?.meds ?? '')}" />
           </label>
           <label class="field">
             <span class="lbl">Gear</span>
-            <input type="text" data-intake="gearChanges" value="${escapeAttr(selectedLeg?.gearChanges ?? '')}" />
+            <input type="text" data-intake="gearChanges" autocomplete="off" value="${escapeAttr(selectedLeg?.gearChanges ?? '')}" />
           </label>
         </div>
         <!-- Two rows, not one wrapping row. The three buttons used to share a

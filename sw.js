@@ -239,7 +239,7 @@ self.addEventListener('fetch', (event) => {
           '<title>Offline</title><body style="margin:0;background:#0A0F14;color:#F0ECE3;font:16px system-ui;' +
           'display:grid;place-items:center;height:100vh;text-align:center;padding:24px">' +
           '<div><p style="font-size:20px;font-weight:600">No signal, and this page was never saved.</p>' +
-          '<p style="color:#7A8D99">Open it once with a connection and it will be here next time.</p></div>',
+          '<p style="color:#90A2AD">Open it once with a connection and it will be here next time.</p></div>',
           { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
       }
     })());

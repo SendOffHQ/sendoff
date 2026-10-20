@@ -35,13 +35,13 @@
   /* The wordmark's letterforms on light grounds are the as-drawn near-black,
      a half-step darker than the body-copy ink above. See brand/README.md. */
   --so-wm-letter-on-light: #0D1117;
-  --so-mute:          #7A8D99;
+  --so-mute:          #90A2AD;  /* 4.5:1 on every panel and the highlighted row */
   --so-faint:         #4E606D;
 
   /* ---- Semantic (kept separate from the accent) ---- */
   --so-on-pace:  #6EE7A8;
   --so-tight:    #FFB07A;
-  --so-cutoff:   #E5484D;
+  --so-cutoff:   #FF7377;  /* text and marks; the mic fill keeps #E5484D */
 
   /* ---- Type ---- */
   --so-font-display: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;

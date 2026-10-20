@@ -26,7 +26,11 @@
   --signal: #0fb8bf;          /* on dark grounds (the app) */
   --signal-on-light: #0a8b92; /* on cream / white (print, marketing) */
   --beam: #5efdf6;            /* glow only: 1.2:1 on white, never a surface */
+  /* The browser's own controls (date pickers, number spinners, scrollbars,
+     autofill) are drawn for a dark page, not white boxes on it. */
+  color-scheme: dark;
 }
+@media print { :root { color-scheme: light; } }
 
 /* ---------- the photo panel ----------
    Race.media.mountPanel builds this. It was written into pit.html and moved
@@ -511,8 +515,38 @@ input[type="email"], input[type="url"], textarea, select {
   padding: 10px 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px;
   width: 100%;
 }
-input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
-input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+/* A ring as well as the border, so the field being typed into is plain at a
+   glance. The outline stays, transparent, for Windows high-contrast mode,
+   which draws it and drops the shadow. */
+input:focus, textarea:focus, select:focus {
+  outline: 2px solid transparent; border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
+
+/* A phone zooms the page into any field set under 16px when it is tapped,
+   which is why zoom used to be switched off on the crew page, the racer
+   screen and settings. On touch screens every field is 16px instead, and
+   pinching to zoom works everywhere. Important because pages size their own
+   fields smaller for a laptop, some of them importantly; a field drawn larger
+   than 16px says so with an important rule more specific than this one (the
+   crew page's time field). test/touch-and-focus.mjs holds every page to it. */
+@media (pointer: coarse) {
+  :is(input:not([type]), input[type="text"], input[type="password"], input[type="number"],
+      input[type="datetime-local"], input[type="date"], input[type="time"], input[type="email"],
+      input[type="url"], input[type="search"], input[type="tel"], textarea, select) { font-size: 16px !important; }
+}
+/* Pinch zoom stays; the double-tap zoom that made quick taps wait goes. */
+a, button, label, input, select, textarea, summary, [role="button"] { touch-action: manipulation; }
+
+/* Somebody who has asked their phone for less motion gets no blinking, pulsing
+   or sliding: the LIVE label, the racer dots and the save spinners hold still. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important; scroll-behavior: auto !important;
+  }
+}
 
 /* Split date + time control (setup wizard) */
 .datetime-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

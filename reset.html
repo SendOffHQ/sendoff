@@ -33,7 +33,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=6a95c972">
+<link rel="stylesheet" href="lib/race-theme.css?v=5da9761b">
 <style>
   .wrap { max-width: 480px; margin: 60px auto; padding: 0 20px; }
   .card {
@@ -61,7 +61,7 @@
     border-radius: 4px; color: var(--text);
     font-family: 'JetBrains Mono', monospace; font-size: 13px;
   }
-  input:focus { outline: none; border-color: var(--accent); }
+  input:focus { outline: 2px solid transparent; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
   .btn-row { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
   .hint { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
   .ok {
@@ -134,7 +134,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=4e37575c"></script>
+<script src="lib/race-core.js?v=6f5dd06e"></script>
 <script>
   function escapeHtml(s) {
     return String(s == null ? '' : s)

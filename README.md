@@ -130,6 +130,7 @@ iteration.
   charts.html             per-race charts
   print-report.html       per-race printable
   hub.json                optional hub-wide config (login proxy URL)
+  DESIGN.md               the design system: tokens, type, components, and the rules the tests hold
   lib/
     race-core.js          shared helpers (compute, GitHub API, GPX, format, auth)
     race-theme.css        shared design tokens + base styles
