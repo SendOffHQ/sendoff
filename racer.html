@@ -171,8 +171,9 @@
   .rgrip {
     flex: 0 0 44px; min-height: 58px; background: none; cursor: grab; touch-action: none;
     border: 1px dashed var(--border-bright); border-radius: 6px;
-    color: var(--text-dim); font-size: 18px; letter-spacing: -0.2em;
+    color: var(--text-dim); display: flex; align-items: center; justify-content: center;
   }
+  .rgrip svg { fill: currentColor; pointer-events: none; }
   .rchips.reordering .rchip:disabled { opacity: 1; cursor: default; }
   .rchip-row.dragging { opacity: 0.55; }
   .rchip-row.dragging .rgrip { cursor: grabbing; }
@@ -640,6 +641,11 @@
     // this has made once already: the two agree only until something moves.
     const items = Race.fuel.presetsInOrder(cfg);
     const metrics = Race.fuel.metrics(cfg);
+    // The six-dot drag handle, drawn rather than typed: two vertical ellipses
+    // set side by side sat as far apart as the phone's font put them, and read
+    // as two marks rather than one grip. One column alone is a menu.
+    const GRIP = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">' +
+      [6, 12, 18].map(y => `<circle cx="9" cy="${y}" r="2"/><circle cx="15" cy="${y}" r="2"/>`).join('') + '</svg>';
     if (items.length) {
       chips.push(`<div class="rblock">
         <div class="rlbl-row">
@@ -652,7 +658,7 @@
             const n = +leg[`preset_${i}`] || 0;
             return `<div class="rchip-row" data-row="${i}">
             ${reordering ? `<button type="button" class="rgrip" data-grip="${i}"
-              aria-label="Move ${esc(p.name)}: drag, or use the arrow keys">\u22ee\u22ee</button>` : ''}
+              aria-label="Move ${esc(p.name)}: drag, or use the arrow keys">${GRIP}</button>` : ''}
             <button class="rchip" type="button" data-preset="${i}"${reordering ? ' disabled' : ''}>
               <span>+ ${esc(p.name)}<span class="sub">${esc(metrics.filter(m => +p.values[m.key])
                   .map(m => Race.fuel.fmt(m, p.values[m.key]) + ' ' + (m.short || m.label)).join(' · '))}</span></span>

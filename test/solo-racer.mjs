@@ -159,6 +159,12 @@ await page.click('#reorder-toggle');
 ok('the switch brings them, one per item', await page.locator('#intake [data-grip]').count(), 8);
 ok('on the left of each chip', await page.evaluate(() =>
   [...document.querySelectorAll('#rchips .rchip-row')].every(r => r.firstElementChild.matches('[data-grip]'))), true);
+// Drawn, not typed: two vertical ellipses side by side sat a font's width
+// apart and read as two marks. Six dots in two columns 6px apart, one grip.
+ok('each is one six-dot grip, two close columns', await page.$eval('#rchips [data-grip] svg', svg => {
+  const xs = [...new Set([...svg.querySelectorAll('circle')].map(c => c.getBoundingClientRect().x))];
+  return [svg.querySelectorAll('circle').length, xs.length, Math.round(Math.abs(xs[1] - xs[0]))];
+}), [6, 2, 6]);
 ok('and the items do not log while it is on', await page.evaluate(() =>
   [...document.querySelectorAll('#rchips .rchip')].every(c => c.disabled)), true);
 await page.evaluate(() => document.getElementById('rchips').scrollIntoView({ block: 'center' }));
