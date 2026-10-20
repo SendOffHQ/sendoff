@@ -46,7 +46,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=b55e7946">
+<link rel="stylesheet" href="lib/race-theme.css?v=6a95c972">
 <style>
   .p-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: -6px 0 26px; }
   /* display: flex above would otherwise win over the hidden attribute, and
@@ -61,7 +61,7 @@
     background: var(--border); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
   .p-total { background: var(--bg-card); padding: 14px 16px; }
   .p-total b { display: block; font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; }
-  .p-total span { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em;
+  .p-total span { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.15em;
     text-transform: uppercase; color: var(--text-muted); }
   @media (max-width: 700px) {
     .p-totals { grid-template-columns: repeat(2, 1fr); }
@@ -76,7 +76,7 @@
   .p-best { display: grid; grid-template-columns: 9em 7.5em 1fr; gap: 10px; padding: 7px 0;
     border-top: 1px solid var(--border); align-items: baseline; }
   .p-best:first-of-type { border-top: 0; }
-  .p-best .k { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em;
+  .p-best .k { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.12em;
     text-transform: uppercase; color: var(--text-muted); }
   .p-best .v { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
   .p-best .r { color: var(--text-dim); font-size: 13px; }
@@ -87,14 +87,14 @@
   .p-race-name a { color: inherit; text-decoration: none; }
   .p-race-name a:hover { color: var(--accent); }
   .p-sub { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; margin-top: 4px; }
-  .p-chip { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase;
+  .p-chip { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase;
     padding: 4px 8px; border: 1px solid var(--border-bright); border-radius: 3px; white-space: nowrap; color: var(--text-dim); }
   .p-chip.done { color: var(--green); border-color: var(--green); }
   .p-chip.dnf { color: var(--yellow); border-color: var(--yellow); }
   .p-stats { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 14px 0 4px; }
   .p-stat { font-family: 'JetBrains Mono', monospace; }
   .p-stat b { font-size: 17px; }
-  .p-stat span { display: block; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+  .p-stat span { display: block; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
   .p-note { color: var(--text-muted); font-size: 12px; margin-top: 6px; }
   .p-report { color: var(--text-dim); font-size: 14px; line-height: 1.55; margin: 12px 0 0; white-space: pre-wrap; }
   .p-report b { color: var(--text); font-weight: 600; }
@@ -151,7 +151,7 @@
   .p-pub-addr a { color: var(--accent); }
   .p-race-pub { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 12px; padding-top: 10px;
     border-top: 1px dashed var(--border); font-size: 12px; color: var(--text-muted); }
-  .p-race-pub .lbl { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+  .p-race-pub .lbl { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
   .p-pubchip { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 4px 9px; border-radius: 999px; cursor: pointer;
     background: transparent; color: var(--text-dim); border: 1px solid var(--border-bright); }
   .p-pubchip[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
@@ -190,7 +190,7 @@
   <span><a href="/app/">Back to the hub</a></span>
 </footer>
 
-<script src="lib/race-core.js?v=783d6b2f"></script>
+<script src="lib/race-core.js?v=4e37575c"></script>
 <script>
   // The racer profile: every race this account ran, what it adds up to, and
   // what the racer has written about each since. See ROADMAP.md, "Racer

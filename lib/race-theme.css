@@ -10,7 +10,7 @@
   --border-bright: #33454f;
   --text: #f0ece3;   /* matches the wordmark letters as drawn */
   --text-dim: #b6c2c9;
-  --text-muted: #7a8d99;
+  --text-muted: #90a2ad;
   --accent: #0fb8bf;
   --accent-glow: rgba(15, 184, 191, 0.18);
   --accent-ink: #04181a;      /* text on a filled accent, 7.5:1 */
@@ -18,7 +18,7 @@
   --green: #6ee7a8;
   --green-glow: rgba(110, 231, 168, 0.18);
   --yellow: #ffb07a;
-  --red: #e5484d;
+  --red: #ff7377;           /* 4.5:1 or better on every card and highlight */
   --blue: #8aa9d0;            /* low-emphasis states: upcoming, done, viewer */
 
   /* SendOff brand: see brand/README.md. One hue, two values: the signal
@@ -44,14 +44,14 @@
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   width: 100%; background: transparent; border: 0; padding: 0; cursor: pointer;
   text-align: left; color: var(--text-muted);
-  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
   letter-spacing: 0.18em; text-transform: uppercase;
 }
 .photo-head:hover { color: var(--accent); }
 .photo-head-right { display: flex; align-items: center; gap: 8px; }
 .photo-head-warn { color: var(--yellow); }
 .photo-head-err { color: var(--red); }
-.photo-head-caret::before { content: '▼'; font-size: 8px; }
+.photo-head-caret::before { content: '▼'; font-size: 11px; }
 .photo-bar.collapsed .photo-head-caret::before { content: '▶'; }
 .photo-body { margin-top: 2px; }
 /* `hidden` works through a UA display rule and any author display outranks
@@ -131,7 +131,7 @@
   background: transparent; border: 1px solid var(--border-bright);
   color: var(--text-dim); cursor: pointer;
   padding: 6px 12px; border-radius: 4px;
-  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
   letter-spacing: 0.12em; text-transform: uppercase;
 }
 .tut-close:hover { color: var(--accent); border-color: var(--accent); }
@@ -230,7 +230,7 @@ header.site {
      mono and uppercase, and in the intro dialog, where it is neither. */
   display: inline-block;
   font-family: 'JetBrains Mono', ui-monospace, monospace; text-transform: uppercase;
-  font-size: 9px; letter-spacing: 0.2em; line-height: 1;
+  font-size: 11px; letter-spacing: 0.2em; line-height: 1;
   padding: 4px 6px 3px; border-radius: 3px; white-space: nowrap;
   color: var(--accent); border: 1px solid var(--accent);
   margin-left: -6px;   /* closes most of the row's 14px gap: it belongs to the name */
@@ -293,7 +293,7 @@ footer.site {
   margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border);
   display: flex; justify-content: space-between; align-items: center;
   flex-wrap: wrap; gap: 16px;
-  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
   letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted);
 }
 
@@ -306,7 +306,7 @@ footer.site {
   font-family: 'JetBrains Mono', monospace; font-size: 11px;
 }
 .account-bar button.account-signin {
-  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
   letter-spacing: 0.12em; text-transform: uppercase;
   background: transparent; border: 1px solid var(--border);
   color: var(--text-muted); padding: 5px 10px; border-radius: 3px;
@@ -373,7 +373,7 @@ header.site { position: relative; }
   border-top: 1px solid var(--border); margin-top: 4px; padding-top: 11px;
 }
 .account-bar .account-menu-who {
-  font-size: 10px; letter-spacing: 0.04em; color: var(--text-muted);
+  font-size: 11px; letter-spacing: 0.04em; color: var(--text-muted);
   padding: 7px 10px 8px; border-bottom: 1px solid var(--border);
   margin-bottom: 4px; overflow-wrap: anywhere; text-transform: none;
 }
@@ -396,7 +396,7 @@ header.site { position: relative; }
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
 }
 .menu-count {
-  font-size: 10px; letter-spacing: 0.06em; line-height: 1;
+  font-size: 11px; letter-spacing: 0.06em; line-height: 1;
   padding: 3px 6px; border-radius: 10px; flex: none;
   background: var(--accent); color: var(--bg);
 }
@@ -442,7 +442,7 @@ header.site { position: relative; }
 .install-steps { margin: 0; padding-left: 20px; color: var(--text-dim); font-size: 14px; line-height: 1.6; }
 .install-steps li + li { margin-top: 8px; }
 .modal-field > span {
-  display: block; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  display: block; font-family: 'JetBrains Mono', monospace; font-size: 11px;
   letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted);
   margin-bottom: 5px;
 }
@@ -457,7 +457,7 @@ header.site { position: relative; }
   background: transparent; border: 1px dashed var(--border-bright);
   color: var(--text-dim); padding: 8px 12px; border-radius: 4px;
   cursor: pointer; width: 100%; margin: 8px 0 14px;
-  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
   letter-spacing: 0.1em; text-transform: uppercase;
 }
 .modal-addrow:hover { color: var(--accent); border-color: var(--accent); }
@@ -467,7 +467,7 @@ header.site { position: relative; }
 }
 .prof-band-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .prof-band-head > span {
-  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
   letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted);
   white-space: nowrap;
 }
@@ -482,7 +482,7 @@ header.site { position: relative; }
 .prof-band-targets { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
 .prof-band-targets label { display: block; }
 .prof-band-targets span {
-  display: block; font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  display: block; font-family: 'JetBrains Mono', monospace; font-size: 11px;
   letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted);
   margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -524,7 +524,7 @@ label.field {
 }
 label.field > .lbl {
   display: block;
-  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
   letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted);
   margin-bottom: 6px;
 }
@@ -560,7 +560,7 @@ label.field > .hint {
   font-size: 18px; font-weight: 600; color: var(--text);
 }
 .access-head-toggle {
-  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
   letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim);
   border: 1px solid var(--border-bright); border-radius: 3px; padding: 4px 9px;
 }
@@ -571,7 +571,7 @@ label.field > .hint {
 .access-section { margin-bottom: 22px; }
 .access-section:last-child { margin-bottom: 0; }
 .access-section-title {
-  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
   letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted);
   margin-bottom: 10px;
 }
@@ -584,7 +584,7 @@ label.field > .hint {
 }
 .access-list .row .who { color: var(--text); word-break: break-all; }
 .access-list .row .tag {
-  font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase;
+  font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase;
   padding: 2px 6px; border-radius: 2px; color: var(--text-muted);
   border: 1px solid var(--border-bright);
 }
@@ -602,7 +602,7 @@ label.field > .hint {
 .access-list .row .role-pick {
   background: var(--bg-card); border: 1px solid var(--border-bright);
   color: var(--text); border-radius: 3px; padding: 4px 6px;
-  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
   text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer;
 }
 .access-list .row .role-pick:hover { border-color: var(--accent); }
@@ -620,7 +620,7 @@ label.field > .hint {
 .access-list .row button {
   background: transparent; border: 1px solid var(--border);
   color: var(--text-muted); padding: 4px 8px; border-radius: 3px;
-  font-family: 'JetBrains Mono', monospace; font-size: 10px; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; cursor: pointer;
 }
 .access-list .row button:hover { color: var(--red); border-color: var(--red); }
 .access-list .empty {
@@ -658,7 +658,7 @@ label.field > .hint {
 .access-invite-result .url, .access-share-result .url { color: var(--green); margin-top: 6px; display: block; }
 .access-invite-result .copy, .access-share-result .copy {
   margin-top: 8px; padding: 6px 10px;
-  font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
 }
 .access-err { color: var(--red); margin-top: 8px; font-size: 11px; }
 /* Set apart from the rest of the panel: everything above it is reversible. */
@@ -689,7 +689,7 @@ label.field > .hint {
 .share-row button {
   background: transparent; border: 1px solid var(--border);
   color: var(--text-muted); padding: 4px 8px; border-radius: 3px;
-  font-family: 'JetBrains Mono', monospace; font-size: 10px; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; cursor: pointer;
 }
 .share-row button.copy:hover { color: var(--accent); border-color: var(--accent); }
 .share-row button.revoke:hover { color: var(--red); border-color: var(--red); }
@@ -709,7 +709,7 @@ label.field > .hint {
 /* The Account box: who you are, then one row per way of signing in. */
 .acct-who { font-size: 14px; color: var(--text-dim); margin: 0 0 16px; overflow-wrap: anywhere; }
 .acct-who b { color: var(--text); }
-.acct-h { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.18em;
+.acct-h { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em;
   text-transform: uppercase; color: var(--text-muted); margin: 0 0 4px; }
 .acct-row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 12px 0; border-top: 1px solid var(--border); }
@@ -730,7 +730,7 @@ label.field > .hint {
 /* An aid station's cutoff, on its own line under the name and distance,
    where a day and a time have room on a phone. */
 .aid-cut { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
-.aid-cut-lbl { flex: 0 0 auto; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+.aid-cut-lbl { flex: 0 0 auto; font-family: 'JetBrains Mono', monospace; font-size: 11px;
   letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
 .aid-cut .cut-pick { flex: 1 1 15em; max-width: 24em; }
 @media (max-width: 520px) {
@@ -769,12 +769,12 @@ label.field > .hint {
 .ax-suggest button span { color: var(--text-muted); font-family: 'IBM Plex Sans', sans-serif; margin-left: 6px; }
 .ax-suggest[hidden] { display: none; }
 .signin-or { display: flex; align-items: center; gap: 10px; margin: 14px 0 12px;
-  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.15em;
   text-transform: uppercase; color: var(--text-muted); }
 .signin-or::before, .signin-or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
 /* Part of this number is an AI crew's guess, until somebody types the real one. */
-.est-tag { color: var(--accent); font-size: 10px; letter-spacing: 0.04em; text-transform: none; white-space: nowrap; }
+.est-tag { color: var(--accent); font-size: 11px; letter-spacing: 0.04em; text-transform: none; white-space: nowrap; }
 
 /* ---------- the course: map and elevation profile ----------
    lib/course-view.js, on the race page and the pit board. */
@@ -811,9 +811,9 @@ label.field > .hint {
 .course-elev .elev-line { fill: none; stroke: #0fb8bf; stroke-width: 1.6; }
 .course-elev .elev-aid-line { stroke-dasharray: 3 3; }
 .course-elev .elev-grid { stroke: var(--border); stroke-width: 1; }
-.course-elev .elev-axis-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; fill: var(--text-muted); }
+.course-elev .elev-axis-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; fill: var(--text-muted); }
 .course-elev .elev-axis-unit {
-  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
   fill: var(--text-muted); letter-spacing: 0.1em; text-transform: uppercase;
 }
 .course-elev .elev-aid-dot { cursor: pointer; }
@@ -832,4 +832,4 @@ label.field > .hint {
 /* How the racer said they felt, beside a leg's times. Race.feel. */
 .feel-face { display: inline-block; vertical-align: -3px; }
 .feel-tag { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;
-  font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); }
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); }

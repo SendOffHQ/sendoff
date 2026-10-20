@@ -40,7 +40,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=b55e7946">
+<link rel="stylesheet" href="lib/race-theme.css?v=6a95c972">
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css" />
 <style>
   .cutoffs {
@@ -68,7 +68,7 @@
     .race-clock { text-align: left; align-items: flex-start; }
   }
   .race-clock .label {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted);
   }
   .race-clock .time {
@@ -118,7 +118,7 @@
     border-top: 1px solid var(--border);
   }
   .fc-parts-title {
-    grid-column: 1 / -1; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    grid-column: 1 / -1; font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted);
     margin-bottom: 2px;
   }
@@ -133,7 +133,7 @@
   .finish-card-btn {
     background: rgba(15,184,191,0.12); color: var(--accent);
     border: 1px solid rgba(15,184,191,0.45); border-radius: 3px;
-    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
     letter-spacing: 0.14em; text-transform: uppercase; padding: 6px 11px; cursor: pointer;
   }
   .finish-card-btn:hover { background: rgba(15,184,191,0.22); border-color: var(--accent); }
@@ -159,7 +159,7 @@
     text-transform: uppercase; margin-top: 4px;
   }
   .status-badge {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
     letter-spacing: 0.2em; text-transform: uppercase;
     padding: 6px 10px; border-radius: 2px; border: 1px solid currentColor;
   }
@@ -198,18 +198,18 @@
     50% { opacity: 1; }
   }
   .stat .label {
-    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
     text-transform: uppercase; letter-spacing: 0.18em; color: var(--text-muted);
   }
   .stat .value {
     font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700;
     letter-spacing: -0.02em; color: var(--text);
   }
-  .stat .sub { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
-  .stat .sub.proj-margin { font-size: 9px; margin-top: -2px; }
+  .stat .sub { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+  .stat .sub.proj-margin { font-size: 11px; margin-top: -2px; }
   .stat .sub.proj-margin.over { color: var(--red); }
   /* The racer's own goal, under the cutoff margin, in the badge's colours. */
-  .stat .sub.proj-goal { font-size: 9px; margin-top: 1px; }
+  .stat .sub.proj-goal { font-size: 11px; margin-top: 1px; }
   .stat .sub.proj-goal.onpace { color: var(--green); }
   .stat .sub.proj-goal.tight { color: var(--yellow); }
   .stat .sub.proj-goal.offpace { color: var(--red); }
@@ -228,7 +228,7 @@
      as two items, the tag stays one box and wraps inside itself. */
   .intake-title {
     display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.2em; text-transform: uppercase;
     color: var(--text-muted); margin-bottom: 14px;
   }
@@ -236,7 +236,7 @@
     color: var(--accent); border: 1px solid var(--accent); border-radius: 2px;
     padding: 2px 6px; letter-spacing: 0.12em; min-width: 0; overflow-wrap: anywhere;
   }
-  .intake-now { color: var(--text-muted); font-size: 10px; margin-left: 4px; }
+  .intake-now { color: var(--text-muted); font-size: 11px; margin-left: 4px; }
   .intake-row {
     display: grid; grid-template-columns: 90px 1fr auto auto;
     gap: 14px; align-items: center; padding: 8px 0;
@@ -265,7 +265,7 @@
     align-items: center; margin-bottom: 14px;
   }
   .legs-title {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted);
   }
 
@@ -282,7 +282,7 @@
     justify-content: center; align-items: center;
     font-family: 'JetBrains Mono', monospace;
   }
-  .leg-cell .n { font-size: 10px; color: var(--text-muted); margin-bottom: 2px; }
+  .leg-cell .n { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
   .leg-cell .n .lp { margin-left: 3px; color: var(--accent); }
   .leg-cell .t { font-size: 11px; font-weight: 700; }
   .leg-cell.done { background: rgba(110, 231, 168, 0.08); border-color: rgba(110, 231, 168, 0.4); }
@@ -335,7 +335,7 @@
   .media-toggle {
     background: transparent; border: 1px solid var(--border-bright); color: var(--text-dim);
     border-radius: 4px; padding: 5px 10px; cursor: pointer;
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.12em; text-transform: uppercase;
   }
   .media-toggle:hover { color: var(--accent); border-color: var(--accent); }
@@ -388,14 +388,14 @@
   .gallery-close {
     background: transparent; border: 1px solid var(--border-bright); color: var(--text-dim);
     border-radius: 4px; padding: 6px 12px; cursor: pointer;
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.12em; text-transform: uppercase;
   }
   .gallery-close:hover { color: var(--accent); border-color: var(--accent); }
   .gallery-body { overflow-y: auto; padding: 16px 18px 22px; }
   .gallery-leg + .gallery-leg { margin-top: 20px; }
   .gallery-leg h3 {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted);
     margin: 0 0 10px;
   }
@@ -410,7 +410,7 @@
   .leglog-head:hover .leglog-toggle { color: var(--accent); border-color: var(--accent); }
   .leglog-head-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 600; }
   .leglog-toggle {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim);
     border: 1px solid var(--border-bright); border-radius: 3px; padding: 4px 9px;
   }
@@ -420,7 +420,7 @@
   .leglog.collapsed .when-expanded, .leglog:not(.collapsed) .when-collapsed { display: none; }
   .leglog table { width: 100%; border-collapse: collapse; font-size: 12px; }
   .leglog th {
-    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted);
     text-align: left; padding: 14px 8px 10px; font-weight: 500;
     border-bottom: 1px solid var(--border);
@@ -442,10 +442,10 @@
   }
   .leglog tr.note-row:last-child td { border-bottom: none; }
   .leglog tr.empty td { color: var(--text-muted); font-style: italic; text-align: center; padding: 24px; }
-  .leglog .leg-seg { color: var(--text-muted); font-size: 10px; display: block; }
+  .leglog .leg-seg { color: var(--text-muted); font-size: 11px; display: block; }
   .st-tag {
     display: inline-block; margin-left: 5px; padding: 1px 5px; border-radius: 2px;
-    font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
     letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid currentColor;
     vertical-align: 1px; white-space: nowrap;
   }
@@ -480,7 +480,7 @@
     .leglog tr.leg-row td.num { text-align: left; }
     .leglog tr.leg-row td.num::before {
       content: attr(data-label);
-      display: block; font-family: 'JetBrains Mono', monospace; font-size: 9px;
+      display: block; font-family: 'JetBrains Mono', monospace; font-size: 11px;
       letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted);
       margin-bottom: 3px;
     }
@@ -564,11 +564,11 @@
      Esri's and will be missing offline; the map is useful without them. -->
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
-<script src="lib/demo.js?v=ef20f88a"></script>
+<script src="lib/demo.js?v=68e3cb36"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8a2565f0"></script>
-<script src="lib/course-view.js?v=bb2e63e2"></script>
-<script src="lib/race-core.js?v=783d6b2f"></script>
+<script src="lib/course-view.js?v=9a7a055a"></script>
+<script src="lib/race-core.js?v=4e37575c"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -1001,7 +1001,7 @@
         pitSec = c.currentPitSeconds;
       }
       const pitCell = l.skipped ? '–' : pitSec != null
-        ? Race.fmt.durationShort(pitSec) + (next ? '' : ' <span style="color: var(--accent); font-size: 9px;">●</span>')
+        ? Race.fmt.durationShort(pitSec) + (next ? '' : ' <span style="color: var(--accent); font-size: 11px;">●</span>')
         : '–';
       // A station gone by with no check-in: no time it was reached, and one
       // time for the stretch, on its first leg.
@@ -1259,7 +1259,7 @@
         <div class="legs-section">
           <div class="legs-head">
             <span class="legs-title">${cfg.courseType === 'loops' ? 'Lap Status' : 'Segments'}</span>
-            <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted);">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted);">
               ${c.timed
                 ? `${c.legsDone} done${c.status !== 'finished' && c.timeLeftSec ? ` · ${hmLeft(c.timeLeftSec)} left` : ''}`
                 : `${c.legsDone} done · ${c.totalLegs - c.legsDone} to go`}

@@ -33,7 +33,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=b55e7946">
+<link rel="stylesheet" href="lib/race-theme.css?v=6a95c972">
 <style>
   .wrap { max-width: 860px; margin: 0 auto; }
   .section {
@@ -51,7 +51,7 @@
     font-weight: 600; letter-spacing: -0.01em;
   }
   .section-status {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted);
     display: flex; align-items: center; gap: 8px;
   }
@@ -75,10 +75,10 @@
   .loop-head, .loop-dims { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
   .loop-head input[data-k="name"] { flex: 1 1 140px; min-width: 0; font-weight: 600; }
   .loop-field { display: inline-flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace;
-    font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
   .loop-field input { width: 88px; }
   .loop-field input[readonly] { opacity: 0.6; }
-  .loop-sub { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase;
+  .loop-sub { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase;
     color: var(--text-muted); margin: 6px 0; }
   .loop-note { font-size: 11px; color: var(--text-muted); margin: 0 0 8px; }
   .loop-file { margin: 4px 0 8px; }
@@ -103,12 +103,13 @@
   .radio-content .desc {
     display: block; font-size: 12px; color: var(--text-dim); margin-top: 6px;
   }
+  .radio-content .desc a { color: var(--accent); }
 
   table.list {
     width: 100%; border-collapse: collapse; margin-bottom: 12px;
   }
   table.list th {
-    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted);
     text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border);
     font-weight: 500;
@@ -138,7 +139,7 @@
     #runner-table tbody td { display: block; padding: 0; border: 0; width: auto; }
     #runner-table td.name-cell { grid-column: 1 / -1; }
     #runner-table td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 5px;
-      font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.18em;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em;
       text-transform: uppercase; color: var(--text-muted); }
     #runner-table input[type="text"], #runner-table select { font-size: 16px; padding: 11px 12px; width: 100%; }
     #runner-table input[type="color"] { height: 44px; }
@@ -149,13 +150,13 @@
   /* The date and time above sit in a div rather than a label, having two
      controls, and get the same small heading the labelled fields have. */
   div.field { display: block; margin-bottom: 14px; }
-  div.field > .lbl { display: block; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  div.field > .lbl { display: block; font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
   div.field > .hint { display: block; font-size: 11px; color: var(--text-muted); margin-top: 4px; }
   .aid-opts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 0 0 10px; }
   .aid-chip {
     display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
-    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.06em;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em;
     padding: 5px 9px; border-radius: 3px; white-space: nowrap;
     border: 1px solid var(--border-bright); color: var(--text-muted); background: var(--bg-elevated);
   }
@@ -202,7 +203,7 @@
   }
   .fuel-items { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 16px; }
   .sub-title {
-    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted);
     margin-bottom: 8px;
   }
@@ -226,7 +227,7 @@
   #band-table th:last-child, #band-table td:last-child { width: 46px; }
   .th-unit {
     display: block; text-transform: lowercase; letter-spacing: 0.05em;
-    font-size: 9px; color: var(--text-muted); font-weight: 400; margin-top: 2px;
+    font-size: 11px; color: var(--text-muted); font-weight: 400; margin-top: 2px;
   }
   .table-scroll th { white-space: nowrap; }
   /* The aid tables were the only ones on this page not wrapped, and they got
@@ -752,7 +753,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=783d6b2f"></script>
+<script src="lib/race-core.js?v=4e37575c"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
