@@ -125,7 +125,7 @@ Made after racing Sangre de Cristo 100 self-crewed.
 
 Quesadilla at mile 60? 🌮
 
-Aid stations never have what you planned for. The write-in box handles everything that isn't a button: what you ate, a sock change, taped a hot spot. Type it, hit Log, keep moving.
+Aid stations never have what you planned for. The write-in box handles everything that isn't a button: what you ate, a sock change, taped a hot spot. Tap the mic and say it, or type it, then hit Log and keep moving.
 
 #ultrarunning #aidstationfood #trailrunning #selfsupported #100miler #sendoff
 

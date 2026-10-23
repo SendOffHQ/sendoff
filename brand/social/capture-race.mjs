@@ -92,11 +92,25 @@ const SHOTS = {
   'racer': { page: 'racer.html', at: MID, signedIn: true, media: true },
   'racer-reorder': { page: 'racer.html', at: MID, signedIn: true, media: true,
     scrollTo: '#reorder-toggle', scrollPad: 80, prep: page => click(page, '#reorder-toggle') },
+  // One note typed and logged, the next being said: the mic is on and the
+  // words are landing in the box. The capture browser's own recogniser has no
+  // speech service behind it and stops at once, so a stand-in takes both of
+  // its names: it hears one sentence and keeps listening, the way a phone does
+  // while somebody is still talking.
   'racer-jot': { page: 'racer.html', at: MID, signedIn: true, media: true, scrollTo: '#jot-form', scrollPad: 330,
+    init: () => {
+      window.SpeechRecognition = window.webkitSpeechRecognition = class {
+        start() { queueMicrotask(() => this.onresult && this.onresult({ results: [[{ transcript: 'Half a quesadilla' }]] })); }
+        stop() { this.onend && this.onend(); }
+      };
+    },
     prep: async page => {
-      for (const note of ['Half a quesadilla and broth', 'New socks, taped left heel']) {
-        await page.fill('#jot', note); await click(page, '#jot-send');
-      }
+      await page.fill('#jot', 'New socks, taped left heel'); await click(page, '#jot-send');
+      await click(page, '#jot-mic');
+      const heard = await page.evaluate(() => [document.getElementById('jot').value, document.getElementById('jot-mic').className]);
+      if (heard[0] !== 'Half a quesadilla' || !/\bon\b/.test(heard[1])) throw new Error('the mic did not hear it: ' + heard);
+      // Caught at the pulse's rest, so the red disc is drawn whole.
+      await page.addStyleTag({ content: '.rjot-mic.on { animation: none; }' });
     } },
   // Shorter, so the no-signal banner along the bottom sits inside the frame.
   'racer-offline': { page: 'racer.html', at: MID, signedIn: true, media: true, height: 700,
