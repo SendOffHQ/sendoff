@@ -121,9 +121,39 @@ ok('on pace, with the margin', await racePage(), { badge: 'On Pace', goal: `Goal
 ok('and on the racer screen', await racerLine(), [`On pace for your 30:00 goal · ${by} under`, 'ok']);
 await setGoal({ hours: 27 });
 ok('inside the last 2.5% of it: tight', (await racePage()).badge, 'Tight');
+
+// Reported 2026-10-25: a goal set for Lake Murray, and nothing for it on the
+// chart. The cumulative chart draws a dotted line where the goal would put
+// the racer, shared over the legs by distance and climb.
+console.log('\non the charts');
+await setGoal({ hours: 30 });
+const chart = async () => {
+  await page.goto(BASE + `/charts.html?id=${SLUG}`);
+  await page.waitForSelector('#chart-cum path.data-line', { timeout: 20000 });
+  return page.evaluate(() => ({
+    lines: document.querySelectorAll('#chart-cum path.goal-line').length,
+    said: /dotted = on goal/.test(document.querySelector('#chart-cum').closest('.chart-card').textContent)
+  }));
+};
+ok('a dotted goal line on the cumulative chart, and the key says so', await chart(), { lines: 1, said: true });
+const line = await page.evaluate(async (slug) => {
+  const get = async (f) => { const r = await (await fetch(`/api/get?path=races/${slug}/${f}`, { headers: { Authorization: 'Bearer stub' } })).json();
+    return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(r.content), c => c.charCodeAt(0)))); };
+  const cfg = await get('config.json');
+  const pts = Race.charts.goalLine(cfg, cfg.runners[0], 0, 38);
+  const end = pts[pts.length - 1];
+  const rates = pts.slice(1).map((p, i) => (p.y - pts[i].y) / (p.x - pts[i].x)).filter(Number.isFinite);
+  return { end: [Math.round(end.x * 100) / 100, Math.round(end.y * 10) / 10], total: Math.round(Race.course.totalDistanceMi(cfg) * 10) / 10,
+    rising: pts.every((p, i) => !i || (p.x >= pts[i - 1].x && p.y >= pts[i - 1].y)),
+    bends: Math.max(...rates) - Math.min(...rates) > 0.1 };
+}, SLUG);
+ok('it reaches the finish at the goal time', line.end, [30, line.total]);
+ok('climbing all the way, slower on the climbs than the flat', [line.rising, line.bends], [true, true]);
+
 console.log('\nno goal');
 await setGoal(undefined);
 ok('held to the cutoff alone, as before', await racePage(), { badge: 'On Pace', goal: null, cls: '' });
+ok('and no goal line on the chart', (await chart()).lines, 0);
 
 console.log('\na timed race');
 // Two 15-mile laps in six hours of a 24-hour race: 120 miles at the end.

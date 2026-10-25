@@ -67,6 +67,7 @@
   .chart-svg .grid line { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 4; opacity: 0.6; }
   .chart-svg .data-line { fill: none; stroke-width: 2; }
   .chart-svg .data-line.projection { stroke-dasharray: 7 5; opacity: 0.55; }
+  .chart-svg .data-line.goal-line { stroke-dasharray: 0 6; stroke-linecap: round; stroke-width: 3; opacity: 0.8; }
   .chart-svg .data-dot  { stroke-width: 0; }
   .chart-svg .projection-dot { opacity: 0.85; }
   .chart-svg .target { stroke: var(--yellow); stroke-width: 1; stroke-dasharray: 4 4; fill: none; }
@@ -110,7 +111,7 @@
   <span>Charts auto-refresh every 30s</span>
 </footer>
 
-<script src="lib/race-core.js?v=6f5dd06e"></script>
+<script src="lib/race-core.js?v=9e26e2a5"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
