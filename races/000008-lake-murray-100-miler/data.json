@@ -1,0 +1,122 @@
+{
+  "lastUpdated": "2026-10-25T18:36:46.356Z",
+  "runners": [
+    {
+      "id": "fajita-brandon-konen",
+      "legs": [
+        {
+          "index": 1,
+          "startTime": "2026-10-24T11:00:26.263Z",
+          "endTime": "2026-10-24T12:05:03.122Z"
+        },
+        {
+          "index": 2,
+          "startTime": "2026-10-24T12:07:06.079Z",
+          "feelOut": "good",
+          "endTime": "2026-10-24T13:17:21.837Z",
+          "feelIn": "good"
+        },
+        {
+          "index": 3,
+          "startTime": "2026-10-24T13:18:17.385Z",
+          "feelOut": "good",
+          "endTime": "2026-10-24T14:25:49.529Z"
+        },
+        {
+          "index": 4,
+          "startTime": "2026-10-24T14:28:46.417Z",
+          "endTime": "2026-10-24T15:41:55.022Z",
+          "feelIn": "good"
+        },
+        {
+          "index": 5,
+          "startTime": "2026-10-24T15:46:00.903Z",
+          "feelOut": "good",
+          "endTime": "2026-10-24T17:00:11.571Z"
+        },
+        {
+          "index": 6,
+          "startTime": "2026-10-24T17:13:32.519Z",
+          "endTime": "2026-10-24T18:16:40.549Z"
+        },
+        {
+          "index": 7,
+          "startTime": "2026-10-24T18:21:41.000Z",
+          "feelOut": "good",
+          "endTime": "2026-10-24T19:41:58.340Z"
+        },
+        {
+          "index": 8,
+          "startTime": "2026-10-24T19:42:53.330Z",
+          "endTime": "2026-10-24T21:03:47.671Z",
+          "feelIn": "ok"
+        },
+        {
+          "index": 9,
+          "startTime": "2026-10-24T21:09:23.122Z",
+          "feelOut": "ok",
+          "endTime": "2026-10-24T22:38:02.080Z"
+        },
+        {
+          "index": 10,
+          "startTime": "2026-10-24T22:47:23.055Z",
+          "feelOut": "ok",
+          "endTime": "2026-10-25T00:25:14.498Z"
+        },
+        {
+          "index": 11,
+          "startTime": "2026-10-25T00:26:47.580Z",
+          "feelOut": "ok",
+          "endTime": "2026-10-25T01:55:19.766Z"
+        },
+        {
+          "index": 12,
+          "startTime": "2026-10-25T01:57:10.047Z",
+          "feelOut": "ok",
+          "endTime": "2026-10-25T03:50:33.441Z",
+          "feelIn": "rough"
+        },
+        {
+          "index": 13,
+          "startTime": "2026-10-25T03:59:33.041Z",
+          "feelOut": "rough",
+          "endTime": "2026-10-25T06:09:54.126Z",
+          "skipped": true
+        },
+        {
+          "index": 14,
+          "startTime": "2026-10-25T06:09:54.126Z",
+          "endTime": "2026-10-25T08:29:22.785Z",
+          "skipped": true
+        },
+        {
+          "index": 15,
+          "startTime": "2026-10-25T08:29:22.785Z",
+          "endTime": "2026-10-25T10:53:11.262Z",
+          "skipped": true
+        },
+        {
+          "index": 16,
+          "startTime": "2026-10-25T10:53:11.262Z",
+          "endTime": "2026-10-25T12:52:44.199Z",
+          "skipped": true
+        },
+        {
+          "index": 17,
+          "startTime": "2026-10-25T12:52:44.199Z",
+          "endTime": "2026-10-25T15:01:03.756Z"
+        },
+        {
+          "index": 18,
+          "startTime": "2026-10-25T15:01:30.039Z",
+          "endTime": "2026-10-25T18:36:44.117Z"
+        },
+        {
+          "index": 19,
+          "startTime": "2026-10-25T18:36:45.349Z",
+          "endTime": "2026-10-25T18:36:46.199Z"
+        }
+      ]
+    }
+  ]
+}
