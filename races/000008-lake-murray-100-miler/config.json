@@ -1,0 +1,344 @@
+{
+  "name": "Lake Murray 100 Miler",
+  "location": "Lake Murray State Park, Ardmore, OK",
+  "startTime": "2026-10-24T06:00:00-05:00",
+  "timezone": "America/Chicago",
+  "courseType": "segments",
+  "activity": "trail-run",
+  "units": {
+    "distance": "mi",
+    "elevation": "ft"
+  },
+  "visibility": "public",
+  "cutoffs": {
+    "totalHours": 32
+  },
+  "course": {
+    "segments": [
+      {
+        "name": "Start · Tipps Point → Buzzards Roost 1",
+        "fromAid": "Start · Tipps Point",
+        "toAid": "Buzzards Roost 1",
+        "distanceMi": 4.7,
+        "elevationGainFt": 489,
+        "elevationLossFt": 387,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": "Under 5 mi drive: 77 S about 2 mi then left into Buzzards Roost campground; parking limited",
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Buzzards Roost 1 → Tucker Tower 1",
+        "fromAid": "Buzzards Roost 1",
+        "toAid": "Tucker Tower 1",
+        "distanceMi": 5.3,
+        "elevationGainFt": 242,
+        "elevationLossFt": 350,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": "Crew only 8:30 AM to 4:30 PM while the tower is open; busy with park visitors",
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Tucker Tower 1 → Buzzards Roost 2",
+        "fromAid": "Tucker Tower 1",
+        "toAid": "Buzzards Roost 2",
+        "distanceMi": 5.3,
+        "elevationGainFt": 271,
+        "elevationLossFt": 148,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Buzzards Roost 2 → Tipps Point 1",
+        "fromAid": "Buzzards Roost 2",
+        "toAid": "Tipps Point 1",
+        "distanceMi": 5.6,
+        "elevationGainFt": 432,
+        "elevationLossFt": 539,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Tipps Point 1 → Tipps Point 2",
+        "fromAid": "Tipps Point 1",
+        "toAid": "Tipps Point 2",
+        "distanceMi": 5.6,
+        "elevationGainFt": 524,
+        "elevationLossFt": 527,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": "After the 5.6 mi Elephant Rock loop",
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Tipps Point 2 → Buzzards Roost 3",
+        "fromAid": "Tipps Point 2",
+        "toAid": "Buzzards Roost 3",
+        "distanceMi": 4.7,
+        "elevationGainFt": 485,
+        "elevationLossFt": 387,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Buzzards Roost 3 → Tucker Tower 2",
+        "fromAid": "Buzzards Roost 3",
+        "toAid": "Tucker Tower 2",
+        "distanceMi": 5.3,
+        "elevationGainFt": 212,
+        "elevationLossFt": 286,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": "Crew only 8:30 AM to 4:30 PM",
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Tucker Tower 2 → Buzzards Roost 4",
+        "fromAid": "Tucker Tower 2",
+        "toAid": "Buzzards Roost 4",
+        "distanceMi": 5.3,
+        "elevationGainFt": 271,
+        "elevationLossFt": 148,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Buzzards Roost 4 → Tipps Point 3",
+        "fromAid": "Buzzards Roost 4",
+        "toAid": "Tipps Point 3",
+        "distanceMi": 5.6,
+        "elevationGainFt": 467,
+        "elevationLossFt": 555,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": null,
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Tipps Point 3 → Tipps Point 4",
+        "fromAid": "Tipps Point 3",
+        "toAid": "Tipps Point 4",
+        "distanceMi": 5.6,
+        "elevationGainFt": 524,
+        "elevationLossFt": 527,
+        "arriveCutoffHours": 16.5,
+        "crewAccess": true,
+        "crewNote": "Pacers start here (mile 53 or after dark)",
+        "pacerEligible": true,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Tipps Point 4 → Buzzards Roost 5",
+        "fromAid": "Tipps Point 4",
+        "toAid": "Buzzards Roost 5",
+        "distanceMi": 4.7,
+        "elevationGainFt": 435,
+        "elevationLossFt": 454,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": null,
+        "pacerEligible": true,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Buzzards Roost 5 → Tucker Tower 3",
+        "fromAid": "Buzzards Roost 5",
+        "toAid": "Tucker Tower 3",
+        "distanceMi": 5.3,
+        "elevationGainFt": 242,
+        "elevationLossFt": 262,
+        "arriveCutoffHours": null,
+        "crewAccess": false,
+        "crewNote": "Closed to crew at night",
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Tucker Tower 3 → Buzzards Roost 6",
+        "fromAid": "Tucker Tower 3",
+        "toAid": "Buzzards Roost 6",
+        "distanceMi": 5.3,
+        "elevationGainFt": 299,
+        "elevationLossFt": 148,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": null,
+        "pacerEligible": true,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Buzzards Roost 6 → Tipps Point 5",
+        "fromAid": "Buzzards Roost 6",
+        "toAid": "Tipps Point 5",
+        "distanceMi": 5.6,
+        "elevationGainFt": 391,
+        "elevationLossFt": 539,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": null,
+        "pacerEligible": true,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Tipps Point 5 → Tipps Point 6",
+        "fromAid": "Tipps Point 5",
+        "toAid": "Tipps Point 6",
+        "distanceMi": 5.6,
+        "elevationGainFt": 577,
+        "elevationLossFt": 527,
+        "arriveCutoffHours": 24.5,
+        "crewAccess": true,
+        "crewNote": null,
+        "pacerEligible": true,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Tipps Point 6 → Buzzards Roost 7",
+        "fromAid": "Tipps Point 6",
+        "toAid": "Buzzards Roost 7",
+        "distanceMi": 4.7,
+        "elevationGainFt": 435,
+        "elevationLossFt": 459,
+        "arriveCutoffHours": null,
+        "crewAccess": true,
+        "crewNote": null,
+        "pacerEligible": true,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Buzzards Roost 7 → Tucker Tower 4",
+        "fromAid": "Buzzards Roost 7",
+        "toAid": "Tucker Tower 4",
+        "distanceMi": 5.3,
+        "elevationGainFt": 212,
+        "elevationLossFt": 229,
+        "arriveCutoffHours": 27.75,
+        "crewAccess": true,
+        "crewNote": "Crew from 8:30 AM",
+        "pacerEligible": false,
+        "dropBag": false,
+        "checkpoint": false
+      },
+      {
+        "name": "Tucker Tower 4 → Buzzards Roost 8",
+        "fromAid": "Tucker Tower 4",
+        "toAid": "Buzzards Roost 8",
+        "distanceMi": 5.3,
+        "elevationGainFt": 352,
+        "elevationLossFt": 214,
+        "arriveCutoffHours": 30,
+        "crewAccess": true,
+        "crewNote": null,
+        "pacerEligible": true,
+        "dropBag": true,
+        "checkpoint": false
+      },
+      {
+        "name": "Buzzards Roost 8 → Finish · Tipps Point",
+        "fromAid": "Buzzards Roost 8",
+        "toAid": "Finish · Tipps Point",
+        "distanceMi": 5.6,
+        "elevationGainFt": 391,
+        "elevationLossFt": 542,
+        "arriveCutoffHours": 32,
+        "crewAccess": true,
+        "crewNote": "32 hour limit",
+        "pacerEligible": false,
+        "dropBag": true,
+        "checkpoint": false
+      }
+    ],
+    "startAid": {
+      "crewAccess": true,
+      "crewNote": "Start/finish pavilion off Cisco Rd; crew canopies on the grass to the right",
+      "pacerEligible": false,
+      "dropBag": true
+    },
+    "elevationGainFt": 7250
+  },
+  "runners": [
+    {
+      "id": "fajita-brandon-konen",
+      "name": "Fajita",
+      "bib": "Fajita (Brandon Konen)",
+      "color": "#0a8b92",
+      "goal": {
+        "hours": 30
+      },
+      "targets": {
+        "caloriesPerHour": 250,
+        "fluidOzPerHour": 20,
+        "sodiumMgPerHour": 500
+      },
+      "phaseTargets": [],
+      "crewNotes": ""
+    }
+  ],
+  "fuelMetrics": [
+    {
+      "key": "calories",
+      "label": "Calories",
+      "unit": "cal",
+      "short": "Cal",
+      "decimals": 0,
+      "step": 10
+    },
+    {
+      "key": "fluidOz",
+      "label": "Fluid",
+      "unit": "oz",
+      "short": "Fluid",
+      "decimals": 1,
+      "step": 1
+    },
+    {
+      "key": "sodiumMg",
+      "label": "Sodium",
+      "unit": "mg",
+      "short": "Na",
+      "decimals": 0,
+      "step": 50
+    }
+  ],
+  "fuelPresets": [],
+  "phaseTargets": [],
+  "targets": {
+    "caloriesPerHour": 250,
+    "fluidOzPerHour": 20,
+    "sodiumMgPerHour": 500
+  }
+}
