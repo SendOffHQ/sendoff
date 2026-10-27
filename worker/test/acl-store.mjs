@@ -138,6 +138,35 @@ const anonRes = await call('/get?path='+encodeURIComponent(`races/${SLUG}/config
 const anonCfg = JSON.parse(Buffer.from((await anonRes.json()).content,'base64').toString('utf8'));
 ok('an anonymous reader sees no addresses', anonCfg.runners.map(r => r.email), [undefined, undefined]);
 
+console.log('\nthe crew assigned to each runner are addresses too');
+// Several athletes on one race, each with their own crew: the crew page shows
+// somebody only the runners they look after.
+const shaNow = (await (await call('/get?path='+encodeURIComponent(`races/${SLUG}/config.json`), { token: t3 })).json()).sha;
+const crewSave = await call('/commit', { token: t3, body: { path: `races/${SLUG}/config.json`, sha: shaNow,
+  content: JSON.stringify({ ...legacyCfg, name:'Saved',
+    runners:[{ id:'a', name:'A', email: OWNER, crew: [CREW, ' Crew@Example.com '] }, { id:'b', name:'B', crew: [] }] }), message:'save' } });
+ok('saved', crewSave.status, 200);
+ok('none in the stored file', storedCfg().runners.map(r => r.crew), [undefined, undefined]);
+ok('kept in KV, tidied, by runner', JSON.parse(kv.get('acl:'+SLUG)).runnerCrew, { a: [CREW] });
+const crewTok = await login(CREW);
+const asCrew = await call('/get?path='+encodeURIComponent(`races/${SLUG}/config.json`), { token: crewTok });
+const crewCfg = JSON.parse(Buffer.from((await asCrew.json()).content,'base64').toString('utf8'));
+ok('crew reading the race are told who looks after whom', crewCfg.runners.map(r => r.crew || null), [[CREW], null]);
+const anon2 = await call('/get?path='+encodeURIComponent(`races/${SLUG}/config.json`));
+const anonCfg2 = JSON.parse(Buffer.from((await anon2.json()).content,'base64').toString('utf8'));
+ok('an anonymous reader is not', anonCfg2.runners.map(r => r.crew), [undefined, undefined]);
+await call('/access/add', { token: t3, body: { slug: SLUG, email: OUT, role: 'pacer' } });
+ok('and a change to who is on the race keeps them', JSON.parse(kv.get('acl:'+SLUG)).runnerCrew, { a: [CREW] });
+const save2 = async (runners) => {
+  const sha = (await (await call('/get?path='+encodeURIComponent(`races/${SLUG}/config.json`), { token: t3 })).json()).sha;
+  return (await call('/commit', { token: t3, body: { path: `races/${SLUG}/config.json`, sha,
+    content: JSON.stringify({ ...legacyCfg, name:'Saved', runners }), message:'save' } })).status;
+};
+await save2([{ id:'a', name:'A', email: OWNER }, { id:'b', name:'B' }]);
+ok('a save that does not mention crew leaves them alone', JSON.parse(kv.get('acl:'+SLUG)).runnerCrew, { a: [CREW] });
+await save2([{ id:'a', name:'A', email: OWNER, crew: [] }, { id:'b', name:'B', crew: [OUT] }]);
+ok('an empty list clears them, a new one sets them', JSON.parse(kv.get('acl:'+SLUG)).runnerCrew, { b: [OUT] });
+
 console.log('\nwithout KV, nobody is locked out');
 reset();
 const noKv = { ...env, AUTH_KV: undefined };

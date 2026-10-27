@@ -247,6 +247,13 @@
 
   .runner-shown { font-size: 12px; color: var(--text-muted); margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .runner-shown strong { color: var(--text); }
+  /* Which crew look after this racer: the crew page shows each of them only
+     the racers they are assigned to. */
+  .runner-crew { margin-top: 8px; font-size: 12px; }
+  .runner-crew summary { cursor: pointer; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; padding: 6px 0; }
+  .runner-crew summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+  .runner-crew label { display: flex; align-items: center; gap: 8px; padding: 6px 0; color: var(--text); min-height: 32px; }
+  .runner-crew .hint { color: var(--text-muted); margin: 4px 0 2px; line-height: 1.5; }
   .runner-use-name { background: none; border: 1px solid var(--accent); color: var(--accent); border-radius: 3px;
     padding: 3px 8px; font: 600 11px 'JetBrains Mono', monospace; cursor: pointer; }
 
@@ -640,6 +647,9 @@
   // invited as a racer, with the name off their account. Fetched once so the
   // runner rows can offer them without waiting for the access panel to open.
   let accountPeople = [];
+  // Everyone who works the race and could look after a racer: the creator and
+  // anyone on it as crew or pacer.
+  let crewPeople = [];
 
   async function loadAccountPeople() {
     if (!Race.auth.has() || !Race.hub.isProxyMode()) return;
@@ -657,6 +667,14 @@
         out.push({ email, role: p.role, displayName: p.displayName || '' });
       }
       accountPeople = out;
+      const crew = [];
+      if (s.createdBy) crew.push({ email: String(s.createdBy).toLowerCase(), role: 'owner', displayName: s.createdByName || '' });
+      for (const p of (s.people || [])) {
+        const email = String(p.email || '').toLowerCase();
+        if (!email || email === String(s.createdBy || '').toLowerCase()) continue;
+        if (p.role === 'crew' || p.role === 'pacer') crew.push({ email, role: p.role, displayName: p.displayName || '' });
+      }
+      crewPeople = crew;
       // The rows can offer the roster now, and the goals picker can say who
       // people are rather than only what their address is.
       if (editingRunners) { renderRunnerRows(); renderProfilePicker(); }
@@ -664,7 +682,26 @@
       // No signal, or not allowed to read the roster. The rows fall back to a
       // plain name field, which is what they were before this existed.
       accountPeople = [];
+      crewPeople = [];
     }
+  }
+
+  // Who looks after this racer. Only with two racers or more: with one, the
+  // crew page has nobody else to hide.
+  function runnerCrewCell(r, i) {
+    if (editingRunners.length < 2 || !crewPeople.length) return '';
+    const mine = new Set((r.crew || []).map(e => String(e).toLowerCase()));
+    const rows = crewPeople.map(p => `<label><input type="checkbox" data-crew-for="${i}" value="${escapeAttr(p.email)}"${mine.has(p.email) ? ' checked' : ''} />` +
+      `${escapeHtml(personName(p))}${p.role === 'owner' ? ' (owner)' : p.role === 'pacer' ? ' (pacer)' : ''}</label>`);
+    // Assigned and since taken off the race: still shown, so a save never drops it unseen.
+    for (const e of mine) if (!crewPeople.some(p => p.email === e)) {
+      rows.push(`<label><input type="checkbox" data-crew-for="${i}" value="${escapeAttr(e)}" checked />${escapeHtml(e)} (no longer on this race)</label>`);
+    }
+    const names = crewPeople.filter(p => mine.has(p.email)).map(personName);
+    const said = names.length ? names.join(', ') : 'everyone';
+    return `<details class="runner-crew"><summary>Crew: ${escapeHtml(said)}</summary>` +
+      `<p class="hint">Ticked crew see only their racers on the crew page. Nobody ticked: every crew member sees this racer.</p>` +
+      rows.join('') + `</details>`;
   }
 
   // What to call someone: the name off their profile, or the part of their
@@ -743,6 +780,7 @@
       editingRunners = (cfg.runners || []).map(r => ({
         key: r.id, id: r.id, name: r.name || '', bib: r.bib || '',
         color: r.color || RUNNER_COLORS[0], email: r.email || '',
+        crew: Array.isArray(r.crew) ? r.crew.map(e => String(e).toLowerCase()) : [],
         // Only a goal this race can use: one of the other kind, left from
         // before the format changed, is not offered back to be saved again.
         goal: Race.goal.of(cfg, r) ? Race.goal.text(r.goal, cfg) : ''
@@ -1005,6 +1043,8 @@
         // racer can be assigned to a runner without a reload.
         onRosterChanged: (panel) => {
           accountPeople = panel.racers();
+          // Somebody added as crew can be given racers straight away.
+          loadAccountPeople();
           if (editingRunners) renderRunnerRows();
           // The panel now knows who made the race, which is what decides
           // whether the delete section exists at all.
@@ -1387,7 +1427,7 @@
     const tbody = document.getElementById('runner-edit-rows');
     tbody.innerHTML = editingRunners.map((r, i) => `
       <tr>
-        <td class="name-cell" data-label="Racer ${i + 1}">${runnerNameCell(r, i)}</td>
+        <td class="name-cell" data-label="Racer ${i + 1}">${runnerNameCell(r, i)}${runnerCrewCell(r, i)}</td>
         <td data-label="Bib / label"><input type="text" data-runner="${i}" data-k="bib" value="${escapeAttr(r.bib)}" placeholder="#42" aria-label="Racer ${i + 1} bib or label" /></td>
         <td data-label="Goal"><input type="text" data-runner="${i}" data-k="goal" aria-label="Racer ${i + 1} goal" value="${escapeAttr(r.goal || '')}" placeholder="${escapeAttr(Race.goal.placeholder(cfg))}"
                    aria-label="Goal (optional)" class="goal-in" /></td>
@@ -1437,6 +1477,8 @@
       // splits it is looking at, and what picks their profile for their goals.
       const email = String(r.email || '').trim().toLowerCase();
       if (email) runner.email = email;
+      // Always sent from here, empty included: that is how a list is cleared.
+      runner.crew = (r.crew || []).slice();
       runners.push(runner);
     }
     if (!runners.length) { toast('At least one runner is required.', 'error'); return; }
@@ -2391,6 +2433,17 @@
     }
   });
 
+  document.getElementById('runner-edit-rows').addEventListener('change', (e) => {
+    const i = e.target.dataset.crewFor;
+    if (i == null) return;
+    const r = editingRunners[+i];
+    const set = new Set(r.crew || []);
+    if (e.target.checked) set.add(e.target.value); else set.delete(e.target.value);
+    r.crew = [...set];
+    const sum = e.target.closest('details').querySelector('summary');
+    const names = crewPeople.filter(p => set.has(p.email)).map(personName);
+    sum.textContent = 'Crew: ' + (names.length ? names.join(', ') : 'everyone');
+  });
   document.getElementById('runner-edit-rows').addEventListener('input', (e) => {
     const i = e.target.dataset.runner, k = e.target.dataset.k;
     if (i == null || !k || k === 'who') return;

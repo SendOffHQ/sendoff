@@ -149,6 +149,17 @@
     flex-wrap: wrap;
   }
   .runner-head > div:first-child { min-width: 0; }
+  /* Rolled up: the head, and one line of where they are. */
+  .runner.foldable .runner-head { cursor: pointer; }
+  .runner.folded .runner-head { border-bottom: 0; }
+  .runner-fold-line { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+  .runner-fold {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    background: none; border: 1px solid var(--border-bright); border-radius: 4px; color: var(--text-dim);
+    padding: 8px 12px; min-height: 36px; cursor: pointer;
+  }
+  .runner-fold:hover { color: var(--accent); border-color: var(--accent); }
+  .runner-fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .runner-name {
     font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; font-size: 32px;
     font-weight: 600; letter-spacing: -0.02em; overflow-wrap: anywhere;
@@ -1088,20 +1099,29 @@
     const allDist = Race.units.distanceVal(totalDist, cfg) || 0;
     const pctDone = allDist > 0 ? Math.min(100, Math.round(doneDist / allDist * 100)) : 0;
 
+    // With several racers each card rolls up to its head and one line, all
+    // rolled up to begin with, so the field fits on a phone and somebody
+    // following one racer opens theirs. Remembered for this viewer.
+    const fold = mergedRunners.length > 1;
+    const open = !fold || openRunners.has(runner.id);
+    const bodyId = 'runner-body-' + Race.slug(runner.id);
     return `
-      <article class="runner" style="--runner-color: ${color};">
-        <div class="runner-head">
+      <article class="runner${fold ? ' foldable' : ''}${open ? '' : ' folded'}" style="--runner-color: ${color};" data-runner-id="${escapeHtml(runner.id)}">
+        <div class="runner-head"${fold ? ` data-fold-head="${escapeHtml(runner.id)}"` : ''}>
           <div>
             <div class="runner-name">${escapeHtml(runner.name).replace(/([._])/g, '$1<wbr>')}</div>
             <div class="runner-bib">${escapeHtml(runner.bib || '')}</div>
+            ${fold && !open ? `<div class="runner-fold-line">${c.timed ? `${doneDist.toFixed(1)} ${Race.units.distanceLabel(cfg)}` : `${doneDist.toFixed(1)} / ${allDist.toFixed(1)} ${Race.units.distanceLabel(cfg)}`} · <span class="live-timer" data-base="${c.completedRaceSec}" data-since="${c.liveSince || ''}">${Race.fmt.duration(c.raceSec)}</span></div>` : ''}
           </div>
           <div class="runner-head-right">
             ${c.status === 'finished'
               ? `<button class="finish-card-btn" type="button" data-card="${escapeHtml(runner.id)}">Finish card</button>` : ''}
             <span class="status-badge status-${c.status}">${statusLabel(c.status, c)}</span>
+            ${fold ? `<button class="runner-fold" type="button" data-fold="${escapeHtml(runner.id)}" aria-expanded="${open}" aria-controls="${bodyId}">${open ? 'Hide' : 'Show'}</button>` : ''}
           </div>
         </div>
 
+        <div class="runner-body" id="${bodyId}"${open ? '' : ' hidden'}>
         <div class="stats">
           ${isSimpleLoop() ? `
           <div class="stat">
@@ -1286,6 +1306,7 @@
               <tbody>${legLog(runner, c)}</tbody>
             </table>
           </div>
+        </div>
         </div>
       </article>
     `;
@@ -1529,6 +1550,24 @@
   // own slow timer and belong inside the leg log, so they need to be able to
   // redraw what is already on screen without going back to the network for
   // splits that have not changed.
+  const OPEN_KEY = 'race-open:' + slug;
+  let openRunners = new Set();
+  try { openRunners = new Set(JSON.parse(localStorage.getItem(OPEN_KEY) || '[]')); } catch (e) {}
+  function toggleRunner(id) {
+    if (openRunners.has(id)) openRunners.delete(id); else openRunners.add(id);
+    try { localStorage.setItem(OPEN_KEY, JSON.stringify([...openRunners])); } catch (e) {}
+    drawRunners();
+    const btn = document.querySelector(`#runners [data-fold="${CSS.escape(id)}"]`);
+    if (btn) btn.focus();
+  }
+  document.getElementById('runners').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-fold]');
+    if (btn) { toggleRunner(btn.dataset.fold); return; }
+    // The head opens it too, except where it holds a button of its own.
+    const head = e.target.closest('[data-fold-head]');
+    if (head && !e.target.closest('button, a')) toggleRunner(head.dataset.foldHead);
+  });
+
   function drawRunners() {
     const container = document.getElementById('runners');
     if (!container || !cfg) return;

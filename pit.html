@@ -91,6 +91,11 @@
     color: var(--text-dim);
   }
   .where strong { color: var(--text); }
+  /* Whose racers this board is showing, on a race with several. */
+  .board-scope { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim);
+    margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .board-scope button { background: none; border: 0; padding: 8px 4px; min-height: 36px; cursor: pointer;
+    color: var(--accent); font: inherit; text-decoration: underline; text-underline-offset: 3px; }
   .edit-time { display: grid; gap: 10px; }
   .edit-time-clock { display: flex; gap: 8px; }
   .edit-time input[data-edit="time"] { flex: 1 1 auto; min-width: 0; font-family: 'JetBrains Mono', monospace; font-size: 18px !important; letter-spacing: 0.04em; }
@@ -1093,11 +1098,12 @@
     // cannot freeze the board.
     if (!force && pickingLeg()) { renderWaiting = true; return; }
     const runnersById = new Map((cfg.runners || []).map(r => [r.id, r]));
-    const merged = (cfg.runners || []).map(r => {
+    const all = (cfg.runners || []).map(r => {
       const dr = (data.runners || []).find(d => d.id === r.id) || { id: r.id, legs: [] };
       return { ...r, ...dr };
     });
-    document.getElementById('runners').innerHTML = merged.map(renderRunner).join('');
+    const merged = myBoard(all);
+    document.getElementById('runners').innerHTML = boardScope(all, merged) + merged.map(renderRunner).join('');
     boardRunners = merged;
     courseView.load();
     courseView.update();
@@ -1108,6 +1114,39 @@
     tick();
     updateLastUpdatedLabel();
   }
+
+  // ---------- whose racers ----------
+  // On a race with several athletes, each crew looks after some of them. A
+  // crew member assigned to racers (Settings, Racers, Crew) sees those, plus
+  // any racer nobody is assigned to; everyone else sees the whole field. One
+  // tap shows everybody, kept for the tab.
+  const SCOPE_KEY = 'pit-show-all:' + slug;
+  let showAll = false;
+  try { showAll = sessionStorage.getItem(SCOPE_KEY) === '1'; } catch (e) {}
+  function assignedToMe(all) {
+    const me = (Race.auth.email() || '').toLowerCase();
+    if (!me) return null;
+    const mine = all.filter(r => (r.crew || []).some(e => String(e).toLowerCase() === me));
+    return mine.length ? all.filter(r => mine.includes(r) || !(r.crew || []).length) : null;
+  }
+  function myBoard(all) {
+    const mine = assignedToMe(all);
+    return mine && !showAll ? mine : all;
+  }
+  function boardScope(all, shown) {
+    const mine = assignedToMe(all);
+    if (!mine || mine.length === all.length) return '';
+    return showAll
+      ? `<div class="board-scope">All ${all.length} racers · <button type="button" data-scope="mine">Just mine (${mine.length})</button></div>`
+      : `<div class="board-scope">Your racers: ${mine.length} of ${all.length} · <button type="button" data-scope="all">Show all</button></div>`;
+  }
+  document.getElementById('runners').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-scope]');
+    if (!b) return;
+    showAll = b.dataset.scope === 'all';
+    try { sessionStorage.setItem(SCOPE_KEY, showAll ? '1' : '0'); } catch (err) {}
+    render(true);
+  });
 
   // ---------- racer mode ----------
   // Someone running this race wants the racer screen, not the crew board. The

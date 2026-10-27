@@ -946,12 +946,44 @@ function runnerLinksFromConfig(cfg) {
   return out;
 }
 
+// Which crew look after which runner, on a race with several: the crew page
+// shows somebody only the runners they are assigned to. Addresses again, so
+// kept where the runner links are and never in the file. { runnerId: [email] }
+function runnerCrewFromConfig(cfg) {
+  const out = {};
+  for (const r of ((cfg && cfg.runners) || [])) {
+    if (!r || !r.id || !Array.isArray(r.crew)) continue;
+    const emails = [...new Set(r.crew.map(normalizeEmail).filter(Boolean))].slice(0, 50);
+    if (emails.length) out[r.id] = emails;
+  }
+  return out;
+}
+function cleanRunnerCrew(v) {
+  const out = {};
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return out;
+  for (const [id, list] of Object.entries(v)) {
+    if (!Array.isArray(list)) continue;
+    const emails = [...new Set(list.map(normalizeEmail).filter(Boolean))];
+    if (emails.length) out[id] = emails;
+  }
+  return out;
+}
+// The file's runners with their addresses taken out: the account link and the
+// crew assigned to them both live in KV.
+function runnersWithoutAddresses(runners) {
+  return (runners || []).map(r => {
+    if (!r || (r.email === undefined && r.crew === undefined)) return r;
+    const copy = Object.assign({}, r); delete copy.email; delete copy.crew; return copy;
+  });
+}
+
 function aclFromConfig(cfg) {
   return {
     createdBy: normalizeEmail(cfg && cfg.createdBy) || null,
     people: racePeople(cfg),
     teamCanInvite: !!(cfg && cfg.teamCanInvite),
-    runnerEmails: runnerLinksFromConfig(cfg)
+    runnerEmails: runnerLinksFromConfig(cfg),
+    runnerCrew: runnerCrewFromConfig(cfg)
   };
 }
 
@@ -981,7 +1013,8 @@ async function readAcl(env, slug) {
           }))
         : [],
       teamCanInvite: !!a.teamCanInvite,
-      runnerEmails: (a.runnerEmails && typeof a.runnerEmails === 'object') ? a.runnerEmails : {}
+      runnerEmails: (a.runnerEmails && typeof a.runnerEmails === 'object') ? a.runnerEmails : {},
+      runnerCrew: cleanRunnerCrew(a.runnerCrew)
     };
   } catch (e) {
     // Stored and unparseable. Unlike the read failing, this will not fix
@@ -1013,7 +1046,8 @@ async function aclFromD1(env, slug) {
       role: RACE_ROLES.includes(p.role) ? p.role : 'viewer'
     })),
     teamCanInvite: false,
-    runnerEmails: {}
+    runnerEmails: {},
+    runnerCrew: {}
   };
 }
 
@@ -1024,6 +1058,7 @@ async function writeAcl(env, slug, acl) {
     people: (acl.people || []).map(p => ({ email: normalizeEmail(p.email), role: p.role })),
     teamCanInvite: !!acl.teamCanInvite,
     runnerEmails: acl.runnerEmails || {},
+    runnerCrew: cleanRunnerCrew(acl.runnerCrew),
     updatedAt: new Date().toISOString()
   };
   await env.AUTH_KV.put(ACL_KEY(slug), JSON.stringify(stored));
@@ -1070,8 +1105,14 @@ function withAcl(cfg, acl) {
   out.teamCanInvite = acl.teamCanInvite;
   setRacePeople(out, acl.people);
   const links = acl.runnerEmails || {};
-  out.runners = (cfg.runners || []).map(r => (
-    r && r.id && links[r.id] ? Object.assign({}, r, { email: links[r.id] }) : r));
+  const crew = acl.runnerCrew || {};
+  out.runners = (cfg.runners || []).map(r => {
+    if (!r || !r.id || (!links[r.id] && !crew[r.id])) return r;
+    const add = {};
+    if (links[r.id]) add.email = links[r.id];
+    if (crew[r.id]) add.crew = crew[r.id].slice();
+    return Object.assign({}, r, add);
+  });
   return out;
 }
 
@@ -3223,14 +3264,12 @@ async function handleCommit(req, env, ctx) {
           createdBy: normalizeEmail(created.createdBy) || normalizeEmail(session.email),
           people: racePeople(created),
           teamCanInvite: !!created.teamCanInvite,
-          runnerEmails: runnerLinksFromConfig(created)
+          runnerEmails: runnerLinksFromConfig(created),
+          runnerCrew: runnerCrewFromConfig(created)
         };
         for (const f of ACL_FIELDS) if (f !== 'visibility') delete created[f];
         for (const f of INJECTED_FIELDS) delete created[f];
-        created.runners = (created.runners || []).map(r => {
-          if (!r || r.email === undefined) return r;
-          const copy = Object.assign({}, r); delete copy.email; return copy;
-        });
+        created.runners = runnersWithoutAddresses(created.runners);
         content = JSON.stringify(created, null, 2) + '\n';
         const words = await nameHoldWords(env, slug, created.name);
         if (words.length) holdAfter = { name: created.name, words };
@@ -3282,11 +3321,16 @@ async function handleCommit(req, env, ctx) {
       // taken out of the file. A writer can still change it: that is what the
       // settings page does when somebody picks who a runner is.
       const links = runnerLinksFromConfig(submitted);
-      submitted.runners = (submitted.runners || []).map(r => {
-        if (!r || r.email === undefined) return r;
-        const copy = Object.assign({}, r); delete copy.email; return copy;
-      });
-      aclUpdate = Object.assign(aclFromConfig(raceCfg), { runnerEmails: links });
+      // A runner saved with no crew list at all keeps the one they had: only a
+      // page that knows about assignments sends one, and an empty list is how
+      // it clears them. A page from before this existed cannot wipe them.
+      const crew = runnerCrewFromConfig(submitted);
+      const had = runnerCrewFromConfig(raceCfg);
+      for (const r of (submitted.runners || [])) {
+        if (r && r.id && r.crew === undefined && had[r.id]) crew[r.id] = had[r.id];
+      }
+      submitted.runners = runnersWithoutAddresses(submitted.runners);
+      aclUpdate = Object.assign(aclFromConfig(raceCfg), { runnerEmails: links, runnerCrew: crew });
       content = JSON.stringify(submitted, null, 2) + '\n';
       // A rename is checked as a new race's name is. One that passes lets go
       // of a race held for its old name.
