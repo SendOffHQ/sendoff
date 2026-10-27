@@ -487,6 +487,23 @@
       <p class="fuel-hint" id="copy-laps-note" role="status"></p>
     </div>
 
+    <!-- After a race: the real times for legs that were logged wrong or not
+         at all, from a CSV of just those legs. See Race.legFix. -->
+    <div class="copy-laps" id="leg-fix" hidden>
+      <div class="fuel-editor-title" style="margin-top:18px;">Correct legs from a file</div>
+      <p class="fuel-hint">For check-ins that were missed or pressed at the wrong time, with the real
+        times from a watch or the official results. Download the template, keep only the legs that
+        need fixing, put in when they arrived and when they left, and import it. Only the times in
+        the file change.</p>
+      <div class="copy-laps-row">
+        <label>Racer <select id="leg-fix-who" aria-label="The racer whose legs to correct"></select></label>
+        <button class="btn" type="button" id="leg-fix-template">Download template</button>
+        <button class="btn" type="button" id="leg-fix-pick">Import corrections</button>
+        <input type="file" id="leg-fix-file" accept=".csv,text/csv,.tsv,.txt" hidden />
+      </div>
+      <div class="fuel-hint" id="leg-fix-note" role="status"></div>
+    </div>
+
     <div class="fuel-editor">
       <div class="fuel-editor-title">Fueling</div>
       <div class="plan-for" id="plan-for" hidden>
@@ -612,7 +629,7 @@
 
 <div id="toast" role="status" aria-live="polite" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=9e26e2a5"></script>
+<script src="lib/race-core.js?v=39dec014"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -753,6 +770,7 @@
     if (!cfg || !data) return;
     fillActivity();
     renderCopyLaps();
+    renderLegFix();
     document.getElementById('aid-editor').style.display = cfg.courseType === 'segments' ? '' : 'none';
     document.getElementById('loops-editor').style.display = cfg.courseType === 'loops' ? '' : 'none';
     // With several loops, each loop's course file is in its card above.
@@ -2376,6 +2394,73 @@
     renderRunnerRows();
     renderPlanPicker();
   });
+  // ---------- correcting legs from a file ----------
+  // Once the race is over (everybody in, or past the cutoff), never during it:
+  // a file of times landing on a live race would fight the crew's check-ins.
+  function renderLegFix() {
+    const box = document.getElementById('leg-fix');
+    const people = cfg.runners || [];
+    box.hidden = !people.length || Race.raceState(cfg, data) !== 'finished';
+    if (box.hidden) return;
+    const sel = document.getElementById('leg-fix-who');
+    const keep = people.some(r => r.id === sel.value) ? sel.value : people[0].id;
+    sel.innerHTML = people.map(r =>
+      `<option value="${escapeAttr(r.id)}"${r.id === keep ? ' selected' : ''}>${escapeAttr(r.name || r.id)}</option>`).join('');
+  }
+  const legFixRunner = () => {
+    const id = document.getElementById('leg-fix-who').value;
+    return { id, name: ((cfg.runners || []).find(r => r.id === id) || {}).name || id,
+      legs: (((data.runners || []).find(d => d.id === id) || {}).legs || []) };
+  };
+  document.getElementById('leg-fix-template').addEventListener('click', () => {
+    const r = legFixRunner();
+    const blob = new Blob([Race.legFix.template(cfg, r)], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${slug}-${Race.slug(r.name)}-legs.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  document.getElementById('leg-fix-pick').addEventListener('click', () => document.getElementById('leg-fix-file').click());
+  document.getElementById('leg-fix-file').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const note = document.getElementById('leg-fix-note');
+    const r = legFixRunner();
+    const { fixes, errors } = Race.legFix.parse(await file.text(), cfg);
+    const list = (xs) => '<ul>' + xs.slice(0, 8).map(x => `<li>${escapeHtml(x)}</li>`).join('') +
+      (xs.length > 8 ? `<li>and ${xs.length - 8} more</li>` : '') + '</ul>';
+    if (errors.length) { note.innerHTML = `<strong>${escapeHtml(file.name)} was not imported.</strong> Nothing changed.${list(errors)}`; return; }
+    if (!fixes.length) { note.textContent = `${file.name} has no times in it to put in.`; return; }
+    const check = Race.legFix.apply(r.legs, fixes);
+    if (check.errors.length) { note.innerHTML = `<strong>${escapeHtml(file.name)} was not imported.</strong> With these times:${list(check.errors)}`; return; }
+    const when = (ms) => Race.tz.format(ms, cfg, { weekday: 'short', hour: 'numeric', minute: '2-digit', second: '2-digit' });
+    const lines = fixes.map(f => `Leg ${f.leg}: ` + [f.arrived != null ? `arrived ${when(f.arrived)}` : '', f.left != null ? `left ${when(f.left)}` : '']
+      .filter(Boolean).join(', '));
+    if (!confirm(`Put these times on ${r.name}'s legs?\n\n${lines.join('\n')}`)) return;
+    const pick = document.getElementById('leg-fix-pick');
+    pick.classList.add('is-busy');
+    try {
+      let done = null;
+      // Applied to the race as it is on the server, not this page's copy.
+      await Race.gh.mutateJson(Race.auth.cfg(), DATA_PATH, (remote) => {
+        remote.runners = remote.runners || [];
+        let at = remote.runners.findIndex(d => d.id === r.id);
+        if (at < 0) { remote.runners.push({ id: r.id, legs: [] }); at = remote.runners.length - 1; }
+        done = Race.legFix.apply(remote.runners[at].legs, fixes);
+        if (done.errors.length) throw new Error(done.errors[0]);
+        remote.runners[at] = { ...remote.runners[at], legs: done.legs };
+        remote.lastUpdated = new Date().toISOString();
+        return remote;
+      }, `settings: correct ${r.id}'s legs from ${file.name}`);
+      await load();
+      note.textContent = `Done: ${fixes.length} leg${fixes.length === 1 ? '' : 's'} of ${r.name}'s corrected from ${file.name}.`;
+    } catch (err) {
+      note.textContent = 'Could not put them in: ' + (err.message || err);
+    } finally { pick.classList.remove('is-busy'); }
+  });
+
   // ---------- ran together ----------
   // Offered once a race has two racers. It starts on the racer with the fewest
   // legs logged, from the one with the most, which is nearly always the pair
