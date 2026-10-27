@@ -313,6 +313,12 @@
     say into words, and it may send the recording to whoever makes it to do that: Google for
     Chrome, Apple for Safari. SendOff never receives the recording, only the words you then log,
     the same as if you had typed them.</dd>
+  <dt id="reminder">Your browser's push service</dt>
+  <dd>Only if you turn on the send-off reminder on the racer screen. Your browser gives SendOff an
+    address at its maker's push service (Google for Chrome, Apple for Safari, Mozilla for Firefox),
+    and SendOff knocks on it when a reminder is due. The knock carries nothing: no name, no race, no
+    words. Your phone then asks SendOff what to say. The push service learns only that your device
+    was sent something, and when.</dd>
   <dt>An AI you connect as crew</dt>
   <dd>Only if somebody who runs the race connects one, and only that race and that racer. See
     <a href="#ai-crew">an AI as crew</a>.</dd>
@@ -342,6 +348,17 @@
   a week after the race's cutoff or a month after it was made, whichever is later. Removing it from
   Manage access stops it at once. Whoever has the link
   can do what the assistant can, so keep it to yourself.</p>
+
+<h2 id="send-off-reminder">The send-off reminder</h2>
+<p>Off unless the racer turns it on, on the racer screen, on their own phone. It asks the phone's
+  permission to show notifications. While it is on, SendOff keeps, in Cloudflare KV, the push
+  address the browser gave it, the race and racer it is for, the address of the account that turned
+  it on, the aid station names, and which stations it has already reminded about. Every five minutes
+  the worker looks at that racer's check-ins in the race data it already holds; if they checked in
+  at a station and have not been sent off well past their usual stop, it sends one reminder for that
+  station. It works from the check-in times alone. It never asks for or uses the phone's location.
+  Turning it off deletes the record at once; otherwise it is deleted four days after it was last
+  renewed, and straight away if the push service says the address is gone.</p>
 
 <h2>What is not done</h2>
 <p>No cookies are set. Your sign-in session lives in your browser's local storage rather than a
@@ -390,6 +407,7 @@
   <tr><td>A username given up</td><td>kept back from others for 30 days</td></tr>
   <tr><td>Reactions on race photos</td><td>until taken back, or the photo, race or account is deleted</td></tr>
   <tr><td>A race name held for review</td><td>until it is let through, or the race is renamed or deleted; a name let through is remembered until the race is deleted</td></tr>
+  <tr><td>A send-off reminder</td><td>until turned off, or 4 days after the racer screen last renewed it</td></tr>
   <tr><td>Races and logged data</td><td>until deleted</td></tr>
 </table>
 
@@ -456,6 +474,6 @@
     <span aria-hidden="true"> &middot; </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=39dec014"></script>
+<script src="lib/race-core.js?v=85d905ba"></script>
 </body>
 </html>

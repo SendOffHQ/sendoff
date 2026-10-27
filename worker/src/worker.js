@@ -3073,6 +3073,185 @@ async function handleMediaReact(req, env, ctx) {
   return json({ id, ...reactionsFor(await raceReactions(env, row.slug, email), id) }, {}, env, req);
 }
 
+// ---------- a nudge for a racer who has not been sent off ----------
+// A racer checks in at an aid station and walks out without pressing the
+// send-off, so the race page shows them sat in the tent for an hour and the
+// crew at the next station have no idea they are coming. Asked for after Lake
+// Murray, where four check-ins in a row were missed in the night.
+//
+// The racer turns it on from the racer screen, which registers the phone for
+// web push. Every five minutes the scheduled run reads each registered
+// racer's legs: checked in at a station, not sent off, not the finish, and
+// there longer than twice their usual stop plus five minutes (between ten and
+// forty-five; fifteen until they have a stop to go on), it sends one push for
+// that station. Nothing is tracked and nothing about place is read: only the
+// times the race already has. The push carries no payload; the phone asks
+// /push/message for its words, so nothing about the race passes through the
+// push service. A registration lasts four days and goes when the push service
+// says the phone has gone.
+const PUSH_KEYS = 'push:vapid';
+const PUSH_INDEX = 'push:index';
+const PUSH_SUB = (h) => 'push:sub:' + h;
+const PUSH_TTL = 4 * 86400;
+const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+async function sha256Hex(text) {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+// The application server's key pair, made the first time it is needed and
+// kept in KV: the public half goes to every phone that subscribes, the
+// private half signs each push and never leaves the worker.
+async function vapidKeys(env) {
+  const have = await env.AUTH_KV.get(PUSH_KEYS);
+  if (have) {
+    const k = JSON.parse(have);
+    return { pub: k.pub, priv: await crypto.subtle.importKey('jwk', k.jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']) };
+  }
+  const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+  const pub = b64u(await crypto.subtle.exportKey('raw', pair.publicKey));
+  const jwk = await crypto.subtle.exportKey('jwk', pair.privateKey);
+  await env.AUTH_KV.put(PUSH_KEYS, JSON.stringify({ pub, jwk, createdAt: new Date().toISOString() }));
+  return { pub, priv: pair.privateKey };
+}
+async function vapidAuth(env, endpoint) {
+  const { pub, priv } = await vapidKeys(env);
+  const enc = (o) => b64u(new TextEncoder().encode(JSON.stringify(o)));
+  const head = enc({ typ: 'JWT', alg: 'ES256' }) + '.' +
+    enc({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'mailto:info@sendoff.run' });
+  const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, priv, new TextEncoder().encode(head));
+  return `vapid t=${head}.${b64u(sig)}, k=${pub}`;
+}
+// How long a racer may sit at a station before the nudge: twice their usual
+// stop and five minutes, from ten to forty-five. Seconds.
+function nudgeAfterSec(legs) {
+  const by = new Map((legs || []).filter(l => l).map(l => [l.index, l]));
+  const stops = [];
+  for (const l of by.values()) {
+    const n = by.get(l.index + 1);
+    if (l.endTime && !l.skipped && n && n.startTime) {
+      const s = (Date.parse(n.startTime) - Date.parse(l.endTime)) / 1000;
+      if (s >= 0 && s < 6 * 3600) stops.push(s);
+    }
+  }
+  if (!stops.length) return 900;
+  stops.sort((a, b) => a - b);
+  const med = stops[Math.floor(stops.length / 2)];
+  return Math.min(2700, Math.max(600, 2 * med + 300));
+}
+// Where the racer is waiting to be sent off from, or null: { legIndex, since }.
+function waitingAt(legs, totalLegs) {
+  const done = (legs || []).filter(l => l && l.endTime).sort((a, b) => a.index - b.index);
+  const last = done[done.length - 1];
+  if (!last) return null;
+  if (totalLegs && last.index >= totalLegs) return null;
+  if ((legs || []).some(l => l && l.index > last.index && l.startTime)) return null;
+  return { legIndex: last.index, since: Date.parse(last.endTime) };
+}
+
+// GET /push/key: the public key a phone subscribes with.
+async function handlePushKey(req, env) {
+  if (!env.AUTH_KV) return json({ error: 'Not configured' }, { status: 503 }, env, req);
+  return json({ key: (await vapidKeys(env)).pub }, {}, env, req);
+}
+// POST /push/subscribe  { slug, runnerId, endpoint, legs, stations: [name] }
+// The racer, or somebody who works the race, for that racer's legs.
+async function handlePushSubscribe(req, env) {
+  if (!env.AUTH_KV) return json({ error: 'Not configured' }, { status: 503 }, env, req);
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Sign in first.' }, { status: 401 }, env, req);
+  let b; try { b = await req.json(); } catch (e) { b = null; }
+  const slug = b && typeof b.slug === 'string' ? b.slug : '';
+  const runnerId = b && typeof b.runnerId === 'string' ? b.runnerId : '';
+  const endpoint = b && typeof b.endpoint === 'string' ? b.endpoint : '';
+  if (!slug || !runnerId || !/^https:\/\//.test(endpoint) || endpoint.length > 1000) {
+    return json({ error: 'Missing slug, runnerId or endpoint' }, { status: 400 }, env, req);
+  }
+  const cfg = await loadRaceConfigNow(env, slug);
+  if (!cfg) return json({ error: 'No such race' }, { status: 404 }, env, req);
+  const role = roleForRace(cfg, session.email);
+  if (!WRITING_ROLES.has(role) && !asSiteAdmin(env, session)) return json({ error: 'Not on this race' }, { status: 403 }, env, req);
+  if (!(cfg.runners || []).some(r => r && r.id === runnerId)) return json({ error: 'No such racer' }, { status: 404 }, env, req);
+  const h = await sha256Hex(endpoint);
+  const sub = {
+    endpoint, slug, runnerId, email: normalizeEmail(session.email),
+    legs: Math.max(0, Math.min(10000, +b.legs || 0)),
+    stations: Array.isArray(b.stations) ? b.stations.slice(0, 2000).map(x => String(x || '').slice(0, 80)) : [],
+    nudged: {}, createdAt: new Date().toISOString()
+  };
+  const old = await env.AUTH_KV.get(PUSH_SUB(h));
+  if (old) { try { sub.nudged = JSON.parse(old).nudged || {}; } catch (e) {} }
+  await env.AUTH_KV.put(PUSH_SUB(h), JSON.stringify(sub), { expirationTtl: PUSH_TTL });
+  const idx = JSON.parse((await env.AUTH_KV.get(PUSH_INDEX)) || '[]');
+  if (!idx.includes(h)) { idx.push(h); await env.AUTH_KV.put(PUSH_INDEX, JSON.stringify(idx.slice(-500))); }
+  return json({ ok: true }, {}, env, req);
+}
+// POST /push/unsubscribe  { endpoint }
+async function handlePushUnsubscribe(req, env) {
+  if (!env.AUTH_KV) return json({ error: 'Not configured' }, { status: 503 }, env, req);
+  let b; try { b = await req.json(); } catch (e) { b = null; }
+  const endpoint = b && typeof b.endpoint === 'string' ? b.endpoint : '';
+  if (!endpoint) return json({ error: 'Missing endpoint' }, { status: 400 }, env, req);
+  await dropPushSub(env, await sha256Hex(endpoint));
+  return json({ ok: true }, {}, env, req);
+}
+async function dropPushSub(env, h) {
+  await env.AUTH_KV.delete(PUSH_SUB(h));
+  const idx = JSON.parse((await env.AUTH_KV.get(PUSH_INDEX)) || '[]');
+  if (idx.includes(h)) await env.AUTH_KV.put(PUSH_INDEX, JSON.stringify(idx.filter(x => x !== h)));
+}
+// POST /push/message  { endpoint }: what the phone shows. Knowing the
+// endpoint, which only that phone and this worker do, is the credential.
+async function handlePushMessage(req, env) {
+  if (!env.AUTH_KV) return json({ error: 'Not configured' }, { status: 503 }, env, req);
+  let b; try { b = await req.json(); } catch (e) { b = null; }
+  const endpoint = b && typeof b.endpoint === 'string' ? b.endpoint : '';
+  const raw = endpoint ? await env.AUTH_KV.get(PUSH_SUB(await sha256Hex(endpoint))) : null;
+  if (!raw) return json({ error: 'Not subscribed' }, { status: 404 }, env, req);
+  const sub = JSON.parse(raw);
+  return json(sub.message || { title: 'SendOff', body: 'Still at the aid station? Tap to send off.', url: `/racer.html?id=${encodeURIComponent(sub.slug)}` }, {}, env, req);
+}
+// The scheduled run: every registered racer, nudged where they are waiting.
+async function runNudges(env, now = Date.now()) {
+  if (!env.AUTH_KV) return { checked: 0, sent: 0 };
+  const idx = JSON.parse((await env.AUTH_KV.get(PUSH_INDEX)) || '[]');
+  let checked = 0, sent = 0;
+  const dataCache = new Map();
+  for (const h of idx) {
+    const raw = await env.AUTH_KV.get(PUSH_SUB(h));
+    if (!raw) { await dropPushSub(env, h); continue; }
+    const sub = JSON.parse(raw);
+    checked++;
+    let data = dataCache.get(sub.slug);
+    if (data === undefined) {
+      data = null;
+      try {
+        const env0 = await readFromD1(env, `races/${sub.slug}/data.json`);
+        if (env0) data = JSON.parse(base64ToUtf8(JSON.parse(env0).content));
+      } catch (e) { data = null; }
+      dataCache.set(sub.slug, data);
+    }
+    const r = data && (data.runners || []).find(x => x && x.id === sub.runnerId);
+    if (!r || r.stoppedAt) continue;
+    const w = waitingAt(r.legs, sub.legs);
+    if (!w || sub.nudged[w.legIndex]) continue;
+    const mins = Math.round((now - w.since) / 60000);
+    if ((now - w.since) / 1000 < nudgeAfterSec(r.legs)) continue;
+    const at = sub.stations[w.legIndex - 1] || 'the aid station';
+    sub.message = { title: `Still at ${at}?`, body: `You checked in ${mins} min ago. Tap to send off when you leave.`,
+      url: `/racer.html?id=${encodeURIComponent(sub.slug)}`, tag: `${sub.slug}:${sub.runnerId}` };
+    sub.nudged[w.legIndex] = new Date(now).toISOString();
+    await env.AUTH_KV.put(PUSH_SUB(h), JSON.stringify(sub), { expirationTtl: PUSH_TTL });
+    let res = null;
+    try {
+      res = await fetch(sub.endpoint, { method: 'POST', headers: {
+        Authorization: await vapidAuth(env, sub.endpoint), TTL: '1800', Urgency: 'high', 'Content-Length': '0' } });
+    } catch (e) { res = null; }
+    if (res && (res.status === 404 || res.status === 410)) await dropPushSub(env, h);
+    else if (res && res.ok) sent++;
+  }
+  return { checked, sent };
+}
+
 // POST /media/delete  { id, slug }
 async function handleMediaDelete(req, env, ctx) {
   if (!mediaEnabled(env)) return json({ error: 'Photos are not configured.' }, { status: 503 }, env, req);
@@ -6509,8 +6688,13 @@ export default {
       }
       return json({ error: msg, unhandled: true }, { status: 500 }, env, request);
     }
+  },
+  // Every five minutes (wrangler.toml, [triggers]): the send-off nudges.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runNudges(env).catch(() => {}));
   }
 };
+export { runNudges, nudgeAfterSec, waitingAt };
 
 async function route(request, env, ctx) {
     {
@@ -6569,6 +6753,10 @@ async function route(request, env, ctx) {
     if (request.method === 'GET'  && path === '/media')           return handleMediaList(request, env);
     if (request.method === 'POST' && path === '/media/delete')    return handleMediaDelete(request, env, ctx);
     if (request.method === 'POST' && path === '/media/react')     return handleMediaReact(request, env, ctx);
+    if (request.method === 'GET'  && path === '/push/key')         return handlePushKey(request, env);
+    if (request.method === 'POST' && path === '/push/subscribe')   return handlePushSubscribe(request, env);
+    if (request.method === 'POST' && path === '/push/unsubscribe') return handlePushUnsubscribe(request, env);
+    if (request.method === 'POST' && path === '/push/message')     return handlePushMessage(request, env);
     if (request.method === 'GET'  && path === '/media-file')      return handleMediaFile(request, env);
     if (request.method === 'POST' && path === '/invite')          return handleInvite(request, env);
     if (request.method === 'POST' && path === '/share-link')      return handleShareLink(request, env);

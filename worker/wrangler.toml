@@ -4,6 +4,11 @@ compatibility_date = "2026-05-01"
 
 # Non-secret config goes here. Sensitive values are set via
 # `wrangler secret put <NAME>` so they never end up in git.
+# The send-off nudge: every five minutes the worker looks for racers who
+# checked in at an aid station and have not been sent off. See runNudges.
+[triggers]
+crons = ["*/5 * * * *"]
+
 [vars]
 GITHUB_OWNER = "SendOffHQ"
 GITHUB_REPO = "sendoff"

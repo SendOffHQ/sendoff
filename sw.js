@@ -173,6 +173,38 @@ async function cacheFirst(cacheName, request, event) {
   throw new Error('offline and not cached');
 }
 
+// The send-off nudge (worker: runNudges). A push arrives with no payload, so
+// nothing about the race passes through the push service; the words come
+// from the worker, which knows this phone by its subscription.
+async function nudgeWords() {
+  const sub = await self.registration.pushManager.getSubscription();
+  let base = '';
+  try { base = ((await (await fetch('/hub.json', { cache: 'no-store' })).json()).auth || {}).proxyUrl || ''; } catch (e) {}
+  if (sub && base) {
+    try {
+      const r = await fetch(base.replace(/\/$/, '') + '/push/message', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) });
+      if (r.ok) return await r.json();
+    } catch (e) {}
+  }
+  return { title: 'SendOff', body: 'Still at the aid station? Tap to send off when you leave.', url: '/racer.html' };
+}
+self.addEventListener('push', (event) => {
+  event.waitUntil(nudgeWords().then(m => self.registration.showNotification(m.title, {
+    body: m.body, tag: m.tag || 'sendoff-nudge', renotify: true, requireInteraction: true,
+    icon: '/brand/icon-192.png', badge: '/brand/favicon-32.png', data: { url: m.url || '/racer.html' }
+  })));
+});
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = new URL((event.notification.data && event.notification.data.url) || '/racer.html', self.location.origin).href;
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    const same = list.find(c => c.url.split('#')[0] === url);
+    if (same) return same.focus();
+    return self.clients.openWindow(url);
+  }));
+});
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
 

@@ -85,6 +85,7 @@ let aiCrewLinks = [];
 
 // Whether hub.json advertises the live push. Off by default: a page that
 // believes in it opens a websocket, and this server does not speak one.
+const pushLog = [];
 let livePush = false;
 let heldRaces = [{ slug: 'zz-held-race', name: 'Bullsh*t Backyard', words: ['shit'],
   by: 'crew@example.com', at: '2026-10-16T18:00:00.000Z' }];
@@ -231,6 +232,16 @@ const server = http.createServer((req, res) => {
   // Sign in with Google. Off until a test turns it on, the way an unset
   // GOOGLE_CLIENT_ID leaves it off. The worker's checks on the token are
   // tested against the worker; here a credential is just a word.
+  // The send-off reminder. The real worker keeps these in KV and sends the
+  // push; here a test reads back what the page registered.
+  if (url.pathname === '/api/push/key') return send(200, JSON.stringify({ key: 'BA' + 'A'.repeat(85) }), 'application/json');
+  if (url.pathname === '/api/push/subscribe' || url.pathname === '/api/push/unsubscribe') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => { pushLog.push({ path: url.pathname.slice(10), ...JSON.parse(body || '{}') }); send(200, '{"ok":true}', 'application/json'); });
+    return;
+  }
+  if (url.pathname === '/api/push-log') return send(200, JSON.stringify(pushLog), 'application/json');
   if (url.pathname === '/api/google-on') { googleOn = true; return send(200, '{"ok":true}', 'application/json'); }
   if (url.pathname === '/api/facebook-on') { facebookOn = true; return send(200, '{"ok":true}', 'application/json'); }
   if (url.pathname === '/api/auth-providers') {
