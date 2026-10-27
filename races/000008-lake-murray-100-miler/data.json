@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-10-27T17:42:55.120Z",
+  "lastUpdated": "2026-10-27T18:27:59.898Z",
   "runners": [
     {
       "id": "fajita-brandon-konen",
@@ -80,40 +80,36 @@
           "index": 13,
           "startTime": "2026-10-25T03:59:33.041Z",
           "feelOut": "rough",
-          "endTime": "2026-10-25T06:09:54.126Z",
-          "skipped": true
+          "endTime": "2026-10-25T06:00:06.000Z"
         },
         {
           "index": 14,
-          "startTime": "2026-10-25T06:09:54.126Z",
-          "endTime": "2026-10-25T08:29:22.785Z",
-          "skipped": true
+          "startTime": "2026-10-25T06:02:01.000Z",
+          "endTime": "2026-10-25T08:26:43.000Z"
         },
         {
           "index": 15,
-          "startTime": "2026-10-25T08:29:22.785Z",
-          "endTime": "2026-10-25T10:53:11.262Z",
-          "skipped": true
+          "startTime": "2026-10-25T08:28:27.000Z",
+          "endTime": "2026-10-25T10:47:29.000Z"
         },
         {
           "index": 16,
-          "startTime": "2026-10-25T10:53:11.262Z",
-          "endTime": "2026-10-25T12:52:44.199Z",
-          "skipped": true
+          "startTime": "2026-10-25T10:48:51.000Z",
+          "endTime": "2026-10-25T12:41:12.000Z"
         },
         {
           "index": 17,
-          "startTime": "2026-10-25T12:52:44.199Z",
-          "endTime": "2026-10-25T15:01:03.756Z"
+          "startTime": "2026-10-25T12:43:24.000Z",
+          "endTime": "2026-10-25T14:24:52.000Z"
         },
         {
           "index": 18,
-          "startTime": "2026-10-25T15:01:30.039Z",
-          "endTime": "2026-10-25T18:36:44.117Z"
+          "startTime": "2026-10-25T14:26:19.000Z",
+          "endTime": "2026-10-25T16:00:32.000Z"
         },
         {
           "index": 19,
-          "startTime": "2026-10-25T18:00:45.000Z",
+          "startTime": "2026-10-25T16:02:09.000Z",
           "endTime": "2026-10-25T18:02:44.000Z"
         }
       ]
