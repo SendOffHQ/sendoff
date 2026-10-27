@@ -119,7 +119,26 @@
         "Fajita"
       ],
       "cutoffHours": 32
+    },
+    {
+      "slug": "000009-dinosaur-valley-100k",
+      "name": "Dinosaur Valley 100k",
+      "location": "Dinosaur Valley State Park, Glen Rose, TX",
+      "startTime": "2026-11-21T07:00:00-06:00",
+      "timezone": "America/Chicago",
+      "courseType": "loops",
+      "units": {
+        "distance": "mi",
+        "elevation": "ft"
+      },
+      "activity": "trail-run",
+      "totalDistanceMi": 63,
+      "runnerNames": [
+        "Jasmine",
+        "Oppenheimer"
+      ],
+      "cutoffHours": 36
     }
   ],
-  "lastUpdated": "2026-10-25T03:25:15.748Z"
+  "lastUpdated": "2026-10-27T20:23:02.833Z"
 }
