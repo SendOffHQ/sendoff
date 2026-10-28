@@ -344,7 +344,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
-<script src="lib/race-core.js?v=85d905ba"></script>
+<script src="lib/race-core.js?v=c03ac4e9"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -427,11 +427,12 @@
     const segs = (cfg.course && cfg.course.segments) || [];
     let hours = null, what = null;
     if (next.nextAction === 'in' && next.nextLegIndex) {
-      const h = segs[next.nextLegIndex - 1] && segs[next.nextLegIndex - 1].arriveCutoffHours;
+      const stop = Race.checkIns.stop(cfg, merged(), next.nextLegIndex);
+      const h = segs[stop - 1] && segs[stop - 1].arriveCutoffHours;
       if (h != null && h !== '' && isFinite(+h)) {
         hours = +h;
-        const def = Race.course.legAt(cfg, next.nextLegIndex);
-        what = (def && def.toAid) || `leg ${next.nextLegIndex}`;
+        const def = Race.course.legAt(cfg, stop);
+        what = (def && def.toAid) || `leg ${stop}`;
       }
     }
     if (hours == null) {
@@ -559,15 +560,20 @@
         ${st && st.crewNote ? `<div class="rnote">${esc(st.crewNote)}</div>` : ''}
       </div>`);
     } else if (next.nextLegIndex) {
-      const def = Race.course.legAt(cfg, next.nextLegIndex);
-      const st = Race.stationAt(cfg, next.nextLegIndex);
+      // The next check-in, which for a racer who checks in only at the pit
+      // is the end of the lap, however many stations are on the way.
+      const stop = Race.checkIns.stop(cfg, runner, next.nextLegIndex);
+      const def = Race.course.legAt(cfg, stop);
+      const st = Race.stationAt(cfg, stop);
+      const first = Race.course.legAt(cfg, next.nextLegIndex);
+      const toGo = def && first ? def.cumulativeMi - (first.cumulativeMi - first.distanceMi) : 0;
       const bits = [];
-      if (def && def.distanceMi) bits.push(`${Race.units.distance(def.distanceMi, cfg)} to go`);
+      if (toGo > 0) bits.push(`${Race.units.distance(toGo, cfg)} to go`);
       if (def && def.cumulativeMi) bits.push(`mile ${Race.units.distanceVal(def.cumulativeMi, cfg).toFixed(1)}`);
       if (st && st.dropBag) bits.push('drop bag');
       out.push(`<div class="rblock">
         <span class="rlbl">Next</span>
-        <span class="raid">${esc((def && def.toAid) || `Leg ${next.nextLegIndex}`)}</span>
+        <span class="raid">${esc((def && def.toAid) || `Leg ${stop}`)}</span>
         <div class="rmeta">${esc(bits.join(' · '))}</div>
       </div>`);
     }
@@ -705,7 +711,8 @@
       }
       const chosen = undoFeel && undoFeel.value;
       const skip = skipOffer();
-      const skipped = undoPress && undoPress.skips
+      // Not said for a check-in at the pit: those stations were never pressed.
+      const skipped = undoPress && undoPress.skips && !undoPress.pit
         ? Race.skip.missed(cfg, { first: undoPress.legIndex, last: undoPress.legIndex + undoPress.skips }) : [];
       act.innerHTML = `<div class="rundo" data-undo="${undoUntil}">
         <span class="rundo-msg">
@@ -739,14 +746,20 @@
       if (un) un.addEventListener('click', () => setStopped(false));
       return;
     }
-    const def = Race.course.legAt(cfg, next.nextLegIndex);
+    // Named for the next check-in: for a racer who checks in only at the
+    // pit, the end of the lap rather than the station before it.
+    const def = Race.course.legAt(cfg, Race.checkIns.stop(cfg, runner, next.nextLegIndex));
     // A lap has no aid station to name, so it is named for itself: "Lap 7 ·
     // Loop B", which on a course of two loops is the thing worth knowing.
-    const lapName = def && !def.toAid && def.lap ? def.name : null;
+    // A racer who checks in only at the pit is out for the whole lap, so the
+    // lap is the name for it too.
+    const pitLap = def && def.lap && Race.checkIns.pitOnly(cfg, runner);
+    const lapName = def && !def.toAid && def.lap ? def.name
+      : pitLap ? `Lap ${def.lap}` + (def.loopName ? ` · ${def.loopName}` : '') : null;
     const label = next.nextAction === 'in'
       ? (lapName ? `Lap done · ${lapName}` : `Arrived at ${(def && def.toAid) || 'the next aid'}`)
       : (next.state === 'idle'
-          ? `Start · ${(def && def.toAid) ? 'to ' + def.toAid : (lapName || 'leg 1')}`
+          ? `Start · ${(def && def.toAid && !pitLap) ? 'to ' + def.toAid : (lapName || 'leg 1')}`
           : (lapName ? `Leaving · ${lapName}` : `Leaving · to ${(def && def.toAid) || 'the next aid'}`));
     const queued = Race.queue.pending().length;
     const sub = queued
@@ -912,24 +925,27 @@
       return l;
     };
     const began = next.nextAction === 'in' ? (legFor(next.nextLegIndex).startTime || null) : null;
-    legFor(next.nextLegIndex)[next.nextAction === 'out' ? 'startTime' : 'endTime'] = now;
-    if (through) legFor(next.nextLegIndex + 1).startTime = now;
-    undoPress = { legIndex: next.nextLegIndex, action: next.nextAction, at: now, began, skips: 0,
-                  upTo: through ? next.nextLegIndex + 1 : next.nextLegIndex };
+    // A racer who checks in only at the pit arrives at the end of the lap,
+    // with the stations on the way filled in by distance.
+    const arr = next.nextAction === 'in' ? Race.checkIns.arrival(cfg, runner, next.nextLegIndex, began, now) : null;
+    const legs = arr ? arr.legs : { [next.nextLegIndex]: { startTime: now } };
+    if (through && !(arr && arr.skips)) legs[next.nextLegIndex + 1] = { startTime: now };
+    for (const k of Object.keys(legs)) Object.assign(legFor(+k), legs[k]);
+    const at = arr ? arr.to : next.nextLegIndex;
+    undoPress = { legIndex: next.nextLegIndex, action: next.nextAction, at: now, began, skips: arr ? arr.skips : 0,
+                  pit: !!(arr && arr.skips), upTo: Math.max(...Object.keys(legs).map(Number)) };
 
-    const def = Race.course.legAt(cfg, next.nextLegIndex);
+    const def = Race.course.legAt(cfg, at);
     undoLabel = (next.nextAction === 'in' ? 'Arrived' : 'Out') +
       ` ${Race.fmt.clockTime(now, cfg)}` +
       ((def && def.toAid) ? ` · ${def.toAid}` : '');
     undoUntil = Date.now() + UNDO_MS;
-    undoFeel = { legIndex: next.nextLegIndex, key: next.nextAction === 'out' ? 'feelOut' : 'feelIn', value: null };
+    undoFeel = { legIndex: at, key: next.nextAction === 'out' ? 'feelOut' : 'feelIn', value: null };
     render();
 
-    const legs = { [next.nextLegIndex]: { [next.nextAction === 'out' ? 'startTime' : 'endTime']: now } };
-    if (through) legs[next.nextLegIndex + 1] = { startTime: now };
     try {
       pressWrite = Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId: meId, legs },
-        `racer: ${runner.name || meId} ${next.nextAction === 'out' ? 'out' : 'in'} leg ${next.nextLegIndex}`);
+        `racer: ${runner.name || meId} ${next.nextAction === 'out' ? 'out' : 'in'} leg ${at}`);
       await pressWrite;
     } catch (err) {
       toast(`Save failed: ${err.message}`, 'error');
@@ -940,7 +956,8 @@
   // it: the press can be for the one past it instead. Null otherwise.
   function skipOffer() {
     const p = undoPress;
-    if (!p || p.action !== 'in' || !p.began) return null;
+    // Not for a check-in at the pit: the stations on the lap were meant.
+    if (!p || p.action !== 'in' || !p.began || p.pit) return null;
     const pressed = p.legIndex + p.skips;
     if (pressed + 1 > Race.course.legCount(cfg)) return null;
     return { past: Race.skip.stopName(cfg, pressed), at: Race.skip.stopName(cfg, pressed + 1) };

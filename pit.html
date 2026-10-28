@@ -298,7 +298,7 @@
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/race-core.js?v=85d905ba"></script>
+<script src="lib/race-core.js?v=c03ac4e9"></script>
 <script src="lib/course-view.js?v=9a7a055a"></script>
 <script>
   const slug = Race.qs('id');
@@ -389,26 +389,28 @@
       return l;
     };
     const began = next.nextAction === 'in' ? (legFor(next.nextLegIndex).startTime || null) : null;
-    legFor(next.nextLegIndex)[next.nextAction === 'out' ? 'startTime' : 'endTime'] = now;
-    if (throughCheckpoint) legFor(next.nextLegIndex + 1).startTime = now;
+    // Commit in one entry, so the halves of a checkpoint, or the stations a
+    // racer who checks in only at the pit went by, are never split by a
+    // signal that drops between them. Those stations are filled in by
+    // distance (Race.checkIns).
+    const arr = next.nextAction === 'in' ? Race.checkIns.arrival(cfg, runner, next.nextLegIndex, began, now) : null;
+    const legs = arr ? arr.legs : { [next.nextLegIndex]: { startTime: now } };
+    if (throughCheckpoint && !(arr && arr.skips)) legs[next.nextLegIndex + 1] = { startTime: now };
+    for (const k of Object.keys(legs)) Object.assign(legFor(+k), legs[k]);
+    const at = arr ? arr.to : next.nextLegIndex;
     if (began) {
-      pitPress[runnerId] = { legIndex: next.nextLegIndex, at: now, began, skips: 0,
-        upTo: throughCheckpoint ? next.nextLegIndex + 1 : next.nextLegIndex, until: Date.now() + SKIP_MS };
+      pitPress[runnerId] = { legIndex: next.nextLegIndex, at: now, began, skips: arr ? arr.skips : 0,
+        pit: !!(arr && arr.skips), upTo: Math.max(...Object.keys(legs).map(Number)), until: Date.now() + SKIP_MS };
     } else delete pitPress[runnerId];
     render();
     drawSkip();
 
-    // Commit. Both halves of a checkpoint go in one entry so they can never be
-    // split by a signal that drops between them.
-    const legs = { [next.nextLegIndex]: { [next.nextAction === 'out' ? 'startTime' : 'endTime']: now } };
-    if (throughCheckpoint) legs[next.nextLegIndex + 1] = { startTime: now };
-
-    const what = throughCheckpoint
-      ? `through checkpoint · leg ${next.nextLegIndex}`
-      : `${next.nextAction === 'out' ? 'sent off' : 'checked in'} · leg ${next.nextLegIndex}`;
+    const what = throughCheckpoint && !(arr && arr.skips)
+      ? `through checkpoint · leg ${at}`
+      : `${next.nextAction === 'out' ? 'sent off' : 'checked in'} · leg ${at}`;
     try {
       const r = await Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId, legs },
-        `pit: ${runner.name || runnerId} sign-${next.nextAction} leg ${next.nextLegIndex}`);
+        `pit: ${runner.name || runnerId} sign-${next.nextAction} leg ${at}`);
       toast(r.queued ? `No signal · ${what} saved on this phone` : `Saved · ${what}`, 'ok');
     } catch (err) {
       toast(`Save failed: ${err.message}`, 'error');
@@ -454,8 +456,10 @@
     if (!p || Date.now() >= p.until) return '';
     const pressed = p.legIndex + p.skips;
     const names = p.skips ? Race.skip.missed(cfg, { first: p.legIndex, last: pressed }) : [];
-    const more = pressed + 1 <= Race.course.legCount(cfg);
-    return (names.length ? `<div class="skip-note">Skipped: ${escapeHtml(names.join(', '))}. Undo last takes it back.</div>` : '') +
+    // A check-in at the pit for a racer who only checks in there: the
+    // stations on the lap were never going to be pressed, so nothing to offer.
+    const more = !p.pit && pressed + 1 <= Race.course.legCount(cfg);
+    return (names.length ? `<div class="skip-note">${p.pit ? 'Filled in by distance' : 'Skipped'}: ${escapeHtml(names.join(', '))}. Undo last takes it back.</div>` : '') +
       (more ? `<button class="skip-btn" type="button" data-action="skip" data-runner="${escapeAttr(runnerId)}">` +
         `<span class="k">Skipped · check-in missed · <span data-skip-left></span></span>` +
         `<span class="d">Past ${escapeHtml(Race.skip.stopName(cfg, pressed))}, at ${escapeHtml(Race.skip.stopName(cfg, pressed + 1))} now</span></button>` : '');
@@ -812,7 +816,7 @@
   // On course, it is where the racer will come in. In a pit, it is the next
   // one, because that is where the crew goes once the racer is sent off.
   // Before the start, the start itself.
-  function stopLine(next) {
+  function stopLine(next, runner) {
     let label, name, st;
     if (next.state === 'finished') return '';
     if (next.state === 'idle') {
@@ -820,7 +824,9 @@
       label = 'At the start';
       name = (Race.course.aidStations(cfg)[0] || {}).name || 'Start';
     } else {
-      const idx = next.state === 'on-course' ? next.currentLegIndex : next.nextLegIndex;
+      // The next place they check in, which for a racer who does that only
+      // at the pit is the end of the lap.
+      const idx = Race.checkIns.stop(cfg, runner, next.state === 'on-course' ? next.currentLegIndex : next.nextLegIndex);
       st = Race.stationAt(cfg, idx);
       label = next.state === 'on-course' ? 'Meet at' : 'Next stop';
       name = st && st.name;
@@ -879,15 +885,20 @@
     if (next.state === 'finished') {
       buttonLabel = 'Finished'; buttonDisabled = true;
     } else if (next.state === 'on-course') {
-      const def = Race.course.legAt(cfg, next.currentLegIndex);
-      const st = Race.stationAt(cfg, next.currentLegIndex);
+      const stop = Race.checkIns.stop(cfg, runner, next.currentLegIndex);
+      const def = Race.course.legAt(cfg, stop);
+      const st = Race.stationAt(cfg, stop);
       buttonLabel = st && st.checkpoint
         ? (st.name ? `Checkpoint Reached · ${st.name}` : 'Checkpoint Reached')
         : (def && def.toAid ? `Check In at ${def.toAid}` : `Check In · End ${def ? def.name : 'leg'}`);
     } else if (next.state === 'in-pit') {
       const def = Race.course.legAt(cfg, next.nextLegIndex);
-      buttonLabel = def && def.toAid
-        ? `Send Off · ${def.fromAid || '?'} → ${def.toAid}`
+      const to = Race.course.legAt(cfg, Race.checkIns.stop(cfg, runner, next.nextLegIndex)) || def;
+      // Out for a whole lap, from the pit back to it: named for the lap.
+      buttonLabel = def && def.lap && Race.checkIns.pitOnly(cfg, runner)
+        ? `Send Off · Lap ${def.lap}`
+        : def && to && to.toAid
+        ? `Send Off · ${def.fromAid || '?'} → ${to.toAid}`
         : `Send Off · Start ${def ? def.name : 'leg'}`;
     } else {
       const def = Race.course.legAt(cfg, 1);
@@ -1028,7 +1039,7 @@
           <div class="runner-name">${escapeHtml(runner.name)}</div>
           <div class="state-badge state-${stateClass}">${stateLabel}</div>
         </div>
-        <div class="where">${whereLine(runner, next)}${stopLine(next)}</div>
+        <div class="where">${whereLine(runner, next)}${stopLine(next, runner)}</div>
         <div class="state-timer" data-since="${since}"${done ? ` data-elapsed="${finishedSec}"` : ''}>
           <span class="label">${timerLabel}</span>
           <span class="value runner-timer">–</span>
