@@ -135,7 +135,7 @@ Aid stations never have what you planned for. The write-in box handles everythin
 
 Eat to the plan, hour by hour. 📊
 
-The racer screen shows calories, fluid and sodium for the current hour against your target. Green means you're on it. The other colors mean it's time to eat something.
+The racer screen shows calories, fluid, and sodium for the current hour against your target. Tracking something else, like carbs or caffeine? Add your own fueling metric with its own hourly goal, and it shows up right alongside them. Green means you're on it. The other colors mean it's time to eat something.
 
 Your stomach keeps score. Now you can too.
 
