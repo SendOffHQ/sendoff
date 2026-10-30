@@ -118,6 +118,8 @@ await page.waitForSelector('#runners .board-scope', { timeout: 20000 });
 const names = () => page.$$eval('#runners .runner-name, #runners h2, #runners .rname', els => els.map(e => e.textContent.trim()));
 let scope = await page.textContent('.board-scope');
 ok('says it is showing their racers', scope.replace(/\s+/g, ' ').trim(), 'Your racers: 2 of 3 · Show all');
+ok('each card in its racer\'s colour, as on the race page', await page.$$eval('#runners article.runner', els => els.map(e => [e.dataset.runner, e.style.getPropertyValue('--runner-color').trim()])),
+  [['bo', '#6ee7a8'], ['cy', '#ffb07a']]);
 ok('Bo, and Cy who nobody is assigned to; not Ann', (await page.evaluate(() => document.getElementById('runners').textContent)).includes('Ann'), false);
 await page.click('[data-scope="all"]');
 ok('Show all brings everybody', (await page.evaluate(() => document.getElementById('runners').textContent)).includes('Ann'), true);

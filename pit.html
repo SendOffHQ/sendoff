@@ -58,13 +58,13 @@
   .runner.course { border-color: rgba(15, 184, 191, 0.5); }
   .runner.pit    { border-color: rgba(110, 231, 168, 0.4); }
   .runner.done   { border-color: rgba(138, 169, 208, 0.4); }
+  /* The racer's own colour along the top, as on the race page and the
+     charts, so a crew with several racers knows whose card it is at a
+     glance. Where they are is still the border, the badge and the timer. */
   .runner::before {
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-    background: var(--border); transition: background 0.3s ease;
+    background: linear-gradient(90deg, var(--runner-color, var(--accent)), transparent);
   }
-  .runner.course::before { background: linear-gradient(90deg, var(--accent), transparent); }
-  .runner.pit::before    { background: linear-gradient(90deg, var(--green), transparent); }
-  .runner.done::before   { background: linear-gradient(90deg, var(--blue), transparent); }
 
   .runner-head {
     padding: 16px 20px 12px; display: flex;
@@ -1034,7 +1034,7 @@
     `;
 
     return `
-      <article class="runner ${stateClass}" data-runner="${runner.id}">
+      <article class="runner ${stateClass}" style="--runner-color: ${/^#[0-9a-f]{3,8}$/i.test(runner.color || '') ? runner.color : 'var(--accent)'};" data-runner="${runner.id}">
         <div class="runner-head">
           <div class="runner-name">${escapeHtml(runner.name)}</div>
           <div class="state-badge state-${stateClass}">${stateLabel}</div>
