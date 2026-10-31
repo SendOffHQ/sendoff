@@ -1,7 +1,7 @@
 // One-tap items per racer (2026-10-31): the list stays the race's, since a
 // leg counts an item under its position, but each racer can have their own
-// of them on their screen and their card on the crew page. Chosen in
-// Settings, in the items' On column for the racer picked in Plan for.
+// of them on their screen and their card on the crew page. In Settings the
+// items table shows the racer picked in Plan for, like their goals.
 //
 //   node test/items-per-racer.mjs
 import { chromium } from 'playwright';
@@ -79,30 +79,45 @@ console.log('\nsettings');
 await page.goto(BASE + `/settings.html?id=${SLUG}`);
 await page.waitForSelector('#runner-editor-head', { timeout: 20000 });
 await page.click('#runner-editor-head');
-await page.waitForSelector('#preset-rows input[data-preset-on]', { timeout: 20000 });
-const ticks = () => page.$$eval('#preset-rows input[data-preset-on]', els => els.map(e => e.checked));
-ok('an On column for the racer picked, Ann', [(await page.textContent('.preset-on-head')).trim(), await ticks()], ['On Ann', [true, true, false]]);
+await page.waitForSelector('#preset-rows tr', { timeout: 20000 });
+const rows = () => page.$$eval('#preset-rows input[data-k="name"]', els => els.map(e => e.value));
+ok('no checkbox column', await page.locator('#preset-rows input[type="checkbox"]').count(), 0);
+ok('the items of the racer in Plan for: Ann', await rows(), ['Gel', 'Flask']);
 await page.selectOption('#plan-runner', { label: 'Bo' });
-ok('Bo: every item', [(await page.textContent('.preset-on-head')).trim(), await ticks()], ['On Bo', [true, true, true]]);
-await page.uncheck('#preset-rows input[data-preset-on="1"]');
-await page.selectOption('#plan-runner', { label: 'Ann' });
-ok('Ann\'s are still hers after switching', await ticks(), [true, true, false]);
+ok('Bo: every item', await rows(), ['Gel', 'Flask', 'Salt pill']);
+await page.click('#preset-rows tr:nth-child(2) [data-del-preset]');
+ok('× takes Flask off Bo', await rows(), ['Gel', 'Salt pill']);
 await page.click('#add-preset');
 await page.fill('#preset-rows tr:last-child input[data-k="name"]', 'Caffeine gum');
-ok('an item added is ticked for the racer picked', await ticks(), [true, true, false, true]);
-await page.check('#preset-rows input[data-preset-on="2"]');
+ok('and an item added is his', await rows(), ['Gel', 'Salt pill', 'Caffeine gum']);
+await page.selectOption('#plan-runner', { label: 'Ann' });
+ok('Ann still has Flask, and not the gum', await rows(), ['Gel', 'Flask']);
 await page.click('#runner-save');
 const saved = await until(async () => { const c = await api(CFG); return (c.fuelPresets || []).length === 4 ? c : null; });
-ok('saved by racer: Ann every item, so no list; Bo without Flask or the gum', saved && saved.runners.map(r => r.presets || null), [null, [0, 2]]);
+ok('saved: the race keeps all four, each racer theirs', saved && [saved.fuelPresets.map(p => p.name), saved.runners.map(r => r.presets || null)],
+  [['Gel', 'Flask', 'Salt pill', 'Caffeine gum'], [[0, 1], [0, 2, 3]]]);
 ok('fits a phone', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 
-console.log('\none racer');
-await api(CFG, { ...saved, runners: saved.runners.slice(0, 1) });
+console.log('\nan item nobody has any more');
 await page.goto(BASE + `/settings.html?id=${SLUG}`);
 await page.waitForSelector('#runner-editor-head', { timeout: 20000 });
 await page.click('#runner-editor-head');
 await page.waitForSelector('#preset-rows tr', { timeout: 20000 });
-ok('no On column', await page.locator('#preset-rows input[data-preset-on]').count(), 0);
+await page.selectOption('#plan-runner', { label: 'Bo' });
+await page.click('#preset-rows tr:nth-child(3) [data-del-preset]');
+await page.click('#runner-save');
+const gone = await until(async () => { const c = await api(CFG); return (c.fuelPresets || []).length === 3 ? c : null; });
+ok('goes from the race', gone && [gone.fuelPresets.map(p => p.name), gone.runners.map(r => r.presets || null)],
+  [['Gel', 'Flask', 'Salt pill'], [[0, 1], [0, 2]]]);
+const saved2 = gone;
+
+console.log('\none racer');
+await api(CFG, { ...saved2, runners: saved2.runners.slice(0, 1) });
+await page.goto(BASE + `/settings.html?id=${SLUG}`);
+await page.waitForSelector('#runner-editor-head', { timeout: 20000 });
+await page.click('#runner-editor-head');
+await page.waitForSelector('#preset-rows tr', { timeout: 20000 });
+ok('every item, as before', await page.$$eval('#preset-rows input[data-k="name"]', els => els.length), 3);
 
 ok('no page errors', errs, []);
 await b.close(); srv.kill('SIGKILL');
