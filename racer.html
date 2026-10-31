@@ -344,7 +344,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
-<script src="lib/race-core.js?v=c03ac4e9"></script>
+<script src="lib/race-core.js?v=b9ffc33a"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -615,7 +615,7 @@
       sec.style.display = next.state === 'idle' ? '' : 'none';
       jot.style.display = 'none';
       if (next.state !== 'idle') return;
-      const items = Race.fuel.presetsInOrder(cfg);
+      const items = Race.fuel.presetsFor(cfg, merged());
       const link = `/settings?id=${encodeURIComponent(slug)}#items`;
       document.getElementById('intake-chips').innerHTML = `<div class="rblock rpreview">
         <span class="rlbl">Log what you took</span>
@@ -657,7 +657,7 @@
     // in the list, because that is what tapPreset looks it up by and what the
     // leg counts it under. Handing out the list's index instead is the mistake
     // this has made once already: the two agree only until something moves.
-    const items = Race.fuel.presetsInOrder(cfg);
+    const items = Race.fuel.presetsFor(cfg, merged());
     const metrics = Race.fuel.metrics(cfg);
     // The six-dot drag handle, drawn rather than typed: two vertical ellipses
     // set side by side sat as far apart as the phone's font put them, and read
@@ -1130,7 +1130,10 @@
   // The order as it now stands on screen, saved like a press: through the
   // queue, so with no signal it is held on the phone and sent later. Only the
   // order is written, never the list: a leg counts an item under its position.
-  async function saveChipOrder(order) {
+  async function saveChipOrder(shown) {
+    // The racer may see only some of the race's items; the others keep their
+    // places among them.
+    const order = Race.fuel.mergeOrder(cfg, shown);
     const plain = order.every((n, k) => n === k);
     if (plain) delete cfg.presetOrder; else cfg.presetOrder = order.slice();
     renderIntake();
@@ -1139,7 +1142,7 @@
         'racer: reorder one-tap items');
     } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
   }
-  const chipOrder = () => Race.fuel.presetsInOrder(cfg).map(x => x.i);
+  const chipOrder = () => Race.fuel.presetsFor(cfg, merged()).map(x => x.i);
 
   document.getElementById('intake-chips').addEventListener('pointerdown', (e) => {
     const grip = e.target.closest('[data-grip]');

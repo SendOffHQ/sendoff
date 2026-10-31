@@ -298,7 +298,7 @@
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/race-core.js?v=c03ac4e9"></script>
+<script src="lib/race-core.js?v=b9ffc33a"></script>
 <script src="lib/course-view.js?v=9a7a055a"></script>
 <script>
   const slug = Race.qs('id');
@@ -950,7 +950,8 @@
     // anything could be filtered out. Shown in the order dragged into on the
     // settings page, which is a separate list precisely so the positions, and
     // every count already logged under them, never move.
-    const presets = Race.fuel.presetsInOrder(cfg);
+    // The racer's own, where the race gives them some (Race.fuel.presetsFor).
+    const presets = Race.fuel.presetsFor(cfg, runner);
     const stagedNow = stagedFor(runner.id, selectedLegIdx);
     const presetBtns = presets.length === 0 ? '' : `
         <div class="intake-presets">

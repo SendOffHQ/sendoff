@@ -380,7 +380,11 @@ export function raceStatus(cfg, data, runnerId, now) {
     planPerHourRightNow: Object.keys(now_).length ? fmtVals(now_) : null
   };
   if (p.crewNotes) out.racerNotesForCrew = p.crewNotes;
-  const items = presets(cfg);
+  // The racer's own items, where the race gives them some (runner.presets,
+  // by position in the race's list). log_item still takes any of the race's.
+  const mine = ((cfg && cfg.runners) || []).find(r => r && r.id === runnerId) || {};
+  const all = presets(cfg);
+  const items = Array.isArray(mine.presets) ? all.filter((_, i) => mine.presets.map(Number).includes(i)) : all;
   if (items.length) {
     out.oneTapItems = items.map(it => ({ name: it.name,
       adds: fmtVals(Object.fromEntries(ms.map(m => [m.key, num(it.values[m.key])]).filter(([, v]) => v))) }));

@@ -120,6 +120,11 @@ ok('the finish cutoff', st.race.finishCutoff, 'Sun 1:00 PM');
 ok('what they have had, and the plan', [st.intake.raceTotal['Calories (cal)'], st.intake.planPerHourRightNow['Calories (cal)']], [200, 250]);
 ok('their own notes for crew', st.racerNotesForCrew, 'Salt every hour');
 ok('the one-tap items', st.oneTapItems.map(i => i.name), ['Gel', 'Flask']);
+{
+  const { raceStatus } = await import('../src/ai-crew.js');
+  const two = { fuelPresets: [{ name: 'Gel', values: {} }, { name: 'Flask', values: {} }], runners: [{ id: 'pat', name: 'Pat', presets: [1] }] };
+  ok('only the racer\'s own items, where they have a list', raceStatus(two, { runners: [{ id: 'pat', legs: [] }] }, 'pat', Date.now()).oneTapItems.map(i => i.name), ['Flask']);
+}
 ok('and that two of their notes are unread', st.unreadNotes, 2);
 ok('with the notes themselves, so they are handled before any answer',
   [st.notesToHandleFirst.map(n => [n.leg, n.station, n.line]), /^Before you answer, handle these/.test(st.doFirst)],

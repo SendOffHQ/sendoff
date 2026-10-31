@@ -253,6 +253,8 @@
     font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); }
   .runner-checkins select { flex: 1 1 180px; min-width: 0; }
   .runner-crew { margin-top: 8px; font-size: 12px; }
+  .preset-on, .preset-on-head { text-align: center; white-space: nowrap; }
+  .preset-on input { width: 22px; height: 22px; accent-color: var(--accent); }
   .runner-crew summary { cursor: pointer; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; padding: 6px 0; }
   .runner-crew summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
   .runner-crew label { display: flex; align-items: center; gap: 8px; padding: 6px 0; color: var(--text); min-height: 32px; }
@@ -513,8 +515,8 @@
         <label for="plan-runner">Plan for</label>
         <select id="plan-runner"></select>
         <span class="fuel-hint">The goal column, the hour bands and the crew
-          notes below are this racer's. The metric names, units and the
-          items are the race's, shared by everyone on it.</span>
+          notes below are this racer's, and so is the On column of the items.
+          The metric names and units are the race's, shared by everyone on it.</span>
       </div>
       <div class="table-scroll">
         <table class="aid-list" id="fuel-table">
@@ -571,7 +573,9 @@
         all blank for something you only need to count</strong>, like a
         medicine: the tap records that it was taken, and the race page and the
         printout show it against that leg. A flask is a flask whoever drinks
-        it, so these belong to the race rather than to one racer.
+        it, so the list belongs to the race. With more than one racer, the
+        <strong>On</strong> column says which of them the racer picked in Plan
+        for gets on their screen and their crew card.
       </p>
       <div class="table-scroll">
         <table class="aid-list" id="preset-table">
@@ -632,7 +636,7 @@
 
 <div id="toast" role="status" aria-live="polite" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=c03ac4e9"></script>
+<script src="lib/race-core.js?v=b9ffc33a"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -823,7 +827,11 @@
       // Anyone without a plan of their own opens on the race's, which is what
       // they are already being held to on the board.
       editingPlans = {};
-      for (const r of (cfg.runners || [])) editingPlans[r.id] = planFrom(Race.fuel.forRunner(cfg, r));
+      for (const r of (cfg.runners || [])) {
+        editingPlans[r.id] = planFrom(Race.fuel.forRunner(cfg, r));
+        // Which of the race's items are this racer's, by position; null for all.
+        editingPlans[r.id].items = Array.isArray(r.presets) ? r.presets.map(Number) : null;
+      }
       planKey = editingRunners.length ? editingRunners[0].key : null;
       editingFuel = Race.fuel.toRows(cfg);
       editingPresets = Race.fuel.presets(cfg).map(pre => ({ name: pre.name, values: { ...pre.values } }));
@@ -1213,19 +1221,38 @@
     const metrics = Race.fuel.fromRows(editingFuel).metrics;
     // 150 for the name, 46 for the delete button, 92 per metric: enough that a
     // four-digit sodium amount is not clipped, and the wrapper scrolls past it.
-    document.getElementById('preset-table').style.minWidth = (236 + 92 * metrics.length) + 'px';
+    const who = presetPlanRunner();
+    document.getElementById('preset-table').style.minWidth = (236 + 92 * metrics.length + (who ? 84 : 0)) + 'px';
     document.getElementById('preset-head').innerHTML =
-      '<th></th><th>Name</th>' + metrics.map(m => `<th>${Race.fuel.colHead(m, escapeHtml)}</th>`).join('') + '<th></th>';
+      '<th></th>' + (who ? `<th class="preset-on-head">On ${escapeHtml(who.name)}</th>` : '') + '<th>Name</th>' +
+      metrics.map(m => `<th>${Race.fuel.colHead(m, escapeHtml)}</th>`).join('') + '<th></th>';
     return metrics;
+  }
+
+  // Items per racer. The list is the race's, since a leg counts an item under
+  // its position, but each racer can have their own of them on their screen
+  // and their card on the crew page (Race.fuel.presetsFor). With two racers or
+  // more, the table gets a column for the racer picked in "Plan for" above.
+  function presetPlanRunner() {
+    const named = (editingRunners || []).filter(r => (r.name || '').trim());
+    if (named.length < 2) return null;
+    return named.find(r => r.key === planKey) || null;
+  }
+  function presetOn(i) {
+    const plan = editingPlans && editingPlans[planKey];
+    return !plan || !Array.isArray(plan.items) || plan.items.includes(i);
   }
 
   function renderPresetRows() {
     const metrics = renderPresetHead();
+    const who = presetPlanRunner();
     document.getElementById('preset-rows').innerHTML = editingPresetOrder.map(i => [editingPresets[i], i]).map(([pre, i]) => `
       <tr data-row="${i}">
         <td class="drag-cell"><button type="button" class="drag-handle" data-drag="${i}"
           aria-label="Move ${escapeAttr(pre.name || 'this item')}: drag, or use the arrow keys"
           title="Drag to reorder">\u22ee\u22ee</button></td>
+        ${who ? `<td class="preset-on"><input type="checkbox" data-preset-on="${i}"${presetOn(i) ? ' checked' : ''}
+          aria-label="${escapeAttr(pre.name || 'This item')} on ${escapeAttr(who.name)}'s screen" /></td>` : ''}
         <td><input type="text" data-preset="${i}" data-k="name" aria-label="Item ${i + 1} name" value="${escapeAttr(pre.name)}" placeholder="e.g. Tailwind flask, or Ibuprofen" /></td>
         ${metrics.map(m => `<td><input type="number" data-preset="${i}" data-mk="${escapeAttr(m.key)}" aria-label="Item ${i + 1} ${escapeAttr(m.label || m.key)}"
              min="0" step="${m.step || 1}" value="${escapeAttr(pre.values[m.key] ?? '')}" placeholder="0" /></td>`).join('')}
@@ -1387,8 +1414,14 @@
     document.getElementById('crew-notes').value = editingNotes;
   }
 
-  // One runner needs no picker: everything below the title is theirs already.
+  // The items' On column follows the picker: whose it is, and whether there
+  // is one at all.
   function renderPlanPicker() {
+    drawPlanPicker();
+    if (editingPresets) renderPresetRows();
+  }
+  // One runner needs no picker: everything below the title is theirs already.
+  function drawPlanPicker() {
     const host = document.getElementById('plan-for');
     const sel = document.getElementById('plan-runner');
     const named = (editingRunners || []).filter(r => (r.name || '').trim());
@@ -1570,6 +1603,12 @@
         .filter(([k, v]) => liveKeys.has(k.replace(/PerHour$/, '')) && +v > 0));
       r.phaseTargets = Race.fuel.bandsFromRows(plan.bands, fuelRows.metrics);
       r.crewNotes = (plan.notes || '').trim().slice(0, 2000);
+      // Their items, by the positions that survived this save. Every item
+      // ticked is stored as no list, so an item added later reaches them.
+      if (Array.isArray(plan.items)) {
+        const mine = plan.items.filter(k => survived.has(k)).map(k => survived.get(k));
+        if (mine.length < survived.size) r.presets = mine;
+      }
       for (const c of Race.fuel.bandCollisions(plan.bands, fuelRows.metrics)) clashes.push({ ...c, who: r.name });
       delete r.planKey;
     }
@@ -2398,6 +2437,7 @@
     loadPlan();
     renderFuelRows();
     renderBandRows();
+    renderPresetRows();
     renderProfilePicker();
   });
   document.getElementById('add-runner-edit').addEventListener('click', () => {
@@ -2669,6 +2709,10 @@
   document.getElementById('add-preset').addEventListener('click', () => {
     editingPresets.push({ name: '', values: {} });
     editingPresetOrder.push(editingPresets.length - 1);
+    // On the racer picked above. Anyone with a list of their own does not get
+    // it unless ticked; anyone without one sees every item, this one too.
+    const plan = editingPlans && editingPlans[planKey];
+    if (plan && Array.isArray(plan.items) && presetPlanRunner()) plan.items.push(editingPresets.length - 1);
     renderPresetRows();
   });
   document.getElementById('preset-rows').addEventListener('input', (e) => {
@@ -2682,12 +2726,24 @@
       else pre.values[e.target.dataset.mk] = parseFloat(v) || 0;
     }
   });
+  document.getElementById('preset-rows').addEventListener('change', (e) => {
+    const i = e.target.dataset.presetOn;
+    if (i == null || !editingPlans) return;
+    const plan = editingPlans[planKey] || (editingPlans[planKey] = planFrom(null));
+    // The first untick turns "every item" into a list of them.
+    const items = new Set(Array.isArray(plan.items) ? plan.items : editingPresetOrder);
+    if (e.target.checked) items.add(+i); else items.delete(+i);
+    plan.items = editingPresetOrder.filter(k => items.has(k));
+  });
   document.getElementById('preset-rows').addEventListener('click', (e) => {
     const del = e.target.dataset.delPreset;
     if (del == null) return;
     const d = +del;
     editingPresets.splice(d, 1);
     editingPresetOrder = editingPresetOrder.filter(k => k !== d).map(k => (k > d ? k - 1 : k));
+    for (const plan of Object.values(editingPlans || {})) {
+      if (Array.isArray(plan.items)) plan.items = plan.items.filter(k => k !== d).map(k => (k > d ? k - 1 : k));
+    }
     renderPresetRows();
   });
 
