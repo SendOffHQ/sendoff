@@ -35,7 +35,7 @@ optional Cloudflare Worker auth proxy.
 - Mile pace per leg
 - Aid-station time per stop
 - Intake per hour: calories / fluid / sodium, with target lines
-- Cumulative progress with a pace-based projected-finish ray and cutoff line
+- Cumulative progress with a pace-based projected-finish ray, and every cutoff on the race clock as a red dashed vertical line labelled with its station (each aid station's, the last lap or leg start, the finish), on the charts page and the print report. `test/cutoff-lines.mjs`
 
 ## Sharing
 - Finish card (`lib/finish-card.js`): a 1080x1350 image drawn on the finisher's own device at the end of a race, with the course elevation profile, the splits marked on it, finish time, margin inside the cutoff, and the day's numbers. Four shapes (4:5, 1:1, 4:3, 16:9), with the wide two laid out in two columns rather than a stretched portrait. Ten switches choose what is on it (location, cutoff margin, course profile, each stat, date); the layout reflows and the card crops to what it holds, and the choices are remembered on that device. Save, or share straight to another app where the browser supports it. Nothing is uploaded and it works with no signal.

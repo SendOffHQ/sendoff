@@ -263,7 +263,8 @@ and banners, 6px for cards and panels. Fully round only for the one-tap item chi
   Enter or Space toggles, `aria-expanded` says which way.
 - **Charts.** One line per racer in the racer's colour, 2px, small dots; faint dashed grid;
   mono 11px axis labels in text-muted; targets dashed in warm, cutoffs dashed in red. On the
-  cumulative chart a racer's projection is dashed and their goal dotted, both in their colour. Narrow
+  cumulative chart a racer's projection is dashed and their goal dotted, both in their colour. Every cutoff on
+  the race clock is a red dashed vertical line there, labelled up the line with its station. Narrow
   charts label every second or third tick rather than shrink the labels.
 - **Motion.** The live pulse beside the wordmark, the LIVE label's blink, the racer dot's pulse
   and the microphone while it records are the only endless animations. Every animation stops for somebody who has asked their phone for less

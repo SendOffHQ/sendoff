@@ -184,6 +184,7 @@
   .chart-svg .target { stroke: var(--yellow); stroke-width: 1; stroke-dasharray: 4 4; fill: none; }
   .chart-svg .target-label { fill: var(--yellow); font-size: 10px; }
   .chart-svg .cutoff { stroke: var(--red); stroke-width: 1; stroke-dasharray: 4 4; fill: none; }
+  .chart-svg .cutoff-label { fill: var(--red); font-size: 11px; }
   .intake-grid {
     display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;
   }
@@ -281,6 +282,7 @@
     .chart-svg .target { stroke: #8a6700 !important; }
     .chart-svg .target-label { fill: #8a6700 !important; }
     .chart-svg .cutoff { stroke: #a82626 !important; }
+    .chart-svg .cutoff-label { fill: #a82626 !important; }
     .intake-grid { page-break-inside: avoid; }
 
     footer.site { color: #555 !important; border-top: 1px solid #999 !important; }
@@ -319,7 +321,7 @@
   <div>Auto-generated · race-dashboard hub</div>
 </footer>
 
-<script src="lib/race-core.js?v=b9ffc33a"></script>
+<script src="lib/race-core.js?v=50818dbc"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
