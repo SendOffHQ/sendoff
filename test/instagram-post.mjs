@@ -21,7 +21,7 @@ const ok = (l, g, w) => { const q = JSON.stringify(g) === JSON.stringify(w); if 
 console.log('\nevery feature post is ready to go');
 const ids = [...fs.readFileSync(path.join(SOCIAL, 'features.html'), 'utf8')
   .matchAll(/<section class="slide[^"]*" id="([^"]+)"/g)].map(m => m[1]);
-ok('twenty-eight posts in features.html', ids.length, 28);
+ok('twenty-nine posts in features.html', ids.length, 29);
 const notReady = [];
 for (const id of ids) {
   try {

@@ -340,3 +340,21 @@ No need to follow them in two places. One race page has them both: every lap as 
 Link in bio.
 
 #ghosttrain #ghosttrainultra #timedrace #ultrarunning #trailrunning #100miler #sendoff
+
+---
+
+## 29. Rio del Lago 100 (`sendoff-feature-rio-del-lago.png`)
+
+Collaborators: @jdupree_ocr
+
+Tomorrow is another hundred, only 6 weeks after my first one.
+
+Rio del Lago 100 starts at 5 AM in Folsom, CA, so the first couple of hours are by headlamp. This should be a much easier course than the altitude and elevation of Colorado, but that doesn't mean it'll be easy.
+
+I'm logging every aid station on SendOff myself, with an AI crew helping track what I eat and drink, so you can follow along live: where I am, what I've had, and how close I am to the cutoff.
+
+Rio del Lago also has live results on Race Result, and they'll have a live feed on YouTube from the start/finish.
+
+🔗 sendoff.run/race?id=000005-rio-del-lago-100
+
+#riodellago100 #ultrarunning #100miler #trailrunning #folsom #sendoff

@@ -8,7 +8,7 @@ GitHub's settings, and none of it involves pasting a token into a chat.
 ## How it works
 
 - `.github/workflows/instagram-post.yml` publishes one post. You pick it from
-  a list of the eighteen.
+  the list of posts.
 - The image is the JPEG that sendoff.run serves for that post. Instagram
   fetches it from there itself, which is why a post has to be merged and
   deployed before it can go out.

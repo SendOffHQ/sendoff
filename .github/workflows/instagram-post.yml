@@ -50,6 +50,7 @@ on:
           - ai-crew
           - ghost-train
           - ghost-train-both
+          - rio-del-lago
       dry_run:
         description: Dry run (check everything, post nothing)
         type: boolean
