@@ -226,21 +226,30 @@
   <div class="phone"><img src="shots/ghost-train-live-map.png" alt="" style="object-fit:cover;object-position:50% 100%;aspect-ratio:1170/2400"></div>
 </section>
 
-<section class="slide story photo-story grad glow" id="rio-del-lago">
-  <!-- The whole story is the photo, cut 9:16 from the selfie. The face sits
-       low in it, so the headline goes up over the sky and the details over
-       the vest, clear of the reply bar. -->
-  <img class="bg" src="photos/rio-del-lago-runner-story.jpg" alt="" style="top:0;height:1920px;-webkit-mask-image:none;mask-image:none">
-  <div class="shade-top" style="position:absolute;left:0;right:0;top:0;height:36%;z-index:1;background:linear-gradient(180deg,rgba(10,15,20,.9) 0%,rgba(10,15,20,.74) 60%,rgba(10,15,20,0) 100%)"></div>
-  <div class="shade" style="height:34%;background:linear-gradient(180deg,rgba(10,15,20,0) 0%,rgba(10,15,20,.82) 35%,rgba(10,15,20,.95) 100%)"></div>
+<section class="slide story grad glow" id="rio-del-lago">
+  <!-- The selfie set smaller in the middle, a wider cut with the river round
+       it, feathered at every edge into a blurred, darkened copy of itself
+       that fills the rest. The headline sits above it and the details below,
+       clear of the reply bar. -->
+  <style>
+    #rio-del-lago .fill{position:absolute;inset:-80px;width:calc(100% + 160px);height:calc(100% + 160px);
+      object-fit:cover;filter:blur(36px) brightness(.4) saturate(1.1);z-index:0}
+    #rio-del-lago .pic{position:absolute;left:0;top:520px;width:1080px;height:920px;object-fit:cover;object-position:62% 42%;z-index:1;
+      -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 18%,#000 76%,transparent 100%),linear-gradient(90deg,transparent 0,#000 14%,#000 86%,transparent 100%);
+      -webkit-mask-composite:source-in;
+      mask-image:linear-gradient(180deg,transparent 0,#000 18%,#000 76%,transparent 100%),linear-gradient(90deg,transparent 0,#000 14%,#000 86%,transparent 100%);
+      mask-composite:intersect}
+  </style>
+  <img class="fill" src="photos/rio-del-lago-runner-story.jpg" alt="">
+  <img class="pic" src="photos/rio-del-lago-runner-wide.jpg" alt="">
   <div class="top" style="position:relative;z-index:2;text-shadow:0 2px 14px rgba(0,0,0,.55)">
     <div class="wm"></div>
     <p class="kick" style="color:var(--beam);font-weight:500">Tomorrow · Rio del Lago 100</p>
     <h1 style="font-size:104px">Another hundred,<br><em style="color:var(--beam)">six weeks on.</em></h1>
   </div>
-  <div class="pbottom">
+  <div style="position:absolute;left:88px;right:88px;bottom:330px;z-index:2;text-shadow:0 2px 14px rgba(0,0,0,.6)">
     <p class="lead" style="margin-top:0;max-width:30ch;text-wrap:balance">5 AM start in Folsom, CA. Every aid station live on SendOff, with an AI crew tracking what goes in.</p>
-    <p class="when">Sat 5 AM PT · sendoff.run</p>
+    <p class="when" style="color:var(--beam)">Sat 5 AM PT · sendoff.run</p>
   </div>
 </section>
 
