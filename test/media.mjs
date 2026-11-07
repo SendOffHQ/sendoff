@@ -214,6 +214,28 @@ ok('the leg they chose survives the poll',
 ok('and so does the caption they typed',
    await page.evaluate(() => document.querySelector('[data-ph-caption]').value), 'Half a quesadilla');
 
+// The race moving on: a leg picked by hand holds only until then, and from
+// there the picker follows where the race is, as it does when nobody touches
+// it. It used to stay on the leg the page loaded with all day.
+const at = () => page.evaluate(() => [String(defaultLegIndex()), document.querySelector('[data-ph-leg]').value]);
+const legsTo = (n) => page.evaluate((n) => {
+  const t = (h) => new Date(Date.now() - h * 3600e3).toISOString();
+  for (const r of data.runners) {
+    r.legs = [];
+    for (let i = 1; i <= n; i++) r.legs.push({ index: i, startTime: t(n - i + 1), ...(i < n ? { endTime: t(n - i) } : {}) });
+  }
+  renderPhotos();
+}, n);
+await legsTo(3);
+ok('mid-race, untouched, it is on the leg under way', await at(), ['3', '3']);
+await page.selectOption('[data-ph-leg]', '7');
+await page.evaluate(() => renderPhotos());
+ok('a leg picked by hand holds while the race is still there', (await at())[1], '7');
+await legsTo(4);
+ok('the race moves on, and it gives way to where the race is', await at(), ['4', '4']);
+await legsTo(5);
+ok('and keeps following it after that', await at(), ['5', '5']);
+
 // With no signal a photo has to look like it was taken, or a crew member
 // takes it again, or gives up on the feature at the aid station it is for.
 console.log('\nwith the worker unreachable it still queues, and says so');
