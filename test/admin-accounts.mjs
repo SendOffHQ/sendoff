@@ -45,7 +45,9 @@ for (const width of [1280, 390]) {
     // Wide enough to read: the bug gave it two characters. On a phone it may
     // wrap between words, never inside one.
     return { below: box.top >= head.bottom - 1, full: Math.abs(box.width - row.getBoundingClientRect().width) <= 2,
-             oneLine: a.getBoundingClientRect().width >= Math.min(140, a.scrollWidth) };
+             // A pixel of slack: scrollWidth is rounded, the box is not, so a name
+             // laid out at 138.6px reads as 139 against itself.
+             oneLine: a.getBoundingClientRect().width + 1 >= Math.min(140, a.scrollWidth) };
   });
   ok('its races sit under it, not beside it', geo.below, true);
   ok('across the whole row', geo.full, true);
