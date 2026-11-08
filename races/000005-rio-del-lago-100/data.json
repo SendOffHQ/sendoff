@@ -1,0 +1,263 @@
+{
+  "lastUpdated": "2026-11-08T17:30:01.965Z",
+  "runners": [
+    {
+      "id": "jason",
+      "legs": [
+        {
+          "index": 1,
+          "startTime": "2026-11-07T13:00:00.826Z",
+          "feelOut": "good",
+          "calories": 240,
+          "sodiumMg": 245,
+          "preset_0": 1,
+          "preset_12": 1,
+          "endTime": "2026-11-07T14:27:25.289Z",
+          "feelIn": "good"
+        },
+        {
+          "index": 2,
+          "startTime": "2026-11-07T14:27:44.398Z",
+          "feelOut": "good",
+          "calories": 690,
+          "sodiumMg": 2015,
+          "preset_9": 1,
+          "fluidOz": 32,
+          "preset_8": 1,
+          "preset_6": 1,
+          "preset_2": 1,
+          "endTime": "2026-11-07T15:51:59.566Z",
+          "feelIn": "good",
+          "aiEst": {
+            "calories": 180,
+            "sodiumMg": 190
+          },
+          "notes": "8:21 AM: AI crew: 2 Rice Krispie treats (45 cal each) (~90 cal, ~100 mg); quarter of a PB&J (~90 cal, ~90 mg)"
+        },
+        {
+          "index": 3,
+          "startTime": "2026-11-07T15:54:13.412Z",
+          "feelOut": "good",
+          "calories": 120,
+          "sodiumMg": 390,
+          "aiEst": {
+            "calories": 120,
+            "sodiumMg": 200,
+            "fluidOz": 34
+          },
+          "notes": "8:22 AM: AI crew: Neversecond C30+ gel (~120 cal, ~200 mg)\n9:07 AM: AI crew: about a liter of water from the bladder (~34 oz)",
+          "preset_2": 1,
+          "endTime": "2026-11-07T16:46:40.334Z",
+          "feelIn": "good",
+          "preset_1": 2,
+          "fluidOz": 34
+        },
+        {
+          "index": 4,
+          "startTime": "2026-11-07T17:07:18.873Z",
+          "feelOut": "good",
+          "notes": "9:07 AM: AI crew: Beals Point: switched from street shoes to trail shoes and taped early blisters from the street shoes.\n9:57 AM: AI crew: full peanut butter and jelly sandwich (~380 cal, ~400 mg)",
+          "sodiumMg": 780,
+          "preset_2": 2,
+          "endTime": "2026-11-07T17:54:46.546Z",
+          "calories": 380,
+          "aiEst": {
+            "calories": 380,
+            "sodiumMg": 400
+          }
+        },
+        {
+          "index": 5,
+          "startTime": "2026-11-07T17:56:51.620Z",
+          "feelOut": "good",
+          "sodiumMg": 2196,
+          "preset_2": 3,
+          "fluidOz": 49,
+          "preset_6": 1,
+          "calories": 345,
+          "preset_15": 1,
+          "preset_14": 1,
+          "endTime": "2026-11-07T19:35:58.591Z",
+          "feelIn": "good",
+          "aiEst": {
+            "calories": 25,
+            "fluidOz": 17,
+            "sodiumMg": 10
+          },
+          "notes": "11:41 AM: AI crew: 500 mL water (~17 oz); 2 gummy worms (~25 cal, ~10 mg)"
+        },
+        {
+          "index": 6,
+          "startTime": "2026-11-07T19:40:58.068Z",
+          "feelOut": "good",
+          "sodiumMg": 520,
+          "preset_2": 1,
+          "calories": 320,
+          "preset_0": 1,
+          "endTime": "2026-11-07T20:16:29.795Z",
+          "feelIn": "good",
+          "fluidOz": 44,
+          "aiEst": {
+            "calories": 220,
+            "fluidOz": 44,
+            "sodiumMg": 225
+          },
+          "notes": "12:39 PM: AI crew: 1 liter of water from the bladder (~34 oz); 10 oz Red Bull (~130 cal, ~10 oz, ~125 mg); Rice Krispie treats (90 cal) (~90 cal, ~100 mg)\n12:39 PM: AI crew: Rattlesnake Bar 1: changed the dressing on the left foot blister."
+        },
+        {
+          "index": 7,
+          "startTime": "2026-11-07T20:36:38.873Z",
+          "feelOut": "good",
+          "sodiumMg": 1651,
+          "preset_2": 6,
+          "calories": 435,
+          "preset_3": 1,
+          "preset_0": 1,
+          "endTime": "2026-11-07T22:19:35.333Z",
+          "feelIn": "good",
+          "fluidOz": 34,
+          "aiEst": {
+            "calories": 85,
+            "fluidOz": 34,
+            "sodiumMg": 400
+          },
+          "notes": "2:33 PM: AI crew: 500 mL flask of Skratch (~85 cal, ~17 oz, ~400 mg); 500 mL water (~17 oz)"
+        },
+        {
+          "index": 8,
+          "startTime": "2026-11-07T22:21:12.539Z",
+          "feelOut": "good",
+          "fluidOz": 34,
+          "sodiumMg": 680,
+          "preset_6": 0,
+          "preset_2": 1,
+          "calories": 430,
+          "preset_4": 1,
+          "endTime": "2026-11-07T22:39:50.966Z",
+          "skipped": true,
+          "aiEst": {
+            "calories": 120,
+            "fluidOz": 34,
+            "sodiumMg": 250
+          },
+          "notes": "3:06 PM: AI crew: about a liter from the hydration bladder (checked at Overlook) (~34 oz); quarter of a quesadilla (~120 cal, ~250 mg)"
+        },
+        {
+          "index": 9,
+          "startTime": "2026-11-07T22:39:50.966Z",
+          "feelIn": "good",
+          "endTime": "2026-11-08T00:09:48.733Z"
+        },
+        {
+          "index": 10,
+          "startTime": "2026-11-08T00:15:56.262Z",
+          "feelOut": "good",
+          "calories": 710,
+          "fluidOz": 16,
+          "sodiumMg": 1610,
+          "preset_8": 1,
+          "preset_2": 2,
+          "preset_7": 1,
+          "endTime": "2026-11-08T03:15:51.608Z",
+          "aiEst": {
+            "calories": 330,
+            "sodiumMg": 600
+          },
+          "notes": "8:13 PM: AI crew: Rice Krispie treats (90 cal) on the way to Auburn Lakes Trail (~90 cal, ~100 mg); half a quesadilla at Auburn Lakes Trail (~240 cal, ~500 mg)\n8:13 PM: AI crew: 2 × Caffeine Pill\n8:13 PM: AI crew: Auburn Lakes Trail: changed socks. Took 500 mg Tylenol (~7:30 PM) and 2 caffeine pills.",
+          "preset_16": 2
+        },
+        {
+          "index": 11,
+          "startTime": "2026-11-08T03:38:28.523Z",
+          "sodiumMg": 2268,
+          "preset_2": 1,
+          "calories": 1190,
+          "preset_13": 1,
+          "fluidOz": 16,
+          "preset_8": 1,
+          "preset_14": 1,
+          "endTime": "2026-11-08T06:33:29.284Z",
+          "feelIn": "ok",
+          "aiEst": {
+            "calories": 560,
+            "sodiumMg": 1200
+          },
+          "notes": "10:41 PM: AI crew: two slices of cheese pizza (~560 cal, ~1200 mg)"
+        },
+        {
+          "index": 12,
+          "startTime": "2026-11-08T06:40:52.913Z",
+          "feelOut": "ok",
+          "preset_16": 1,
+          "calories": 410,
+          "fluidOz": 37,
+          "sodiumMg": 1290,
+          "aiEst": {
+            "calories": 200,
+            "fluidOz": 37,
+            "sodiumMg": 1050
+          },
+          "notes": "11:16 PM: AI crew: 500 mL flask of Happy Tummy (~80 cal, ~17 oz, ~300 mg)\n12:59 AM: AI crew: half a flask of LMNT (~8 oz, ~500 mg); 3/4 of a flask of water (~12 oz); about seven boiled red potato chunks (~120 cal, ~250 mg)",
+          "preset_11": 1,
+          "endTime": "2026-11-08T08:44:53.442Z",
+          "feelIn": "ok"
+        },
+        {
+          "index": 13,
+          "startTime": "2026-11-08T08:57:10.987Z",
+          "feelOut": "ok",
+          "calories": 220,
+          "sodiumMg": 745,
+          "aiEst": {
+            "calories": 220,
+            "sodiumMg": 745,
+            "fluidOz": 4
+          },
+          "notes": "1:54 AM: AI crew: 90 cal Rice Krispies treat (~90 cal, ~95 mg)\n1:54 AM: AI crew: 500 mL of water (16.9 oz)\n2:36 AM: AI crew: a quarter of a quesadilla (~120 cal, ~250 mg); about 4 oz of broth (~10 cal, ~4 oz, ~400 mg)\n2:36 AM: AI crew: Changed socks and blister bandages at Overlook 2.",
+          "fluidOz": 20.9,
+          "endTime": "2026-11-08T10:13:20.392Z",
+          "feelIn": "ok"
+        },
+        {
+          "index": 14,
+          "startTime": "2026-11-08T10:33:24.705Z",
+          "feelOut": "ok",
+          "preset_1": 2,
+          "calories": 550,
+          "sodiumMg": 321,
+          "preset_0": 3,
+          "endTime": "2026-11-08T11:22:43.530Z",
+          "feelIn": "good",
+          "preset_3": 1
+        },
+        {
+          "index": 15,
+          "startTime": "2026-11-08T11:23:00.921Z",
+          "feelOut": "good",
+          "endTime": "2026-11-08T13:20:15.411Z",
+          "feelIn": "ok"
+        },
+        {
+          "index": 16,
+          "startTime": "2026-11-08T13:40:40.623Z",
+          "feelOut": "ok",
+          "endTime": "2026-11-08T14:28:27.077Z",
+          "feelIn": "ok"
+        },
+        {
+          "index": 17,
+          "startTime": "2026-11-08T14:31:08.685Z",
+          "feelOut": "ok",
+          "endTime": "2026-11-08T16:31:33.026Z",
+          "feelIn": "ok"
+        },
+        {
+          "index": 18,
+          "startTime": "2026-11-08T16:33:46.497Z",
+          "feelOut": "ok",
+          "endTime": "2026-11-08T17:30:01.508Z"
+        }
+      ]
+    }
+  ]
+}
