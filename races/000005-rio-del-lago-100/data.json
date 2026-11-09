@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-11-08T17:30:01.965Z",
+  "lastUpdated": "2026-11-09T13:03:54.926Z",
   "runners": [
     {
       "id": "jason",
@@ -133,8 +133,7 @@
           "preset_2": 1,
           "calories": 430,
           "preset_4": 1,
-          "endTime": "2026-11-07T22:39:50.966Z",
-          "skipped": true,
+          "endTime": "2026-11-07T23:04:00.000Z",
           "aiEst": {
             "calories": 120,
             "fluidOz": 34,
@@ -144,9 +143,9 @@
         },
         {
           "index": 9,
-          "startTime": "2026-11-07T22:39:50.966Z",
+          "startTime": "2026-11-07T23:10:00.000Z",
           "feelIn": "good",
-          "endTime": "2026-11-08T00:09:48.733Z"
+          "endTime": "2026-11-08T00:09:48.000Z"
         },
         {
           "index": 10,
