@@ -152,8 +152,10 @@ const rows = await page.evaluate(() => {
   const save = box(document.querySelector('[data-action="save-intake"]'));
   return { times, save };
 });
-ok('both time buttons are on the same line', rows.times.length === 2 &&
-   Math.abs(rows.times[0].top - rows.times[1].top) < 2, true);
+// By station, the finish has a time in and no time out, so one correction
+// here; wherever there are more, they share a line.
+ok('the time buttons are on the same line', rows.times.length >= 1 &&
+   rows.times.every(t => Math.abs(t.top - rows.times[0].top) < 2), true);
 ok('and save is below them, on its own', rows.save.top >= rows.times[0].bottom - 1, true);
 
 const idleWidth = await page.evaluate(sel => document.querySelector(sel).offsetWidth, intake);

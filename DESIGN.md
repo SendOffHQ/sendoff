@@ -255,6 +255,10 @@ and banners, 6px for cards and panels. Fully round only for the one-tap item chi
   their line on the charts and their dot on the map, and nothing else.
 - **Stat tiles.** Label in mono caps (text-muted), value in mono 20px bold (text, or teal when
   live), subline in mono 12px (text-dim). Tiles divide with 1px borders, not gaps.
+- **Stations, not legs.** Wherever times are read or corrected (the crew page, the race page,
+  the printed report), a row is an aid station: its name, the time in, the time out, the time
+  spent there, and where the racer came from underneath. Never "A → B" as a row's name: one stop
+  split across two rows is how a crew corrects the wrong one.
 - **Tags.** Small mono caps, outlined or tinted, coloured by meaning: drop bag teal, checkpoint
   blue, no crew red, pacer green, skipped warm.
 - **Toasts** have `role="status"` and `aria-live="polite"`; **error banners** have

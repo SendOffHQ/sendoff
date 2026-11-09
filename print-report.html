@@ -321,7 +321,7 @@
   <div>Auto-generated · race-dashboard hub</div>
 </footer>
 
-<script src="lib/race-core.js?v=a1ac9399"></script>
+<script src="lib/race-core.js?v=891cfa34"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -362,6 +362,16 @@
     // On paper this is the part nobody can look up later, and it belongs to
     // this runner rather than to the race, so it prints inside their block.
     const crewNotes = Race.fuel.notesFor(cfg, runner);
+    // The start is a stop with only a time out.
+    const first = (runner.legs || []).find(l => l.index === 1);
+    const startRow = first && first.startTime ? `
+        <tr>
+          <td class="leg-num">–<span style="font-size: 10px; color: var(--text-muted); display: block;">${escapeHtml(Race.stations.startName(cfg))}</span></td>
+          <td class="num">–</td>
+          <td class="num">${Race.fmt.clockTimeSec(first.startTime, cfg)}</td>
+          <td class="num"></td><td class="num"></td>
+          ${metrics.map(() => '<td class="num"></td>').join('')}
+        </tr>` : '';
     const legRows = (runner.legs || []).slice().sort((a, b) => a.index - b.index).map((l, i, arr) => {
       const def = Race.course.legAt(cfg, l.index);
       const dur = (l.startTime && l.endTime)
@@ -371,7 +381,6 @@
         ? (new Date(next.startTime) - new Date(l.endTime)) / 1000 : null;
       // A station gone by with no check-in, skipped on the racer's phone: no
       // time either side of it, and one time for the stretch, on its first leg.
-      const prev = arr[i - 1];
       const span = Race.skip.span(arr, l.index);
       const legCell = span
         ? (l.index === span.first ? Race.fmt.durationShort(span.sec) : `with ${span.first}`)
@@ -390,14 +399,17 @@
       // Simple lap-only loops just show the index; segments and
       // loops-with-aids show the leg name beneath it.
       const showName = def && def.name && !(cfg.courseType === 'loops' && !Race.course.hasLoopAid(cfg));
+      // By station: the stop this leg ends at, in and out of it, the split
+      // from the stop before and the time spent there (Race.stations).
       const legName = showName
-        ? `<span style="font-size: 10px; color: var(--text-muted); display: block;">${escapeHtml(def.name)}</span>`
+        ? `<span style="font-size: 10px; color: var(--text-muted); display: block;">${escapeHtml(Race.stations.label(cfg, l.index))}</span>`
         : '';
+      const outCell = !(next && next.startTime) ? '–' : l.skipped ? 'no check-in' : Race.fmt.clockTimeSec(next.startTime, cfg);
       return `
         <tr>
           <td class="leg-num">${l.index}${legName}</td>
-          <td class="num">${prev && prev.skipped && prev.index === l.index - 1 ? 'no check-in' : Race.fmt.clockTimeSec(l.startTime, cfg)}</td>
-          <td class="num">${l.skipped ? 'no check-in' : Race.fmt.clockTimeSec(l.endTime, cfg)}</td>
+          <td class="num">${l.skipped ? 'no check-in' : (l.endTime ? Race.fmt.clockTimeSec(l.endTime, cfg) : '–')}</td>
+          <td class="num">${outCell}</td>
           <td class="num">${legCell}</td>
           <td class="num">${pitSec != null ? Race.fmt.durationShort(pitSec) : '–'}</td>
           ${metrics.map(m => `<td class="num">${
@@ -433,15 +445,15 @@
         <table class="legs">
           <thead>
             <tr>
-              <th>#</th>
-              <th class="num">Out</th>
+              <th>Station</th>
               <th class="num">In</th>
-              <th class="num">Leg</th>
+              <th class="num">Out</th>
+              <th class="num">Split</th>
               <th class="num">Aid</th>
               ${metrics.map(m => `<th class="num">${escapeHtml(m.short)}</th>`).join('')}
             </tr>
           </thead>
-          <tbody>${legRows || `<tr><td colspan="${cols}" style="text-align:center; padding:24px; color: var(--text-muted); font-style: italic;">No legs yet</td></tr>`}</tbody>
+          <tbody>${legRows ? startRow + legRows : `<tr><td colspan="${cols}" style="text-align:center; padding:24px; color: var(--text-muted); font-style: italic;">No legs yet</td></tr>`}</tbody>
         </table>
         ${crewNotes ? `<div class="crew-notes-card">
           <span class="crew-notes-label">Notes for the crew</span>

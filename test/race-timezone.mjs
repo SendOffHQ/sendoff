@@ -138,8 +138,13 @@ const legNow = async () => page.evaluate(async ([slug, t]) => {
   return d.runners.find(x => x.id === t.runner).legs.find(l => l.index === t.leg);
 }, [SLUG, target]);
 // The box: a day and a 24-hour time, opened on the time already there.
+// By station: a leg's arrival is the time in at the station it ends at, and
+// its send-off the time out of the one before, so each is on that row.
 const openEdit = async (field, leg) => {
-  await page.click(`[data-action="edit-time"][data-runner="${target.runner}"][data-field="${field}"]`);
+  const row = field === 'startTime' && target.leg > 1 ? target.leg - 1 : target.leg;
+  await page.selectOption(`select[data-intake-leg][data-runner="${target.runner}"]`, String(row));
+  await page.waitForSelector(`[data-action="edit-time"][data-runner="${target.runner}"][data-leg="${target.leg}"][data-field="${field}"]`);
+  await page.click(`[data-action="edit-time"][data-runner="${target.runner}"][data-leg="${target.leg}"][data-field="${field}"]`);
   await page.waitForSelector('.edit-time [data-edit="time"]');
   return page.evaluate(() => ({
     time: document.querySelector('.edit-time [data-edit="time"]').value + ' ' + document.querySelector('.edit-time [data-edit="ampm"]').value,
@@ -195,7 +200,7 @@ await page.evaluate(async ([slug, t, s0]) => {
     body: JSON.stringify({ path: `races/${slug}/data.json`, content: JSON.stringify(d), message: 'stray press' }) });
 }, [SLUG, target, start0]);
 await page.reload();
-await page.waitForSelector('[data-action="edit-time"][data-field="startTime"]', { state: 'attached', timeout: 20000 });
+await page.waitForSelector('[data-action="edit-time"][data-field="endTime"]', { state: 'attached', timeout: 20000 });
 const newStart = start0 + 10 * 60e3, newEnd = start0 + 68 * 60e3;
 await openEdit('startTime');
 const warned = await save(twelve(newStart));

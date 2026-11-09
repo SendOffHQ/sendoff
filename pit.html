@@ -209,6 +209,7 @@
     color: var(--text-muted); margin-right: 4px;
   }
   .intake-times .missing { color: var(--yellow); }
+  .intake-from { margin: -6px 0 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); }
 
   .intake-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .intake-presets { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 14px; }
@@ -301,7 +302,7 @@
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/race-core.js?v=a1ac9399"></script>
+<script src="lib/race-core.js?v=891cfa34"></script>
 <script src="lib/course-view.js?v=9a7a055a"></script>
 <script>
   const slug = Race.qs('id');
@@ -548,7 +549,10 @@
     const seedMs = cur != null ? cur : (otherMs != null ? otherMs : Date.now());
     const seed = Race.tz.parts(cur != null ? cur : Date.now(), cfg);
 
-    const m = Race.modal(`${cur != null ? 'Edit' : 'Set'} ${isStart ? 'send-off' : 'arrival'} · ${Race.course.legAt(cfg, legIndex)?.name || 'leg ' + legIndex}`, 'Save time');
+    // Said as the stop it is: the time in at the station this leg ends at,
+    // or the time out of the one it starts from.
+    const where = isStart ? (legIndex === 1 ? 'the start' : Race.stations.label(cfg, legIndex - 1)) : Race.stations.label(cfg, legIndex);
+    const m = Race.modal(`${cur != null ? 'Edit' : 'Set'} time ${isStart ? 'out of' : 'in at'} ${where}`, 'Save time');
     m.body.innerHTML = `
       <div class="edit-time">
         <label class="modal-field"><span>Date</span>
@@ -564,7 +568,7 @@
             </select>
           </div>
         </label>
-        ${otherMs != null ? `<p class="edit-time-other">${isStart ? 'Arrival' : 'Send-off'} on this leg: ${escapeHtml(Race.tz.format(otherMs, cfg, { weekday: 'short', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }))}</p>` : ''}
+        ${otherMs != null ? `<p class="edit-time-other">${isStart ? `In at ${escapeHtml(Race.stations.label(cfg, legIndex))}` : `Out of ${escapeHtml(legIndex === 1 ? 'the start' : Race.stations.label(cfg, legIndex - 1))}`}: ${escapeHtml(Race.tz.format(otherMs, cfg, { weekday: 'short', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }))}</p>` : ''}
         ${joined != null ? `<p class="edit-time-other">No check-in here, so this is an estimate. A time saved goes on both legs either side of the station.</p>` : ''}
       </div>`;
     const daySel = m.body.querySelector('[data-edit="day"]');
@@ -896,7 +900,12 @@
   // The two times the selected leg actually holds, to the second. A press that
   // went in a minute late, or one that never went in at all, is the thing a
   // crew is scanning for, and neither shows up in a duration.
-  function legTimesLine(leg, runner) {
+  // The aid station a leg ends at, as one stop: when the racer came in, when
+  // they left, and how long they were there, with the time from the stop
+  // before underneath. A leg still under way is the stop they are heading
+  // for, and says when they left the one before, since a send-off just made
+  // is the time most likely to need putting right.
+  function stationTimesLine(leg, runner) {
     if (!leg) return '';
     const clock = ts => Race.fmt.clockTimeSec(ts, cfg);
     // With how the racer said they felt at that moment, when they said.
@@ -904,19 +913,46 @@
     const cell = (label, ts, v) => ts
       ? `<span><span class="k">${label}</span> ${escapeHtml(clock(ts))}${face(v)}</span>`
       : `<span class="missing"><span class="k">${label}</span> not recorded</span>`;
+    const none = (label) => `<span class="missing"><span class="k">${label}</span> no check-in</span>`;
+    const legs = (runner && runner.legs) || [];
+    const t = Race.stations.times(legs, leg.index);
+    const from = Race.stations.fromLabel(cfg, leg.index);
     // A station skipped on the racer's phone has no check-in on either side
     // of it, and the legs it joins are one time.
-    const legs = (runner && runner.legs) || [];
-    const before = legs.find(l => l.index === leg.index - 1);
-    const none = (label) => `<span class="missing"><span class="k">${label}</span> no check-in</span>`;
     const span = Race.skip.span(legs, leg.index);
-    const dur = span
-      ? `<span><span class="k">Legs ${span.first} to ${span.last}</span> ${Race.fmt.duration(span.sec)}</span>`
-      : (leg.startTime && leg.endTime)
-      ? `<span><span class="k">Leg</span> ${Race.fmt.duration((new Date(leg.endTime) - new Date(leg.startTime)) / 1000)}</span>`
-      : (leg.startTime ? '<span class="k">still out</span>' : '');
-    return `<div class="intake-times">${before && before.skipped ? none('Out') : cell('Out', leg.startTime, leg.feelOut)}${
-      leg.skipped ? none('In') : cell('In', leg.endTime, leg.feelIn)}${dur}</div>`;
+    const travel = span
+      ? `Legs ${span.first} to ${span.last}: ${Race.fmt.duration(span.sec)} in all`
+      : t.travelSec != null ? `${Race.fmt.duration(t.travelSec)} from ${escapeHtml(from)}` : '';
+    if (!leg.endTime) {
+      const before = legs.find(l => l.index === leg.index - 1);
+      return `<div class="intake-times">${before && before.skipped ? none('Left') : cell(`Left ${escapeHtml(from)}`, leg.startTime, leg.feelOut)}` +
+        `${leg.startTime ? '<span class="k">on the way</span>' : ''}</div>`;
+    }
+    const out = t.next && t.next.startTime
+      ? (t.skipped ? none('Out') : cell('Out', t.next.startTime, t.next.feelOut))
+      : '<span class="k">still here</span>';
+    const stop = t.stopSec != null && !t.skipped ? `<span><span class="k">Here</span> ${Race.fmt.duration(t.stopSec)}</span>` : '';
+    const start = leg.index === 1 && leg.startTime ? `<div class="intake-from">Started ${escapeHtml(clock(leg.startTime))}</div>` : '';
+    return `<div class="intake-times">${t.skipped ? none('In') : cell('In', leg.endTime, leg.feelIn)}${out}${stop}</div>` +
+      (travel ? `<div class="intake-from">${travel}</div>` : '') + start;
+  }
+
+  // The corrections for that stop: its arrival and its departure, and on the
+  // first one the start. A leg still under way offers its send-off from the
+  // stop before, and the arrival for when it was missed.
+  function stationEditButtons(leg, runner) {
+    if (!leg) return '';
+    const btn = (legIndex, field, label) =>
+      `<button class="btn" data-action="edit-time" data-runner="${runner.id}" data-leg="${legIndex}" data-field="${field}">${escapeHtml(label)}</button>`;
+    const next = (runner.legs || []).find(l => l.index === leg.index + 1);
+    const from = Race.stations.fromLabel(cfg, leg.index);
+    if (!leg.endTime) {
+      return btn(leg.index, 'startTime', leg.startTime ? `Edit time out of ${from}` : `Set time out of ${from}`) +
+        btn(leg.index, 'endTime', 'Set arrival');
+    }
+    return btn(leg.index, 'endTime', 'Edit time in') +
+      (next && next.startTime ? btn(leg.index + 1, 'startTime', 'Edit time out') : '') +
+      (leg.index === 1 ? btn(1, 'startTime', 'Edit start') : '');
   }
 
   function renderRunner(runner) {
@@ -979,11 +1015,13 @@
       : (panelLegs[0]?.index || null);
     const selectedLeg = panelLegs.find(l => l.index === selectedLegIdx);
 
+    // Each option is an aid station, the one this leg ends at: what was eaten
+    // on the way there and at the stop goes on it, and its In and Out are
+    // edited together below (Race.stations).
     const legOptions = panelLegs.map(l => {
-      const def = Race.course.legAt(cfg, l.index);
-      const labelText = (def && def.name) ? def.name : `Leg ${l.index}`;
+      const labelText = Race.stations.label(cfg, l.index);
       // Said plainly, so nobody wonders why this one has no times to edit yet.
-      const running = !l.startTime ? ' · no send-off' : (l.endTime ? '' : ' · running');
+      const running = !l.startTime ? ' · no send-off' : (l.endTime ? '' : ' · on the way');
       return `<option value="${l.index}" ${l.index === selectedLegIdx ? 'selected' : ''}>${escapeHtml(labelText)}${running}</option>`;
     }).join('');
 
@@ -1036,9 +1074,9 @@
       <div class="intake-panel">
         <div class="intake-panel-head">
           <span class="intake-panel-title">Intake / notes</span>
-          <select data-intake-leg data-runner="${runner.id}" aria-label="Leg">${legOptions}</select>
+          <select data-intake-leg data-runner="${runner.id}" aria-label="Aid station">${legOptions}</select>
         </div>
-        ${legTimesLine(selectedLeg, runner)}
+        ${stationTimesLine(selectedLeg, runner)}
         ${fuelMetrics.length ? `<div class="intake-grid">
           ${fuelMetrics.map(m => `
           <label class="field">
@@ -1072,10 +1110,7 @@
              end time orphaned underneath, so the button this whole panel
              exists for read as one of a set of three. The corrections belong
              together; saving belongs on its own line. -->
-        <div class="intake-actions">
-          <button class="btn" data-action="edit-time" data-runner="${runner.id}" data-leg="${selectedLeg?.index || ''}" data-field="startTime">${selectedLeg?.startTime ? 'Edit' : 'Set'} start time</button>
-          <button class="btn" data-action="edit-time" data-runner="${runner.id}" data-leg="${selectedLeg?.index || ''}" data-field="endTime">${selectedLeg?.endTime ? 'Edit' : 'Set'} end time</button>
-        </div>
+        <div class="intake-actions">${stationEditButtons(selectedLeg, runner)}</div>
         <div class="intake-actions">
           <button class="btn primary" data-action="save-intake" data-runner="${runner.id}">Save intake</button>
         </div>

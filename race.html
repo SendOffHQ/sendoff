@@ -453,7 +453,8 @@
   }
   .leglog tr.note-row:last-child td { border-bottom: none; }
   .leglog tr.empty td { color: var(--text-muted); font-style: italic; text-align: center; padding: 24px; }
-  .leglog .leg-seg { color: var(--text-muted); font-size: 11px; display: block; }
+  /* The station is what a row is now, so its name reads as the row's name. */
+  .leglog .leg-seg { color: var(--text); font-size: 13px; display: block; }
   .st-tag {
     display: inline-block; margin-left: 5px; padding: 1px 5px; border-radius: 2px;
     font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
@@ -487,7 +488,7 @@
       grid-column: 1 / -1; width: auto;
       display: flex; align-items: baseline; gap: 8px;
     }
-    .leglog .leg-seg { display: inline; font-size: 11px; min-width: 0; }
+    .leglog .leg-seg { display: inline; font-size: 14px; min-width: 0; }
     .leglog tr.leg-row td.num { text-align: left; }
     .leglog tr.leg-row td.num::before {
       content: attr(data-label);
@@ -579,7 +580,7 @@
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8a2565f0"></script>
 <script src="lib/course-view.js?v=9a7a055a"></script>
-<script src="lib/race-core.js?v=a1ac9399"></script>
+<script src="lib/race-core.js?v=891cfa34"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -805,12 +806,18 @@
         pitCell = `<span class="col-pit">${Race.fmt.durationShort(pitDone)} pit</span>`;
       }
 
+      // A row is the aid station this leg ends at: in and out of it on the
+      // race's clock, and the leg there as where it is from (Race.stations).
+      const inOut = entry && entry.endTime && !entry.skipped
+        ? `In ${Race.fmt.clockTime(entry.endTime, cfg)}${nextEntry && nextEntry.startTime ? ` · Out ${Race.fmt.clockTime(nextEntry.startTime, cfg)}` : ''}`
+        : '';
       return `
         <div class="seg-row ${cls}">
           <span class="num">${s.index}</span>
           <span class="nm">
-            ${escapeHtml(s.name)}${stationTags(Race.stationAt(cfg, s.index))}${entry && entry.skipped ? ' <span class="st-tag skip">No check-in</span>' : ''}
-            <div class="meta">${Race.units.distance(s.distanceMi, cfg)} · ${Race.units.distance(s.cumulativeMi, cfg)} total${s.elevationGainFt != null ? ` · +${Math.round(Race.units.elevationVal(s.elevationGainFt, cfg))}/-${Math.round(Race.units.elevationVal(Math.abs(s.elevationLossFt || 0), cfg))} ${Race.units.elevationLabel(cfg)}` : ''}</div>
+            ${escapeHtml(Race.stations.label(cfg, s.index))}${stationTags(Race.stationAt(cfg, s.index))}${entry && entry.skipped ? ' <span class="st-tag skip">No check-in</span>' : ''}
+            <div class="meta">${Race.units.distance(s.cumulativeMi, cfg)} · ${Race.units.distance(s.distanceMi, cfg)} from ${escapeHtml(Race.stations.fromLabel(cfg, s.index))}${s.elevationGainFt != null ? ` · +${Math.round(Race.units.elevationVal(s.elevationGainFt, cfg))}/-${Math.round(Race.units.elevationVal(Math.abs(s.elevationLossFt || 0), cfg))} ${Race.units.elevationLabel(cfg)}` : ''}</div>
+            ${inOut ? `<div class="meta in-out">${inOut}</div>` : ''}
             ${span && s.index === span.first ? `<div class="meta skip-line">One time for legs ${span.first} to ${span.last}</div>` : ''}
             ${Race.feel.pair(entry) ? `<div class="meta feel-line">${Race.feel.pair(entry)}</div>` : ''}
           </span>
@@ -994,7 +1001,7 @@
   }
 
   function fuelMetrics() { return Race.fuel.metrics(cfg); }
-  function logCols() { return 4 + fuelMetrics().length; }
+  function logCols() { return 5 + fuelMetrics().length; }
 
   function legLog(runner, c) {
     if (!runner.legs || runner.legs.length === 0) {
@@ -1051,14 +1058,16 @@
       const showName = segDef && segDef.name && !isSimpleLoop();
       const st = Race.stationAt(cfg, l.index);
       const tagHtml = stationTags(st) + (l.skipped ? ' <span class="st-tag skip">No check-in</span>' : '');
+      // By station: the stop this leg ends at, with its in and out.
       const legLabel = showName
-        ? `${l.index} <span class="leg-seg">${escapeHtml(segDef.name)}${tagHtml}</span>`
+        ? `${l.index} <span class="leg-seg">${escapeHtml(Race.stations.label(cfg, l.index))}${tagHtml}</span>`
         : `${l.index}${tagHtml}`;
       return `
         <tr class="leg-row${oldCls}">
           <td class="leg-num">${legLabel}</td>
-          <td class="num" data-label="Done">${l.skipped ? '–' : Race.fmt.clockTime(l.endTime, cfg)}</td>
-          <td class="num" data-label="Leg">${legCell}</td>
+          <td class="num" data-label="In">${l.skipped ? '–' : Race.fmt.clockTime(l.endTime, cfg)}</td>
+          <td class="num" data-label="Out">${l.skipped || !(next && next.startTime) ? '–' : Race.fmt.clockTime(next.startTime, cfg)}</td>
+          <td class="num" data-label="Split">${legCell}</td>
           <td class="num" data-label="Pit">${pitCell}</td>
           ${fuelMetrics().map(m => `<td class="num" data-label="${escapeHtml(m.short)}">${
             Race.fuel.cell(m, l)}</td>`).join('')}
@@ -1278,7 +1287,7 @@
 
         <div class="legs-section">
           <div class="legs-head">
-            <span class="legs-title">${cfg.courseType === 'loops' ? 'Lap Status' : 'Segments'}</span>
+            <span class="legs-title">${cfg.courseType === 'loops' ? 'Lap Status' : 'Aid Stations'}</span>
             <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted);">
               ${c.timed
                 ? `${c.legsDone} done${c.status !== 'finished' && c.timeLeftSec ? ` · ${hmLeft(c.timeLeftSec)} left` : ''}`
@@ -1289,7 +1298,7 @@
           <div class="leglog ${leglogCollapsed(runner.id, (runner.legs || []).length) ? 'collapsed' : ''}" data-runner="${runner.id}">
             ${(runner.legs || []).length > 2 ? `
               <div class="leglog-head" data-action="toggle-leglog" data-runner="${runner.id}">
-                <span class="leglog-head-title">Leg Log</span>
+                <span class="leglog-head-title">Station Log</span>
                 <span class="leglog-toggle">
                   <span class="when-collapsed">Show all ${runner.legs.length}</span>
                   <span class="when-expanded">Show recent 2</span>
@@ -1299,7 +1308,7 @@
             <table>
               <thead>
                 <tr>
-                  <th>#</th><th>Done</th><th class="num">Leg</th><th class="num">Pit</th>
+                  <th>Station</th><th class="num">In</th><th class="num">Out</th><th class="num">Split</th><th class="num">Pit</th>
                   ${fuelMetrics().map(m => `<th class="num">${escapeHtml(m.short)}</th>`).join('')}
                 </tr>
               </thead>

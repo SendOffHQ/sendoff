@@ -171,19 +171,22 @@ const rows = await page.$$eval('.seg-list .seg-row:not(.start)', rs => rs.slice(
 ok('the race page: Music Pass marked, one time for the two legs', rows, [
   { tag: true, dur: stretch, line: 'One time for legs 1 to 2', pit: '' },
   { tag: false, dur: 'with 1', line: null, pit: rows[1].pit }]);
-const log = await page.$$eval('.leglog tr.leg-row', rs => rs.map(r => [...r.querySelectorAll('td')].slice(1, 3).map(td => td.textContent.trim())));
+// In and Split, by station (Out sits between them).
+const log = await page.$$eval('.leglog tr.leg-row', rs => rs.map(r => { const td = [...r.querySelectorAll('td')].map(t => t.textContent.trim()); return [td[1], td[3]]; }));
 ok('and the leg log: no time at Music Pass, the stretch on its first leg', [log.find(r => r[1] === stretch) && log.find(r => r[1] === stretch)[0], log.some(r => r[1] === 'with 1')], ['–', true]);
 
 await page.goto(BASE + `/pit.html?id=${SLUG}`);
 await page.waitForSelector('.intake-times', { timeout: 20000 });
 const pitLine = (await page.textContent('.intake-times')).replace(/\s+/g, ' ').trim();
-ok('the pit board: no check-in on the way out, and the stretch',
-  [/^Out no check-in ?In \S+/.test(pitLine), pitLine.includes('Legs 1 to 2')], [true, true]);
+const pitFrom = (await page.textContent('.intake-from')).replace(/\s+/g, ' ').trim();
+ok('the pit board, by station: in at Music Meadows, and the stretch since the start',
+  [/^In \S+/.test(pitLine), pitFrom.includes('Legs 1 to 2')], [true, true]);
 
 console.log('\na real time from somebody who saw it');
 await page.selectOption('select[data-intake-leg]', '1');
-await page.waitForFunction(() => /no check-in/.test((document.querySelector('.intake-times') || {}).textContent || '') &&
-  /^Out/.test(document.querySelector('.intake-times').textContent.trim()) && document.querySelector('[data-action="edit-time"][data-leg="1"]'));
+// Music Pass, the station gone by: no check-in, in or out.
+await page.waitForFunction(() => /^In no check-in ?Out no check-in/.test(((document.querySelector('.intake-times') || {}).textContent || '').replace(/\s+/g, ' ').trim()) &&
+  document.querySelector('[data-action="edit-time"][data-leg="1"]'));
 await page.click('[data-action="edit-time"][data-leg="1"][data-field="endTime"]');
 await page.waitForSelector('.edit-time [data-edit="time"]');
 ok('the box says it is an estimate', /No check-in here/.test(await page.textContent('.edit-time')), true);
