@@ -484,6 +484,25 @@
   // the leg came out at 24:58:03. Nothing is guessed now: the date field opens
   // on the day the time already has, and a leg that would run backwards or
   // past a day is asked about before it is saved.
+  // A clock time as typed on a phone. The number pad a phone opens for this
+  // field has no colon on it (reported at Rio del Lago, 2026-11-08), so a
+  // dot, a comma, a space or a dash does as well, and so do the digits alone:
+  // 304 is 3:04, 1530 is 15:30, 30400 is 3:04:00. Hands back the parts the
+  // way the old pattern did: [, hours, minutes, seconds?, am|pm?].
+  function readClock(text) {
+    const v = String(text || '').trim().toLowerCase();
+    const half = (v.match(/\s*(am|pm|a|p)$/) || [])[1];
+    const body = half ? v.slice(0, v.length - v.match(/\s*(am|pm|a|p)$/)[0].length) : v;
+    let h, mi, se;
+    let m = body.match(/^(\d{1,2})[:.,\s-](\d{2})(?:[:.,\s-](\d{2}))?$/);
+    if (m) { [, h, mi, se] = m; }
+    else if ((m = body.match(/^\d{3,6}$/))) {
+      const d = body.length % 2 ? '0' + body : body;
+      h = d.slice(0, 2); mi = d.slice(2, 4); se = d.length > 4 ? d.slice(4, 6) : undefined;
+    } else return null;
+    return [v, String(+h), mi, se, half];
+  }
+
   function editEventTime(runnerId, legIndex, field) {
     const runner = (data.runners || []).find(r => r.id === runnerId);
     const leg = runner && (runner.legs || []).find(l => l.index === legIndex);
@@ -515,7 +534,7 @@
         <label class="modal-field"><span>Time (${escapeHtml(Race.tz.label(cfg, seedMs))})</span>
           <div class="edit-time-clock">
             <input type="text" data-edit="time" inputmode="numeric" autocomplete="off" spellcheck="false"
-                   placeholder="h:mm:ss" value="${(seed.h % 12) || 12}:${pad(seed.mi)}:${pad(seed.s)}" />
+                   placeholder="h:mm:ss, or 304 for 3:04" value="${(seed.h % 12) || 12}:${pad(seed.mi)}:${pad(seed.s)}" />
             <select data-edit="ampm" aria-label="AM or PM">
               <option value="AM"${seed.h < 12 ? ' selected' : ''}>AM</option>
               <option value="PM"${seed.h >= 12 ? ' selected' : ''}>PM</option>
@@ -532,14 +551,20 @@
     daySel.addEventListener('change', () => { dayTouched = true; });
     let confirmed = null;
     timeIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); m.primary.click(); } });
+    // Shown with its colons once the field is left, so what will be saved is
+    // what is on screen.
+    timeIn.addEventListener('blur', () => {
+      const t = readClock(timeIn.value);
+      if (t) timeIn.value = `${+t[1]}:${t[2]}${t[3] ? ':' + t[3] : ''}`;
+    });
     setTimeout(() => { timeIn.focus(); timeIn.select(); }, 0);
 
     m.primary.addEventListener('click', async () => {
       // h:mm or h:mm:ss, with AM or PM from the picker. A 24-hour time typed
       // anyway (19:11, 00:30) is taken as written rather than refused.
-      const t = timeIn.value.trim().toLowerCase().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm|a|p)?$/);
+      const t = readClock(timeIn.value);
       if (!t || +t[1] > 23 || +t[2] > 59 || +(t[3] || 0) > 59) {
-        m.setMsg('Use a time like 7:11:11, and pick AM or PM.', 'err');
+        m.setMsg('Use a time like 7:11:11 or 71111, and pick AM or PM.', 'err');
         return;
       }
       let hour = +t[1];

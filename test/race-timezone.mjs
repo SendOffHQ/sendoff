@@ -171,6 +171,14 @@ ok('and a time typed in is read on the race clock', [await save(twelve(later)), 
 await openEdit('endTime');
 const later2 = later + 60e3;
 ok('a 24-hour time typed anyway is taken as written', [await save(wall(later2, true)), (await legNow()).endTime], [null, new Date(Math.floor(later2 / 1000) * 1000).toISOString()]);
+// A phone's number pad has no colon: a dot, or the digits alone, do as well.
+for (const [how, sep] of [['the digits alone', ''], ['a dot', '.']]) {
+  const t = later2 + (sep ? 120e3 : 60e3);
+  const [clock, half] = twelve(t).split(' ');
+  await openEdit('endTime');
+  ok(`with no colon on the keypad, ${how} will do`, [await save(clock.split(':').join(sep) + ' ' + half), (await legNow()).endTime],
+    [null, new Date(Math.floor(t / 1000) * 1000).toISOString()]);
+}
 
 // The sequence that produced a 24:58:03 leg at the Hennepin 100: a missed
 // station fixed by correcting the send-off first, while the arrival still
