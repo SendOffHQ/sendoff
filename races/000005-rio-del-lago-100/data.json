@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-11-09T12:47:10.894Z",
+  "lastUpdated": "2026-11-09T12:52:53.611Z",
   "runners": [
     {
       "id": "jason",
@@ -133,7 +133,7 @@
           "preset_2": 1,
           "calories": 430,
           "preset_4": 1,
-          "endTime": "2026-11-07T23:30:00.000Z",
+          "endTime": "2026-11-07T22:55:00.000Z",
           "aiEst": {
             "calories": 120,
             "fluidOz": 34,
