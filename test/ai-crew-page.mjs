@@ -69,12 +69,15 @@ const pageBox = await page.evaluate(() => {
   return d && { open: d.open, summary: d.querySelector('summary').textContent.trim(), prompt: t ? t.value : '',
     copy: !!d.querySelector('button[data-copy-share]') && d.querySelector('button[data-copy-share]').dataset.copyShare === t.value };
 });
-ok('then the steps for a race page in Claude, opened', pageBox && [pageBox.open, pageBox.summary, pageBox.copy], [true, 'Build a race page in Claude', true]);
+ok('then the steps for a race page with their AI, opened', pageBox && [pageBox.open, pageBox.summary, pageBox.copy], [true, 'Build a race page with your AI', true]);
 ok('with a prompt for this racer and the SendOff tools it can use', pageBox && [
   pageBox.prompt.includes("It's for Test Racer at "),
   pageBox.prompt.includes('tools: ["race_status", "log_item", "log_intake", "add_note", "mark_notes_read"]'),
   pageBox.prompt.includes('mcp.watchTool("SendOff", "race_status"'),
   pageBox.prompt.includes('needs_reauth')], [true, true, true, true]);
+ok('for any assistant and any watch, not only Claude and Coros', [
+  /In another assistant, use whatever it has/.test(pageBox.prompt), /show me the same board here in the chat/.test(pageBox.prompt),
+  /watch connected \(Coros, Garmin or another\)/.test(pageBox.prompt), /querySleepHrv/.test(pageBox.prompt)], [true, true, true, false]);
 ok('and no long dash in it', /\u2014/.test(pageBox.prompt), false);
 await page.click('#ax-ai [data-revoke-ai]');
 await page.waitForFunction(() => !document.querySelector('#ax-ai [data-revoke-ai]'), null, { timeout: 10000 });
