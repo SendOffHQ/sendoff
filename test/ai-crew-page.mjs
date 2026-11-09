@@ -74,7 +74,7 @@ const leg1 = runner.legs.find(l => l.index === 1);
 leg1.calories = 480; leg1.aiEst = { calories: 280 };
 await writeData(d0);
 await page.goto(BASE + `/race.html?id=${SLUG}`);
-await page.waitForSelector('td[data-label="Done"]', { state: 'attached', timeout: 20000 });
+await page.waitForSelector('td[data-label="In"]', { state: 'attached', timeout: 20000 });
 const cells = await page.$$eval('td.num', els => els.map(e => e.textContent.trim()));
 ok('a leg with a guess in it reads ~', cells.includes('~480cal'), true);
 ok('and only that one', cells.filter(c => c.startsWith('~')), ['~480cal']);
