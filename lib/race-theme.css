@@ -628,6 +628,13 @@ label.field > .hint {
 /* An AI on the race, marked as one. */
 .access-list .row .tag.ai { color: var(--accent); border-color: var(--accent); }
 .ax-ai-steps { margin: 10px 0 6px; padding-left: 20px; font-size: 12px; line-height: 1.6; }
+.ax-ai-page { margin: 14px 0 4px; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
+.ax-ai-page summary { cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--text); min-height: 32px; display: flex; align-items: center; }
+.ax-ai-page summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.ax-ai-page[open] summary { margin-bottom: 6px; }
+.ax-ai-prompt { width: 100%; box-sizing: border-box; margin: 8px 0; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  line-height: 1.5; color: var(--text-dim); background: var(--bg); border: 1px solid var(--border-bright); border-radius: 4px; padding: 8px; resize: vertical; }
 /* Words, in a box made for an address: break between them, not inside. */
 .access-invite-result .ax-ai-what, .access-invite-result .ax-ai-steps, .access-invite-result .access-hint { word-break: normal; overflow-wrap: break-word; }
 .ax-ai-privacy { margin-top: 8px; }

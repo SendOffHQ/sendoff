@@ -60,6 +60,22 @@ ok('and how to connect it in Claude', (await page.textContent('#ax-ai-result .ax
 ok('the AI is on the roster, marked as one', await page.$$eval('#access .access-list .row', rows => rows
   .filter(r => r.querySelector('.tag.ai')).map(r => r.textContent.replace(/\s+/g, ' ').trim())), ['Claude AI crew for Test Racer AI']);
 ok('its link is listed to copy again or remove', await page.$$eval('#ax-ai [data-revoke-ai]', els => els.map(e => e.dataset.aiLabel)), ['Claude']);
+
+// A race page in Claude, asked for after Rio del Lago: the prompt that has
+// the racer's own Claude build one phone screen with the race and a crew chat.
+const pageBox = await page.evaluate(() => {
+  const d = document.querySelector('#ax-ai .ax-ai-page');
+  const t = d && d.querySelector('.ax-ai-prompt');
+  return d && { open: d.open, summary: d.querySelector('summary').textContent.trim(), prompt: t ? t.value : '',
+    copy: !!d.querySelector('button[data-copy-share]') && d.querySelector('button[data-copy-share]').dataset.copyShare === t.value };
+});
+ok('then the steps for a race page in Claude, opened', pageBox && [pageBox.open, pageBox.summary, pageBox.copy], [true, 'Build a race page in Claude', true]);
+ok('with a prompt for this racer and the SendOff tools it can use', pageBox && [
+  pageBox.prompt.includes("It's for Test Racer at "),
+  pageBox.prompt.includes('tools: ["race_status", "log_item", "log_intake", "add_note", "mark_notes_read"]'),
+  pageBox.prompt.includes('mcp.watchTool("SendOff", "race_status"'),
+  pageBox.prompt.includes('needs_reauth')], [true, true, true, true]);
+ok('and no long dash in it', /\u2014/.test(pageBox.prompt), false);
 await page.click('#ax-ai [data-revoke-ai]');
 await page.waitForFunction(() => !document.querySelector('#ax-ai [data-revoke-ai]'), null, { timeout: 10000 });
 ok('removing asks first, then it is gone', [/Remove Claude\? Its link stops working at once\./.test(dialogs.at(-1)),
