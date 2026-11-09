@@ -103,6 +103,12 @@ ok('and it all fits a phone', await page.evaluate(() => document.documentElement
 await until(async () => !!(await leg(2)).startTime);
 await page.click('.rundo-feel [data-feel="good"]');
 await until(async () => (await leg(1)).feelIn === 'good');
+// Two taps: the first only asks. An accidental tap after a check-in skipped
+// Overlook at Rio del Lago and nobody noticed (2026-11-09).
+await page.click('#skip');
+ok('the first tap only asks, and says what a skip would do',
+  [(await page.textContent('#skip')).replace(/\s+/g, ' ').trim(), (await leg(1)).skipped || false],
+  ['Tap again to confirm the skip You went past Music Pass without checking in, and you are at Music Meadows 1 now.', false]);
 await page.click('#skip');
 const skipped = await until(async () => (await leg(1)).skipped === true && !!(await leg(2)).endTime && (await leg(2)).feelIn === 'good');
 ok('Skipped makes it the arrival at Music Meadows', skipped, true);
@@ -136,9 +142,9 @@ console.log('\ntwo stations missed');
 await page.waitForSelector('#go');
 await page.click('#go');
 await page.waitForSelector('#skip');
-await page.click('#skip');
+await page.click('#skip'); await page.click('#skip');
 await page.waitForSelector('.rundo .skipped');
-await page.click('#skip');
+await page.click('#skip'); await page.click('#skip');
 await until(async () => !!(await leg(3)).endTime);
 const ls2 = await readLegs();
 ok('a second tap skips the next one too', [ls2.map(l => [l.index, !!l.skipped, !!l.endTime]), await page.textContent('.rundo .skipped')],
@@ -150,7 +156,7 @@ await setLegs([{ index: 1, startTime: START }]);
 await openRacer();
 await page.click('#go');
 await page.waitForSelector('#skip');
-await page.click('#skip');
+await page.click('#skip'); await page.click('#skip');
 await until(async () => !!(await leg(2)).endTime);
 l1 = await leg(1); l2 = await leg(2);
 const stretch = await page.evaluate(([a, b]) => Race.fmt.durationShort((Date.parse(b) - Date.parse(a)) / 1000), [START, l2.endTime]);
@@ -193,11 +199,11 @@ await openRacer();
 await page.click('#go');
 await page.waitForSelector('#skip');
 ok('past Music Meadows 3 is Music Pass 2', /Past Music Meadows 3, at Music Pass 2 now/.test(await page.textContent('#skip')), true);
-await page.click('#skip');
+await page.click('#skip'); await page.click('#skip');
 await until(async () => !!(await leg(16)).startTime);
 ok('a checkpoint skipped to is passed through, as a press there is', [!!(await leg(15)).endTime, !!(await leg(16)).startTime, !!(await leg(16)).endTime], [true, true, false]);
 ok('and then the finish', /Past Music Pass 2, at Finish now/.test(await page.textContent('#skip')), true);
-await page.click('#skip');
+await page.click('#skip'); await page.click('#skip');
 await until(async () => !!(await leg(16)).endTime);
 ok('which ends the race, with nothing past it to skip to', [!!(await leg(16)).endTime, !!(await leg(15)).skipped, await page.$('#skip')], [true, true, null]);
 
@@ -215,6 +221,8 @@ ok('after it, the same offer as the racer\'s phone',
 ok('counting down', /Skipped · check-in missed · 1\ds/.test((await page.textContent('.skip-btn .k')).replace(/\s+/g, ' ')), true);
 ok('and it fits a phone', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 await until(async () => !!(await leg(2)).startTime);
+await page.click('.skip-btn');
+ok('on the crew page too, the first tap only asks', /Tap again to confirm the skip/.test(await page.textContent('.skip-btn')), true);
 await page.click('.skip-btn');
 ok('Skipped makes it the arrival at Music Meadows',
   await until(async () => (await leg(1)).skipped === true && !!(await leg(2)).endTime && !(await leg(3)).startTime), true);

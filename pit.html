@@ -170,6 +170,9 @@
     letter-spacing: 0.08em; text-transform: uppercase; }
   .skip-btn .d { display: block; font-size: 12px; color: var(--text-muted); margin-top: 3px; }
   .skip-btn:hover { color: var(--yellow); border-color: var(--yellow); }
+  /* Armed: the first tap only asks, the second skips. */
+  .skip-btn.armed { color: var(--yellow); border: 1px solid var(--yellow); background: rgba(255, 196, 0, 0.08); }
+  .skip-btn.armed .d { color: var(--text); }
   .skip-note { color: var(--yellow); font-family: 'JetBrains Mono', monospace; font-size: 11px; margin-bottom: 8px; }
   .skip-note:last-child { margin-bottom: 0; }
 
@@ -422,6 +425,22 @@
   // wanted it: the check-in just made is really the arrival at the next one.
   // The station in between is marked missed and the time since the last
   // check-in is one stretch (Race.skip). Another tap skips the next one too.
+  // Two taps, not one: the first says what a skip would do and the second does
+  // it, so a thumb landing here by accident after a check-in changes nothing.
+  // The offer is held a few seconds longer so it does not vanish between them.
+  function armOrSkip(runnerId) {
+    const p = pitPress[runnerId];
+    if (!p || Date.now() >= p.until) return;
+    if (!p.armed) {
+      p.armed = true;
+      p.until = Math.max(p.until, Date.now() + 8000);
+      drawSkip();
+      return;
+    }
+    p.armed = false;
+    skipStation(runnerId);
+  }
+
   async function skipStation(runnerId) {
     const p = pitPress[runnerId];
     const runner = (data.runners || []).find(r => r.id === runnerId);
@@ -460,15 +479,19 @@
     // stations on the lap were never going to be pressed, so nothing to offer.
     const more = !p.pit && pressed + 1 <= Race.course.legCount(cfg);
     return (names.length ? `<div class="skip-note">${p.pit ? 'Filled in by distance' : 'Skipped'}: ${escapeHtml(names.join(', '))}. Undo last takes it back.</div>` : '') +
-      (more ? `<button class="skip-btn" type="button" data-action="skip" data-runner="${escapeAttr(runnerId)}">` +
-        `<span class="k">Skipped · check-in missed · <span data-skip-left></span></span>` +
-        `<span class="d">Past ${escapeHtml(Race.skip.stopName(cfg, pressed))}, at ${escapeHtml(Race.skip.stopName(cfg, pressed + 1))} now</span></button>` : '');
+      (more ? (p.armed
+        ? `<button class="skip-btn armed" type="button" data-action="skip" data-runner="${escapeAttr(runnerId)}">` +
+          `<span class="k">Tap again to confirm the skip · <span data-skip-left></span></span>` +
+          `<span class="d">They went past ${escapeHtml(Race.skip.stopName(cfg, pressed))} without checking in, and are at ${escapeHtml(Race.skip.stopName(cfg, pressed + 1))} now.</span></button>`
+        : `<button class="skip-btn" type="button" data-action="skip" data-runner="${escapeAttr(runnerId)}">` +
+          `<span class="k">Skipped · check-in missed · <span data-skip-left></span></span>` +
+          `<span class="d">Past ${escapeHtml(Race.skip.stopName(cfg, pressed))}, at ${escapeHtml(Race.skip.stopName(cfg, pressed + 1))} now</span></button>`) : '');
   }
   function drawSkip() {
     document.querySelectorAll('[data-skip-slot]').forEach(slot => {
       const p = pitPress[slot.dataset.skipSlot];
       const live = p && Date.now() < p.until;
-      const key = live ? `${p.until}-${p.skips}` : '';
+      const key = live ? `${p.until}-${p.skips}-${p.armed ? 1 : 0}` : '';
       if (slot.dataset.key !== key) { slot.dataset.key = key; slot.innerHTML = skipSlotHtml(slot.dataset.skipSlot); }
       const left = slot.querySelector('[data-skip-left]');
       if (left && live) left.textContent = `${Math.ceil((p.until - Date.now()) / 1000)}s`;
@@ -1328,7 +1351,7 @@
     if (!t) return;
     const action = t.dataset.action;
     if (action === 'press') press(t.dataset.runner);
-    else if (action === 'skip') skipStation(t.dataset.runner);
+    else if (action === 'skip') armOrSkip(t.dataset.runner);
     else if (action === 'undo') deleteLastEvent(t.dataset.runner);
     else if (action === 'stop') stopRunner(t.dataset.runner);
     else if (action === 'save-intake') saveIntake(t.dataset.runner);

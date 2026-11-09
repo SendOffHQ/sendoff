@@ -250,6 +250,10 @@
     letter-spacing: 0.08em; text-transform: uppercase; }
   .rundo-skip .d { display: block; font-size: 12px; color: var(--text-muted); margin-top: 3px; }
   .rundo-skip:hover { color: var(--yellow); border-color: var(--yellow); }
+  /* Armed: the first tap only asks. A thumb landing here by accident after a
+     check-in skipped Overlook at Rio del Lago, and nobody noticed. */
+  .rundo-skip.armed { color: var(--yellow); border: 1px solid var(--yellow); background: rgba(255, 196, 0, 0.08); }
+  .rundo-skip.armed .d { color: var(--text); }
   .rundo-msg .skipped { display: block; color: var(--yellow); font-size: 11px; margin-top: 4px; }
   .rundo-msg .stamp { display: block; color: var(--green); font-size: 15px; font-weight: 700; }
   .rundo-msg .fade { display: block; color: var(--text-muted); font-size: 11px; margin-top: 4px; }
@@ -704,7 +708,8 @@
       const left = Math.ceil((undoUntil - Date.now()) / 1000);
       // Drawn once per press and then only the countdown moves: redrawing the
       // whole bar every second would take a face out from under a thumb.
-      const bar = act.querySelector(`.rundo[data-undo="${undoUntil}"]`);
+      const barKey = `${undoUntil}-${skipArmed && skipArmed === undoPress ? 'armed' : ''}`;
+      const bar = act.querySelector(`.rundo[data-undo="${barKey}"]`);
       if (bar) {
         bar.querySelector('.fade').textContent = `Undo for ${left}s`;
         return;
@@ -714,7 +719,7 @@
       // Not said for a check-in at the pit: those stations were never pressed.
       const skipped = undoPress && undoPress.skips && !undoPress.pit
         ? Race.skip.missed(cfg, { first: undoPress.legIndex, last: undoPress.legIndex + undoPress.skips }) : [];
-      act.innerHTML = `<div class="rundo" data-undo="${undoUntil}">
+      act.innerHTML = `<div class="rundo" data-undo="${barKey}">
         <span class="rundo-msg">
           <span class="stamp">${esc(undoLabel)}</span>
           ${skipped.length ? `<span class="skipped">Skipped: ${esc(skipped.join(', '))}</span>` : ''}
@@ -726,12 +731,15 @@
             aria-pressed="${chosen === k}" aria-label="${Race.feel.LABEL[k]}">${Race.feel.svg(k, 40)}</button>`).join('')}</span>
         </div>` : ''}
         <button class="rundo-btn" type="button" id="undo">Undo</button>
-        ${skip ? `<button class="rundo-skip" type="button" id="skip"><span class="k">Skipped · check-in missed</span>
-          <span class="d">Past ${esc(skip.past)}, at ${esc(skip.at)} now</span></button>` : ''}
+        ${skip ? (skipArmed === undoPress
+          ? `<button class="rundo-skip armed" type="button" id="skip"><span class="k">Tap again to confirm the skip</span>
+          <span class="d">You went past ${esc(skip.past)} without checking in, and you are at ${esc(skip.at)} now.</span></button>`
+          : `<button class="rundo-skip" type="button" id="skip"><span class="k">Skipped · check-in missed</span>
+          <span class="d">Past ${esc(skip.past)}, at ${esc(skip.at)} now</span></button>`) : ''}
       </div>`;
       document.getElementById('undo').addEventListener('click', undoLast);
       const sk = document.getElementById('skip');
-      if (sk) sk.addEventListener('click', skipStation);
+      if (sk) sk.addEventListener('click', armOrSkip);
       act.querySelectorAll('[data-feel]').forEach(b => b.addEventListener('click', () => chooseFeel(b.dataset.feel)));
       return;
     }
@@ -968,6 +976,21 @@
   // station in between missed, and the time from the last check-in to now one
   // stretch rather than a long leg and a one-second one. A second tap skips
   // another. Undo still takes back the whole press.
+  // Two taps, not one: the first says what a skip would do and the second does
+  // it. Held for a few seconds longer than the Undo would have been, so the
+  // bar does not vanish between the two.
+  let skipArmed = null;
+  function armOrSkip() {
+    if (skipArmed !== undoPress) {
+      skipArmed = undoPress;
+      undoUntil = Math.max(undoUntil, Date.now() + 8000);
+      render();
+      return;
+    }
+    skipArmed = null;
+    skipStation();
+  }
+
   async function skipStation() {
     if (!skipOffer() || Date.now() >= undoUntil) return;
     const p = undoPress;
