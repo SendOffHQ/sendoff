@@ -50,7 +50,7 @@ export function isTimed(cfg) { return !!(cfg && cfg.courseType === 'loops' && cf
 export function endsAt(cfg) {
   const start = cfg && cfg.startTime ? Date.parse(cfg.startTime) : NaN;
   const h = num(cfg && cfg.cutoffs && cfg.cutoffs.totalHours);
-  return Number.isFinite(start) && h > 0 ? start + h * 3600e3 : null;
+  return Number.isFinite(start) && h > 0 ? start + Math.round(h * 60) * 60000 : null;
 }
 // Each loop, with its own aid stations (segments within one lap) when it has
 // any. A course with no loops list is one loop: loopSegments, or a plain lap.
@@ -177,9 +177,16 @@ export function whereIs(cfg, runner) {
     if (l.startTime) events.push({ ts: Date.parse(l.startTime), idx: l.index, action: 'out', seq: 0 });
     if (l.endTime) events.push({ ts: Date.parse(l.endTime), idx: l.index, action: 'in', seq: 1 });
   }
-  events.sort((a, b) => (a.ts - b.ts) || (a.idx - b.idx) || (a.seq - b.seq));
+  // By place in the race, not by the clock, the way the pages read it: a
+  // time corrected out of order must not move the racer back a station.
+  events.sort((a, b) => (a.idx - b.idx) || (a.seq - b.seq));
   const last = events[events.length - 1];
   if (!last) return { state: 'not started', leg: 0, intakeLeg: null };
+  // Out of a race to a finish (the crew page's "Dropped", or the racer's own
+  // screen). What was eaten can still be logged against where they stopped.
+  if (!isTimed(cfg) && runner && runner.stoppedAt && !(last.action === 'in' && last.idx >= legCount(cfg))) {
+    return { state: 'dropped', leg: last.idx, intakeLeg: last.idx, since: Date.parse(runner.stoppedAt) || last.ts };
+  }
   if (last.action === 'out') return { state: 'on course', leg: last.idx, intakeLeg: last.idx, since: last.ts };
   if (isTimed(cfg) ? runnerDone(cfg, runner) : last.idx >= legCount(cfg)) return { state: 'finished', leg: last.idx, intakeLeg: null, since: last.ts };
   return { state: 'at aid station', leg: last.idx, intakeLeg: last.idx, since: last.ts };
@@ -350,7 +357,7 @@ export function raceStatus(cfg, data, runnerId, now) {
   const arrived = legs.map(l => Date.parse(l && l.endTime)).filter(Number.isFinite);
   const lastIn = arrived.length ? Math.max(...arrived) : NaN;
   const stop = Date.parse(runner.stoppedAt);
-  const endedAt = !(where.state === 'finished' || runnerDone(cfg, runner, now)) ? NaN
+  const endedAt = !(where.state === 'finished' || where.state === 'dropped' || runnerDone(cfg, runner, now)) ? NaN
     : Number.isFinite(stop) && (!Number.isFinite(lastIn) || stop > lastIn) ? stop : lastIn;
   const until = Number.isFinite(endedAt) ? Math.min(now, endedAt) : now;
   const elapsedH = !isNaN(start) && until > start ? (until - start) / 3600e3 : 0;
@@ -395,7 +402,7 @@ export function raceStatus(cfg, data, runnerId, now) {
 
   // The leg the racer is on, or about to start, and the station ahead.
   const legNo = where.state === 'at aid station' ? where.leg + 1 : where.state === 'not started' ? 1 : where.leg;
-  const ahead = where.state !== 'finished' ? legAt(cfg, legNo) : null;
+  const ahead = where.state !== 'finished' && where.state !== 'dropped' ? legAt(cfg, legNo) : null;
   if (where.state === 'at aid station') {
     const here = legAt(cfg, where.leg);
     out.atStation = here ? { name: here.to, at: distance(here.cumulativeMi, cfg), arrived: clock(where.since, cfg, true),
@@ -407,7 +414,9 @@ export function raceStatus(cfg, data, runnerId, now) {
       dropBag: !!ahead.station.dropBag, pacerPickup: !!ahead.station.pacerEligible,
       checkpointOnly: !!ahead.station.checkpoint, crewNote: ahead.station.crewNote || null };
     if (ahead.cutoffHours != null && !isNaN(start)) {
-      const at = start + ahead.cutoffHours * 3600e3;
+      // On the whole minute: a third of an hour is not a number held exactly,
+      // and a clock a moment short of 6:20 reads 6:19 (the pages do the same).
+      const at = start + Math.round(ahead.cutoffHours * 60) * 60000;
       next.cutoff = clock(at, cfg, true);
       next.cutoffIn = now < at ? hm(at - now) : 'passed';
     }

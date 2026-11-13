@@ -8,7 +8,7 @@
 // Wrong passwords are now counted per account and per client address, and a
 // token carries the account's session epoch, which goes up when the password
 // is changed or reset. Neither may cost the KV allowance much: a sign-in that
-// works writes nothing, and the epoch is read at most once a minute.
+// works writes nothing, and the epoch is read at most once in five minutes.
 //
 //   node worker/test/login-limit.mjs
 import worker from '../src/worker.js';
@@ -128,8 +128,8 @@ ok('signed in', await works(mine), 200);
 // What that other copy wrote: the new password's record, with the epoch raised.
 kv.set('user:' + YOU, JSON.stringify({ email: YOU, ...await cred('changed-elsewhere'), sessionEpoch: 1 }));
 ok('this copy has not looked yet', await works(mine), 200);
-skew += 61 * 1000;
-ok('a minute on, it has, and the old session is over', await works(mine), 401);
+skew += 301 * 1000;
+ok('five minutes on, it has, and the old session is over', await works(mine), 401);
 
 console.log('\na reset link ends sessions too');
 const adminToken = (await login(ADMIN, 'right-password')).token;
@@ -143,7 +143,7 @@ ok('and everything signed in before it is out', [await works(stale), await works
 // crew is signed out of a race in progress.
 console.log('\nwhen the account cannot be read');
 const fresh = (await login(ADMIN, 'right-password')).token;
-skew += 61 * 1000;
+skew += 301 * 1000;
 kvDown = 'user:';
 ok('a signed, unexpired token is not refused over it', await works(fresh), 200);
 ok('but one already known to be over stays over', await works(stale), 401);

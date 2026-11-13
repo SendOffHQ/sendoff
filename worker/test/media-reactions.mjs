@@ -112,5 +112,17 @@ const busy = await upload('busy');
 for (let i = 0; i < 300; i++) await react(other, busy.id, '👏', i % 2 ? false : undefined);
 ok('three hundred an hour, then a pause', (await react(other, busy.id, '👏')).status, 429);
 
+// An upload whose answer is lost is sent again. The phone names each photo,
+// so the second copy is recognised rather than stored as a second photograph.
+console.log('\nthe same photo sent twice');
+{
+  const cid = '11111111-2222-4333-8444-555555555555';
+  const send = (slug) => call(`/media?id=${slug}&leg=1&cid=${cid}`, { token: owner, type: 'image/jpeg', raw: true, body: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]) });
+  const slug = Object.keys(Object.fromEntries(env.DB.races))[0];
+  const before = (await list(slug, owner)).media.length;
+  const one = await send(slug), two = await send(slug);
+  ok('is one photo', [one.media.id, two.media.id, two.duplicate, (await list(slug, owner)).media.length - before], [cid, cid, true, 1]);
+}
+
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

@@ -352,7 +352,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
-<script src="lib/race-core.js?v=08a0311f"></script>
+<script src="lib/race-core.js?v=be1d1aab"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -853,7 +853,20 @@
     const n = Race.course.legCount(cfg);
     const stations = [];
     for (let i = 1; i <= n; i++) { const st = Race.stationAt(cfg, i); stations.push(i === n ? 'the finish' : ((st && st.name) || `station ${i}`)); }
-    await Race.api.pushSubscribe({ slug, runnerId: meId, endpoint: sub.endpoint, legs: Race.course.isTimed(cfg) ? 0 : n, stations });
+    const body = () => ({ slug, runnerId: meId, endpoint: sub.endpoint, legs: Race.course.isTimed(cfg) ? 0 : n, stations });
+    const said = await Race.api.pushSubscribe(body());
+    // The worker says which key it signs with. A subscription made with any
+    // other key can never be delivered to, and the browser goes on handing
+    // back the one it has, so without this a changed key meant a reminder
+    // that said "on" and never arrived. Made again with the right key.
+    const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const mine = sub.options && sub.options.applicationServerKey ? b64(sub.options.applicationServerKey) : null;
+    if (said && said.key && mine && said.key.replace(/=+$/, '') !== mine) {
+      await sub.unsubscribe().catch(() => {});
+      const raw = Uint8Array.from(atob(said.key.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - said.key.length % 4) % 4)), c => c.charCodeAt(0));
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: raw });
+      await Race.api.pushSubscribe(body());
+    }
   }
   async function toggleNudge() {
     const btn = document.getElementById('nudge-toggle');
@@ -862,8 +875,17 @@
       if (nudgeOn()) {
         const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.getSubscription();
-        if (sub) { await Race.api.pushUnsubscribe(sub.endpoint).catch(() => {}); await sub.unsubscribe().catch(() => {}); }
+        // This race only. The phone has one subscription for every race it
+        // watches, and dropping it here used to switch the reminder off for
+        // any other race too, while that race's screen went on saying "on".
+        // It is given up only when no other race on this phone still wants it.
         try { localStorage.removeItem(NUDGE_KEY); } catch (e) {}
+        let others = false;
+        try { others = Object.keys(localStorage).some(k => k.startsWith('sendoff-nudge-') && localStorage.getItem(k) === '1'); } catch (e) {}
+        if (sub) {
+          await Race.api.pushUnsubscribe(sub.endpoint, slug, meId).catch(() => {});
+          if (!others) await sub.unsubscribe().catch(() => {});
+        }
         toast('Send-off reminder off', 'ok');
       } else {
         if (await Notification.requestPermission() !== 'granted') { redrawNudge(); return; }

@@ -346,10 +346,12 @@ async function requireAuth(req, env) {
 //
 // Every request with a session goes through requireAuth, and KV reads are
 // counted against a daily allowance, so the number is remembered per isolate
-// for a minute rather than read each time. That minute, plus the time KV takes
-// to carry a write to another location, is how long an old token can outlive
-// a password change.
-const SESSION_EPOCH_CACHE_MS = 60 * 1000;
+// for five minutes rather than read each time: a crew page polls every few
+// seconds for a day and a half, and a read a minute for each of them is a
+// large share of that allowance. Those five minutes, plus the time KV takes
+// to carry a write to another location, are how long an old token can
+// outlive a password change.
+const SESSION_EPOCH_CACHE_MS = 5 * 60 * 1000;
 const sessionEpochs = new Map();   // email -> { epoch, at }
 
 function rememberSessionEpoch(email, epoch) {
@@ -3269,7 +3271,24 @@ async function handleMediaUpload(req, env, ctx) {
   }
 
   const ext = type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg';
-  const id = crypto.randomUUID();
+  // The phone names each photo before it sends it. An upload whose answer is
+  // lost on the way back is sent again, and with nothing to tell the two
+  // apart the second copy went in as a second photograph. The phone's name
+  // for it is the id, so a repeat finds the row already there and is told so.
+  const cid = (url.searchParams.get('cid') || '').toLowerCase();
+  const named = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(cid) ? cid : null;
+  if (named) {
+    try {
+      const had = await env.DB.prepare('SELECT * FROM media WHERE id = ?').bind(named).all();
+      const row0 = had && had.results && had.results[0];
+      if (row0) {
+        // Somebody else's id, or one from another race, is not this photo.
+        if (row0.slug !== slug) return json({ error: 'That photo id is already in use' }, { status: 409 }, env, req);
+        return json({ media: mediaRow(env, row0), duplicate: true }, { status: 200 }, env, req);
+      }
+    } catch (e) { /* cannot tell: carry on and let the insert decide */ }
+  }
+  const id = named || crypto.randomUUID();
   const key = `races/${slug}/media/${id}.${ext}`;
 
   await env.MEDIA.put(key, body, {

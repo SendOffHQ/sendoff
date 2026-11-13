@@ -252,6 +252,25 @@ console.log('\nper hour, once they are done');
   ok('ran to the end of a timed race: up to their last lap', perHour(timedR, { id: 'pat', legs: stopped.legs }, 40), 229);
 }
 
+// A racer who drops out of a race to a finish (the crew page's "Dropped"), a
+// time corrected out of order, and a cutoff that is a third of an hour.
+console.log('\ndropped, out of order, and a cutoff on its minute');
+{
+  const { raceStatus } = await import('../src/ai-crew.js');
+  const T0 = Date.parse('2026-10-03T12:00:00Z'), at = (h) => new Date(T0 + h * 3600e3).toISOString();
+  const cfgD = { courseType: 'segments', startTime: at(0), timezone: 'UTC', cutoffs: { totalHours: 30 },
+    course: { segments: [{ toAid: 'A', distanceMi: 10, arriveCutoffHours: 4 }, { toAid: 'B', distanceMi: 10, arriveCutoffHours: 13.33 }, { toAid: 'Finish', distanceMi: 10 }] },
+    runners: [{ id: 'pat', name: 'Pat' }] };
+  const out = { id: 'pat', stoppedAt: at(6), legs: [{ index: 1, startTime: at(0), endTime: at(5), calories: 1200 }] };
+  const d = raceStatus(cfgD, { runners: [out] }, 'pat', T0 + 40 * 3600e3);
+  ok('dropped is said, and nothing is next', [d.state, d.nextStation || null], ['dropped', null]);
+  ok('and per hour stops where they did', d.intake.perHourSoFar['Calories (cal)'], 200);
+  const going = { id: 'pat', legs: [{ index: 1, startTime: at(0), endTime: at(5) }, { index: 2, startTime: at(4.9) }] };
+  const g = raceStatus(cfgD, { runners: [going] }, 'pat', T0 + 6 * 3600e3);
+  ok('a send-off corrected to before the arrival is still a send-off', [g.state, g.nextStation.to], ['on course', 'B']);
+  ok('13.33 hours after noon is 1:20 AM, not 1:19', g.nextStation.cutoff, 'Sun 1:20 AM');
+}
+
 console.log('\ntaken away');
 const rev = await call('/ai-crew/revoke', { token: crew, body: { token: made.token } });
 ok('crew who cannot hand out access cannot take it away', rev.status, 403);
