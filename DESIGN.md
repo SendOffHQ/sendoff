@@ -232,6 +232,9 @@ Sizes:
   and nothing there can be pressed. Undo, the faces and Skipped stack above it, Skipped
   furthest, and for 0.7 seconds after the press none of them answer. A double tap must never
   be read as a second decision (`test/skip-station.mjs`).
+- **When the board cannot know, the button asks.** In a backyard a bell that rings with no
+  check-in splits the big button in two, the answer that keeps the racer in on the left in its
+  own colour and the one that puts them out on the right in red. Neither is pressed for the crew.
 - **Pinch zoom is never switched off.** No `user-scalable=no`, no `maximum-scale=1`.
 - Pages work offline from the cache and say when they last updated. A screen that may be stale
   says so in words, not only with a colour.

@@ -297,6 +297,9 @@
   .progress .step.done::before { content: '✓ '; color: var(--green); }
   .progress .step.pending::before { content: '• '; color: var(--text-muted); }
   .progress .step.fail::before { content: '✗ '; color: var(--red); }
+  /* A choice that is a sentence: the box, then what it does. */
+  .check-field { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--text-dim); line-height: 1.5; }
+  .check-field input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 auto; margin: 2px 0 0; accent-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -458,7 +461,7 @@
       <span class="hint">Where the race is. The start, the cutoffs and every split are in this
         zone, and everyone following sees the race's own clock.</span>
     </label>
-    <div class="grid-2">
+    <div class="grid-2" id="race-cutoff-grid">
       <div class="field">
         <span class="lbl" id="race-cutoff-lbl">Finish cutoff</span>
         <div id="race-cutoff-pick"></div>
@@ -528,7 +531,25 @@
               <span class="desc">As many laps as fit before the clock runs out. The race ends at the finish cutoff.</span>
             </div>
           </label>
+          <label>
+            <input type="radio" name="fmt" value="backyard" />
+            <div class="radio-content">
+              <span class="title">Backyard</span>
+              <span class="desc">A lap on every bell. Not back by the next bell, or not out on one, and you are out. Last one standing wins.</span>
+            </div>
+          </label>
         </div>
+      </div>
+      <div id="backyard-fields" style="display:none">
+        <label class="field">
+          <span class="lbl">Bell every (minutes)</span>
+          <input type="number" id="bell-interval" min="1" max="1440" step="1" value="60" />
+          <span class="hint">60 for the usual backyard: 4.167 miles on the hour, every hour.</span>
+        </label>
+        <label class="field check-field">
+          <input type="checkbox" id="bell-auto" checked />
+          <span>Send off automatically on the bell. A runner back in time goes out with the bell without anybody pressing anything. Off, and the crew sends each lap off.</span>
+        </label>
       </div>
       <label class="field" id="loop-count-field">
         <span class="lbl">Number of laps</span>
@@ -753,7 +774,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=732ba36f"></script>
+<script src="lib/race-core.js?v=54ee8fd8"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -971,10 +992,22 @@
   // Timed or a set number of laps. Timed has no lap count, and its finish
   // cutoff is when the race ends rather than a deadline to beat.
   function setFormat(f) {
-    state.format = f === 'timed' ? 'timed' : 'distance';
-    const timed = state.courseType === 'loops' && state.format === 'timed';
+    state.format = f === 'timed' || f === 'backyard' ? f : 'distance';
+    const loops = state.courseType === 'loops';
+    const timed = loops && state.format !== 'distance';
+    const yard = loops && state.format === 'backyard';
     document.getElementById('loop-count-field').style.display = timed ? 'none' : '';
     document.getElementById('race-cutoff-lbl').textContent = timed ? 'Race ends' : 'Finish cutoff';
+    // A backyard ends when one runner is left, so it has no finish cutoff
+    // and no last-lap gate to set.
+    document.getElementById('backyard-fields').style.display = yard ? '' : 'none';
+    document.getElementById('race-cutoff-grid').style.display = yard ? 'none' : '';
+    // The yard: 4.167 miles, which is 100 miles in 24 hours. Put in for a
+    // lap nobody has changed from the form's own starting figure.
+    if (yard && state.loops.length === 1 && (state.loops[0].distance === '10' || state.loops[0].distance === '')) {
+      state.loops[0].distance = state.units.distance === 'km' ? '6.706' : '4.167';
+      renderLoopRows();
+    }
     renderLoopsSummary();
     syncGoalHints();
   }
@@ -1088,7 +1121,7 @@
     const rows = loopRowsAsConfig();
     const d = (mi) => Race.units.distance(mi, { units: state.units });
     const round = rows.reduce((a, l) => a + l.distanceMi * (rows.length > 1 ? l.times : 1), 0);
-    const timed = state.format === 'timed';
+    const timed = state.format !== 'distance';
     const laps = parseInt(document.getElementById('loop-count').value, 10) || 0;
     let text;
     if (rows.length > 1) {
@@ -1265,7 +1298,7 @@
   // holds them to it the way it holds them to the cutoff. Which it is follows
   // the format, so the box says which as the format changes.
   function goalCfg() {
-    return { courseType: state.courseType, format: state.courseType === 'loops' && state.format === 'timed' ? 'timed' : undefined,
+    return { courseType: state.courseType, format: state.courseType === 'loops' && state.format !== 'distance' ? state.format : undefined,
       units: state.units };
   }
   function goalHint() { return Race.goal.placeholder(goalCfg()); }
@@ -1624,8 +1657,15 @@
     const officialGainFt = Race.units.toFeet(document.getElementById('official-gain').value, { units: state.units });
 
     if (state.courseType === 'loops') {
-      const timed = state.format === 'timed';
-      if (timed) cfg.format = 'timed';
+      const timed = state.format !== 'distance';
+      if (timed) cfg.format = state.format;
+      if (state.format === 'backyard') {
+        cfg.backyard = {
+          intervalMin: Math.round(+document.getElementById('bell-interval').value) || 60,
+          autoStart: document.getElementById('bell-auto').checked
+        };
+        delete cfg.cutoffs.totalHours; delete cfg.cutoffs.lastLegStartHours;
+      }
       const rows = loopRowsAsConfig();
       cfg.course = timed ? {} : {
         loopCount: parseInt(document.getElementById('loop-count').value, 10) || 0
@@ -1699,7 +1739,7 @@
       activity: cfg.activity,
       totalDistanceMi: +Race.course.totalDistanceMi(cfg).toFixed(2),
       // A timed race has no distance to list; the hub says how long it runs.
-      ...(Race.course.isTimed(cfg) ? { format: 'timed' } : {}),
+      ...(Race.course.isTimed(cfg) ? { format: cfg.format } : {}),
       runnerNames: cfg.runners.map(r => r.name),
       cutoffHours: cfg.cutoffs.totalHours
       // No createdBy. The hub manifest is a file anyone can read, and the
@@ -1712,7 +1752,9 @@
     if (!cfg.name) errs.push('Race name is required.');
     if (!slug) errs.push('Slug could not be derived from name.');
     if (!cfg.startTime) errs.push('Start time is required.');
-    if (!(cfg.cutoffs.totalHours > 0)) errs.push('A finish cutoff after the start is required.');
+    const yard = Race.course.isBackyard(cfg);
+    if (yard && !(cfg.backyard.intervalMin >= 1 && cfg.backyard.intervalMin <= 1440)) errs.push('Set how many minutes there are between bells.');
+    if (!yard && !(cfg.cutoffs.totalHours > 0)) errs.push('A finish cutoff after the start is required.');
     // The last-lap gate was never checked: one before the start, or after the
     // finish cutoff, went in as it was.
     const gate = cfg.cutoffs.lastLegStartHours;
@@ -1738,7 +1780,7 @@
       if (g.error) errs.push(`${r.name.trim()}'s goal: put ${g.error}, or leave it blank.`);
     }
     if (cfg.courseType === 'loops') {
-      if (cfg.format !== 'timed' && !(cfg.course.loopCount >= 1)) errs.push('Number of laps is required, and has to be at least 1.');
+      if (!Race.course.isTimed(cfg) && !(cfg.course.loopCount >= 1)) errs.push('Number of laps is required, and has to be at least 1.');
       if (cfg.course.loops && cfg.course.loops.some(l => !(l.distanceMi > 0))) errs.push('Each loop needs a distance, or its stations.');
       else if (!cfg.course.loops && !cfg.course.loopDistanceMi) errs.push('Loop distance is required (set a distance per loop, or list loop aid stations).');
       for (const [i, l] of state.loops.entries()) {

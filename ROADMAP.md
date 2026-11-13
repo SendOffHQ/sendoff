@@ -50,9 +50,9 @@ After the race, in this order:
 **Reordered 2026-10-02**: time-based races and cheers and messages moved to
 the front, with usernames beside them as the start of following a racer.
 
-3. **Time-based races.** *Partly built 2026-10-14: timed loop races, and loop
-   courses of more than one loop, each with its own stations and course file.
-   Left: backyard rules.* 24-hour obstacle races, backyard ultras and fixed-time
+3. **Time-based races.** *Built: timed loop races, and loop courses of more
+   than one loop, each with its own stations and course file (2026-10-14);
+   backyard rules (2026-11-13).* 24-hour obstacle races, backyard ultras and fixed-time
    loops, where the clock is fixed and the distance is the result. The pit
    board already fits; what changes is everything that counts the race. See
    "Time-based races" in section 1.
@@ -1598,7 +1598,19 @@ drops any loop course file a saved config stops naming (never course.gpx). The m
 (or about to start from the pit) lit and the rest dim, with each racer's dot on
 their own loop and a chip per loop to pick the profile shown.
 
-**Still to do:** backyard rules; a setting for whether the lap at the horn
+**Backyard rules, built 2026-11-13:** format `backyard`, with `backyard.intervalMin`
+(60 unless set) and `backyard.autoStart` (on unless set). Lap n goes on bell
+n - 1 and is due back by bell n; with automatic send-off a runner back in time
+leaves on the bell without a press (worked out by `Race.backyard.view`, written
+down by any open crew page or racer screen and by the worker's scheduled run).
+A bell with no check-in splits the big button into back in time (the lap ends
+on the bell, marked `noTime`, and the next goes on it) or out (`stoppedAt` is
+the bell). With automatic send-off off, a bell nobody sent them off on splits
+it into off on that bell or did not start. The winner is marked by hand
+(`won`), because SendOff's roster is rarely the whole field. No send-off
+reminder in a backyard. `test/backyard.mjs`, `worker/test/backyard.mjs`.
+
+**Still to do:** a setting for whether the lap at the horn
 counts; laps per hour as the pace.
 
 #### As first written

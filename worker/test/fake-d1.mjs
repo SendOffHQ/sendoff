@@ -114,6 +114,9 @@ export function fakeD1() {
     const r = a.length ? races.get(a[0]) : null;
     if (sql === 'SELECT slug FROM races WHERE slug = ?') return r ? [{ slug: r.slug }] : [];
     if (sql === 'SELECT slug FROM races') return [...races.keys()].map(slug => ({ slug }));
+    if (sql === "SELECT slug, config, data FROM races WHERE config LIKE '%backyard%'") {
+      return [...races.values()].filter(x => String(x.config).includes('backyard')).map(x => ({ slug: x.slug, config: x.config, data: x.data }));
+    }
     if (sql === 'SELECT data FROM races WHERE slug = ?') return r ? [{ data: r.data }] : [];
     if (sql === 'SELECT created_by FROM races WHERE slug = ?') return r ? [{ created_by: r.created_by }] : [];
     if (sql === 'SELECT config, config_sha FROM races WHERE slug = ?') return r ? [{ config: r.config, config_sha: r.config_sha }] : [];

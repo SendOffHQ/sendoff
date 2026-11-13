@@ -294,6 +294,9 @@
   }
   .toast.error { color: var(--red); border-color: var(--red); }
   .toast.ok { color: var(--green); border-color: rgba(110,231,168,0.4); }
+  /* A choice that is a sentence: the box, then what it does. */
+  .check-row { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--text-dim); line-height: 1.5; }
+  .check-row input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 auto; margin: 2px 0 0; accent-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -413,7 +416,16 @@
       <select id="loops-format">
         <option value="distance">A set number of laps</option>
         <option value="timed">Timed: as many laps as fit</option>
+        <option value="backyard">Backyard: a lap on every bell, until one is left</option>
       </select>
+    </div>
+    <div class="row" id="loops-bell-row" style="display:none">
+      <label for="loops-interval">Bell every</label>
+      <input type="number" id="loops-interval" min="1" max="1440" step="1" aria-describedby="loops-interval-unit" />
+      <span id="loops-interval-unit" class="hint" style="margin:0">minutes</span>
+    </div>
+    <div class="row" id="loops-auto-row" style="display:none">
+      <label class="check-row"><input type="checkbox" id="loops-auto" /> Send off automatically on the bell</label>
     </div>
     <div class="row" id="loops-count-row">
       <label for="loops-count">Number of laps</label>
@@ -637,7 +649,7 @@
 
 <div id="toast" role="status" aria-live="polite" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=732ba36f"></script>
+<script src="lib/race-core.js?v=54ee8fd8"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -2034,7 +2046,9 @@
     const pat = Race.course.loopPattern(cfg);
     const listed = Array.isArray(cfg.course?.loops) ? cfg.course.loops : [];
     return {
-      format: Race.course.isTimed(cfg) ? 'timed' : 'distance',
+      format: Race.course.isBackyard(cfg) ? 'backyard' : Race.course.isTimed(cfg) ? 'timed' : 'distance',
+      intervalMin: Math.round(Race.backyard.intervalMs(cfg) / 60000),
+      autoStart: Race.backyard.autoStart(cfg),
       count: cfg.course?.loopCount || '',
       loops: pat.map((l, i) => ({
         // Kept through a save, so a loop's course file stays its own.
@@ -2063,9 +2077,16 @@
     const du = Race.units.distanceLabel(cfg), eu = Race.units.elevationLabel(cfg);
     document.getElementById('loops-format').value = st.format;
     document.getElementById('loops-count').value = st.count;
-    document.getElementById('loops-count-row').style.display = st.format === 'timed' ? 'none' : '';
+    document.getElementById('loops-count-row').style.display = st.format === 'distance' ? '' : 'none';
+    document.getElementById('loops-bell-row').style.display = st.format === 'backyard' ? '' : 'none';
+    document.getElementById('loops-auto-row').style.display = st.format === 'backyard' ? '' : 'none';
+    document.getElementById('loops-interval').value = st.intervalMin;
+    document.getElementById('loops-auto').checked = st.autoStart !== false;
     document.getElementById('loops-format-hint').textContent = st.format === 'timed'
       ? 'The race ends at the finish cutoff under Race details. Each runner runs as many laps as fit, and the crew can stop them early from the crew page.'
+      : st.format === 'backyard'
+      ? 'Every lap starts on the bell, the first one at the start. A runner not back by the next bell, or who does not go out on one, is out; the crew page asks which when a bell rings with no check-in. The race goes on until the last one standing.'
+        + (st.autoStart !== false ? ' A runner back in time goes out with the bell without anyone pressing anything.' : ' The crew sends each lap off on the bell.')
       : 'Done after the last lap.';
     const many = st.loops.length > 1;
     document.getElementById('loops-list').innerHTML = st.loops.map((l, li) => {
@@ -2168,7 +2189,7 @@
       ? loops.map(l => `${l.name} ×${l.times}`).join(', then ') + `, repeating: ${d(round)} a round.`
       : `${d(loops[0].distanceMi)} a lap.`;
     const n = parseInt(editingLoops.count, 10) || 0;
-    if (editingLoops.format !== 'timed' && n) {
+    if (editingLoops.format === 'distance' && n) {
       text += ` ${n} laps is ${d(Race.course.totalDistanceMi({ courseType: 'loops', course: { loopCount: n, loops: loops.map(l => ({ ...l })) } }))}.`;
     }
     el.textContent = text;
@@ -2176,10 +2197,12 @@
 
   async function saveLoops() {
     const st = editingLoops;
-    const timed = st.format === 'timed';
+    const timed = st.format === 'timed' || st.format === 'backyard';
     const n = parseInt(st.count, 10) || 0;
     const loops = loopsConfig();
     if (!timed && !(n > 0)) { toast('Set how many laps the race is.', 'error'); return; }
+    const interval = Math.round(+st.intervalMin);
+    if (st.format === 'backyard' && !(interval >= 1 && interval <= 1440)) { toast('Set how many minutes there are between bells.', 'error'); return; }
     for (const [i, l] of loops.entries()) {
       const raw = st.loops[i].stations;
       if (raw.length) {
@@ -2215,7 +2238,9 @@
       }
       const writtenCfg = await Race.gh.mutateJson(Race.auth.cfg(), CONFIG_PATH, (remote) => {
         const c = remote.course = remote.course || {};
-        if (timed) { remote.format = 'timed'; delete c.loopCount; } else { delete remote.format; c.loopCount = n; }
+        if (timed) { remote.format = st.format; delete c.loopCount; } else { delete remote.format; c.loopCount = n; }
+        if (st.format === 'backyard') remote.backyard = { intervalMin: interval, autoStart: st.autoStart !== false };
+        else delete remote.backyard;
         delete c.loops; delete c.loopSegments; delete c.loopDistanceMi; delete c.loopElevationGainFt;
         if (loops.length === 1 && !loops[0].segments.length) {
           // One plain loop is stored the way it always was.
@@ -2242,7 +2267,7 @@
         const e = (m.races || []).find(r => r.slug === slug);
         if (e) {
           e.totalDistanceMi = +Race.course.totalDistanceMi(writtenCfg).toFixed(2);
-          if (timed) e.format = 'timed'; else delete e.format;
+          if (timed) e.format = st.format; else delete e.format;
           m.lastUpdated = new Date().toISOString();
         }
         return m;
@@ -2404,6 +2429,8 @@
     document.getElementById('loops-editor').classList.toggle('collapsed');
   });
   document.getElementById('loops-format').addEventListener('change', (e) => { editingLoops.format = e.target.value; renderLoopsEditor(); });
+  document.getElementById('loops-interval').addEventListener('input', (e) => { editingLoops.intervalMin = e.target.value; });
+  document.getElementById('loops-auto').addEventListener('change', (e) => { editingLoops.autoStart = e.target.checked; renderLoopsEditor(); });
   document.getElementById('loops-count').addEventListener('input', (e) => { editingLoops.count = e.target.value; renderLoopsSummary(); });
   document.getElementById('add-loop').addEventListener('click', () => {
     const i = editingLoops.loops.length;

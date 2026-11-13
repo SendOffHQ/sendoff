@@ -3564,6 +3564,9 @@ function waitingAt(legs, totalLegs) {
 // course cannot be read here.
 function nudgeDue(cfg, runner, legsHint, now) {
   if (!runner || runner.stoppedAt || !Array.isArray(runner.legs)) return null;
+  // A backyard's stop is set by the bell, not by habit, and the bell is the
+  // reminder: nothing about a "usual stop" applies.
+  if (cfg && aiCrew.isBackyard(cfg)) return null;
   const end = cfg ? aiCrew.endsAt(cfg) : null;
   if (end != null && now >= end) return null;
   const w = waitingAt(runner.legs, (cfg && totalLegs(cfg)) || +legsHint || 0);
@@ -4822,6 +4825,8 @@ function totalLegs(cfg) {
   return (c.segments || []).length;
 }
 
+const findRunnerIn = (list, id) => (list || []).find(r => r && r.id === id) || null;
+
 // Done: every leg of a race with a set distance, or in a timed race stopped
 // by hand or out of time with no lap under way.
 function runnerFinished(cfg, runner) {
@@ -4999,7 +5004,14 @@ async function announceFinishes(env, slug, cfg, data) {
   const pending = recorded ? await readFinishPending(env) : null;
   let url = null;
   for (const f of done_) {
-    const text = f.distance
+    // A backyard's result is the laps, and how it ended: last one standing,
+    // or out after so many.
+    const yard = aiCrew.isBackyard(cfg) ? (findRunnerIn(fresh, f.id) || {}) : null;
+    const text = yard
+      ? (yard.won
+        ? `**${forDiscord(f.name, 60)}** won ${forDiscord(cfg.name) || 'the backyard'}, last one standing after ${f.laps} lap${f.laps === 1 ? '' : 's'}.`
+        : `**${forDiscord(f.name, 60)}** ran ${f.laps} lap${f.laps === 1 ? '' : 's'} (${f.distance}) at ${forDiscord(cfg.name) || 'the backyard'}.`)
+      : f.distance
       ? `**${forDiscord(f.name, 60)}** ran ${f.distance} (${f.laps} lap${f.laps === 1 ? '' : 's'}) at ${forDiscord(cfg.name) || 'the race'}.`
       : `**${forDiscord(f.name, 60)}** finished ${forDiscord(cfg.name) || 'the race'}${f.time ? ` in ${f.time}` : ''}.`;
     if (pending && FINISH_ID.test(f.id)) {
@@ -6465,7 +6477,7 @@ async function handleAiCrewRevoke(req, env) {
 // data.json changed the way a crew member's press changes it: read, change,
 // write back under the version guard, and again if somebody else got there
 // first. Then the same nudge a press sends, so open pages see it.
-async function mutateRaceData(env, ctx, slug, change) {
+async function mutateRaceData(env, ctx, slug, change, who) {
   const path = `races/${slug}/data.json`;
   for (let i = 0; i < 4; i++) {
     let doc = null, sha = null;
@@ -6480,7 +6492,7 @@ async function mutateRaceData(env, ctx, slug, change) {
     if (!doc || typeof doc !== 'object') doc = { runners: [] };
     const result = change(doc);
     doc.lastUpdated = new Date().toISOString();
-    const failed = await commitToD1(env, path, JSON.stringify(doc, null, 2) + '\n', 'ai-crew', sha);
+    const failed = await commitToD1(env, path, JSON.stringify(doc, null, 2) + '\n', who || 'ai-crew', sha);
     if (!failed) {
       await purgeReadCache(env, path);
       if (ctx && ctx.waitUntil) ctx.waitUntil(publishChange(env, path));
@@ -6489,6 +6501,58 @@ async function mutateRaceData(env, ctx, slug, change) {
     if (failed.status !== 409) throw new Error(failed.error || 'Could not save that');
   }
   throw new Error('The race was busy. Try again in a moment.');
+}
+
+// ---------- a backyard's bell ----------
+// With automatic send-off, a runner back by a bell left on it. The pages write
+// that down as the bell rings, and everything that reads the race works it
+// out anyway, but a backyard can run for days with nobody's page open in the
+// small hours. So every scheduled run writes down the send-offs the bells have
+// made since. The time written is the bell's, however late this run is.
+//
+// One query for every race that might be a backyard; the rest of the work is
+// per race and only for one that has started and is not over.
+async function runBells(env, ctx, now = Date.now()) {
+  if (!env.DB) return { races: 0, written: 0 };
+  let rows = [];
+  try {
+    rows = (await env.DB.prepare(`SELECT slug, config, data FROM races WHERE config LIKE '%backyard%'`).all()).results || [];
+  } catch (e) { return { races: 0, written: 0 }; }
+  let races = 0, written = 0;
+  for (const row of rows) {
+    try {
+      const cfg = JSON.parse(row.config || '{}');
+      if (!aiCrew.isBackyard(cfg) || (cfg.backyard && cfg.backyard.autoStart === false)) continue;
+      const start = Date.parse(cfg.startTime);
+      // Not yet started, or started more than ten days ago: nothing to do.
+      if (!(start <= now) || now - start > 10 * 86400e3) continue;
+      const data = JSON.parse(row.data || '{}');
+      const ids = new Set((cfg.runners || []).map(r => r && r.id).filter(Boolean));
+      const due = [...ids].map(id => {
+        const r = (data.runners || []).find(x => x && x.id === id) || { id, legs: [] };
+        const d = aiCrew.bellStartDue(cfg, r, now);
+        return d ? { id, ...d } : null;
+      }).filter(Boolean);
+      races++;
+      if (!due.length) continue;
+      await mutateRaceData(env, ctx, row.slug, (doc) => {
+        doc.runners = Array.isArray(doc.runners) ? doc.runners : [];
+        for (const d of due) {
+          let r = doc.runners.find(x => x && x.id === d.id);
+          if (!r) { r = { id: d.id, legs: [] }; doc.runners.push(r); }
+          // Again against the copy being written: a page may have got there.
+          const again = aiCrew.bellStartDue(cfg, r, now);
+          if (!again || again.leg !== d.leg) continue;
+          r.legs = Array.isArray(r.legs) ? r.legs : [];
+          let leg = r.legs.find(l => l && l.index === d.leg);
+          if (!leg) { leg = { index: d.leg }; r.legs.push(leg); r.legs.sort((a, b) => a.index - b.index); }
+          leg.startTime = d.startTime;
+          written++;
+        }
+      }, 'bell');
+    } catch (e) { /* one race that cannot be read is that race's alone */ }
+  }
+  return { races, written };
 }
 
 function mcpHeaders() {
@@ -6687,7 +6751,7 @@ async function handleMyRaces(req, env) {
       courseType: cfg.courseType,
       activity: cfg.activity,
       totalDistanceMi: cfg.course ? +aiCrew.totalDistanceMi(cfg).toFixed(2) : 0,
-      ...(aiCrew.isTimed(cfg) ? { format: 'timed' } : {}),
+      ...(aiCrew.isTimed(cfg) ? { format: aiCrew.isBackyard(cfg) ? 'backyard' : 'timed' } : {}),
       runnerNames: (cfg.runners || []).map(r => r.name),
       cutoffHours: cfg.cutoffs && cfg.cutoffs.totalHours || null,
       visibility: cfg.visibility === 'private' ? 'private' : 'public',
@@ -7092,7 +7156,7 @@ function manifestEntry(slug, cfg) {
     units: cfg.units,
     activity: cfg.activity,
     totalDistanceMi: total,
-    ...(aiCrew.isTimed(cfg) ? { format: 'timed' } : {}),
+    ...(aiCrew.isTimed(cfg) ? { format: aiCrew.isBackyard(cfg) ? 'backyard' : 'timed' } : {}),
     runnerNames: (cfg.runners || []).map(r => r.name),
     cutoffHours: (cfg.cutoffs && cfg.cutoffs.totalHours) || null
   };
@@ -7442,10 +7506,11 @@ export default {
   // Every five minutes (wrangler.toml, [triggers]): the send-off nudges.
   async scheduled(event, env, ctx) {
     ctx.waitUntil(runNudges(env).catch(() => {}));
+    ctx.waitUntil(runBells(env, ctx).catch(() => {}));
     ctx.waitUntil(migrateLegacyCourses(env).catch(() => {}));
   }
 };
-export { runNudges, nudgeAfterSec, waitingAt, nudgeDue, pushEndpointOk, migrateLegacyCourses };
+export { runNudges, nudgeAfterSec, waitingAt, nudgeDue, pushEndpointOk, migrateLegacyCourses, runBells };
 
 async function route(request, env, ctx) {
     {

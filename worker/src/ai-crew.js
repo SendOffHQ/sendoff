@@ -46,8 +46,11 @@ const num = (v) => { const n = +v; return v === '' || v == null || !Number.isFin
 function loopSegments(cfg) { return (cfg && cfg.course && cfg.course.loopSegments) || []; }
 const TIMED_MAX_LAPS = 999;
 
-export function isTimed(cfg) { return !!(cfg && cfg.courseType === 'loops' && cfg.format === 'timed'); }
+export function isTimed(cfg) { return !!(cfg && cfg.courseType === 'loops' && (cfg.format === 'timed' || cfg.format === 'backyard')); }
+export function isBackyard(cfg) { return !!(cfg && cfg.courseType === 'loops' && cfg.format === 'backyard'); }
 export function endsAt(cfg) {
+  // A backyard ends when one runner is left, not on a clock.
+  if (isBackyard(cfg)) return null;
   const start = cfg && cfg.startTime ? Date.parse(cfg.startTime) : NaN;
   const h = num(cfg && cfg.cutoffs && cfg.cutoffs.totalHours);
   return Number.isFinite(start) && h > 0 ? start + Math.round(h * 60) * 60000 : null;
@@ -167,6 +170,49 @@ export function legAt(cfg, index) {
       : (index === segs.length ? num(cfg.cutoffs && cfg.cutoffs.totalHours) : null) };
 }
 
+// ---------- a backyard's bell ----------
+// The same rules as lib/race-core.js backyard: lap n goes on bell n - 1 (bell
+// 0 is the start) and is due back by bell n. With automatic send-off, a
+// runner back by a bell left on it.
+export function bellMs(cfg, k) {
+  const s = cfg && cfg.startTime ? Date.parse(cfg.startTime) : NaN;
+  if (!Number.isFinite(s)) return null;
+  const m = num(cfg.backyard && cfg.backyard.intervalMin);
+  return s + Math.max(0, k) * ((m >= 1 && m <= 1440 ? Math.round(m) : 60) * 60000);
+}
+export function nextBell(cfg, now) {
+  const s = cfg && cfg.startTime ? Date.parse(cfg.startTime) : NaN;
+  if (!Number.isFinite(s)) return null;
+  const step = bellMs(cfg, 1) - s;
+  const k = now < s ? 0 : Math.floor((now - s) / step) + 1;
+  return { k, at: bellMs(cfg, k) };
+}
+const lapEndAt = (cfg, i) => { const d = legAt(cfg, i); return !d || d.lapEnd !== false; };
+export function lapsDone(cfg, runner) {
+  return ((runner && runner.legs) || []).filter(l => l && l.endTime && lapEndAt(cfg, l.index)).length;
+}
+// The send-off the bell owes this runner and nobody has written: { leg,
+// startTime } or null.
+export function bellStartDue(cfg, runner, now) {
+  if (!isBackyard(cfg) || !runner || runner.stoppedAt) return null;
+  if (cfg.backyard && cfg.backyard.autoStart === false) return null;
+  const legs = (runner.legs || []).filter(l => l && (l.startTime || l.endTime)).sort((a, b) => a.index - b.index);
+  if (legs.some(l => l.startTime && !l.endTime)) return null;
+  const last = legs[legs.length - 1];
+  if (last && !lapEndAt(cfg, last.index)) return null;      // in an aid station inside a lap
+  const n = lapsDone(cfg, runner);
+  const bell = bellMs(cfg, n);
+  if (bell == null || now < bell) return null;
+  if (n > 0) {
+    const end = Math.max(...legs.filter(l => l.endTime && lapEndAt(cfg, l.index)).map(l => Date.parse(l.endTime)));
+    if (!(end <= bell)) return null;
+  }
+  let leg = 1;
+  while (leg < 100000) { const d = legAt(cfg, leg); if (!d || (d.lap || leg) > n) break; leg++; }
+  if (legs.some(l => l.index === leg && l.startTime)) return null;
+  return { leg, startTime: new Date(bell).toISOString() };
+}
+
 // Where the racer is, read the way lib/race-core.js nextActionFor reads it:
 // the latest press decides. Intake goes on the leg they are running, or the
 // one that ends at the station they are standing in.
@@ -186,6 +232,12 @@ export function whereIs(cfg, runner) {
   // screen). What was eaten can still be logged against where they stopped.
   if (!isTimed(cfg) && runner && runner.stoppedAt && !(last.action === 'in' && last.idx >= legCount(cfg))) {
     return { state: 'dropped', leg: last.idx, intakeLeg: last.idx, since: Date.parse(runner.stoppedAt) || last.ts };
+  }
+  // A backyard: out on a bell, or by choice. The winner is finished.
+  if (isBackyard(cfg) && runner && runner.stoppedAt) {
+    return runner.won
+      ? { state: 'finished', leg: last.idx, intakeLeg: null, since: Date.parse(runner.stoppedAt) || last.ts }
+      : { state: 'out', leg: last.idx, intakeLeg: last.idx, since: Date.parse(runner.stoppedAt) || last.ts };
   }
   if (last.action === 'out') return { state: 'on course', leg: last.idx, intakeLeg: last.idx, since: last.ts };
   if (isTimed(cfg) ? runnerDone(cfg, runner) : last.idx >= legCount(cfg)) return { state: 'finished', leg: last.idx, intakeLeg: null, since: last.ts };
@@ -362,7 +414,7 @@ export function raceStatus(cfg, data, runnerId, now) {
   const arrived = legs.map(l => Date.parse(l && l.endTime)).filter(Number.isFinite);
   const lastIn = arrived.length ? Math.max(...arrived) : NaN;
   const stop = Date.parse(runner.stoppedAt);
-  const endedAt = !(where.state === 'finished' || where.state === 'dropped' || runnerDone(cfg, runner, now)) ? NaN
+  const endedAt = !(where.state === 'finished' || where.state === 'dropped' || where.state === 'out' || runnerDone(cfg, runner, now)) ? NaN
     : Number.isFinite(stop) && (!Number.isFinite(lastIn) || stop > lastIn) ? stop : lastIn;
   const until = Number.isFinite(endedAt) ? Math.min(now, endedAt) : now;
   const elapsedH = !isNaN(start) && until > start ? (until - start) / 3600e3 : 0;
@@ -392,13 +444,20 @@ export function raceStatus(cfg, data, runnerId, now) {
       start: isNaN(start) ? null : clock(start, cfg, true),
       elapsed: !isNaN(start) && now > start ? hm(now - start) : null,
       legs: isTimed(cfg) ? null : legCount(cfg),
-      ...(isTimed(cfg) ? { scoredBy: 'time: as many laps as fit before the race ends; the finish cutoff below is when it ends' } : {}),
+      ...(isBackyard(cfg) ? { scoredBy: 'backyard: a lap goes on every bell, a runner not back by the next bell or not out on one is out, and the last one standing wins' }
+        : isTimed(cfg) ? { scoredBy: 'time: as many laps as fit before the race ends; the finish cutoff below is when it ends' } : {}),
       distanceUnit: cfg && cfg.units && cfg.units.distance === 'km' ? 'km' : 'mi'
     },
     racer: { name: def.name || runnerId, bib: def.bib || null, ...(goalText(cfg, def) ? { goal: goalText(cfg, def) } : {}) },
     state: where.state
   };
-  const total_ = num(cfg && cfg.cutoffs && cfg.cutoffs.totalHours);
+  // A backyard: laps done and the bell, which is the number that matters.
+  if (isBackyard(cfg)) {
+    const nb = nextBell(cfg, now);
+    out.backyard = { lapsDone: lapsDone(cfg, runner), ...(runner.won ? { won: true } : {}),
+      ...(nb && where.state !== 'out' && where.state !== 'finished' ? { nextBell: clock(nb.at, cfg, true), nextBellIn: hm(nb.at - now) } : {}) };
+  }
+  const total_ = isBackyard(cfg) ? null : num(cfg && cfg.cutoffs && cfg.cutoffs.totalHours);
   if (total_ && !isNaN(start)) {
     const at = start + total_ * 3600e3;
     out.race.finishCutoff = clock(at, cfg, true);
@@ -407,7 +466,7 @@ export function raceStatus(cfg, data, runnerId, now) {
 
   // The leg the racer is on, or about to start, and the station ahead.
   const legNo = where.state === 'at aid station' ? where.leg + 1 : where.state === 'not started' ? 1 : where.leg;
-  const ahead = where.state !== 'finished' && where.state !== 'dropped' ? legAt(cfg, legNo) : null;
+  const ahead = where.state !== 'finished' && where.state !== 'dropped' && where.state !== 'out' ? legAt(cfg, legNo) : null;
   if (where.state === 'at aid station') {
     const here = legAt(cfg, where.leg);
     out.atStation = here ? { name: here.to, at: distance(here.cumulativeMi, cfg), arrived: clock(where.since, cfg, true),

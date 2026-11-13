@@ -308,7 +308,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     <span aria-hidden="true"> · </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=732ba36f"></script>
+<script src="lib/race-core.js?v=54ee8fd8"></script>
 <script>
   const SORT_KEY = 'race-hub-sort-v1';
   let loadedRaces = [];
@@ -413,7 +413,8 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
       ? Race.tz.format(r.startTime, r, { year: 'numeric', month: 'short', day: 'numeric' })
       : '–';
     // A timed race has no distance until it is run: say how long it lasts.
-    const dist = r.format === 'timed' ? (r.cutoffHours ? `${r.cutoffHours}h timed` : 'Timed')
+    const dist = r.format === 'backyard' ? 'Backyard'
+      : r.format === 'timed' ? (r.cutoffHours ? `${r.cutoffHours}h timed` : 'Timed')
       : r.totalDistanceMi != null ? Race.units.distance(r.totalDistanceMi, { units: r.units }) : '–';
     let badge = '';
     // "editor" still arrives from a worker that has not been redeployed yet.

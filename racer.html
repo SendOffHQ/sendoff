@@ -219,6 +219,13 @@
     text-transform: uppercase; padding: 10px; border-radius: 8px; cursor: pointer; }
   .rstop:hover { color: var(--text); border-color: var(--border-bright); }
   .rbtn:disabled { opacity: 0.55; cursor: default; }
+  /* A backyard bell that has rung: two answers, side by side, neither guessed. */
+  .rsplit { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .rsplit .rbtn { font-size: 14px; padding: 14px 8px; }
+  .rbtn.gone { background: rgba(255, 115, 119, 0.10); color: var(--red); border-color: rgba(255, 115, 119, 0.5); }
+  .rbell { margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); text-align: center; }
+  .rbell strong { color: var(--text); }
+  .rbell.due { color: var(--yellow); }
   .rbtn .sub { display: block; font-size: 11px; font-weight: 400; letter-spacing: 0.03em;
                text-transform: none; color: var(--text-muted); margin-top: 7px; }
 
@@ -352,7 +359,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
-<script src="lib/race-core.js?v=732ba36f"></script>
+<script src="lib/race-core.js?v=54ee8fd8"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -459,6 +466,15 @@
   function marginLine() {
     const runner = merged();
     const next = Race.compute.nextActionFor(runner, cfg);
+    // A backyard has no cutoff but the next bell, and that is under the button.
+    if (Race.course.isBackyard(cfg)) {
+      const n = Race.backyard.state(cfg, Race.backyard.view(cfg, runner)).lapsDone;
+      const laps = `${n} lap${n === 1 ? '' : 's'}`;
+      if (next.state === 'finished') return runner.won
+        ? `<div class="rmargin ok">Won, last one standing, with ${laps}.</div>`
+        : `<div class="rmargin">Out after ${laps}. Your times are kept.</div>`;
+      return `<div class="rmargin ok">${laps} done · every ${Math.round(Race.backyard.intervalMs(cfg) / 60000)} minutes, on the bell</div>`;
+    }
     if (next.state === 'finished') {
       if (next.dropped) return '<div class="rmargin">Dropped. Your times up to here are kept.</div>';
       if (!Race.course.isTimed(cfg)) return '<div class="rmargin ok">Finished.</div>';
@@ -584,7 +600,7 @@
       if (st && st.dropBag) bits.push('drop bag');
       out.push(`<div class="rblock">
         <span class="rlbl">Next</span>
-        <span class="raid">${esc((def && def.toAid) || `Leg ${stop}`)}</span>
+        <span class="raid">${esc((def && def.toAid) || (def && def.lap ? `Lap ${def.lap}` : `Leg ${stop}`))}</span>
         <div class="rmeta">${esc(bits.join(' · '))}</div>
       </div>`);
     }
@@ -715,6 +731,117 @@
     document.getElementById('jot-list').innerHTML = lines.map(s => `<div>${esc(s)}</div>`).join('');
   }
 
+  // ---------- backyard ----------
+  // The bell decides what the one button is (Race.backyard):
+  //   back, before the next bell   nothing to press: the lap goes on the bell
+  //   on a lap, its bell has rung  back in time and going again, or out
+  //   back, the bell has rung, and off on that bell, or not starting, out
+  //   nobody sent them off         (never, with automatic send-off: the
+  //                                bell sends them)
+  // On a lap before its bell, it is the usual button with the bell under it.
+  const bellClock = (ms) => Race.fmt.clockTime(new Date(ms).toISOString(), cfg);
+  function bellLine(runner) {
+    const by = Race.backyard.state(cfg, Race.backyard.view(cfg, runner));
+    if (!by.onLap || !by.due) return '';
+    return `<div class="rbell" data-bell-at="${by.due}">Lap ${by.onLap} due back by <strong>${esc(bellClock(by.due))}</strong> <span data-bell-left></span></div>`;
+  }
+  function bellAct(runner, next) {
+    if (!Race.course.isBackyard(cfg) || !next.nextAction) return null;
+    const by = Race.backyard.state(cfg, Race.backyard.view(cfg, runner));
+    if (by.overdue) {
+      return {
+        html: `<div class="rsplit"><button class="rbtn in" type="button" id="by-back">Back by the bell<span class="sub">Off on lap ${by.overdue.lap + 1}</span></button>` +
+          `<button class="rbtn gone" type="button" id="by-out">Didn't make it<span class="sub">I'm out</span></button></div>` +
+          `<div class="rbell due">Lap ${by.overdue.lap} was due back by <strong>${esc(bellClock(by.overdue.due))}</strong></div>`,
+        wire: () => {
+          document.getElementById('by-back').addEventListener('click', () => bellBack());
+          document.getElementById('by-out').addEventListener('click', () => bellOut(by.overdue.due));
+        }
+      };
+    }
+    if (by.waiting) {
+      return {
+        html: `<div class="rsplit"><button class="rbtn out" type="button" id="go">Off on lap ${by.waiting.lap}<span class="sub">left on the ${esc(bellClock(by.waiting.bell))} bell</span></button>` +
+          `<button class="rbtn gone" type="button" id="by-out">Not starting<span class="sub">I'm out</span></button></div>`,
+        wire: () => {
+          document.getElementById('go').addEventListener('click', pressGo);
+          document.getElementById('by-out').addEventListener('click', () => bellOut(by.waiting.bell));
+        }
+      };
+    }
+    if (by.onLap) return null;
+    // Between laps, or before the start.
+    return {
+      html: `<button class="rbtn out" type="button" disabled>Lap ${by.lapsDone + 1} on the ${esc(bellClock(by.due))} bell` +
+        `<span class="sub">${Race.backyard.autoStart(cfg) ? 'You go out with the bell' : 'Press it when the bell goes'}</span></button>` +
+        `<div class="rbell" data-bell-at="${by.due}">Next bell <strong>${esc(bellClock(by.due))}</strong> <span data-bell-left></span></div>` +
+        (by.lapsDone > 0 ? `<button class="rstop" type="button" id="by-won">I won: last one standing</button>` : '') +
+        `<button class="rstop" type="button" id="stop">I'm out of the race</button>`,
+      wire: () => {
+        const w = document.getElementById('by-won');
+        if (w) w.addEventListener('click', bellWon);
+        document.getElementById('stop').addEventListener('click', () => setStopped(true));
+      }
+    };
+  }
+  // Each second: the countdown, and at the bell, the button again, and the
+  // send-off the bell made written down (automatic send-off only).
+  let bellRang = 0;
+  function bellTick() {
+    if (!cfg || !Race.course.isBackyard(cfg) || !meId) return;
+    const el = document.querySelector('#act [data-bell-at]');
+    const now = Date.now();
+    if (el) {
+      const ms = +el.dataset.bellAt, left = el.querySelector('[data-bell-left]');
+      if (now < ms) { if (left) left.textContent = `· ${Race.backyard.countdown(ms - now)}`; }
+      else if (bellRang !== ms) { bellRang = ms; writeBellStart(); renderAct(); renderReadout(); }
+    }
+  }
+  const bellWritten = new Set();
+  function writeBellStart() {
+    if (!Race.auth.has()) return;
+    const due = Race.backyard.dueStarts(cfg, merged());
+    if (!due) return;
+    const key = `${due.leg}|${due.startTime}`;
+    if (bellWritten.has(key)) return;
+    bellWritten.add(key);
+    Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId: meId, legs: { [due.leg]: { startTime: due.startTime } } },
+      `racer: off on the bell, leg ${due.leg}`).catch(() => {});
+  }
+  async function bellBack() {
+    const w = Race.backyard.backInTime(cfg, Race.backyard.view(cfg, merged()));
+    if (!w) return;
+    let dr = (data.runners || []).find(r => r.id === meId);
+    if (!dr) { dr = { id: meId, legs: [] }; data.runners = (data.runners || []).concat([dr]); }
+    for (const k of Object.keys(w.legs)) {
+      let l = (dr.legs || []).find(x => x.index === +k);
+      if (!l) { l = { index: +k }; dr.legs = (dr.legs || []).concat([l]).sort((a, b) => a.index - b.index); }
+      Object.assign(l, w.legs[k]);
+    }
+    render();
+    try { await Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId: meId, legs: w.legs }, 'racer: back by the bell'); }
+    catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
+  }
+  async function bellOut(whenMs) {
+    if (!confirm(`Out at the ${bellClock(whenMs)} bell? Your laps so far are your result. You can take it back.`)) return;
+    const dr = (data.runners || []).find(r => r.id === meId);
+    const at = new Date(whenMs).toISOString();
+    if (dr) dr.stoppedAt = at;
+    render();
+    try { await Race.queue.write(DATA_PATH, 'setRunnerStopped', { runnerId: meId, stoppedAt: at }, 'racer: out on the bell'); }
+    catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
+  }
+  async function bellWon() {
+    if (!confirm('Last one standing, and you finished the lap alone? This ends your race as the winner. You can take it back.')) return;
+    const dr = (data.runners || []).find(r => r.id === meId);
+    const ends = ((dr && dr.legs) || []).filter(l => l.endTime).map(l => Date.parse(l.endTime));
+    const at = new Date(ends.length ? Math.max(...ends) : Date.now()).toISOString();
+    if (dr) { dr.stoppedAt = at; dr.won = true; }
+    render();
+    try { await Race.queue.write(DATA_PATH, 'setRunnerStopped', { runnerId: meId, stoppedAt: at, won: true }, 'racer: won'); }
+    catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
+  }
+
   function renderAct() {
     const act = document.getElementById('act');
     if (Date.now() < undoUntil) {
@@ -767,10 +894,19 @@
     const timed = Race.course.isTimed(cfg);
     if (!next.nextAction) {
       // A timed race stopped by hand can be taken back, in case of a slip.
-      act.innerHTML = `<button class="rbtn" type="button" disabled>${next.dropped ? 'Dropped' : timed ? 'Done' : 'Finished'}</button>` +
+      act.innerHTML = `<button class="rbtn" type="button" disabled>${Race.course.isBackyard(cfg) ? (runner.won ? 'Winner' : 'Out') : next.dropped ? 'Dropped' : timed ? 'Done' : 'Finished'}</button>` +
         ((timed || next.dropped) && runner.stoppedAt ? `<button class="rstop" type="button" id="unstop">Stopped by mistake? Back in the race</button>` : '');
       const un = document.getElementById('unstop');
       if (un) un.addEventListener('click', () => setStopped(false));
+      return;
+    }
+    // A backyard, when the bell decides what the button is (bellAct).
+    const bell = bellAct(runner, next);
+    if (bell) {
+      if (act.dataset.drawn === bell.html && act.firstChild) return;
+      act.dataset.drawn = bell.html;
+      act.innerHTML = bell.html;
+      bell.wire(act);
       return;
     }
     // Named for the next check-in: for a racer who checks in only at the
@@ -792,10 +928,12 @@
     const sub = queued
       ? `${queued} saved on this phone · ${Race.queue.needsSignIn() ? 'sign in again to send' : 'sends when it can'}`
       : (next.nextAction === 'in' ? 'Logs your arrival' : 'Starts the next leg');
-    const html = `<button class="rbtn ${next.nextAction === 'in' ? 'in' : 'out'}" type="button" id="go">${esc(label)}<span class="sub">${esc(sub)}</span></button>` +
+    const byLine = Race.course.isBackyard(cfg) ? bellLine(runner) : '';
+    const html = `<button class="rbtn ${next.nextAction === 'in' ? 'in' : 'out'}" type="button" id="go">${esc(label)}<span class="sub">${esc(sub)}</span></button>` + byLine +
       // A timed race ends for a runner when they say so: from the pit, where
       // a lap has just ended and every one so far counts.
-      (timed && next.state === 'in-pit' ? `<button class="rstop" type="button" id="stop">Done for the race: stop here</button>` : '') +
+      (timed && !Race.course.isBackyard(cfg) && next.state === 'in-pit' ? `<button class="rstop" type="button" id="stop">Done for the race: stop here</button>` : '') +
+      (Race.course.isBackyard(cfg) ? `<button class="rstop" type="button" id="stop">I'm out of the race</button>` : '') +
       // And in a race to a finish, from an aid station: dropping out. Small,
       // under the button, and it asks first.
       (!timed && next.state === 'in-pit' ? `<button class="rstop" type="button" id="stop">Dropping out: stop here</button>` : '');
@@ -917,7 +1055,9 @@
   }
 
   async function setStopped(on) {
-    if (on && !confirm(Race.course.isTimed(cfg)
+    if (on && !confirm(Race.course.isBackyard(cfg)
+      ? 'Out of the race? The laps you have finished are your result. You can take it back.'
+      : Race.course.isTimed(cfg)
       ? 'Stop here? The laps you have run are your result.'
       : 'Drop out here? Your clocks stop, and your crew and anyone following see that you dropped. You can take it back.')) return;
     const dr = (data.runners || []).find(r => r.id === meId);
@@ -931,6 +1071,7 @@
 
   function render() {
     if (!cfg || !data || !meId) return;
+    if (Race.course.isBackyard(cfg)) writeBellStart();
     renderReadout();
     renderPhotos();
     renderIntake();
@@ -1001,7 +1142,17 @@
     // A racer who checks in only at the pit arrives at the end of the lap,
     // with the stations on the way filled in by distance.
     const arr = next.nextAction === 'in' ? Race.checkIns.arrival(cfg, runner, next.nextLegIndex, began, now) : null;
-    const legs = arr ? arr.legs : { [next.nextLegIndex]: { startTime: now } };
+    // In a backyard a lap leaves on its bell, whenever the button is pressed.
+    let sendAt = now;
+    if (Race.course.isBackyard(cfg)) {
+      const by = Race.backyard.state(cfg, Race.backyard.view(cfg, runner));
+      if (by.overdue) return;
+      if (next.nextAction === 'out' && !by.onLap) {
+        if (!by.waiting) return;
+        sendAt = new Date(by.waiting.bell).toISOString();
+      }
+    }
+    const legs = arr ? arr.legs : { [next.nextLegIndex]: { startTime: sendAt } };
     if (through && !(arr && arr.skips)) legs[next.nextLegIndex + 1] = { startTime: now };
     for (const k of Object.keys(legs)) Object.assign(legFor(+k), legs[k]);
     const at = arr ? arr.to : next.nextLegIndex;
@@ -1599,6 +1750,7 @@
       if (undoUntil && Date.now() >= undoUntil) { undoUntil = 0; undoFeel = null; undoPress = null; renderAct(); load(); }
       else if (undoUntil) renderAct();
       tickClocks();
+      bellTick();
     }, 1000);
     // This used to be a flat 30 seconds, on the reasoning that a runner is the
     // one making the changes so their own page has less to learn. That is only

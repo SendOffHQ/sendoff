@@ -180,7 +180,8 @@
   .status-notstarted { color: var(--text-muted); }
   .status-finished { color: var(--accent); }
   /* Out of the race. Not a pace and not live, so neither a pace colour nor teal. */
-  .status-dnf { color: var(--text-dim); }
+  .status-dnf, .status-out { color: var(--text-dim); }
+  .status-winner { color: var(--accent); }
 
   /* Four across at every size above phones. The runner card is capped at
      900px, so a nine-column row gave each tile about 100px of content
@@ -582,7 +583,7 @@
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8a2565f0"></script>
 <script src="lib/course-view.js?v=e062d140"></script>
-<script src="lib/race-core.js?v=732ba36f"></script>
+<script src="lib/race-core.js?v=54ee8fd8"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -654,7 +655,7 @@
     // A timed race has no pace to be on or off unless the racer has a goal:
     // the clock is fixed and the distance is the result.
     if (c && c.timed && s === 'onpace' && !c.goalStatus) return 'Racing';
-    return { onpace: 'On Pace', tight: 'Tight', offpace: 'Off Pace', notstarted: 'Not Started', finished: 'Finished', dnf: 'Dropped' }[s] || s;
+    return { onpace: 'On Pace', tight: 'Tight', offpace: 'Off Pace', notstarted: 'Not Started', finished: 'Finished', dnf: 'Dropped', out: 'Out', winner: 'Winner' }[s] || s;
   }
   const hmLeft = (sec) => { const m = Math.round(sec / 60); return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`; };
 
@@ -1079,7 +1080,7 @@
       return `
         <tr class="leg-row${oldCls}">
           <td class="leg-num">${legLabel}</td>
-          <td class="num" data-label="In">${l.skipped ? '–' : Race.fmt.clockTime(l.endTime, cfg)}</td>
+          <td class="num" data-label="In">${l.skipped ? '–' : l.noTime ? `by ${Race.fmt.clockTime(l.endTime, cfg)}` : Race.fmt.clockTime(l.endTime, cfg)}</td>
           <td class="num" data-label="Out">${l.skipped || !(next && next.startTime) ? '–' : Race.fmt.clockTime(next.startTime, cfg)}</td>
           <td class="num" data-label="Split">${legCell}</td>
           <td class="num" data-label="Pit">${pitCell}</td>
@@ -1204,6 +1205,8 @@
               liveSub = cfg.courseType === 'segments'
                 ? `at ${segDef && segDef.toAid ? segDef.toAid : 'aid'}`
                 : (segDef && segDef.toAid && segDef.lapEnd === false ? `Lap ${lap} · at ${segDef.toAid}` : `In pit · after lap ${lap}`);
+            } else if (c.backyard && (c.dropped || c.won)) {
+              liveSub = c.won ? 'won' : 'out';
             } else if (c.dropped) {
               // Where they stopped, which is the last thing there is to say.
               const at = Race.stations.label(cfg, c.droppedOnCourse ? c.liveLegIndex - 1 : c.liveLegIndex);
@@ -1230,7 +1233,30 @@
             <span class="value">${Race.fmt.duration(c.avgLegSec)}</span>
             <span class="sub">last: ${Race.fmt.duration(c.lastLegSec)}</span>
           </div>
-          ${c.timed ? (() => {
+          ${c.backyard ? (() => {
+            // A backyard: laps, and the bell. While they are in it, the next
+            // bell and what it is for; once they are out, how far they got.
+            const by = Race.backyard.state(cfg, Race.backyard.view(cfg, runner));
+            const laps = `${by.lapsDone} lap${by.lapsDone === 1 ? '' : 's'}`;
+            const dist = escapeHtml(Race.units.distance(c.milesDone, cfg));
+            if (by.out || by.won) {
+              return `
+              <div class="stat stat-projected">
+                <span class="label">${by.won ? 'Winner' : 'Out'}</span>
+                <span class="value">${laps}</span>
+                <span class="sub proj-at">${dist}</span>
+              </div>`;
+            }
+            const due = by.overdue ? by.overdue.due : by.due;
+            const what = by.overdue ? `lap ${by.overdue.lap} was due` : by.onLap ? `lap ${by.onLap} due back` : `lap ${by.lapsDone + 1} goes`;
+            return `
+              <div class="stat stat-projected">
+                <span class="label">Next bell</span>
+                <span class="value bell-timer" data-bell-at="${due || ''}">${due ? Race.backyard.countdown(due - Date.now()) : '–'}</span>
+                <span class="sub proj-at">${escapeHtml(what)} ${due ? escapeHtml(Race.fmt.clockTime(new Date(due).toISOString(), cfg)) : ''}</span>
+                <span class="sub proj-margin">${laps} · ${dist}</span>
+              </div>`;
+          })() : c.timed ? (() => {
             // A timed race: where the pace so far puts them when it ends, in
             // distance and whole laps; once they are done, where they ended.
             const done = c.status === 'finished';
@@ -1382,6 +1408,15 @@
         ? Race.fmt.durationShort(seconds)
         : Race.fmt.duration(seconds);
     });
+    // A backyard's bell, counted down, and the cards again when it rings.
+    let rang = false;
+    document.querySelectorAll('.bell-timer[data-bell-at]').forEach(t => {
+      const at = +t.dataset.bellAt;
+      if (!at) return;
+      if (Date.now() >= at) { rang = true; return; }
+      t.textContent = Race.backyard.countdown(at - Date.now());
+    });
+    if (rang && cfg && data && Date.now() - (tick.redrawn || 0) > 5000) { tick.redrawn = Date.now(); drawRunners(); }
     // Advance the predicted runner positions every second too.
     updateTracking();
   }
