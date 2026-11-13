@@ -352,7 +352,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
-<script src="lib/race-core.js?v=f724f815"></script>
+<script src="lib/race-core.js?v=5f9c4c30"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -782,7 +782,7 @@
       : (next.state === 'idle'
           ? `Start · ${(def && def.toAid && !pitLap) ? 'to ' + def.toAid : (lapName || 'leg 1')}`
           : (lapName ? `Leaving · ${lapName}` : `Leaving · to ${(def && def.toAid) || 'the next aid'}`));
-    const queued = Race.queue.pending().length;
+    const queued = Race.queue.held().length;
     const sub = queued
       ? `${queued} saved on this phone · ${Race.queue.needsSignIn() ? 'sign in again to send' : 'sends when it can'}`
       : (next.nextAction === 'in' ? 'Logs your arrival' : 'Starts the next leg');

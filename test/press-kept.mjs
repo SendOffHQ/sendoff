@@ -83,6 +83,9 @@ await page.click('#go');
 await page.waitForTimeout(400);
 ok('it is already in this phone\'s storage', await stored(), [{ op: 'setLegTimes', failed: false }]);
 ok('and the server does not have it yet', await arrived(), false);
+// Stored, but only on its way: an ordinary press must not put a bar across
+// the bottom of the screen and move the button under the thumb.
+ok('with no bar for a press that is merely in flight', await bar(), '');
 // The tab goes away with the request still in the air.
 await openRacer();
 ok('a reload still shows the press as made', await page.textContent('#go') !== before, true);
