@@ -39,6 +39,8 @@ globalThis.caches = { default: { async match(){}, async put(){}, async delete(){
 
 // R2, as much of it as the course move uses.
 const bucket = new Map();
+// A private course sits under a random key kept in KV, not under the slug.
+const courseAt = (slug, name) => `pc/${kvStore.get('coursekey:' + slug)}/${name}`;
 const MEDIA = {
   async put(k, v) { bucket.set(k, String(v)); },
   async get(k) { const v = bucket.get(k); return v === undefined ? null : { async text() { return v; } }; },
@@ -264,7 +266,7 @@ ok('the hub manifest is untouched',
   JSON.parse(git.get('races/index.json').text).races.map(r => r.slug), ['six-0-trail-marathon']);
 ok('no share page', git.has(`races/${SLUG}/index.html`), false);
 ok('no preview card', git.has(`races/${SLUG}/og.png`), false);
-ok('the course is in the bucket instead', bucket.has(`course/${SLUG}/course.gpx`), true);
+ok('the course is in the bucket instead', bucket.has(courseAt(SLUG, 'course.gpx')), true);
 
 console.log('\nwhat the stored config says about the people on it');
 const stored = JSON.parse(rows.get(SLUG).config);

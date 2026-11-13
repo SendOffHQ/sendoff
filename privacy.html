@@ -95,7 +95,7 @@
 </header>
 
 <main class="legal">
-<p class="updated">Last updated 9 November 2026</p>
+<p class="updated">Last updated 13 November 2026</p>
 <h2>The short version</h2>
 <p>SendOff stores what you type into it: your email address, your race, and what your crew logs.
   There is no analytics, no advertising, no third-party trackers, no cookies, and nothing is sold
@@ -242,7 +242,11 @@
     who is not on the race exactly as it answers a race that does not exist.</p>
   <p>Its data is not published anywhere. The race, the splits, the course files and the photographs
     are kept in Cloudflare's database and storage, the roster of who is on it is kept separately
-    again, and none of it is written to a public host. A private race is never listed on the hub,
+    again, and none of it is written to the public repository. A course file is read only through
+    the same check as the race, and is stored under a long random name that cannot be worked out
+    from the race. A photograph is stored under a long random name too, and is served to whoever
+    holds that exact address, which the race gives only to the people who can open it. A private
+    race is never listed on the hub,
     never given a share page or a preview card, never announced anywhere, and its address carries
     a random suffix so it cannot be guessed either. </p>
   <p><strong>A public race can be unlisted, but it cannot be made private.</strong> While a race is

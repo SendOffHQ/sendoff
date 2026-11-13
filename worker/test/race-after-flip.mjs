@@ -190,11 +190,30 @@ console.log('\na share link for it');
 r = await call('/share-link', token, { method: 'POST', body: JSON.stringify({ slug: SLUG, role: 'view' }) });
 ok('is made', r.status, 200);
 
+// An invite token is the seat it stands for, and a view link is the owner's to
+// hand out. Manage access used to send both to anybody who could write the
+// race, so a crew member could read an invite meant for somebody else and take
+// it. Only a person who could have made them is sent them.
+console.log('\nwho is sent the outstanding invite and the view link');
+j = await (await call('/access?slug=' + SLUG, token)).json();
+ok('the creator sees the invite, token and all',
+  (j.pendingInvites || []).map(i => [i.email, typeof i.token]), [['new@example.com', 'string']]);
+ok('and the view link', (j.shareLinks || []).map(l => typeof l.token), ['string']);
+r = await call('/access?slug=' + SLUG, mateToken);
+j = await r.json();
+ok('the crew member still gets the roster', [r.status, (j.people || []).length > 0], [200, true]);
+ok('and no invites', j.pendingInvites, []);
+ok('and no view links', j.shareLinks, []);
+ok('nor a token anywhere in the answer', /"token"/.test(JSON.stringify(j)), false);
+
 console.log('\nletting the team invite');
 r = await call('/access/team-invite', token, { method: 'POST',
   body: JSON.stringify({ slug: SLUG, allowed: true }) });
 j = await r.json();
 ok('the setting takes', [r.status, j.teamCanInvite], [200, true]);
+j = await (await call('/access?slug=' + SLUG, mateToken)).json();
+ok('and now the crew member, who may invite, sees them',
+  [(j.pendingInvites || []).length, (j.shareLinks || []).length], [1, 1]);
 
 console.log('\nreading a teammate profile, which is gated on the race');
 r = await call('/profile?email=' + encodeURIComponent(MATE) + '&slug=' + SLUG, token);

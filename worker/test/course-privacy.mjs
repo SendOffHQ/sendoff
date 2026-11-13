@@ -133,6 +133,10 @@ const GPX = '<?xml version="1.0"?><gpx><trk><trkseg>' +
   '<trkpt lat="37.9614" lon="-105.4331"><ele>2400</ele></trkpt>' +
   '</trkseg></trk></gpx>';
 
+// Where a race's course file sits in the bucket: under a random key the worker
+// keeps in KV, never under the slug.
+const stored = (slug, name) => { const k = kvStore.get('coursekey:' + slug); return k ? `pc/${k}/${name}` : null; };
+const has = (slug, name) => { const key = stored(slug, name); return !!key && bucket.has(key); };
 let bad = 0;
 const ok = (l, g, w) => { const p = JSON.stringify(g) === JSON.stringify(w); if (!p) bad++;
   console.log(`  ${p?'ok  ':'FAIL'} ${l.padEnd(56)} ${JSON.stringify(g)}${p?'':' expected '+JSON.stringify(w)}`); };
@@ -149,8 +153,9 @@ ok('the write was accepted', wrote.status, 200);
 // the file full of coordinates.
 ok('and no course file reached git',
    [...repo.keys()].filter(k => k.endsWith('course.gpx')), []);
-ok('the bucket has it instead',
-   [...bucket.keys()], ['course/quiet-race/course.gpx']);
+ok('the bucket has it instead', [bucket.size, has('quiet-race', 'course.gpx')], [1, true]);
+ok('at an address that does not give the race away, or follow from its slug',
+   [[...bucket.keys()].some(k => k.includes('quiet-race')), /^pc\/[0-9a-f]{32}\/course\.gpx$/.test([...bucket.keys()][0])], [false, true]);
 
 console.log('\nand hands it back to somebody allowed to read the race');
 let r = await get('races/quiet-race/course.gpx', token);
@@ -176,7 +181,7 @@ r = await worker.fetch(new Request('https://w/race/delete', {
   method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
   body: JSON.stringify({ slug: 'quiet-race' }) }), env, ctx);
 await settle();
-ok('the bucket no longer holds it', bucket.has('course/quiet-race/course.gpx'), false);
+ok('the bucket no longer holds it, nor KV its key', [bucket.size, kvStore.has('coursekey:quiet-race')], [0, false]);
 
 console.log('\na loop with a course of its own');
 const loopsRace = (visibility) => JSON.stringify({ ...JSON.parse(race(visibility)), courseType: 'loops',
@@ -184,7 +189,7 @@ const loopsRace = (visibility) => JSON.stringify({ ...JSON.parse(race(visibility
     { id: 'b', name: 'Short', distanceMi: 10, times: 1, gpx: 'course-b.gpx' }] } }, null, 2) + '\n';
 await put('races/quiet-loops/config.json', loopsRace('private'));
 ok('an unlisted race takes it', (await put('races/quiet-loops/course-b.gpx', GPX)).status, 200);
-ok('into the bucket, not git', [repo.has('races/quiet-loops/course-b.gpx'), bucket.has('course/quiet-loops/course-b.gpx')], [false, true]);
+ok('into the bucket, not git', [repo.has('races/quiet-loops/course-b.gpx'), has('quiet-loops', 'course-b.gpx')], [false, true]);
 r = await get('races/quiet-loops/course-b.gpx', token);
 ok('and hands it back to the owner', [r.status, Buffer.from((await r.json()).content, 'base64').toString('utf8')], [200, GPX]);
 ok('but not to a stranger', (await get('races/quiet-loops/course-b.gpx', other)).status, 403);
@@ -201,10 +206,10 @@ const flip = async (slug, visibility) => { const res = await worker.fetch(new Re
 await put('races/open-loops/course.gpx', GPX);
 await flip('open-loops', 'private');
 ok('unlisting takes every course file out of git', [repo.has('races/open-loops/course.gpx'), repo.has('races/open-loops/course-b.gpx')], [false, false]);
-ok('and into the bucket', [bucket.has('course/open-loops/course.gpx'), bucket.has('course/open-loops/course-b.gpx')], [true, true]);
+ok('and into the bucket', [has('open-loops', 'course.gpx'), has('open-loops', 'course-b.gpx')], [true, true]);
 await flip('open-loops', 'public');
 ok('listing it again puts them back', [repo.has('races/open-loops/course.gpx'), repo.has('races/open-loops/course-b.gpx'),
-  bucket.has('course/open-loops/course-b.gpx')], [true, true, false]);
+  has('open-loops', 'course-b.gpx')], [true, true, false]);
 
 console.log('\na loop removed');
 const threeLoops = (visibility, keepC) => JSON.stringify({ ...JSON.parse(race(visibility)), courseType: 'loops',
@@ -213,10 +218,10 @@ const threeLoops = (visibility, keepC) => JSON.stringify({ ...JSON.parse(race(vi
     ...(keepC ? [{ id: 'c', name: 'Tiny', distanceMi: 5, times: 1, gpx: 'course-c.gpx' }] : [])] } }, null, 2) + '\n';
 await save('races/quiet-loops/config.json', threeLoops('private', true));
 await put('races/quiet-loops/course-c.gpx', GPX);
-ok('an unlisted race has the third loop\'s file', bucket.has('course/quiet-loops/course-c.gpx'), true);
+ok('an unlisted race has the third loop\'s file', has('quiet-loops', 'course-c.gpx'), true);
 await save('races/quiet-loops/config.json', threeLoops('private', false));
-ok('saving the race without that loop deletes it', bucket.has('course/quiet-loops/course-c.gpx'), false);
-ok('and leaves the others alone', bucket.has('course/quiet-loops/course-b.gpx'), true);
+ok('saving the race without that loop deletes it', has('quiet-loops', 'course-c.gpx'), false);
+ok('and leaves the others alone', has('quiet-loops', 'course-b.gpx'), true);
 await save('races/open-loops/config.json', threeLoops('public', true));
 await put('races/open-loops/course-c.gpx', GPX);
 ok('a public race has it in git', repo.has('races/open-loops/course-c.gpx'), true);
@@ -231,7 +236,38 @@ await worker.fetch(new Request('https://w/race/delete', {
   method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
   body: JSON.stringify({ slug: 'quiet-loops' }) }), env, ctx);
 await settle();
-ok('no course file is left in the bucket, named or not', [...bucket.keys()].filter(k => k.startsWith('course/quiet-loops/')), []);
+ok('no course file is left in the bucket, named or not', [bucket.size, kvStore.has('coursekey:quiet-loops')], [0, false]);
+
+// Before 2026-11-12 the address was course/<slug>/<file>, in a bucket with a
+// public hostname. One still there moves when it is read, and the cron moves
+// the rest.
+console.log('\na course still at its old, guessable address');
+const { migrateLegacyCourses } = await import('../src/worker.js');
+await put('races/old-race/config.json', race('private'));
+await put('races/older-race/config.json', race('private'));
+bucket.set('course/old-race/course.gpx', GPX);
+bucket.set('course/older-race/course.gpx', GPX);
+r = await get('races/old-race/course.gpx', token);
+ok('is still handed to its owner', [r.status, Buffer.from((await r.json()).content, 'base64').toString('utf8')], [200, GPX]);
+ok('and has moved by the time it is', [bucket.has('course/old-race/course.gpx'), has('old-race', 'course.gpx')], [false, true]);
+const swept = await migrateLegacyCourses(env);
+ok('the cron moves the ones nobody has read', [swept.moved, bucket.has('course/older-race/course.gpx'), has('older-race', 'course.gpx')], [1, false, true]);
+ok('and nothing is left under the old prefix', [...bucket.keys()].filter(k => k.startsWith('course/')), []);
+ok('after which it stops looking', [(await migrateLegacyCourses(env)).done, kvStore.has('migrated:course-keys-v1')], [true, true]);
+
+// A race's address is letters, digits, hyphens and underscores. Anything else
+// used to reach GitHub as a path cut short at a # or climbing out with ..,
+// which let a course write create races/evil.html on the site.
+console.log('\nan address that is not a race\'s');
+const before = [...repo.keys()].sort().join('|');
+const tries = ['races/evil.html#/config.json', 'races/evil.html%23/config.json', 'races/../config.json', 'races/a b/config.json',
+  'races/evil.html?x=/config.json', 'races/.hidden/config.json'];
+const answers = [];
+for (const pth of tries) answers.push((await put(pth, race('public'))).status);
+ok('is refused as a race to create', answers, tries.map(() => 403));
+ok('and as a course to write', [(await put('races/evil.html#/course.gpx', '<html>')).status, (await put('races/../course.gpx', GPX)).status], [403, 403]);
+ok('and as a race to read', [(await get('races/evil.html#/config.json', token)).status, (await get('races/../config.json', token)).status], [403, 403]);
+ok('nothing reached the repository', [...repo.keys()].sort().join('|') === before, true);
 
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

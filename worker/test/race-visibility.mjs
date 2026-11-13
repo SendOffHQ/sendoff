@@ -40,6 +40,8 @@ globalThis.caches = { default: { async match(){}, async put(){}, async delete(){
 
 // R2, as much of it as the course move uses.
 const bucket = new Map();
+// A private course sits under a random key kept in KV, not under the slug.
+const courseAt = (slug, name) => `pc/${kvStore.get('coursekey:' + slug)}/${name}`;
 const MEDIA = {
   async put(k, v) { bucket.set(k, String(v)); },
   async get(k) { const v = bucket.get(k); return v === undefined ? null : { async text() { return v; } }; },
@@ -286,7 +288,7 @@ ok('the stored config says unlisted', stored(SLUG).visibility, 'private');
 ok('it is off the hub', listed(SLUG), false);
 ok('the other race is still on it', listed('000001-other'), true);
 ok('the course is out of the repo', git.has(`races/${SLUG}/course.gpx`), false);
-ok('and in private storage, byte for byte', bucket.get(`course/${SLUG}/course.gpx`), GPX);
+ok('and in private storage, byte for byte', bucket.get(courseAt(SLUG, 'course.gpx')), GPX);
 // The one that would have been missed. index.html is a static page on Pages:
 // it opens the race without the worker ever seeing the request, and its
 // preview tags put the race name and the runner's name in any chat window the
@@ -317,7 +319,7 @@ ok('the call succeeds', r.status, 200);
 ok('with nothing left behind', [j.manifestErr, j.courseErr, j.shareErr], [null, null, null]);
 ok('the stored config says public', stored(SLUG).visibility, 'public');
 ok('the course is back in the repo, byte for byte', git.get(`races/${SLUG}/course.gpx`).text, GPX);
-ok('and gone from private storage', bucket.has(`course/${SLUG}/course.gpx`), false);
+ok('and gone from private storage', bucket.has(courseAt(SLUG, 'course.gpx')), false);
 
 const back = manifest().races.find(x => x.slug === SLUG);
 console.log('\nand the hub entry it comes back with');
@@ -449,7 +451,7 @@ j = await r.json();
 ok('the race still comes off the hub', [r.status, stored(BIG).visibility], [200, 'private']);
 ok('and it says the course did not move', /too large/.test(j.courseErr || ''), true);
 ok('leaving the real one where it is', git.has(`races/${BIG}/course.gpx`), true);
-ok('rather than an empty file in its place', bucket.has(`course/${BIG}/course.gpx`), false);
+ok('rather than an empty file in its place', [...bucket.keys()].some(k => k.endsWith('/course.gpx')), false);
 
 // A race stranded between the two lists. The hub reads the public manifest;
 // /my-races used to read the manifest, plus any race whose config said

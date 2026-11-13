@@ -721,7 +721,7 @@ function cleanPhaseTargets(input) {
 
 // ---------- GitHub Contents API helpers ----------
 async function githubGet(env, path) {
-  const url = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURI(path)}?ref=${encodeURIComponent(env.GITHUB_BRANCH || 'main')}`;
+  const url = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${ghPath(path)}?ref=${encodeURIComponent(env.GITHUB_BRANCH || 'main')}`;
   const res = await fetch(url, {
     headers: {
       Authorization: `token ${env.GITHUB_TOKEN}`,
@@ -822,7 +822,7 @@ function commitMessage(raw) {
 }
 
 async function githubPutJson(env, path, data, sha, message, actor) {
-  const url = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURI(path)}`;
+  const url = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${ghPath(path)}`;
   const body = {
     // `actor` is no longer written into the message; see commitMessage above.
     message: commitMessage(message),
@@ -897,13 +897,27 @@ async function mutateRaceConfig(env, slug, mutate, message, actor) {
 // courses of their own, course-<id>.gpx for each loop. Same rules, every one.
 const RACE_FILES = new Set(['config.json', 'data.json', 'course.gpx']);
 const COURSE_FILE = /^course(-[a-z0-9]{1,8})?\.gpx$/;
+// What a race's address may be: letters, digits, hyphens and underscores.
+// Anything else never names a race. It used to be "anything but a slash",
+// and a slug like evil.html# reached GitHub as a path cut short at the #, so
+// a race's course file could be written as races/evil.html and served from
+// the site; .. climbed out of races/ the same way. Found in review,
+// 2026-11-12. Every lookup by slug goes through validSlug, and every GitHub
+// address through ghPath, which encodes each part of the path on its own.
+const SLUG_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/;
+function validSlug(slug) { return typeof slug === 'string' && SLUG_RE.test(slug); }
+function ghPath(path) { return String(path).split('/').map(encodeURIComponent).join('/'); }
+function racePathParts(path) {
+  const m = /^races\/([^/]+)\/([^/]+)$/.exec(String(path || ''));
+  return m && validSlug(m[1]) ? { slug: m[1], file: m[2] } : null;
+}
 function isRacePath(path) {
-  const m = /^races\/[^/]+\/([^/]+)$/.exec(path);
-  return !!m && (RACE_FILES.has(m[1]) || COURSE_FILE.test(m[1]));
+  const m = racePathParts(path);
+  return !!m && (RACE_FILES.has(m.file) || COURSE_FILE.test(m.file));
 }
 function isCoursePath(path) {
-  const m = /^races\/[^/]+\/([^/]+)$/.exec(path);
-  return !!m && COURSE_FILE.test(m[1]);
+  const m = racePathParts(path);
+  return !!m && COURSE_FILE.test(m.file);
 }
 function courseFileName(path) { return String(path).split('/').pop(); }
 // Every course file a race has: its own, and one for each loop that names one.
@@ -912,8 +926,94 @@ function courseFilesOf(cfg) {
   return [...new Set(['course.gpx', ...loops.map(l => l && l.gpx).filter(n => COURSE_FILE.test(String(n || '')))])];
 }
 function racePathSlug(path) {
-  const m = /^races\/([^/]+)\//.exec(path);
-  return m ? m[1] : null;
+  const m = /^races\/([^/]+)\//.exec(String(path || ''));
+  return m && validSlug(m[1]) ? m[1] : null;
+}
+
+// Where an unlisted race's course lives in the bucket.
+//
+// It used to be course/<slug>/<file>, and the bucket is the one the photos
+// are served from at a public hostname: anybody who knew or guessed the slug
+// (a sequence number and the race's name) could fetch the coordinates of a
+// race somebody had deliberately kept off the hub, with no check at all.
+// Found in review, 2026-11-12. It is now pc/<key>/<file>, where the key is
+// 32 random hex characters kept in KV under coursekey:<slug>, so the address
+// cannot be worked out from anything public and the read still goes through
+// /get and its access check. Old objects move the first time they are read
+// or written, and migrateLegacyCourses sweeps up the rest.
+const COURSE_KEY = (slug) => `coursekey:${slug}`;
+const legacyCourseKey = (slug, name) => `course/${slug}/${name}`;
+async function coursePrefix(env, slug, create) {
+  if (!env.AUTH_KV || !validSlug(slug)) return null;
+  let key = await env.AUTH_KV.get(COURSE_KEY(slug));
+  if (!key && create) {
+    const b = new Uint8Array(16); crypto.getRandomValues(b);
+    key = [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+    await env.AUTH_KV.put(COURSE_KEY(slug), key);
+  }
+  return key ? `pc/${key}/` : null;
+}
+async function putPrivateCourse(env, slug, name, text) {
+  const prefix = await coursePrefix(env, slug, true);
+  if (!prefix) throw new Error('No key store for a private course');
+  await env.MEDIA.put(prefix + name, text, { httpMetadata: { contentType: 'application/gpx+xml' } });
+  try { await env.MEDIA.delete(legacyCourseKey(slug, name)); } catch (e) {}
+}
+// The stored course, or null. One still at its old address is moved as it is
+// found, so it stops being reachable from outside the moment anybody reads it.
+async function getPrivateCourse(env, slug, name) {
+  const prefix = await coursePrefix(env, slug, false);
+  if (prefix) {
+    const obj = await env.MEDIA.get(prefix + name);
+    if (obj) return obj;
+  }
+  const old = await env.MEDIA.get(legacyCourseKey(slug, name));
+  if (!old) return null;
+  const text = await old.text();
+  try { await putPrivateCourse(env, slug, name, text); } catch (e) { /* still served below */ }
+  return { etag: old.etag || '', size: old.size || text.length, async text() { return text; } };
+}
+async function deletePrivateCourse(env, slug, name) {
+  const prefix = await coursePrefix(env, slug, false);
+  if (prefix) { try { await env.MEDIA.delete(prefix + name); } catch (e) {} }
+  try { await env.MEDIA.delete(legacyCourseKey(slug, name)); } catch (e) {}
+}
+// Everything a race has in private course storage, named in its config or not.
+async function deleteAllPrivateCourses(env, slug, names) {
+  const prefix = await coursePrefix(env, slug, false);
+  const keys = new Set();
+  for (const n of names || []) { keys.add(legacyCourseKey(slug, n)); if (prefix) keys.add(prefix + n); }
+  for (const pre of [prefix, `course/${slug}/`]) {
+    if (!pre || typeof env.MEDIA.list !== 'function') continue;
+    try {
+      const listed = await env.MEDIA.list({ prefix: pre });
+      for (const o of (listed && listed.objects) || []) keys.add(o.key);
+    } catch (e) { /* the named ones still go */ }
+  }
+  for (const key of keys) { try { await env.MEDIA.delete(key); } catch (e) {} }
+  if (env.AUTH_KV) { try { await env.AUTH_KV.delete(COURSE_KEY(slug)); } catch (e) {} }
+}
+// Courses still at their old, guessable address, moved a batch at a time from
+// the cron until none are left. A flag in KV says when that is, so the bucket
+// is not listed every five minutes for ever.
+const COURSE_MIGRATED = 'migrated:course-keys-v1';
+async function migrateLegacyCourses(env) {
+  if (!env.MEDIA || !env.AUTH_KV || typeof env.MEDIA.list !== 'function') return { moved: 0, done: false };
+  if (await env.AUTH_KV.get(COURSE_MIGRATED)) return { moved: 0, done: true };
+  const listed = await env.MEDIA.list({ prefix: 'course/', limit: 50 });
+  const objects = (listed && listed.objects) || [];
+  let moved = 0;
+  for (const o of objects) {
+    const m = /^course\/([^/]+)\/([^/]+)$/.exec(o.key);
+    if (!m || !validSlug(m[1]) || !COURSE_FILE.test(m[2])) continue;
+    const obj = await env.MEDIA.get(o.key);
+    if (!obj) continue;
+    await putPrivateCourse(env, m[1], m[2], await obj.text());
+    moved++;
+  }
+  const done = objects.length === 0 || (!listed.truncated && moved === objects.length);
+  if (done) await env.AUTH_KV.put(COURSE_MIGRATED, new Date().toISOString());
+  return { moved, done };
 }
 
 // ---------- the access list ----------
@@ -1149,6 +1249,7 @@ async function attachAcl(env, slug, cfg) {
 // which falls back to this; it is left separate because that fallback is a
 // real one and not a formality, for the races that predate the mirror.
 async function loadRaceConfig(env, slug) {
+  if (!validSlug(slug)) return null;
   const r = await githubGetJson(env, `races/${slug}/config.json`);
   return r.missing ? null : attachAcl(env, slug, r.data);
 }
@@ -1161,6 +1262,7 @@ async function loadRaceConfig(env, slug) {
 // readFromD1 below: off unless READ_FROM_D1 says true, and a row that cannot
 // stand behind its own answer is not an answer.
 async function mirroredConfig(env, slug, force) {
+  if (!validSlug(slug)) return null;
   if ((!d1Enabled(env) && !force) || !env.DB || !slug) return null;
   try {
     const r = (await env.DB.prepare(
@@ -1195,12 +1297,14 @@ async function mirroredConfig(env, slug, force) {
 // READ_FROM_D1 says, and reading a stale config from git here would mean
 // checking a write against a roster or visibility that has since changed.
 async function loadRaceConfigNow(env, slug) {
+  if (!validSlug(slug)) return null;
   const m = await mirroredConfig(env, slug, true);
   if (m) return attachAcl(env, slug, m);
   return loadRaceConfig(env, slug);
 }
 
 async function loadRaceConfigShared(env, slug) {
+  if (!validSlug(slug)) return null;
   // The ACL check runs on every read, including reads of data.json, so this is
   // the second of the two GitHub calls a single poll used to cost. Serving it
   // from the mirror is most of the point of serving reads from the mirror at
@@ -2743,7 +2847,7 @@ async function gitPut(env, path, content, sha, message) {
     content: utf8ToBase64(content)
   };
   if (sha) body.sha = sha;
-  return fetch(`https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURI(path)}`, {
+  return fetch(`https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${ghPath(path)}`, {
     method: 'PUT',
     headers: {
       Authorization: `token ${env.GITHUB_TOKEN}`,
@@ -3589,14 +3693,16 @@ async function handleCommit(req, env, ctx) {
       return json({ error: 'A private race needs the media bucket for its course.' },
         { status: 503 }, env, req);
     }
-    await env.MEDIA.put(`course/${racePathSlug(path)}/${courseFileName(path)}`, content, {
-      httpMetadata: { contentType: 'application/gpx+xml' }
-    });
+    if (!env.AUTH_KV) {
+      return json({ error: 'A private race needs the key store for its course.' },
+        { status: 503 }, env, req);
+    }
+    await putPrivateCourse(env, racePathSlug(path), courseFileName(path), content);
     await purgeReadCache(env, path);
     return json({ content: { path } }, { status: 200 }, env, req);
   }
 
-  const ghUrl = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURI(path)}`;
+  const ghUrl = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${ghPath(path)}`;
   const ghBody = {
     message: commitMessage(message),
     branch: env.GITHUB_BRANCH || 'main',
@@ -3830,7 +3936,7 @@ async function handleGet(req, env) {
   // the write path in handleCommit. Checked before the mirror, because the
   // mirror has no column for it and git is exactly where it must not be.
   if (isCoursePath(path) && env.MEDIA) {
-    const obj = await env.MEDIA.get(`course/${racePathSlug(path)}/${courseFileName(path)}`);
+    const obj = await getPrivateCourse(env, racePathSlug(path), courseFileName(path));
     if (obj) {
       // The shape every other read of this endpoint hands back, so the client
       // needs to know nothing about where a course file lives.
@@ -4970,9 +5076,16 @@ async function handleAccessList(req, env) {
   // whole panel used to fail, so an operator lost the list of who is on their
   // race over a list of outstanding invitations. What matters here is the
   // roster, and it comes from somewhere else.
+  //
+  // Both lists carry the token itself, and a token is the whole of the access
+  // it stands for: an invite token for a co-owner would let any crew member
+  // who read it take that seat, and a view link is the owner's to hand out.
+  // So they go only to somebody who could have made them. Everyone else on
+  // the race gets the roster and two empty lists, and no KV scan is spent.
+  const manages = canManageAccess(raceCfg, session.email) || asSiteAdmin(env, session);
   let shareLinks = [];
   try {
-  if (env.AUTH_KV) {
+  if (env.AUTH_KV && manages) {
     const list = await env.AUTH_KV.list({ prefix: 'share:' });
     for (const k of list.keys) {
       const raw = await env.AUTH_KV.get(k.name);
@@ -4995,7 +5108,7 @@ async function handleAccessList(req, env) {
   } catch (e) { shareLinks = null; }
   let pendingInvites = [];
   try {
-  if (env.AUTH_KV) {
+  if (env.AUTH_KV && manages) {
     const list = await env.AUTH_KV.list({ prefix: 'invite:' });
     for (const k of list.keys) {
       const raw = await env.AUTH_KV.get(k.name);
@@ -6097,7 +6210,7 @@ async function mutateStoredRaceConfig(env, slug, mutate, message, actor) {
 // The two raw-file git calls the moves below need. Not githubPutJson, which
 // serializes an object; these carry a GPX and an HTML page.
 const ghUrl = (env, path) =>
-  `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURI(path)}`;
+  `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${ghPath(path)}`;
 const ghHeaders = (env) => ({
   Authorization: `token ${env.GITHUB_TOKEN}`,
   Accept: 'application/vnd.github.v3+json',
@@ -6137,7 +6250,7 @@ async function dropRemovedCourseFiles(env, path, before, content) {
   for (const name of courseFilesOf(before)) {
     if (name === 'course.gpx' || keep.has(name)) continue;
     const file = `races/${slug}/${name}`;
-    if (env.MEDIA) { try { await env.MEDIA.delete(`course/${slug}/${name}`); } catch (e) {} }
+    if (env.MEDIA) await deletePrivateCourse(env, slug, name);
     try {
       const res = await githubGet(env, file);
       if (res.ok) {
@@ -6162,7 +6275,6 @@ async function moveCourseForVisibility(env, slug, want, actor, cfg) {
 
 async function moveCourseFile(env, slug, name, want) {
   const path = `races/${slug}/${name}`;
-  const key = `course/${slug}/${name}`;
 
   if (want === 'private') {
     const res = await githubGet(env, path);
@@ -6178,8 +6290,8 @@ async function moveCourseFile(env, slug, name, want) {
     if (j.encoding !== 'base64' || !j.content) {
       return 'the course is too large to move automatically, so it is still in the repo';
     }
-    await env.MEDIA.put(key, base64ToUtf8(j.content),
-      { httpMetadata: { contentType: 'application/gpx+xml' } });
+    try { await putPrivateCourse(env, slug, name, base64ToUtf8(j.content)); }
+    catch (e) { return 'a private race needs the key store for its course'; }
     // Only after the copy has landed. The other order loses the course
     // outright if the bucket write fails.
     const del = await gitDeleteRaw(env, path, j.sha,
@@ -6193,12 +6305,12 @@ async function moveCourseFile(env, slug, name, want) {
   // gets the map off Pages without a round trip through the worker.
   if (!env.MEDIA) return null;
   let obj = null;
-  try { obj = await env.MEDIA.get(key); } catch (e) { return 'could not read the stored course'; }
+  try { obj = await getPrivateCourse(env, slug, name); } catch (e) { return 'could not read the stored course'; }
   if (!obj) return null;
   const text = await obj.text();
   const res = await gitPutRaw(env, path, text, `hub: list ${slug}, course into the repo`);
   if (!res.ok) return `could not publish the course (${res.status})`;
-  try { await env.MEDIA.delete(key); } catch (e) { /* a leftover object, not a failure */ }
+  await deletePrivateCourse(env, slug, name);   // a leftover object would not be a failure
   return null;
 }
 
@@ -6586,16 +6698,7 @@ async function handleRaceDelete(req, env) {
     // The files the config names, and anything else under the race's course
     // prefix: a loop removed in settings leaves its file behind, and it is a
     // list of coordinates all the same.
-    const keys = new Set(courseFilesOf(raceCfg).map(n => `course/${slug}/${n}`));
-    try {
-      if (typeof env.MEDIA.list === 'function') {
-        const listed = await env.MEDIA.list({ prefix: `course/${slug}/` });
-        for (const o of (listed && listed.objects) || []) keys.add(o.key);
-      }
-    } catch (e) { /* the named ones still go */ }
-    for (const key of keys) {
-      try { await env.MEDIA.delete(key); } catch (e) {}
-    }
+    await deleteAllPrivateCourses(env, slug, courseFilesOf(raceCfg));
   }
 
   // Then the manifest. If a file delete then fails we are left with
@@ -6632,7 +6735,7 @@ async function handleRaceDelete(req, env) {
   const deleted = [], failed = [];
   for (const f of files) {
     const res = await fetch(
-      `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${encodeURI(f.path)}`, {
+      `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/contents/${ghPath(f.path)}`, {
         method: 'DELETE',
         headers: {
           Authorization: `token ${env.GITHUB_TOKEN}`,
@@ -6692,9 +6795,10 @@ export default {
   // Every five minutes (wrangler.toml, [triggers]): the send-off nudges.
   async scheduled(event, env, ctx) {
     ctx.waitUntil(runNudges(env).catch(() => {}));
+    ctx.waitUntil(migrateLegacyCourses(env).catch(() => {}));
   }
 };
-export { runNudges, nudgeAfterSec, waitingAt };
+export { runNudges, nudgeAfterSec, waitingAt, migrateLegacyCourses };
 
 async function route(request, env, ctx) {
     {
