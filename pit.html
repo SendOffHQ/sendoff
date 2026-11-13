@@ -302,7 +302,7 @@
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/race-core.js?v=912b7e21"></script>
+<script src="lib/race-core.js?v=b00a80ec"></script>
 <script src="lib/course-view.js?v=e062d140"></script>
 <script>
   const slug = Race.qs('id');
@@ -1518,7 +1518,9 @@
     const merged = Race.queue.applyTo(DATA_PATH, JSON.parse(JSON.stringify(data))).runners || [];
     for (const r of merged) {
       const next = Race.compute.nextActionFor(r, cfg);
-      if (next.state === 'on-course' && next.currentLegIndex) return next.currentLegIndex;
+      // In an aid station the photograph is of that station, which is the end
+      // of the leg just run. It used to go under the next one along.
+      if ((next.state === 'on-course' || next.state === 'in-pit') && next.currentLegIndex) return next.currentLegIndex;
       if (next.nextLegIndex) return next.nextLegIndex;
     }
     return Race.course.isTimed(cfg) ? 1 : (Race.course.legCount(cfg) || 1);

@@ -269,5 +269,34 @@ ok('there is something to clear', Object.keys(ctx.localStorage).some(k => k.star
 Race.auth.clearSession();
 ok('and nothing is left', Object.keys(ctx.localStorage).filter(k => k.startsWith('so:seen:')), []);
 
+// A public race with no course file, followed by somebody with no account.
+// The missing GPX used to be written down as "this race is not public", and
+// from then on its splits were never asked of the worker again: the page
+// went on showing whatever the slow published copy said, or nothing. Found in
+// review, 2026-11-12. Every race until then had happened to have a GPX.
+console.log('\na public race with no course file, watched signed out');
+const PLAIN = 'no-gpx-race';
+const inner = ctx.fetch;
+ctx.fetch = async (url) => {
+  const u = String(url);
+  if (u.includes('/public?path=')) {
+    served.push(u);
+    const path = decodeURIComponent(u.split('path=')[1]);
+    if (path.endsWith('.gpx')) return { ok: false, status: 404, headers: { get: () => null }, text: async () => 'nope' };
+    const body = path.endsWith('config.json') ? PAGES_CONFIG : dataBody;
+    return { ok: true, status: 200, headers: { get: () => null },
+             json: async () => ({ sha: 's', content: Buffer.from(body, 'utf8').toString('base64') }), text: async () => body };
+  }
+  return inner(url);
+};
+online = true; ctx.navigator.onLine = true;
+ok('there is no course to read', await Race.gh.readRaceText(PLAIN, 'course.gpx', true), null);
+served = [];
+const d5 = await Race.gh.readRaceJson(PLAIN, 'data.json', true);
+ok('the splits still come from the worker', [!!d5, served.filter(u => u.includes('/public?path=') && u.includes('data.json')).length], [true, 1]);
+served = [];
+await Race.gh.readRaceText(PLAIN, 'course.gpx', true);
+ok('and the course is not asked for again', served.filter(u => u.includes('/public?path=')).length, 0);
+
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

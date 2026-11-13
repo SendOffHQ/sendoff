@@ -66,6 +66,28 @@ self.addEventListener('install', (event) => {
     // Individually, so one 404 cannot fail the whole install and leave the
     // worker never activating.
     await Promise.all(SHELL_URLS.map(u => cache.add(u).catch(() => {})));
+    // And what those pages load by a versioned address: the app's own script
+    // and stylesheet. They are not in the list above because their ?v= moves
+    // with every change, so they are read out of the pages just stored. They
+    // used to be left to be cached the first time a page asked for them,
+    // which meant that a new worker's cache had every page and none of the
+    // code: a phone that lost signal between the update and its next page
+    // load opened to "Loading" and stayed there.
+    await Promise.all(SHELL_URLS.filter(u => /\.html$|\/$/.test(u)).map(async (u) => {
+      try {
+        const page = await cache.match(u);
+        if (!page) return;
+        const text = await page.clone().text();
+        const found = new Set();
+        for (const m of text.matchAll(/(?:src|href)="([^"]+\?v=[0-9a-f]+)"/g)) {
+          const abs = new URL(m[1], new URL(u, self.location.origin));
+          if (abs.origin === self.location.origin) found.add(abs.pathname + abs.search);
+        }
+        await Promise.all([...found].map(async (a) => {
+          if (!(await cache.match(a))) await cache.add(a).catch(() => {});
+        }));
+      } catch (e) { /* a page that could not be read costs only its own assets */ }
+    }));
     await self.skipWaiting();
   })());
 });
@@ -187,10 +209,21 @@ async function nudgeWords() {
       if (r.ok) return await r.json();
     } catch (e) {}
   }
-  return { title: 'SendOff', body: 'Still at the aid station? Tap to send off when you leave.', url: '/racer.html' };
+  return PLAIN_NUDGE;
 }
+// A push must end in a notification, promptly. The words are fetched, and on
+// one bar of signal a fetch can hang for a long time: with no deadline the
+// event ended with nothing shown, which is the one thing a browser punishes
+// (it shows its own "updated in the background" notice, and after enough of
+// them takes the subscription away). Past the deadline the plain words go up.
+const NUDGE_WORDS_MS = 6000;
+const PLAIN_NUDGE = { title: 'SendOff', body: 'Still at the aid station? Tap to send off when you leave.', url: '/racer.html' };
 self.addEventListener('push', (event) => {
-  event.waitUntil(nudgeWords().then(m => self.registration.showNotification(m.title, {
+  const words = Promise.race([
+    nudgeWords().catch(() => PLAIN_NUDGE),
+    new Promise(resolve => setTimeout(() => resolve(PLAIN_NUDGE), NUDGE_WORDS_MS))
+  ]);
+  event.waitUntil(words.then(m => self.registration.showNotification(m.title, {
     body: m.body, tag: m.tag || 'sendoff-nudge', renotify: true, requireInteraction: true,
     icon: '/brand/icon-192.png', badge: '/brand/favicon-32.png', data: { url: m.url || '/racer.html' }
   })));
@@ -198,8 +231,17 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = new URL((event.notification.data && event.notification.data.url) || '/racer.html', self.location.origin).href;
+  // The same screen, whatever its address looks like. The site serves
+  // /racer.html as /racer, so a comparison of whole addresses never matched
+  // and every tap on a reminder opened a second racer screen beside the first.
+  const screenOf = (u) => {
+    try {
+      const x = new URL(u, self.location.origin);
+      return x.pathname.replace(/\.html$/, '').replace(/\/$/, '') + '|' + (x.searchParams.get('id') || '');
+    } catch (e) { return String(u); }
+  };
   event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-    const same = list.find(c => c.url.split('#')[0] === url);
+    const same = list.find(c => screenOf(c.url) === screenOf(url));
     if (same) return same.focus();
     return self.clients.openWindow(url);
   }));

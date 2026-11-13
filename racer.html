@@ -352,7 +352,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
-<script src="lib/race-core.js?v=912b7e21"></script>
+<script src="lib/race-core.js?v=b00a80ec"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -628,6 +628,7 @@
       if (next.state !== 'idle') return;
       const items = Race.fuel.presetsFor(cfg, merged());
       const link = `/settings?id=${encodeURIComponent(slug)}#items`;
+      document.getElementById('intake-chips').dataset.drawn = '';
       document.getElementById('intake-chips').innerHTML = `<div class="rblock rpreview">
         <span class="rlbl">Log what you took</span>
         ${items.length ? `<div class="rpreview-chips">${items.map(({ p }) =>
@@ -700,7 +701,12 @@
         </div>
       </div>`);
     }
-    document.getElementById('intake-chips').innerHTML = chips.join('');
+    // The same for the items: left alone unless something on them changed.
+    const chipBox = document.getElementById('intake-chips'), chipHtml = chips.join('');
+    if (chipBox.dataset.drawn !== chipHtml || !chipBox.firstChild) {
+      chipBox.dataset.drawn = chipHtml;
+      chipBox.innerHTML = chipHtml;
+    }
 
     // What has been written in on this leg so far, under the box, so a note
     // made with no signal can be seen to have been kept. The input itself is
@@ -786,10 +792,16 @@
     const sub = queued
       ? `${queued} saved on this phone · ${Race.queue.needsSignIn() ? 'sign in again to send' : 'sends when it can'}`
       : (next.nextAction === 'in' ? 'Logs your arrival' : 'Starts the next leg');
-    act.innerHTML = `<button class="rbtn ${next.nextAction === 'in' ? 'in' : 'out'}" type="button" id="go">${esc(label)}<span class="sub">${esc(sub)}</span></button>` +
+    const html = `<button class="rbtn ${next.nextAction === 'in' ? 'in' : 'out'}" type="button" id="go">${esc(label)}<span class="sub">${esc(sub)}</span></button>` +
       // A timed race ends for a runner when they say so: from the pit, where
       // a lap has just ended and every one so far counts.
       (timed && next.state === 'in-pit' ? `<button class="rstop" type="button" id="stop">Done for the race: stop here</button>` : '');
+    // Rebuilt only when it says something different. This runs on every poll
+    // and every live push, and a button swapped for an identical one between
+    // a thumb going down and coming up never gets the tap.
+    if (act.dataset.drawn === html && document.getElementById('go')) return;
+    act.dataset.drawn = html;
+    act.innerHTML = html;
     document.getElementById('go').addEventListener('click', pressGo);
     const stop = document.getElementById('stop');
     if (stop) stop.addEventListener('click', () => setStopped(true));
@@ -851,7 +863,7 @@
         try { localStorage.removeItem(NUDGE_KEY); } catch (e) {}
         toast('Send-off reminder off', 'ok');
       } else {
-        if (await Notification.requestPermission() !== 'granted') { renderNudge(); return; }
+        if (await Notification.requestPermission() !== 'granted') { redrawNudge(); return; }
         await subscribeNudge();
         try { localStorage.setItem(NUDGE_KEY, '1'); } catch (e) {}
         toast('Send-off reminder on', 'ok');
@@ -859,6 +871,15 @@
     } catch (err) {
       toast(`Could not change the reminder: ${err.message || err}`, 'error');
     }
+    redrawNudge();
+  }
+  // Drawn afresh whatever it says. The toggle is disabled while it works, and
+  // renderNudge only redraws when something changed: a permission prompt that
+  // was dismissed changes nothing, so the button stayed disabled until the
+  // page was reloaded.
+  function redrawNudge() {
+    const box = document.getElementById('nudge');
+    if (box) delete box.dataset.sig;
     renderNudge();
   }
   // Kept fresh while it is on: a registration lasts four days, and the course
@@ -938,7 +959,10 @@
     const st = Race.stationAt(cfg, next.nextLegIndex);
     const through = next.nextAction === 'in' && Race.course.passesThrough(cfg, next.nextLegIndex);
 
-    const dr = (data.runners || []).find(r => r.id === meId);
+    // A racer added in settings after the race began is in the config and
+    // not yet in the data file. Start used to stop dead here, silently.
+    let dr = (data.runners || []).find(r => r.id === meId);
+    if (!dr) { dr = { id: meId, legs: [] }; data.runners = (data.runners || []).concat([dr]); }
     const legFor = (idx) => {
       let l = (dr.legs || []).find(x => x.index === idx);
       if (!l) { l = { index: idx }; dr.legs = (dr.legs || []).concat([l]).sort((a, b) => a.index - b.index); }
@@ -952,8 +976,14 @@
     if (through && !(arr && arr.skips)) legs[next.nextLegIndex + 1] = { startTime: now };
     for (const k of Object.keys(legs)) Object.assign(legFor(+k), legs[k]);
     const at = arr ? arr.to : next.nextLegIndex;
+    // ids and wrote are for the undo: which queued entries it takes back,
+    // and the times this press put on the leg, so an undo sent late only
+    // clears what this phone wrote (Race.queue, `was`).
+    const pressId = Race.queue.newId();
+    const mine = legs[next.nextLegIndex] || {};
     undoPress = { legIndex: next.nextLegIndex, action: next.nextAction, at: now, began, skips: arr ? arr.skips : 0,
-                  pit: !!(arr && arr.skips), upTo: Math.max(...Object.keys(legs).map(Number)) };
+                  pit: !!(arr && arr.skips), upTo: Math.max(...Object.keys(legs).map(Number)),
+                  ids: [pressId], wrote: [next.nextAction === 'in' ? mine.endTime : mine.startTime] };
 
     const def = Race.course.legAt(cfg, at);
     undoLabel = (next.nextAction === 'in' ? 'Arrived' : 'Out') +
@@ -966,7 +996,7 @@
 
     try {
       pressWrite = Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId: meId, legs },
-        `racer: ${runner.name || meId} ${next.nextAction === 'out' ? 'out' : 'in'} leg ${at}`);
+        `racer: ${runner.name || meId} ${next.nextAction === 'out' ? 'out' : 'in'} leg ${at}`, { id: pressId });
       await pressWrite;
     } catch (err) {
       toast(`Save failed: ${err.message}`, 'error');
@@ -1032,8 +1062,11 @@
     // Chained on the press, and set before anything waits, so a face tapped
     // straight after lands on the leg this writes rather than ahead of it.
     const msg = `racer: ${merged().name || meId} skipped ${p.skips === 1 ? 'a station' : p.skips + ' stations'}, in leg ${at}`;
+    const skipId = Race.queue.newId();
+    p.ids.push(skipId);
+    if (legs[p.legIndex] && legs[p.legIndex].endTime) p.wrote.push(legs[p.legIndex].endTime);
     pressWrite = pressWrite.catch(() => {}).then(() =>
-      Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId: meId, legs }, msg));
+      Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId: meId, legs }, msg, { id: skipId }));
     try {
       await pressWrite;
     } catch (err) {
@@ -1087,8 +1120,33 @@
       render();
       try {
         await pressWrite.catch(() => {});
-        await Race.queue.write(DATA_PATH, 'reopenLeg', { runnerId: meId, legIndex: press.legIndex, upTo: press.upTo },
-          `racer: undo leg ${press.legIndex}`);
+        await Race.queue.write(DATA_PATH, 'reopenLeg',
+          { runnerId: meId, legIndex: press.legIndex, upTo: press.upTo, was: press.wrote },
+          `racer: undo leg ${press.legIndex}`, { undoes: press.ids });
+        toast('Undone', 'ok');
+      } catch (err) { toast(`Undo failed: ${err.message}`, 'error'); }
+      return;
+    }
+    // A send-off is taken back as the leg it started, by its own number and
+    // the time this press gave it. It used to be "whichever leg is last in
+    // the copy on screen", which a refresh landing between the press and
+    // the undo could turn into the arrival before it.
+    if (press && press.action === 'out') {
+      const started = dr.legs.find(l => l.index === press.legIndex);
+      if (started && !started.endTime) dr.legs = dr.legs.filter(l => l.index !== press.legIndex);
+      const felt = feltWith && (dr.legs || []).find(l => l.index === feltWith.legIndex);
+      if (felt) delete felt[feltWith.key];
+      render();
+      try {
+        await pressWrite.catch(() => {});
+        if (felt) {
+          Race.queue.write(DATA_PATH, 'setLegFields',
+            { runnerId: meId, legIndex: feltWith.legIndex, fields: { [feltWith.key]: null } },
+            `racer: undo feeling leg ${feltWith.legIndex}`).catch(() => {});
+        }
+        await Race.queue.write(DATA_PATH, 'removeLeg',
+          { runnerId: meId, legIndex: press.legIndex, was: press.wrote },
+          `racer: undo leg ${press.legIndex}`, { undoes: press.ids });
         toast('Undone', 'ok');
       } catch (err) { toast(`Undo failed: ${err.message}`, 'error'); }
       return;
@@ -1100,6 +1158,7 @@
     if (hasIn && hasOut) field = 'endTime';
     else if (hasOut) { field = 'startTime'; whole = true; }
     else { render(); return; }
+    const lastWas = last[field];
     if (whole) dr.legs = dr.legs.filter(l => l.index !== last.index);
     else delete last[field];
     const feltLeg = feltWith && (dr.legs || []).find(l => l.index === feltWith.legIndex);
@@ -1112,8 +1171,8 @@
     }
     try {
       await (whole
-        ? Race.queue.write(DATA_PATH, 'removeLeg', { runnerId: meId, legIndex: last.index }, `racer: undo leg ${last.index}`)
-        : Race.queue.write(DATA_PATH, 'clearLegField', { runnerId: meId, legIndex: last.index, field }, `racer: undo leg ${last.index}`));
+        ? Race.queue.write(DATA_PATH, 'removeLeg', { runnerId: meId, legIndex: last.index, was: lastWas }, `racer: undo leg ${last.index}`)
+        : Race.queue.write(DATA_PATH, 'clearLegField', { runnerId: meId, legIndex: last.index, field, was: lastWas }, `racer: undo leg ${last.index}`));
       toast('Undone', 'ok');
     } catch (err) { toast(`Undo failed: ${err.message}`, 'error'); }
   }
@@ -1148,17 +1207,24 @@
     // not have been drawn.
     if (dir === -1 && had < 1) return;
 
-    const fields = {};
+    // Sent as what changed, each field with what this phone saw and what it
+    // made it, so a tap adds to whatever the crew or an AI crew has logged
+    // since this screen last refreshed instead of replacing it
+    // (Race.queue, bumpLegFields).
+    const fields = {}, changes = {};
     for (const m of Race.fuel.metrics(cfg)) {
       const step = +preset.values[m.key];
       if (!step) continue;
-      fields[m.key] = Math.max(0, Race.fuel.round(m, (parseFloat(leg[m.key]) || 0) + step * dir));
+      const before = parseFloat(leg[m.key]) || 0;
+      fields[m.key] = Math.max(0, Race.fuel.round(m, before + step * dir));
+      changes[m.key] = [before, fields[m.key]];
     }
     fields[`preset_${i}`] = Math.max(0, had + dir);
+    changes[`preset_${i}`] = [had, fields[`preset_${i}`]];
     Object.assign(leg, fields);
     render();
     try {
-      await Race.queue.write(DATA_PATH, 'setLegFields', { runnerId: meId, legIndex, fields },
+      await Race.queue.write(DATA_PATH, 'bumpLegFields', { runnerId: meId, legIndex, changes },
         `racer: ${dir === -1 ? 'took back ' : ''}${preset.name} leg ${legIndex}`);
     } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
   }
@@ -1330,13 +1396,17 @@
     const leg = dr && (dr.legs || []).find(l => l.index === legIndex);
     if (!leg) return;
     const at = Race.fmt.clockTime(new Date().toISOString(), cfg);
-    const notes = [String(leg.notes || '').trim(), `${at}: ${text}`].filter(Boolean).join('\n');
+    // Sent as the one line, to be added to whatever the notes hold by then:
+    // sending this phone's whole copy back would drop a line the crew wrote
+    // since the last refresh.
+    const line = `${at}: ${text}`;
+    const notes = [String(leg.notes || '').trim(), line].filter(Boolean).join('\n');
     leg.notes = notes;
     input.value = '';
     input.blur();
     render();
     try {
-      await Race.queue.write(DATA_PATH, 'setLegFields', { runnerId: meId, legIndex, fields: { notes } },
+      await Race.queue.write(DATA_PATH, 'addLegNote', { runnerId: meId, legIndex, line },
         `racer: note on leg ${legIndex}`);
     } catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
   });
@@ -1370,7 +1440,12 @@
   }
 
   // ---------- data ----------
+  // Loads overlap: the poll, a live push and coming back to the tab can all
+  // start one, and on a bad signal an older read can answer after a newer
+  // one. Whichever started last is the one that is drawn.
+  let loadSeq = 0;
   async function load() {
+    const mine = ++loadSeq;
     try {
       // Once a minute, not every poll. See the note on the same read in
       // pit.html: the settings hardly ever change and this page asks for as
@@ -1380,6 +1455,7 @@
         stale ? Race.gh.readRaceJson(slug, 'config.json', Race.auth.has()) : Promise.resolve(cfg),
         Race.gh.readRaceJson(slug, 'data.json', true)
       ]);
+      if (mine !== loadSeq) return;
       if (stale) cfgFetchedAt = Date.now();
       // A reorder made on this phone with no signal is held in the queue like
       // a press, and replayed over every config read until it lands, or the
@@ -1430,7 +1506,9 @@
     const me = merged();
     if (me) {
       const next = Race.compute.nextActionFor(me, cfg);
-      if (next.state === 'on-course' && next.currentLegIndex) return next.currentLegIndex;
+      // In an aid station the photograph is of that station, which is the end
+      // of the leg just run. It used to go under the next one along.
+      if ((next.state === 'on-course' || next.state === 'in-pit') && next.currentLegIndex) return next.currentLegIndex;
       if (next.nextLegIndex) return next.nextLegIndex;
     }
     return Race.course.isTimed(cfg) ? 1 : (Race.course.legCount(cfg) || 1);
