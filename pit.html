@@ -165,6 +165,9 @@
   .big-split .big-btn { padding: 20px 10px; font-size: 14px; }
   .big-btn.gone { background: rgba(255, 115, 119, 0.08); color: var(--red); }
   .big-btn.gone:hover { background: rgba(255, 115, 119, 0.14); }
+  /* Armed: the first tap only asks; the words say what the second will do. */
+  .big-btn.gone.armed { background: rgba(255, 115, 119, 0.24); box-shadow: inset 0 0 0 1px var(--red); }
+  .btn.armed { color: var(--red); border-color: var(--red); background: rgba(255, 115, 119, 0.08); }
   .bell-line { padding: 8px 16px; background: var(--bg-elevated); font-family: 'JetBrains Mono', monospace;
     font-size: 12px; color: var(--text-dim); border-top: 1px solid var(--border); }
   .bell-line .k { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
@@ -681,15 +684,42 @@
 
   // A timed race has no finish line: a runner is done when the clock runs out
   // or when they say so, and this is them saying so. Every lap so far counts.
+  // ---------- two taps to end a racer's race ----------
+  // Out, stopped, dropped and won, the same way the racer screen does them
+  // (and Skipped before that): the first tap arms the button, which turns
+  // red and says what a second tap will do; a second tap within eight
+  // seconds does it; a tap in the first 0.7 seconds after arming is the
+  // same thumb bouncing and counts for nothing. Each racer's buttons arm on
+  // their own, so a tap on one card never confirms another.
+  const armed = new Map();          // runnerId|key -> when armed
+  const ARM_DEAD_MS = 700, ARM_HOLD_MS = 8000;
+  function isArmed(runnerId, key) {
+    const t = armed.get(runnerId + '|' + key);
+    return !!t && Date.now() - t < ARM_HOLD_MS;
+  }
+  function twoTaps(runnerId, key, run) {
+    const k = runnerId + '|' + key, t = armed.get(k), now = Date.now();
+    if (t && now - t < ARM_HOLD_MS) {
+      if (now - t < ARM_DEAD_MS) return;
+      armed.delete(k);
+      run();
+      return;
+    }
+    armed.set(k, now);
+    render();
+    setTimeout(() => { const at = armed.get(k); if (at && Date.now() - at >= ARM_HOLD_MS) { armed.delete(k); render(); } }, ARM_HOLD_MS + 50);
+  }
+  // A two-tap button: its own words, or, armed, what the second tap does.
+  function armBtn(cls, action, runnerId, key, text, armedText, extra) {
+    const on = isArmed(runnerId, key);
+    return `<button class="${cls}${on ? ' armed' : ''}" data-action="${action}" data-runner="${escapeAttr(runnerId)}"${extra || ''}>${escapeHtml(on ? armedText : text)}</button>`;
+  }
+
   async function stopRunner(runnerId) {
     const who = ((cfg.runners || []).find(r => r.id === runnerId) || {}).name || 'this runner';
     // In a race to a finish this is dropping out. Every clock stops, the
     // board stops offering check-ins, and the send-off reminder stops asking.
-    if (!confirm(Race.course.isBackyard(cfg)
-      ? `Mark ${who} as out of the race now? Their laps finished so far are their result. Undo last takes it back.`
-      : Race.course.isTimed(cfg)
-      ? `Stop ${who} here? Their laps so far are their result, and the crew page stops offering a send-off. Undo last takes it back.`
-      : `Mark ${who} as dropped? Their clocks stop here and nothing more is asked of them. Undo last takes it back.`)) return;
+    // Confirmed by the second tap (twoTaps); Undo last takes it back.
     try {
       const r = await Race.queue.write(DATA_PATH, 'setRunnerStopped', { runnerId, stoppedAt: new Date().toISOString() },
         `pit: ${runnerId} stopped`);
@@ -1087,14 +1117,14 @@
     if (by.overdue) {
       return `<div class="big-split">
           <button class="big-btn in" data-action="by-back" data-runner="${id}">Back in time · send off lap ${by.overdue.lap + 1}</button>
-          <button class="big-btn gone" data-action="by-out" data-runner="${id}" data-when="${by.overdue.due}">Didn't make it back · out</button>
+          ${armBtn('big-btn gone', 'by-out', runner.id, 'by-out', "Didn't make it back · out", 'Tap again to confirm: out', ` data-when="${by.overdue.due}"`)}
         </div>
         <div class="bell-line due"><span class="k">Lap ${by.overdue.lap} was due</span> <strong>${escapeHtml(at(by.overdue.due))}</strong> · no check-in</div>`;
     }
     if (by.waiting) {
       return `<div class="big-split">
           <button class="big-btn out" data-action="press" data-runner="${id}">Send off · lap ${by.waiting.lap} on the ${escapeHtml(at(by.waiting.bell))} bell</button>
-          <button class="big-btn gone" data-action="by-out" data-runner="${id}" data-when="${by.waiting.bell}">Didn't start · out</button>
+          ${armBtn('big-btn gone', 'by-out', runner.id, 'by-out', "Didn't start · out", 'Tap again to confirm: out', ` data-when="${by.waiting.bell}"`)}
         </div>
         <div class="bell-line due"><span class="k">Lap ${by.waiting.lap} went</span> <strong>${escapeHtml(at(by.waiting.bell))}</strong> · not sent off</div>`;
     }
@@ -1158,7 +1188,6 @@
   // bell, which is when they went out, whenever somebody gets to say so.
   async function bellOut(runnerId, whenMs) {
     const who = ((cfg.runners || []).find(r => r.id === runnerId) || {}).name || 'this runner';
-    if (!confirm(`${who} is out at the ${Race.fmt.clockTime(new Date(whenMs).toISOString(), cfg)} bell? Their laps so far are their result. Undo last takes it back.`)) return;
     try {
       const r = await Race.queue.write(DATA_PATH, 'setRunnerStopped', { runnerId, stoppedAt: new Date(whenMs).toISOString() },
         `pit: ${runnerId} out on the bell`);
@@ -1170,7 +1199,6 @@
     const runner = (data.runners || []).find(r => r.id === runnerId);
     const who = ((cfg.runners || []).find(r => r.id === runnerId) || {}).name || 'this runner';
     if (!runner) return;
-    if (!confirm(`${who} is the last one standing and finished the lap alone? This ends their race as the winner. Undo last takes it back.`)) return;
     const ends = (runner.legs || []).filter(l => l.endTime).map(l => Date.parse(l.endTime));
     const at = new Date(ends.length ? Math.max(...ends) : Date.now()).toISOString();
     try {
@@ -1369,13 +1397,13 @@
         <div style="display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--bg-elevated);">
           <button class="btn" data-action="undo" data-runner="${runner.id}">Undo last</button>
           ${Race.course.isTimed(cfg) && !Race.course.isBackyard(cfg) && next.state === 'in-pit'
-            ? `<button class="btn" data-action="stop" data-runner="${runner.id}">Stopped: done for the race</button>` : ''}
+            ? armBtn('btn', 'stop', runner.id, 'stop', 'Stopped: done for the race', 'Tap again to confirm: stopped') : ''}
           ${!Race.course.isTimed(cfg) && (next.state === 'in-pit' || next.state === 'on-course')
-            ? `<button class="btn" data-action="stop" data-runner="${runner.id}">Dropped: out of the race</button>` : ''}
+            ? armBtn('btn', 'stop', runner.id, 'stop', 'Dropped: out of the race', 'Tap again to confirm: dropped') : ''}
           ${Race.course.isBackyard(cfg) && next.state !== 'finished'
-            ? `<button class="btn" data-action="stop" data-runner="${runner.id}">Out of the race</button>` : ''}
+            ? armBtn('btn', 'stop', runner.id, 'stop', 'Out of the race', 'Tap again to confirm: out') : ''}
           ${Race.course.isBackyard(cfg) && next.state === 'in-pit' && !Race.backyard.state(cfg, Race.backyard.view(cfg, runner)).onLap
-            ? `<button class="btn" data-action="by-won" data-runner="${runner.id}">Won: last one standing</button>` : ''}
+            ? armBtn('btn', 'by-won', runner.id, 'by-won', 'Won: last one standing', 'Tap again to confirm: won') : ''}
         </div>
         ${intakePanel}
       </article>
@@ -1704,10 +1732,10 @@
     if (action === 'press') press(t.dataset.runner);
     else if (action === 'skip') armOrSkip(t.dataset.runner);
     else if (action === 'undo') deleteLastEvent(t.dataset.runner);
-    else if (action === 'stop') stopRunner(t.dataset.runner);
+    else if (action === 'stop') twoTaps(t.dataset.runner, 'stop', () => stopRunner(t.dataset.runner));
     else if (action === 'by-back') bellBack(t.dataset.runner);
-    else if (action === 'by-out') bellOut(t.dataset.runner, +t.dataset.when);
-    else if (action === 'by-won') bellWon(t.dataset.runner);
+    else if (action === 'by-out') { const when = +t.dataset.when; twoTaps(t.dataset.runner, 'by-out', () => bellOut(t.dataset.runner, when)); }
+    else if (action === 'by-won') twoTaps(t.dataset.runner, 'by-won', () => bellWon(t.dataset.runner));
     else if (action === 'save-intake') saveIntake(t.dataset.runner);
     else if (action === 'preset') applyPreset(t.dataset.runner, +t.dataset.preset);
     else if (action === 'edit-time') editEventTime(t.dataset.runner, +t.dataset.leg, t.dataset.field);

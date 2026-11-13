@@ -232,10 +232,11 @@ Sizes:
   and nothing there can be pressed. Undo, the faces and Skipped stack above it, Skipped
   furthest, and for 0.7 seconds after the press none of them answer. A double tap must never
   be read as a second decision (`test/skip-station.mjs`).
-- **Ending a race on the racer screen takes two taps, not a dialog.** Out, stop, drop out and
-  won: the first tap arms the button, which turns red and says what the second tap will do; a
+- **Ending a racer's race takes two taps, not a dialog,** on the racer screen and the crew page
+  alike. Out, stop, drop out and won: the first tap arms the button (on the crew page, that
+  racer's alone), which turns red and says what the second tap will do; a
   second tap within eight seconds does it, and one in the first 0.7 seconds is ignored as a
-  bounce (`test/backyard.mjs`).
+  bounce (`test/backyard.mjs`, `test/review-crew.mjs`).
 - **When the board cannot know, the button asks.** In a backyard a bell that rings with no
   check-in splits the big button in two, the answer that keeps the racer in on the left in its
   own colour and the one that puts them out on the right in red. Neither is pressed for the crew.

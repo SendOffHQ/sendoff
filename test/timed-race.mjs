@@ -149,6 +149,9 @@ ok('and every line is on the chart', cum.inside, true);
 console.log('\nstopping');
 await page.goto(BASE + `/pit?id=${SLUG}`);
 await page.waitForSelector('[data-action="stop"]', { timeout: 20000 });
+// Two taps: the first arms it, the second (after the bounce window) stops them.
+await page.click('[data-action="stop"]');
+await page.waitForTimeout(800);
 await page.click('[data-action="stop"]');
 ok('the crew stops them, and the time is kept', await until(async () => !!(await api(`races/${SLUG}/data.json`)).runners[0].stoppedAt), true);
 await page.waitForSelector('.state-badge.state-done', { timeout: 10000 });

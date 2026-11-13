@@ -119,7 +119,11 @@ await setRunner({ legs: lap3() });
 await openPit();
 said.length = 0;
 await page.click('[data-action="by-out"][data-runner="jason"]');
-ok('did not make it back asks first', /out at the .* bell/i.test(said[0] || ''), true);
+ok('did not make it back takes a second tap', [(await page.textContent('[data-action="by-out"][data-runner="jason"]')).trim(),
+  !!(await read('data.json')).runners[0].stoppedAt], ['Tap again to confirm: out', false]);
+await page.waitForTimeout(800);
+await page.click('[data-action="by-out"][data-runner="jason"]');
+ok('and no dialog', said, []);
 const out = await until(async () => (await read('data.json')).runners[0].stoppedAt);
 ok('and is out at the bell, whenever somebody got to it', out, iso(s0 + 3 * H));
 c = await until(async () => { const x = await card(); return x.badge === 'Out' ? x : null; });
@@ -152,7 +156,10 @@ ok('which is counted down', await until(async () => /Next bell .* · \d+:\d\d to
 console.log('\nthe last one standing');
 said.length = 0;
 await page.click('[data-action="by-won"][data-runner="jason"]');
-ok('asks first', /last one standing/i.test(said[0] || ''), true);
+ok('the first tap only asks', (await page.textContent('[data-action="by-won"][data-runner="jason"]')).trim(), 'Tap again to confirm: won');
+await page.waitForTimeout(800);
+await page.click('[data-action="by-won"][data-runner="jason"]');
+ok('the second makes it so, with no dialog', said, []);
 const won = await until(async () => { const r = (await read('data.json')).runners[0]; return r.won ? r : null; });
 ok('and is the winner, at the end of their last lap', won && [won.won, won.stoppedAt], [true, iso(s0 + 85 * M)]);
 c = await until(async () => { const x = await card(); return x.badge === 'Winner' ? x : null; });

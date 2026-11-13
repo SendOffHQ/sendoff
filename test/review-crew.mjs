@@ -160,9 +160,18 @@ ok('where Save puts it', await until(async () => ((await legs()).find(l => l.ind
 console.log('\na racer who drops');
 await setLegs([{ index: 1, startTime: T.s1, endTime: T.e1 }, { index: 2, startTime: T.e1, endTime: T.est }]);
 await openPit();
+// Two taps, no dialog: the first arms the button and says what the second
+// does; one straight after is a bounce; a deliberate second tap drops them.
 said.length = 0;
 await page.click('[data-action="stop"][data-runner="jason"]');
-ok('is asked about first, in words about dropping', /as dropped/.test(said[0] || ''), true);
+ok('the first tap only asks, in words about dropping', [(await page.textContent('[data-action="stop"][data-runner="jason"]')).trim(),
+  !!(await read('data.json')).runners[0].stoppedAt], ['Tap again to confirm: dropped', false]);
+await page.click('[data-action="stop"][data-runner="jason"]');
+await page.waitForTimeout(300);
+ok('a second tap straight after does nothing', !!(await read('data.json')).runners[0].stoppedAt, false);
+await page.waitForTimeout(600);
+await page.click('[data-action="stop"][data-runner="jason"]');
+ok('with no dialog on the way', said, []);
 const dropped = await until(async () => { const c = await card(); return c.badge === 'Dropped' ? c : null; });
 ok('the badge says Dropped and there is nothing left to press', dropped && [dropped.badge, dropped.button, dropped.disabled], ['Dropped', 'Dropped', true]);
 ok('it is on the record', !!(await until(async () => (await read('data.json')).runners[0].stoppedAt)), true);
