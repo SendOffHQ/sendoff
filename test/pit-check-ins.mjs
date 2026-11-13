@@ -65,7 +65,7 @@ await page.waitForSelector('#go', { timeout: 20000 });
 const readNext = () => page.evaluate(() => [...document.querySelectorAll('.rblock')].map(x => x.textContent.replace(/\s+/g, ' ').trim()).find(x => x.startsWith('Next')));
 ok('the next check-in is the end of the lap', await readNext(), 'Next Cedar Brake 10.5 mi to go · mile 10.5');
 ok('and the button says so', (await page.textContent('#go')).replace(/\s+/g, ' ').trim().split('Logs')[0].trim(), 'Lap done · Lap 1 · Long');
-await page.click('#go');
+await page.click('#go'); await page.waitForTimeout(750);
 await page.waitForSelector('.rundo', { timeout: 5000 });
 ok('no Skipped offer, and no "Skipped" line', [await page.locator('#skip').count(), await page.locator('.rundo .skipped').count()], [0, 0]);
 let legs = await until(async () => { const d = await api(DATA); const l = d.runners.find(r => r.id === 'ann').legs; return l.length >= 3 ? l : null; });

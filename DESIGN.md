@@ -225,6 +225,11 @@ Sizes:
 - **Tap targets.** The crew page's and racer screen's main actions (check in, arrived, save) are
   big, full-width buttons, and must stay that way. Aim for 44px on anything tapped at an aid
   station; the shared `.btn` is about 36px today, which is a known gap.
+- **Nothing pressable comes up under a thumb that has just pressed.** After a press on the
+  racer screen the big button becomes a receipt (what was pressed, and when) on the same spot,
+  and nothing there can be pressed. Undo, the faces and Skipped stack above it, Skipped
+  furthest, and for 0.7 seconds after the press none of them answer. A double tap must never
+  be read as a second decision (`test/skip-station.mjs`).
 - **Pinch zoom is never switched off.** No `user-scalable=no`, no `maximum-scale=1`.
 - Pages work offline from the cache and say when they last updated. A screen that may be stale
   says so in words, not only with a colour.

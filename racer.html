@@ -222,28 +222,32 @@
   .rbtn .sub { display: block; font-size: 11px; font-weight: 400; letter-spacing: 0.03em;
                text-transform: none; color: var(--text-muted); margin-top: 7px; }
 
-  /* Undo takes the button's own place, so the fix for a pocket press is under
-     the thumb that made it. */
-  .rundo { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px 16px; min-height: 88px; }
-  .rundo-msg { grid-column: 1; min-width: 0; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
-  .rundo-btn { grid-column: 3; }
-  /* How are you feeling: three faces, asked while the Undo is still up. On a
-     phone they take a row of their own under the press and the Undo. */
-  .rundo-feel { grid-column: 2; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  /* What the button turns into for a few seconds after a press.
+     The receipt (what was pressed, and when) sits exactly where the button
+     was, and nothing there can be pressed: the thumb that made the press is
+     still over that spot, and a second tap landing on a control was how
+     Overlook got skipped at Rio del Lago without anybody meaning it. Undo,
+     the faces and Skipped are stacked above it, a deliberate reach away, with
+     Skipped furthest. The same at every width: a phone turned sideways is
+     wider than any breakpoint and the thumb is in the same place. */
+  .rundo { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px 16px; }
+  .rundo-msg { grid-column: 1 / -1; min-width: 0; min-height: 88px; display: flex; flex-direction: column;
+               justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 13px;
+               border-top: 1px solid var(--border); padding-top: 4px; }
+  .rundo-btn { grid-column: 2; }
+  /* How are you feeling: three faces, asked while the Undo is still up,
+     beside it and above the receipt. */
+  .rundo-feel { grid-column: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
   .rundo-feel .q { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); }
   .rundo-feel .faces { display: flex; gap: 10px; }
   .feel-btn { background: transparent; border: 3px solid transparent; border-radius: 50%; padding: 2px;
               cursor: pointer; line-height: 0; -webkit-tap-highlight-color: transparent; }
   .feel-btn.on { border-color: var(--text); }
   .rundo-feel.chosen .feel-btn:not(.on) { opacity: 0.35; }
-  @media (max-width: 560px) {
-    .rundo { grid-template-columns: 1fr auto; }
-    .rundo-btn { grid-column: 2; grid-row: 1; }
-    .rundo-feel { grid-column: 1 / -1; grid-row: 2; padding-bottom: 6px; }
-  }
   /* The check-in that went by with the phone left behind: the press just made
-     was for a station already passed. Quiet, under the rest, since it is the
-     rare case. */
+     was for a station already passed. Quiet, and at the top of the bar, the
+     furthest thing from the thumb, since it is the rare case and the one
+     that rewrites times. */
   .rundo-skip { grid-column: 1 / -1; background: none; border: 1px dashed var(--border-bright); border-radius: 8px;
     color: var(--text-dim); padding: 9px 12px; cursor: pointer; text-align: left; font: inherit; }
   .rundo-skip .k { display: block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
@@ -348,7 +352,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
-<script src="lib/race-core.js?v=b6a32863"></script>
+<script src="lib/race-core.js?v=e307c2db"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -375,6 +379,9 @@
   // button, rather than guarded by a confirm nobody reads at mile eighty.
   const UNDO_MS = 15000;
   let undoUntil = 0;
+  // How long the bar ignores taps after the press that brought it up.
+  const BAR_DEAD_MS = 700;
+  let barDeadUntil = 0;
   let undoLabel = '';
   // The feeling the bar is asking about: which leg, and whether it is the
   // send-off (feelOut) or the arrival (feelIn). Null outside the Undo window.
@@ -719,28 +726,34 @@
       // Not said for a check-in at the pit: those stations were never pressed.
       const skipped = undoPress && undoPress.skips && !undoPress.pit
         ? Race.skip.missed(cfg, { first: undoPress.legIndex, last: undoPress.legIndex + undoPress.skips }) : [];
+      // Top to bottom: Skipped, then the faces beside Undo, then the receipt
+      // where the button was. Nothing in the receipt can be pressed.
       act.innerHTML = `<div class="rundo" data-undo="${barKey}">
-        <span class="rundo-msg">
-          <span class="stamp">${esc(undoLabel)}</span>
-          ${skipped.length ? `<span class="skipped">Skipped: ${esc(skipped.join(', '))}</span>` : ''}
-          <span class="fade">Undo for ${left}s</span>
-        </span>
+        ${skip ? (skipArmed === undoPress
+          ? `<button class="rundo-skip armed" type="button" id="skip"><span class="k">Tap again to confirm the skip</span>
+          <span class="d">You went past ${esc(skip.past)} without checking in, and you are at ${esc(skip.at)} now.</span></button>`
+          : `<button class="rundo-skip" type="button" id="skip"><span class="k">Skipped · check-in missed</span>
+          <span class="d">Past ${esc(skip.past)}, at ${esc(skip.at)} now</span></button>`) : ''}
         ${undoFeel ? `<div class="rundo-feel${chosen ? ' chosen' : ''}" role="group" aria-label="How are you feeling?">
           <span class="q">${chosen ? 'Noted. Tap another to change it.' : 'How are you feeling?'}</span>
           <span class="faces">${Race.feel.KEYS.map(k => `<button type="button" class="feel-btn${chosen === k ? ' on' : ''}" data-feel="${k}"
             aria-pressed="${chosen === k}" aria-label="${Race.feel.LABEL[k]}">${Race.feel.svg(k, 40)}</button>`).join('')}</span>
         </div>` : ''}
         <button class="rundo-btn" type="button" id="undo">Undo</button>
-        ${skip ? (skipArmed === undoPress
-          ? `<button class="rundo-skip armed" type="button" id="skip"><span class="k">Tap again to confirm the skip</span>
-          <span class="d">You went past ${esc(skip.past)} without checking in, and you are at ${esc(skip.at)} now.</span></button>`
-          : `<button class="rundo-skip" type="button" id="skip"><span class="k">Skipped · check-in missed</span>
-          <span class="d">Past ${esc(skip.past)}, at ${esc(skip.at)} now</span></button>`) : ''}
+        <span class="rundo-msg">
+          <span class="stamp">${esc(undoLabel)}</span>
+          ${skipped.length ? `<span class="skipped">Skipped: ${esc(skipped.join(', '))}</span>` : ''}
+          <span class="fade">Undo for ${left}s</span>
+        </span>
       </div>`;
-      document.getElementById('undo').addEventListener('click', undoLast);
+      // And for a moment after the press nothing on the bar answers at all:
+      // a double tap is two taps a few hundred milliseconds apart, and the
+      // second one is not a decision.
+      const awake = (fn) => (...a) => { if (Date.now() < barDeadUntil) return; fn(...a); };
+      document.getElementById('undo').addEventListener('click', awake(undoLast));
       const sk = document.getElementById('skip');
-      if (sk) sk.addEventListener('click', armOrSkip);
-      act.querySelectorAll('[data-feel]').forEach(b => b.addEventListener('click', () => chooseFeel(b.dataset.feel)));
+      if (sk) sk.addEventListener('click', awake(armOrSkip));
+      act.querySelectorAll('[data-feel]').forEach(b => b.addEventListener('click', awake(() => chooseFeel(b.dataset.feel))));
       return;
     }
     const runner = merged();
@@ -771,7 +784,7 @@
           : (lapName ? `Leaving · ${lapName}` : `Leaving · to ${(def && def.toAid) || 'the next aid'}`));
     const queued = Race.queue.pending().length;
     const sub = queued
-      ? `${queued} saved on this phone · sends when you have signal`
+      ? `${queued} saved on this phone · ${Race.queue.needsSignIn() ? 'sign in again to send' : 'sends when it can'}`
       : (next.nextAction === 'in' ? 'Logs your arrival' : 'Starts the next leg');
     act.innerHTML = `<button class="rbtn ${next.nextAction === 'in' ? 'in' : 'out'}" type="button" id="go">${esc(label)}<span class="sub">${esc(sub)}</span></button>` +
       // A timed race ends for a runner when they say so: from the pit, where
@@ -948,6 +961,7 @@
       ` ${Race.fmt.clockTime(now, cfg)}` +
       ((def && def.toAid) ? ` · ${def.toAid}` : '');
     undoUntil = Date.now() + UNDO_MS;
+    barDeadUntil = Date.now() + BAR_DEAD_MS;
     undoFeel = { legIndex: at, key: next.nextAction === 'out' ? 'feelOut' : 'feelIn', value: null };
     render();
 

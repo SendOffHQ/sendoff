@@ -95,8 +95,28 @@ ok('and reopened, the legs it opened go with it', core.ops[2], [{ index: 1, star
 
 console.log('\nthe phone left at the start');
 ok('the next thing to press is Music Pass', /arrived at music pass/i.test(await page.textContent('#go')), true);
+// Where the big button is, before it is pressed: the thumb is still there a
+// moment later. Skipped used to come up on that exact spot, so tap-tap armed
+// it and tap-tap-tap skipped a station (found in review, 2026-11-12). Now
+// what comes up there is the receipt, which cannot be pressed, and for a
+// moment after the press nothing on the bar answers at all.
+const rect = sel => page.evaluate(sel => { const e = document.querySelector(sel); if (!e) return null;
+  const r = e.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom) }; }, sel);
+const goBox = await rect('#go');
 await page.click('#go');
 await page.waitForSelector('.rundo #skip', { timeout: 5000 });
+// Straight away, the way a double tap lands: on Skipped twice, then on Undo.
+await page.click('#skip'); await page.click('#skip'); await page.click('#undo');
+ok('taps in the first moment after a press do nothing',
+  [await page.locator('#skip.armed').count(), await page.locator('.rundo').count(), !!(await leg(1)).skipped], [0, 1, false]);
+ok('the receipt is exactly where the button was', await rect('.rundo-msg'), goBox);
+ok('and nothing that can be pressed is on that spot', await page.evaluate((top) =>
+  [...document.querySelectorAll('#act button')].filter(b => b.getBoundingClientRect().bottom > top).length, goBox.top), 0);
+ok('Skipped is the furthest thing from it', await page.evaluate(() => {
+  const t = sel => document.querySelector(sel).getBoundingClientRect().top;
+  return t('#skip') < t('#undo') && t('#skip') < t('.rundo-feel');
+}), true);
+await page.waitForTimeout(750);
 ok('the Undo bar offers Skipped, saying where that puts them',
   (await page.textContent('#skip')).replace(/\s+/g, ' ').trim(), 'Skipped · check-in missed Past Music Pass, at Music Meadows 1 now');
 ok('and it all fits a phone', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
@@ -132,7 +152,7 @@ await page.waitForSelector('#go');
 ok('with the press to make again', /arrived at music pass/i.test(await page.textContent('#go')), true);
 
 console.log('\nan Undo at a checkpoint, skipped or not');
-await page.click('#go');
+await page.click('#go'); await page.waitForTimeout(750);
 await until(async () => !!(await leg(2)).startTime);
 await page.click('#undo');
 ok('takes back the arrival as well as the leg it opened',
@@ -140,7 +160,7 @@ ok('takes back the arrival as well as the leg it opened',
 
 console.log('\ntwo stations missed');
 await page.waitForSelector('#go');
-await page.click('#go');
+await page.click('#go'); await page.waitForTimeout(750);
 await page.waitForSelector('#skip');
 await page.click('#skip'); await page.click('#skip');
 await page.waitForSelector('.rundo .skipped');
@@ -154,7 +174,7 @@ ok('each leg starting where the last one was put', [ls2[0].endTime === ls2[1].st
 console.log('\nthe pages, once it stands');
 await setLegs([{ index: 1, startTime: START }]);
 await openRacer();
-await page.click('#go');
+await page.click('#go'); await page.waitForTimeout(750);
 await page.waitForSelector('#skip');
 await page.click('#skip'); await page.click('#skip');
 await until(async () => !!(await leg(2)).endTime);
@@ -199,7 +219,7 @@ console.log('\nthe finish');
 const legs14 = Array.from({ length: 13 }, (_, i) => ({ index: i + 1, startTime: ago(900 - i * 60), endTime: ago(841 - i * 60) }));
 await setLegs(legs14.concat([{ index: 14, startTime: ago(60) }]));
 await openRacer();
-await page.click('#go');
+await page.click('#go'); await page.waitForTimeout(750);
 await page.waitForSelector('#skip');
 ok('past Music Meadows 3 is Music Pass 2', /Past Music Meadows 3, at Music Pass 2 now/.test(await page.textContent('#skip')), true);
 await page.click('#skip'); await page.click('#skip');

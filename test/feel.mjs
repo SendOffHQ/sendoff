@@ -56,7 +56,7 @@ const until = async (test) => { for (let i = 0; i < 40; i++) { if (await test())
 
 console.log('\nthe racer screen, after a press');
 await openRacer();
-await page.click('#go');
+await page.click('#go'); await page.waitForTimeout(750);
 await page.waitForSelector('.rundo .rundo-feel', { timeout: 5000 });
 ok('asks how they are feeling, with three faces, beside the Undo',
   [await page.textContent('.rundo-feel .q'), await page.$$eval('.rundo-feel [data-feel]', bs => bs.map(x => x.dataset.feel)), await page.isVisible('#undo')],
@@ -78,7 +78,7 @@ ok('tapping another changes it', (await leg(2)).feelIn, 'good');
 console.log('\nleaving the aid station');
 await page.waitForFunction(() => !document.querySelector('.rundo'), null, { timeout: 20000 });
 await page.waitForSelector('#go');
-await page.click('#go');
+await page.click('#go'); await page.waitForTimeout(750);
 await page.waitForSelector('.rundo .rundo-feel');
 await page.click('.rundo-feel [data-feel="rough"]');
 await until(async () => (await leg(3)).feelOut === 'rough');
@@ -92,7 +92,7 @@ ok('and the arrival keeps its own', (await leg(2)).feelIn, 'good');
 
 console.log('\nanswered or not, the press stands');
 await openRacer();
-await page.click('#go');
+await page.click('#go'); await page.waitForTimeout(750);
 await page.waitForSelector('.rundo');
 // The press saves in the background, so wait for it to land rather than
 // reading the file the instant the bar appears.

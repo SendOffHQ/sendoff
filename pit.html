@@ -302,7 +302,7 @@
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/race-core.js?v=b6a32863"></script>
+<script src="lib/race-core.js?v=e307c2db"></script>
 <script src="lib/course-view.js?v=e062d140"></script>
 <script>
   const slug = Race.qs('id');
@@ -415,7 +415,7 @@
     try {
       const r = await Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId, legs },
         `pit: ${runner.name || runnerId} sign-${next.nextAction} leg ${at}`);
-      toast(r.queued ? `No signal · ${what} saved on this phone` : `Saved · ${what}`, 'ok');
+      toast(r.queued ? `${r.label} · ${what} saved on this phone` : `Saved · ${what}`, 'ok');
     } catch (err) {
       toast(`Save failed: ${err.message}`, 'error');
     }
@@ -462,7 +462,7 @@
     try {
       const r = await Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId, legs },
         `pit: ${runner.name || runnerId} skipped ${p.skips === 1 ? 'a station' : p.skips + ' stations'}, in leg ${at}`);
-      toast(r.queued ? `No signal · ${what} saved on this phone` : `Saved · ${what}`, 'ok');
+      toast(r.queued ? `${r.label} · ${what} saved on this phone` : `Saved · ${what}`, 'ok');
     } catch (err) {
       toast(`Save failed: ${err.message}`, 'error');
     }
@@ -628,7 +628,7 @@
         const r = await Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId, legs },
           `pit: edit ${runnerId} leg ${legIndex} ${field}`);
         m.close();
-        toast(r.queued ? 'No signal · time saved on this phone' : 'Time saved', 'ok');
+        toast(r.queued ? `${r.label} · time saved on this phone` : 'Time saved', 'ok');
         await load();
       } catch (err) {
         m.primary.disabled = false;
@@ -645,7 +645,7 @@
     try {
       const r = await Race.queue.write(DATA_PATH, 'setRunnerStopped', { runnerId, stoppedAt: new Date().toISOString() },
         `pit: ${runnerId} stopped`);
-      toast(r.queued ? 'No signal · saved on this phone' : `${who} is done`, 'ok');
+      toast(r.queued ? `${r.label} · saved on this phone` : `${who} is done`, 'ok');
       await load();
     } catch (err) { toast(`Could not save: ${err.message}`, 'error'); }
   }
@@ -658,7 +658,7 @@
       if (!confirm('Take back the stop and put this runner back in the race?')) return;
       try {
         const r = await Race.queue.write(DATA_PATH, 'setRunnerStopped', { runnerId, stoppedAt: null }, `pit: ${runnerId} back in`);
-        toast(r.queued ? 'No signal · undo saved on this phone' : 'Back in the race', 'ok');
+        toast(r.queued ? `${r.label} · undo saved on this phone` : 'Back in the race', 'ok');
         await load();
       } catch (err) { toast(`Undo failed: ${err.message}`, 'error'); }
       return;
@@ -673,7 +673,7 @@
       try {
         const r = await Race.queue.write(DATA_PATH, 'reopenLeg', { runnerId, legIndex: p.legIndex, upTo: p.upTo },
           `pit: undo ${runnerId} leg ${p.legIndex}`);
-        toast(r.queued ? 'No signal · undo saved on this phone' : 'Undone', 'ok');
+        toast(r.queued ? `${r.label} · undo saved on this phone` : 'Undone', 'ok');
         await load();
       } catch (err) { toast(`Undo failed: ${err.message}`, 'error'); }
       return;
@@ -698,7 +698,7 @@
             `pit: undo ${runnerId} leg ${last.index}`)
         : await Race.queue.write(DATA_PATH, 'clearLegField', { runnerId, legIndex: last.index, field },
             `pit: undo ${runnerId} leg ${last.index}`);
-      toast(r.queued ? 'No signal · undo saved on this phone' : 'Undone', 'ok');
+      toast(r.queued ? `${r.label} · undo saved on this phone` : 'Undone', 'ok');
       await load();
     } catch (err) { toast(`Undo failed: ${err.message}`, 'error'); }
   }
@@ -1175,40 +1175,106 @@
   // it: an emptied box means "clear this field", so saving after a wipe
   // deleted the note that was already there.
   //
-  // So a poll-driven render stands down while there are unsaved edits. Anything
-  // the person actually asked for (switching legs, saving) passes force and
-  // redraws regardless. The cost is that the whole board pauses while somebody
-  // types, rather than just their card; with a full field of racers that is
-  // worth splitting, but not days before a race.
+  // The first answer was for the whole board to stand down while anything was
+  // unsaved. That kept the typing and froze everything else: a crew member who
+  // tapped "+ Gel" and then Send Off saw the button and the badge stay exactly
+  // as they were, pressed again, and the second press was read as the next
+  // action. One racer's unsaved note froze every racer's card. Found in
+  // review, 2026-11-12.
+  //
+  // So now only the box being typed in is left alone. Everything else on the
+  // board, that racer's own button and badge included, is redrawn round it
+  // (softRender). Anything the person actually asked for (switching legs,
+  // saving) passes force and redraws the lot.
   // The course map and profile, under the cards. See lib/course-view.js.
   let boardRunners = [];
   const courseView = CourseView.mount(document.getElementById('course-map-section'), {
     slug, cfg: () => cfg, runners: () => boardRunners
   });
 
+  // One intake panel's fields differ from what they were drawn with, or the
+  // person is in it right now.
+  function panelInUse(panel) {
+    if (!panel) return false;
+    // In a field or the station list, that is. A button that was just pressed
+    // keeps the focus too, and its panel is exactly the one that should
+    // change.
+    const at = document.activeElement;
+    if (at && panel.contains(at) && at.matches('[data-intake], select[data-intake-leg]')) return true;
+    return [...panel.querySelectorAll('[data-intake]')].some(el => el.value !== (el.dataset.rendered ?? ''));
+  }
+
+  // Redraw the board without touching an intake panel somebody is using.
+  //
+  // The panel is never lifted out of the page, not even for an instant: a
+  // field that leaves the document loses its focus, and on a phone the
+  // keyboard goes with it. So a card with a panel in use stays where it is and
+  // everything else inside it is replaced round the panel; every other card
+  // is simply swapped for its new one.
+  function softRender(box, html) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    const PANEL = ':scope > .intake-panel:not(.intake-preview)';
+    const old = new Map([...box.querySelectorAll(':scope > article.runner[data-runner]')]
+      .map(a => [a.dataset.runner, a]));
+    const want = [];
+    for (const node of [...tpl.content.children]) {
+      const was = node.matches('article.runner[data-runner]') ? old.get(node.dataset.runner) : null;
+      const panel = was && was.querySelector(PANEL);
+      const fresh = node.matches('article.runner') ? node.querySelector(PANEL) : null;
+      // A panel in use is kept only while the new card still has one: with
+      // every leg undone there is nothing left for the typing to be about.
+      if (panel && fresh && panelInUse(panel)) {
+        fresh.remove();
+        for (const c of [...was.childNodes]) if (c !== panel) c.remove();
+        was.className = node.className;
+        was.setAttribute('style', node.getAttribute('style') || '');
+        // The panel is the last thing in a card, so the rest goes before it.
+        while (node.firstChild) was.insertBefore(node.firstChild, panel);
+        want.push(was);
+      } else {
+        want.push(node);
+      }
+    }
+    // Into order. A kept card that is already in its place is not moved.
+    for (const c of [...box.childNodes]) if (c.nodeType !== 1) c.remove();
+    let cursor = box.firstElementChild;
+    for (const n of want) {
+      if (n === cursor) { cursor = cursor.nextElementSibling; continue; }
+      box.insertBefore(n, cursor);
+    }
+    while (cursor) { const next = cursor.nextElementSibling; cursor.remove(); cursor = next; }
+  }
+
   function render(force) {
     if (!cfg || !data) return;
-    if (!force && intakeDirty()) return;
-    // Nor while somebody is choosing a leg. Rebuilding the card swaps the
-    // dropdown for a new one, which shut the list in their hand every time a
-    // poll landed: every five seconds during a race. Held until it closes,
-    // and no longer than half a minute, so a dropdown left focused on a laptop
-    // cannot freeze the board.
-    if (!force && pickingLeg()) { renderWaiting = true; return; }
+    // Unsaved typing, or a leg being chosen: redraw round it. Rebuilding the
+    // card swaps the dropdown for a new one, which shut the list in their hand
+    // every time a poll landed, so the panel it is in is one of the ones left
+    // alone, and is caught up when the dropdown closes. No longer than half a
+    // minute, so a dropdown left focused on a laptop cannot hold it for good.
+    const picking = !force && pickingLeg();
+    if (picking) renderWaiting = true;
+    const at = document.activeElement;
+    const soft = !force && (picking || intakeDirty() ||
+      !!(at && at.matches && at.matches('#runners .intake-panel [data-intake], #runners select[data-intake-leg]')));
     const runnersById = new Map((cfg.runners || []).map(r => [r.id, r]));
     const all = (cfg.runners || []).map(r => {
       const dr = (data.runners || []).find(d => d.id === r.id) || { id: r.id, legs: [] };
       return { ...r, ...dr };
     });
     const merged = myBoard(all);
-    document.getElementById('runners').innerHTML = boardScope(all, merged) + merged.map(renderRunner).join('');
+    const box = document.getElementById('runners');
+    const html = boardScope(all, merged) + merged.map(renderRunner).join('');
+    if (soft) softRender(box, html); else box.innerHTML = html;
     boardRunners = merged;
     courseView.load();
     courseView.update();
     // What each field was drawn with. Anything different later is a person's
-    // unsaved typing.
+    // unsaved typing. A field in a panel that was left alone keeps the mark
+    // it had, which is what makes its typing still count as unsaved.
     document.querySelectorAll('#runners [data-intake]')
-      .forEach(el => { el.dataset.rendered = el.value; });
+      .forEach(el => { if (el.dataset.rendered === undefined) el.dataset.rendered = el.value; });
     tick();
     updateLastUpdatedLabel();
   }

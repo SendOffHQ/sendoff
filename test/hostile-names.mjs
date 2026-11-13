@@ -61,7 +61,7 @@ segs.forEach((s, i) => { s.name = `Leg ${i} ${boom(5)}`; if (s.toAid) s.toAid = 
 cfg.fuelMetrics = [
   { key: 'calories', label: `Calories ${boom(7)}`, unit: boom(8), short: `Cal ${boom(9)}` },
   { key: 'x" onclick="window.__pwned=10', label: 'Bad key', unit: 'g', short: 'Bad' }];
-cfg.presets = [{ name: `Gel ${boom(11)}`, calories: 100 }];
+cfg.fuelPresets = [{ name: `Gel ${boom(11)}`, values: { calories: 100 } }];
 // A racer in data.json alone, whose id is markup.
 data.runners.push({ id: 'x" onmouseover="window.__pwned=12', legs: [] });
 // And somebody on course, so the Live tile and the map have a name to draw.
