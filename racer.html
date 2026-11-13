@@ -218,6 +218,9 @@
     color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em;
     text-transform: uppercase; padding: 10px; border-radius: 8px; cursor: pointer; }
   .rstop:hover { color: var(--text); border-color: var(--border-bright); }
+  /* Armed: the first tap only asks; the words say what the second will do. */
+  .rstop.armed { color: var(--red); border-color: var(--red); background: rgba(255, 115, 119, 0.08); }
+  .rbtn.gone.armed { background: rgba(255, 115, 119, 0.22); border-color: var(--red); }
   .rbtn:disabled { opacity: 0.55; cursor: default; }
   /* A backyard bell that has rung: two answers, side by side, neither guessed. */
   .rsplit { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -731,6 +734,38 @@
     document.getElementById('jot-list').innerHTML = lines.map(s => `<div>${esc(s)}</div>`).join('');
   }
 
+  // ---------- two taps to leave the race ----------
+  // Out, stopped, dropped and won all end the racer's race, and the button
+  // sits under a thumb that is also pressing check-ins. A dialog was the
+  // confirmation, and a dialog on a phone in a vest is easy to wave through.
+  // So these work the way Skipped does: the first tap only arms the button,
+  // which says what a second tap will do, and a second tap within eight
+  // seconds does it. A tap in the first moment after arming is the same
+  // thumb bouncing, not a decision, and counts for nothing.
+  let armedKey = null, armedAt = 0;
+  const ARM_DEAD_MS = 700, ARM_HOLD_MS = 8000;
+  function isArmed(key) { return armedKey === key && Date.now() - armedAt < ARM_HOLD_MS; }
+  function twoTaps(key, run) {
+    const now = Date.now();
+    if (armedKey === key && now - armedAt < ARM_HOLD_MS) {
+      if (now - armedAt < ARM_DEAD_MS) return;
+      armedKey = null;
+      run();
+      return;
+    }
+    armedKey = key; armedAt = now;
+    renderAct();
+    setTimeout(() => { if (armedKey === key && Date.now() - armedAt >= ARM_HOLD_MS) { armedKey = null; renderAct(); } }, ARM_HOLD_MS + 50);
+  }
+  // A button that takes two taps: its own words, or, armed, what the second
+  // tap does.
+  function armButton(cls, id, key, text, armedText) {
+    const on = isArmed(key);
+    return `<button class="${cls}${on ? ' armed' : ''}" type="button" id="${id}" data-arm="${key}">${on ? armedText : text}</button>`;
+  }
+  const stopKey = () => Race.course.isBackyard(cfg) ? 'out' : Race.course.isTimed(cfg) ? 'stop' : 'drop';
+  const stopArmedText = () => ({ out: 'Tap again to confirm: I\'m out', stop: 'Tap again to confirm: stop here', drop: 'Tap again to confirm: drop out' })[stopKey()];
+
   // ---------- backyard ----------
   // The bell decides what the one button is (Race.backyard):
   //   back, before the next bell   nothing to press: the lap goes on the bell
@@ -751,21 +786,21 @@
     if (by.overdue) {
       return {
         html: `<div class="rsplit"><button class="rbtn in" type="button" id="by-back">Back by the bell<span class="sub">Off on lap ${by.overdue.lap + 1}</span></button>` +
-          `<button class="rbtn gone" type="button" id="by-out">Didn't make it<span class="sub">I'm out</span></button></div>` +
+          armButton('rbtn gone', 'by-out', 'by-out', `Didn't make it<span class="sub">I'm out</span>`, `Tap again<span class="sub">to confirm you're out</span>`) + `</div>` +
           `<div class="rbell due">Lap ${by.overdue.lap} was due back by <strong>${esc(bellClock(by.overdue.due))}</strong></div>`,
         wire: () => {
           document.getElementById('by-back').addEventListener('click', () => bellBack());
-          document.getElementById('by-out').addEventListener('click', () => bellOut(by.overdue.due));
+          document.getElementById('by-out').addEventListener('click', () => twoTaps('by-out', () => bellOut(by.overdue.due)));
         }
       };
     }
     if (by.waiting) {
       return {
         html: `<div class="rsplit"><button class="rbtn out" type="button" id="go">Off on lap ${by.waiting.lap}<span class="sub">left on the ${esc(bellClock(by.waiting.bell))} bell</span></button>` +
-          `<button class="rbtn gone" type="button" id="by-out">Not starting<span class="sub">I'm out</span></button></div>`,
+          armButton('rbtn gone', 'by-out', 'by-out', `Not starting<span class="sub">I'm out</span>`, `Tap again<span class="sub">to confirm you're out</span>`) + `</div>`,
         wire: () => {
           document.getElementById('go').addEventListener('click', pressGo);
-          document.getElementById('by-out').addEventListener('click', () => bellOut(by.waiting.bell));
+          document.getElementById('by-out').addEventListener('click', () => twoTaps('by-out', () => bellOut(by.waiting.bell)));
         }
       };
     }
@@ -775,12 +810,12 @@
       html: `<button class="rbtn out" type="button" disabled>Lap ${by.lapsDone + 1} on the ${esc(bellClock(by.due))} bell` +
         `<span class="sub">${Race.backyard.autoStart(cfg) ? 'You go out with the bell' : 'Press it when the bell goes'}</span></button>` +
         `<div class="rbell" data-bell-at="${by.due}">Next bell <strong>${esc(bellClock(by.due))}</strong> <span data-bell-left></span></div>` +
-        (by.lapsDone > 0 ? `<button class="rstop" type="button" id="by-won">I won: last one standing</button>` : '') +
-        `<button class="rstop" type="button" id="stop">I'm out of the race</button>`,
+        (by.lapsDone > 0 ? armButton('rstop', 'by-won', 'won', 'I won: last one standing', 'Tap again to confirm: I won') : '') +
+        armButton('rstop', 'stop', 'out', "I'm out of the race", "Tap again to confirm: I'm out"),
       wire: () => {
         const w = document.getElementById('by-won');
-        if (w) w.addEventListener('click', bellWon);
-        document.getElementById('stop').addEventListener('click', () => setStopped(true));
+        if (w) w.addEventListener('click', () => twoTaps('won', bellWon));
+        document.getElementById('stop').addEventListener('click', () => twoTaps('out', () => setStopped(true)));
       }
     };
   }
@@ -823,7 +858,6 @@
     catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
   }
   async function bellOut(whenMs) {
-    if (!confirm(`Out at the ${bellClock(whenMs)} bell? Your laps so far are your result. You can take it back.`)) return;
     const dr = (data.runners || []).find(r => r.id === meId);
     const at = new Date(whenMs).toISOString();
     if (dr) dr.stoppedAt = at;
@@ -832,7 +866,6 @@
     catch (err) { toast(`Save failed: ${err.message}`, 'error'); }
   }
   async function bellWon() {
-    if (!confirm('Last one standing, and you finished the lap alone? This ends your race as the winner. You can take it back.')) return;
     const dr = (data.runners || []).find(r => r.id === meId);
     const ends = ((dr && dr.legs) || []).filter(l => l.endTime).map(l => Date.parse(l.endTime));
     const at = new Date(ends.length ? Math.max(...ends) : Date.now()).toISOString();
@@ -932,11 +965,11 @@
     const html = `<button class="rbtn ${next.nextAction === 'in' ? 'in' : 'out'}" type="button" id="go">${esc(label)}<span class="sub">${esc(sub)}</span></button>` + byLine +
       // A timed race ends for a runner when they say so: from the pit, where
       // a lap has just ended and every one so far counts.
-      (timed && !Race.course.isBackyard(cfg) && next.state === 'in-pit' ? `<button class="rstop" type="button" id="stop">Done for the race: stop here</button>` : '') +
-      (Race.course.isBackyard(cfg) ? `<button class="rstop" type="button" id="stop">I'm out of the race</button>` : '') +
+      (timed && !Race.course.isBackyard(cfg) && next.state === 'in-pit' ? armButton('rstop', 'stop', 'stop', 'Done for the race: stop here', stopArmedText()) : '') +
+      (Race.course.isBackyard(cfg) ? armButton('rstop', 'stop', 'out', "I'm out of the race", stopArmedText()) : '') +
       // And in a race to a finish, from an aid station: dropping out. Small,
       // under the button, and it asks first.
-      (!timed && next.state === 'in-pit' ? `<button class="rstop" type="button" id="stop">Dropping out: stop here</button>` : '');
+      (!timed && next.state === 'in-pit' ? armButton('rstop', 'stop', 'drop', 'Dropping out: stop here', stopArmedText()) : '');
     // Rebuilt only when it says something different. This runs on every poll
     // and every live push, and a button swapped for an identical one between
     // a thumb going down and coming up never gets the tap.
@@ -945,7 +978,7 @@
     act.innerHTML = html;
     document.getElementById('go').addEventListener('click', pressGo);
     const stop = document.getElementById('stop');
-    if (stop) stop.addEventListener('click', () => setStopped(true));
+    if (stop) stop.addEventListener('click', () => twoTaps(stop.dataset.arm, () => setStopped(true)));
   }
 
   // ---------- the send-off nudge ----------
@@ -1055,11 +1088,7 @@
   }
 
   async function setStopped(on) {
-    if (on && !confirm(Race.course.isBackyard(cfg)
-      ? 'Out of the race? The laps you have finished are your result. You can take it back.'
-      : Race.course.isTimed(cfg)
-      ? 'Stop here? The laps you have run are your result.'
-      : 'Drop out here? Your clocks stop, and your crew and anyone following see that you dropped. You can take it back.')) return;
+    // Confirmed by the second tap (twoTaps). Taking it back needs neither.
     const dr = (data.runners || []).find(r => r.id === meId);
     if (dr) { if (on) dr.stoppedAt = new Date().toISOString(); else delete dr.stoppedAt; }
     render();

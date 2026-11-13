@@ -173,6 +173,35 @@ ok('and between laps, the bell it goes on', (await page.$eval('#act .rbtn', x =>
   `LAP 3 ON THE ${await clock(s0 + 2 * H)} BELL You go out with the bell`);
 ok('nothing on the screen is wider than the phone', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 
+// Out takes two taps: the first only arms the button and says what the
+// second will do; a second tap straight after is the thumb bouncing and does
+// nothing; a deliberate second tap is the confirmation. No dialog.
+console.log('\nI\'m out takes two taps');
+said.length = 0;
+await page.click('#stop');
+ok('the first tap only asks', [(await page.textContent('#stop')).trim(), !!(await read('data.json')).runners[0].stoppedAt],
+  ["Tap again to confirm: I'm out", false]);
+await page.click('#stop');
+await page.waitForTimeout(300);
+ok('a second tap straight after does nothing', !!(await read('data.json')).runners[0].stoppedAt, false);
+await page.waitForTimeout(600);
+await page.click('#stop');
+ok('a deliberate second tap puts them out', !!(await until(async () => (await read('data.json')).runners[0].stoppedAt)), true);
+ok('with no dialog on the way', said, []);
+ok('and the screen says so, with a way back', [(await page.$eval('#act .rbtn', x => x.innerText.trim())), await page.locator('#unstop').count()], ['OUT', 1]);
+
+console.log('\nand so does the split at the bell');
+s0 = await yard(3 + 10 / 60);
+await setRunner({ legs: lap3() });
+await page.goto(BASE + `/racer.html?id=${SLUG}&runner=jason`);
+await page.waitForSelector('#by-out', { timeout: 20000 });
+await page.click('#by-out');
+ok('the first tap only asks', (await page.$eval('#by-out', x => x.innerText.replace(/\s+/g, ' ').trim())), "TAP AGAIN to confirm you're out");
+await page.waitForTimeout(800);
+await page.click('#by-out');
+ok('the second puts them out at the bell', await until(async () => (await read('data.json')).runners[0].stoppedAt), iso(s0 + 3 * H));
+ok('still with no dialog', said, []);
+
 console.log('\nsettings');
 await yard(1.5);
 await page.goto(BASE + `/settings?id=${SLUG}`);
