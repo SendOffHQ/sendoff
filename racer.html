@@ -352,7 +352,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
-<script src="lib/race-core.js?v=5f9c4c30"></script>
+<script src="lib/race-core.js?v=912b7e21"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -452,7 +452,7 @@
       // A timed race has no finish line, only the end of the clock.
       hours = +total; what = Race.course.isTimed(cfg) ? 'the race' : 'the finish';
     }
-    const at = startMs + hours * 3600000;
+    const at = Race.tz.cutoffMs(startMs, hours);
     return { at, what, leftMs: at - Date.now() };
   }
 
@@ -936,8 +936,7 @@
     // A checkpoint is passed, not worked: arriving closes the leg and starts
     // the next in the same instant, so nobody presses twice going by.
     const st = Race.stationAt(cfg, next.nextLegIndex);
-    const through = next.nextAction === 'in' && st && st.checkpoint
-                    && next.nextLegIndex < Race.course.legCount(cfg);
+    const through = next.nextAction === 'in' && Race.course.passesThrough(cfg, next.nextLegIndex);
 
     const dr = (data.runners || []).find(r => r.id === meId);
     const legFor = (idx) => {

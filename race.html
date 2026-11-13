@@ -580,7 +580,7 @@
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8a2565f0"></script>
 <script src="lib/course-view.js?v=e062d140"></script>
-<script src="lib/race-core.js?v=5f9c4c30"></script>
+<script src="lib/race-core.js?v=912b7e21"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -694,10 +694,10 @@
   function renderCutoffs() {
     const start = new Date(cfg.startTime);
     const cuts = cfg.cutoffs || {};
-    const final = new Date(start.getTime() + (cuts.totalHours || 0) * 3600 * 1000);
+    const final = new Date(Race.tz.cutoffMs(start.getTime(), cuts.totalHours || 0));
     const fmt = d => Race.tz.dayClock(d.getTime(), cfg);
     const tightHtml = cuts.lastLegStartHours
-      ? `<div class="cutoff-item warn"><span class="v">${fmt(new Date(start.getTime() + cuts.lastLegStartHours * 3600 * 1000))}</span><span class="l">Last leg start · ${cuts.lastLegStartHours}h</span></div>`
+      ? `<div class="cutoff-item warn"><span class="v">${fmt(new Date(Race.tz.cutoffMs(start.getTime(), cuts.lastLegStartHours)))}</span><span class="l">Last leg start · ${Race.fmt.hoursToHm(cuts.lastLegStartHours)}</span></div>`
       : '';
     document.getElementById('cutoffs').style.display = '';
     document.getElementById('cutoffs').innerHTML = `
@@ -705,7 +705,7 @@
       <div></div>
       <div class="cutoff-item"><span class="v">${fmt(start)}</span><span class="l">Start</span></div>
       ${tightHtml}
-      <div class="cutoff-item danger"><span class="v">${fmt(final)}</span><span class="l">${Race.course.isTimed(cfg) ? 'Ends' : 'Final'} · ${cuts.totalHours}h</span></div>
+      <div class="cutoff-item danger"><span class="v">${fmt(final)}</span><span class="l">${Race.course.isTimed(cfg) ? 'Ends' : 'Final'} · ${Race.fmt.hoursToHm(cuts.totalHours)}</span></div>
     `;
   }
 
@@ -764,7 +764,7 @@
         <div class="seg-row start">
           <span class="num">–</span>
           <span class="nm">
-            ${escapeHtml(Race.course.aidStations(cfg)[0]?.name || 'Start')}${stationTags(st)}
+            ${escapeHtml(Race.stations.startName(cfg))}${stationTags(st)}
             <div class="meta">Before the start</div>
           </span>
           <span class="col-dur"></span><span class="col-cut"></span><span class="col-pit"></span>
@@ -1176,16 +1176,20 @@
               liveCls = ' live-course';
               liveValue = Race.fmt.duration(c.currentLegSeconds);
               const segDef = Race.course.legAt(cfg, c.liveLegIndex);
+              // The lap the leg is on, not the leg's own number: on a loop
+              // with aid stations a lap is several legs, and leg 7 is lap 3.
+              const lap = (segDef && segDef.lap) || c.liveLegIndex;
               liveSub = cfg.courseType === 'segments'
                 ? `${segDef ? segDef.name : 'Leg ' + c.liveLegIndex}`
-                : `Lap ${c.liveLegIndex} on course`;
+                : (segDef && segDef.toAid && segDef.lapEnd === false ? `Lap ${lap} · to ${segDef.toAid}` : `Lap ${lap} on course`);
             } else if (c.inPit) {
               liveCls = ' live-pit';
               liveValue = Race.fmt.duration(c.currentPitSeconds);
               const segDef = Race.course.legAt(cfg, c.liveLegIndex);
+              const lap = (segDef && segDef.lap) || c.liveLegIndex;
               liveSub = cfg.courseType === 'segments'
                 ? `at ${segDef && segDef.toAid ? segDef.toAid : 'aid'}`
-                : `In pit · after lap ${c.liveLegIndex}`;
+                : (segDef && segDef.toAid && segDef.lapEnd === false ? `Lap ${lap} · at ${segDef.toAid}` : `In pit · after lap ${lap}`);
             } else if (c.legsDone >= c.totalLegs && c.legsDone > 0) {
               liveSub = 'finished';
             } else {

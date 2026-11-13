@@ -302,7 +302,7 @@
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/race-core.js?v=5f9c4c30"></script>
+<script src="lib/race-core.js?v=912b7e21"></script>
 <script src="lib/course-view.js?v=e062d140"></script>
 <script>
   const slug = Race.qs('id');
@@ -380,8 +380,7 @@
     // starts the next in the same instant, so a runner is never shown sitting
     // in a pit that does not exist and does not have to press twice going by.
     const st = Race.stationAt(cfg, next.nextLegIndex);
-    const throughCheckpoint = next.nextAction === 'in' && st && st.checkpoint
-                              && next.nextLegIndex < Race.course.legCount(cfg);
+    const throughCheckpoint = next.nextAction === 'in' && Race.course.passesThrough(cfg, next.nextLegIndex);
 
     // Optimistic local update
     const legFor = (idx) => {
@@ -877,7 +876,7 @@
     if (next.state === 'idle') {
       st = Race.course.startAid(cfg);
       label = 'At the start';
-      name = (Race.course.aidStations(cfg)[0] || {}).name || 'Start';
+      name = Race.stations.startName(cfg);
     } else {
       // The next place they check in, which for a racer who does that only
       // at the pit is the end of the lap.
