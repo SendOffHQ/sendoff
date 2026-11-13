@@ -59,6 +59,11 @@ const DB = {
           const r = rows.get(this.args[0]);
           return { results: r ? [r] : [] };
         }
+        // What a read of the race through /get asks for.
+        if (/SELECT config, config_sha, data, data_sha FROM races/.test(this.sql)) {
+          const r = rows.get(this.args[0]);
+          return { results: r ? [r] : [] };
+        }
         return { results: [] };
       },
       async run() {
@@ -182,14 +187,24 @@ console.log('\nand with nothing at all');
 await save({}, mine);
 ok('it says it does not know', await shownFor(ME), '');
 
-console.log('\neverybody on the roster gets the same rule');
+// The crew member was typed onto the race by the person who made it. Until
+// they open the race themselves, the race is told nothing about them: no name
+// on the roster and no profile. Typing an address onto a race you own must
+// not be a way to learn who is behind it.
+console.log('\nsomebody added to a race who has not opened it yet');
 await save({ firstName: 'Casey', lastName: 'Kim' }, theirs);
+ok('has no name on its roster', await shownFor(MATE), '');
+let r = await call('/profile?email=' + encodeURIComponent(MATE) + '&slug=' + SLUG, mine);
+ok('and no profile to read through it', r.status, 404);
+await call('/get?path=' + encodeURIComponent(`races/${SLUG}/config.json`), theirs);
+
+console.log('\neverybody on the roster gets the same rule');
 ok('not just the person asking', await shownFor(MATE), 'Casey Kim');
 
-// The gate on reading somebody else's profile is unchanged by any of this and
-// is worth holding: these fields are a person's actual name.
+// The gate on reading somebody else's profile is worth holding: these fields
+// are a person's actual name.
 console.log('\nand a teammate profile is still gated on the race');
-let r = await call('/profile?email=' + encodeURIComponent(MATE) + '&slug=' + SLUG, mine);
+r = await call('/profile?email=' + encodeURIComponent(MATE) + '&slug=' + SLUG, mine);
 ok('somebody on the race may read it', r.status, 200);
 ok('and sees the name fields', (await r.json()).profile.firstName, 'Casey');
 r = await call('/profile?email=' + encodeURIComponent(MATE), mine);

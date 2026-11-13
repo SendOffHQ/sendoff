@@ -11,9 +11,9 @@ worker.
 ## Endpoints
 
 ### Auth & users
-- `POST /login`: `{ email, password }` → `{ token, email, role, expiresAt }`
+- `POST /login`: `{ email, password }` → `{ token, email, role, expiresAt }`. After ten wrong passwords for one account, or thirty from one address, in 15 minutes: `429` with `code: "too_many_attempts"`.
 - `POST /accept-invite`: `{ token, password }` → session + race assignment
-- `POST /change-password`: `{ currentPassword, newPassword }` (session required)
+- `POST /change-password`: `{ currentPassword, newPassword }` (session required) → `{ ok, token, expiresAt }`. Changing or resetting a password ends every earlier session for the account, including the one that made the change, so the page carries on with the token in the answer.
 - `POST /reset-link`: `{ email }` → one-time reset link (admin only)
 - `GET  /reset-info?token=...` → `{ email }`
 - `POST /reset-password`: `{ token, newPassword }` → session

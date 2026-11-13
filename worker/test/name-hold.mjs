@@ -7,7 +7,7 @@ import worker from '../src/worker.js';
 import { nameProblems } from '../src/moderation.js';
 import { fakeD1 } from './fake-d1.mjs';
 
-const OWNER = 'owner@example.com', ADMIN = 'admin@example.com';
+const OWNER = 'owner@example.com', ADMIN = 'admin@example.com', OTHER = 'other@example.com';
 const repo = new Map();
 const kvStore = new Map();
 const KV = {
@@ -51,7 +51,8 @@ const env = {
   DISCORD_WEBHOOK: 'https://discord.test/hook',
   // Cloudflare's send binding, standing in for whichever way mail goes out.
   EMAIL: { async send(m) { mails.push(m); } }, NOTIFY_EMAIL: 'ops@example.com', NOTIFY_FROM: 'invites@example.com',
-  USERS: JSON.stringify([{ email: OWNER, ...await cred('pw') }, { email: ADMIN, role: 'admin', ...await cred('pw') }]),
+  USERS: JSON.stringify([{ email: OWNER, ...await cred('pw') }, { email: ADMIN, role: 'admin', ...await cred('pw') },
+    { email: OTHER, ...await cred('pw') }]),
 };
 const waited = [];
 const ctx = { waitUntil: (p) => waited.push(p) };
@@ -65,7 +66,7 @@ const call = async (p, o = {}) => {
   return { status: r.status, ...(j || {}) };
 };
 const login = async (e) => (await call('/login', { body: { email: e, password: 'pw' } })).token;
-const owner = await login(OWNER), admin = await login(ADMIN);
+const owner = await login(OWNER), admin = await login(ADMIN), other = await login(OTHER);
 const put = (token, path, doc, sha) => call('/commit', { token, body: { path, content: JSON.stringify(doc), message: 't', ...(sha ? { sha } : {}) } });
 const readCfg = async (slug, token) => {
   const r = await call('/get?path=' + encodeURIComponent(`races/${slug}/config.json`), { token });
@@ -121,10 +122,21 @@ ok('and writing the config back does not store it', (await readCfg('foul')).held
 ok('nor does an ordinary save let it go', !!held('foul'), true);
 ok('nor email the admin again', mails.length, 1);
 
-console.log('\nanybody writing the hub list');
+// The hub list is a file the pages write whole, so the name on an entry is
+// checked as the name on a race is. That used to hold whichever race the
+// entry named, the writer's or not, which let any account put anybody's race
+// on hold. A hold now needs a race the writer can edit.
+console.log('\nsomebody writing the hub list');
+await put(owner, 'races/sneaky/config.json', race('Sneaky 50'));
 await put(owner, 'races/index.json', { races: [{ slug: 'nice', name: 'Nice Run 50' }, { slug: 'sneaky', name: 'Shit Show' }] });
-ok('cannot list a foul name for any race', hub(), ['nice: Nice Run 50']);
+ok('cannot list a foul name for their race', hub(), ['nice: Nice Run 50']);
 ok('and the race it named is held', held('sneaky') && held('sneaky').words, ['shit']);
+const mailsBefore = mails.length;
+await put(other, 'races/index.json', { races: [{ slug: 'nice', name: 'Shit Show' }] });
+ok('somebody else cannot hold a race that is not theirs', [held('nice'), mails.length], [null, mailsBefore]);
+ok('nor rename it on the hub, nor take it off', hub(), ['nice: Nice Run 50']);
+await put(other, 'races/index.json', { races: [{ slug: 'ghost', name: 'Shit Show' }] });
+ok('nor hold a race that does not exist', held('ghost'), null);
 
 console.log('\nthe admin');
 const list = await call('/held', { token: admin });
@@ -149,8 +161,10 @@ await put(owner, 'races/index.json', JSON.parse(repo.get('races/index.json')));
 ok('and the same name is not held again on the next write', [hub().length, held('foul')], [2, null]);
 await edit('foul', { name: 'Fuck It 50' });
 ok('a different one is', !!held('foul'), true);
-const gone = await call('/held/approve', { token: admin, body: { slug: 'sneaky' } });
-ok('a hold on a race that does not exist is cleared', [gone.status, held('sneaky')], [404, null]);
+// A hold left behind by a race that has since gone, put there by hand.
+kvStore.set('held:ghost', JSON.stringify({ slug: 'ghost', name: 'Shit Show', words: ['shit'], by: OWNER, at: '2026-11-01T00:00:00Z' }));
+const gone = await call('/held/approve', { token: admin, body: { slug: 'ghost' } });
+ok('a hold on a race that does not exist is cleared', [gone.status, held('ghost')], [404, null]);
 
 console.log('\nmade public while held');
 await put(owner, 'races/flip/config.json', race('Clean Run'));
