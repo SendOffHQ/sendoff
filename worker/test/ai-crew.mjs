@@ -122,8 +122,15 @@ ok('their own notes for crew', st.racerNotesForCrew, 'Salt every hour');
 ok('the one-tap items', st.oneTapItems.map(i => i.name), ['Gel', 'Flask']);
 {
   const { raceStatus } = await import('../src/ai-crew.js');
-  const two = { fuelPresets: [{ name: 'Gel', values: {} }, { name: 'Flask', values: {} }], runners: [{ id: 'pat', name: 'Pat', presets: [1] }] };
+  const two = { fuelPresets: [{ name: 'Gel', values: {} }, { name: 'Flask', values: {} }], runners: [{ id: 'pat', name: 'Pat', presets: [1] }, { id: 'sam', name: 'Sam' }] };
   ok('only the racer\'s own items, where they have a list', raceStatus(two, { runners: [{ id: 'pat', legs: [] }] }, 'pat', Date.now()).oneTapItems.map(i => i.name), ['Flask']);
+  // Down to one racer, the list left over from when there were two is not
+  // theirs alone any more: settings shows every item, and so must this.
+  const lone = { ...two, runners: [two.runners[0]] };
+  ok('a lone racer has every item', raceStatus(lone, { runners: [{ id: 'pat', legs: [] }] }, 'pat', Date.now()).oneTapItems.map(i => i.name), ['Gel', 'Flask']);
+  // An item deleted after it was logged keeps its place and is offered nowhere.
+  const gone = { fuelPresets: [{ name: 'Gel', values: {}, removed: true }, { name: 'Flask', values: {} }], runners: [{ id: 'pat', name: 'Pat' }] };
+  ok('a removed item is not offered', raceStatus(gone, { runners: [{ id: 'pat', legs: [] }] }, 'pat', Date.now()).oneTapItems.map(i => i.name), ['Flask']);
 }
 ok('and that two of their notes are unread', st.unreadNotes, 2);
 ok('with the notes themselves, so they are handled before any answer',

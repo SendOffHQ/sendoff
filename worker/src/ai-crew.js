@@ -255,10 +255,15 @@ export function itemsFor(cfg, runnerId) {
   for (const raw of (cfg && Array.isArray(cfg.presetOrder) ? cfg.presetOrder : [])) {
     const i = +raw;
     if (!Number.isInteger(i) || i < 0 || i >= list.length || seen.has(i)) continue;
-    seen.add(i); all.push({ p: list[i], i });
+    seen.add(i);
+    if (!list[i].removed) all.push({ p: list[i], i });
   }
-  list.forEach((p, i) => { if (!seen.has(i)) all.push({ p, i }); });
+  // An item deleted after things were logged against it keeps its place and
+  // is marked removed: offered nowhere, as on the pages (Race.fuel).
+  list.forEach((p, i) => { if (!seen.has(i) && !p.removed) all.push({ p, i }); });
   const def = ((cfg && cfg.runners) || []).find(r => r && r.id === runnerId) || {};
+  // A lone racer has every item, whatever list was left from when there were two.
+  if (((cfg && cfg.runners) || []).length <= 1) return all;
   if (!Array.isArray(def.presets)) return all;
   const keep = new Set(def.presets.map(Number));
   return all.filter(x => keep.has(x.i));

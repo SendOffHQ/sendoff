@@ -113,6 +113,10 @@
     letter-spacing: 0.1em; text-transform: uppercase; margin-top: 8px;
   }
   .add-row:hover { color: var(--accent); border-color: var(--accent); }
+  .preset-more { margin: 10px 0 4px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .preset-more[hidden] { display: none; }
+  .preset-more-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-muted); }
   /* Start, zone and cutoffs: laid out like the rows around them, the label
      over its controls. */
   .time-row { margin-top: 10px; }
@@ -579,6 +583,7 @@
           <tbody id="preset-rows"></tbody>
         </table>
       </div>
+      <div id="preset-more" class="preset-more" hidden></div>
       <button class="add-row" type="button" id="add-preset">+ Add an item</button>
     </div>
 
@@ -632,7 +637,7 @@
 
 <div id="toast" role="status" aria-live="polite" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=be1d1aab"></script>
+<script src="lib/race-core.js?v=732ba36f"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -751,9 +756,30 @@
   const CONFIG_SETTLE_MS = 20000;
   let configWrittenUntil = 0;
 
+  // Returns true when the loop editor's numbers were moved into new units and
+  // it needs drawing again. `was` and `now` are configs, or anything with the
+  // same `units`.
+  function carryLoopUnits(was, now) {
+    if (!was || !now || !editingLoops || JSON.stringify(Race.units.of(was)) === JSON.stringify(Race.units.of(now))) return false;
+    const d = (v) => { const mi = Race.units.toMiles(v, was); const out = Race.units.distanceVal(mi, now); return out == null ? v : +out.toFixed(2); };
+    const e = (v) => { const ft = Race.units.toFeet(v, was); const out = Race.units.elevationVal(ft, now); return out == null ? v : Math.round(out); };
+    for (const l of editingLoops.loops || []) {
+      if (l.distance !== '' && l.distance != null) l.distance = d(l.distance);
+      if (l.gain !== '' && l.gain != null) l.gain = e(l.gain);
+      for (const a of l.stations || []) if (a.mileage !== '' && a.mileage != null) a.mileage = d(a.mileage);
+    }
+    return true;
+  }
   function adoptConfig(written) {
     if (!written) return;
+    // The loop editor holds what is in its boxes, in the race's units as they
+    // were when it was drawn. Change the units in Race details and those
+    // numbers are still miles under a column now headed km: saving the loops
+    // then stored 10 miles as 10 kilometres, 6.21 miles, on every lap. They
+    // are carried over into the new units before anything is redrawn.
+    const redraw = carryLoopUnits(cfg, written);
     cfg = written;
+    if (redraw) renderLoopsEditor();
     configWrittenUntil = Date.now() + CONFIG_SETTLE_MS;
     render();
   }
@@ -833,7 +859,7 @@
       }
       planKey = editingRunners.length ? editingRunners[0].key : null;
       editingFuel = Race.fuel.toRows(cfg);
-      editingPresets = Race.fuel.presets(cfg).map(pre => ({ name: pre.name, values: { ...pre.values } }));
+      editingPresets = Race.fuel.presets(cfg).map(pre => ({ name: pre.name, values: { ...pre.values }, ...(pre.removed ? { removed: true } : {}) }));
       editingPresetOrder = Race.fuel.presetsInOrder(cfg).map(x => x.i);
       loadPlan();
       renderPlanPicker();
@@ -1244,7 +1270,20 @@
 
   // The items on screen, in order: the picked racer's, or every item.
   function shownPresets() {
-    return presetPlanRunner() ? editingPresetOrder.filter(presetOn) : editingPresetOrder.slice();
+    const live = editingPresetOrder.filter(i => editingPresets[i] && !editingPresets[i].removed);
+    return presetPlanRunner() ? live.filter(presetOn) : live;
+  }
+  // Whether anything has been logged against the item at position d, or at
+  // any position after it: those are the counts a deleted row would move.
+  function loggedFrom(d) {
+    return ((data && data.runners) || []).some(r => (r.legs || []).some(l =>
+      Object.keys(l || {}).some(k => /^preset_\d+$/.test(k) && +k.slice(7) >= d && +l[k] > 0)));
+  }
+  // The race's items the picked racer does not have, to give back to them.
+  function otherPresets() {
+    if (!presetPlanRunner()) return [];
+    return editingPresetOrder.filter(i => editingPresets[i] && !editingPresets[i].removed
+      && (editingPresets[i].name || '').trim() && !presetOn(i));
   }
   // A new order for the rows on screen, put back among the others without
   // moving them, the way Race.fuel.mergeOrder does for the racer screen.
@@ -1267,6 +1306,14 @@
         <td><button class="row-del" type="button" data-del-preset="${i}" aria-label="Delete">×</button></td>
       </tr>
     `).join('');
+    // Items the race has and this racer does not: one tap gives it to them.
+    // Taking an item off a racer used to be one way only, and an item whose
+    // racer had been removed could not be reached at all.
+    const more = document.getElementById('preset-more');
+    const others = otherPresets();
+    more.hidden = !others.length;
+    more.innerHTML = others.length ? `<span class="preset-more-label">Also on this race:</span> ` + others.map(i =>
+      `<button type="button" class="btn" data-give-preset="${i}">+ ${escapeHtml(editingPresets[i].name)}</button>`).join(' ') : '';
   }
 
   // Everyone on this race who could have a profile worth borrowing from. The
@@ -1528,6 +1575,17 @@
     // reading any plan, or the edit that was never blurred is the one lost.
     syncPlan();
 
+    // The copy of the race on screen has to be the one the server gives a
+    // member, which says who each racer's account is and who crews for whom.
+    // When that read fails the page can fall back to the published copy,
+    // which names nobody, and this save sends every racer's account and crew
+    // exactly as shown: it would clear them all. The server's copy always
+    // says what this account is on the race; the published one never does.
+    if (Race.auth.mode() === 'proxy' && cfg && cfg.myRole == null) {
+      toast('The racers could not be read in full from SendOff just now, so saving here could drop their accounts and crew. Reload the page and try again.', 'error');
+      return;
+    }
+
     // Build the roster, keeping stable ids and assigning deduped ones to new runners.
     const used = new Set();
     const runners = [];
@@ -1536,7 +1594,7 @@
       if (!name) continue; // skip blank rows
       let id = r.id;
       if (!id) {
-        const base = Race.slug(name);
+        const base = Race.slug(name) || 'racer';
         let cand = base, n = 2;
         while (used.has(cand)) cand = `${base}-${n++}`;
         id = cand;
@@ -1586,6 +1644,13 @@
       toast('An item needs a name. Fill it in, or delete the row.', 'error');
       return;
     }
+    // A row with its name cleared is dropped on save, which moves the rows
+    // after it. With something logged at or after it, that would move counts.
+    const blanked = (editingPresets || []).findIndex(pre => !(pre.name || '').trim());
+    if (blanked >= 0 && loggedFrom(blanked)) {
+      toast('An item with its name cleared has things logged against it, or after it. Give it a name, or delete the row with the × so what was logged stays where it is.', 'error');
+      return;
+    }
 
     const fuelRows = Race.fuel.fromRows(editingFuel);
     const presets = Race.fuel.presetsFromRows(editingPresets, fuelRows.metrics);
@@ -1613,9 +1678,12 @@
       r.crewNotes = (plan.notes || '').trim().slice(0, 2000);
       // Their items, by the positions that survived this save. Every item
       // ticked is stored as no list, so an item added later reaches them.
-      if (Array.isArray(plan.items)) {
-        const mine = plan.items.filter(k => survived.has(k)).map(k => survived.get(k));
-        if (mine.length < survived.size) r.presets = mine;
+      // Never for a lone racer: with nobody to tell apart, every item is
+      // theirs, and a list kept from when there were two would hide the rest.
+      if (Array.isArray(plan.items) && runners.length > 1) {
+        const offered = (editingPresets || []).filter(p => (p.name || '').trim() && !p.removed).length;
+        const mine = plan.items.filter(k => survived.has(k) && !editingPresets[k].removed).map(k => survived.get(k));
+        if (mine.length < offered) r.presets = mine;
       }
       for (const c of Race.fuel.bandCollisions(plan.bands, fuelRows.metrics)) clashes.push({ ...c, who: r.name });
       delete r.planKey;
@@ -1745,6 +1813,11 @@
   function fillActivity() {
     const el = document.getElementById('race-activity');
     if (!el) return;
+    // Left alone while somebody has changed one and not saved. This runs on
+    // every refresh, half a minute apart, and it put the three pickers back
+    // to what was stored: pick kilometres, read the page for a moment, press
+    // Save, and miles were saved again.
+    if (raceChoicesDirty) { fillRaceTimes(); return; }
     el.innerHTML = '<option value="">Not set</option>' +
       Race.activities.all.map(a => `<option value="${a.key}">${a.label}</option>`).join('');
     el.value = (cfg && cfg.activity) || '';
@@ -1767,6 +1840,8 @@
   // clocks, so changing the zone keeps 7:00 AM at 7:00 AM in the new one.
   // Left alone once edited, so a poll redrawing the page does not undo it.
   let raceForm = null, raceFormDirty = false;
+  // Activity and the two units, changed and not yet saved (see fillActivity).
+  let raceChoicesDirty = false;
   function fillRaceTimes() {
     if (!cfg || raceFormDirty) return;
     const z = raceZone(), st = cfg.startTime, c = cfg.cutoffs || {};
@@ -1826,11 +1901,19 @@
         // the day and time the race publishes.
         const oldStart = remote.startTime, oldZone = Race.tz.of(remote) || Race.tz.device();
         if (oldStart && (Date.parse(oldStart) !== Date.parse(newStart) || oldZone !== zone)) {
+          // Each keeps its time of day, and moves by as many days as the
+          // start did. It used to keep its date as well, so a race put back a
+          // week had every aid station cutoff a week before its own start.
+          const dayOf = (iso, z) => Date.parse(Race.tz.toInputs(Date.parse(iso), z).date + 'T12:00:00Z');
+          const moved = Math.round((dayOf(newStart, zone) - dayOf(oldStart, oldZone)) / 864e5);
           const keep = (h) => {
             const w = Race.tz.hoursToWall(oldStart, h, oldZone);
-            return w ? Race.tz.wallToHours(newStart, w.date, w.time, zone) : h;
+            if (!w) return h;
+            const date = new Date(Date.parse(w.date + 'T12:00:00Z') + moved * 864e5).toISOString().slice(0, 10);
+            return Race.tz.wallToHours(newStart, date, w.time, zone);
           };
-          for (const list of [remote.course && remote.course.segments, remote.course && remote.course.loopSegments]) {
+          const perLoop = ((remote.course && Array.isArray(remote.course.loops)) ? remote.course.loops : []).map(l => l && l.segments);
+          for (const list of [remote.course && remote.course.segments, remote.course && remote.course.loopSegments, ...perLoop]) {
             (list || []).forEach(sg => { if (sg && sg.arriveCutoffHours != null) sg.arriveCutoffHours = keep(sg.arriveCutoffHours); });
           }
         }
@@ -1843,12 +1926,14 @@
       // Applied in place rather than re-read. Reading the config back straight
       // after writing it races GitHub's own consistency, and would briefly show
       // the units from before the save.
+      const loopsMoved = cfg ? carryLoopUnits(cfg, { units: { distance, elevation } }) : false;
       if (cfg) cfg.units = { distance, elevation };
+      if (loopsMoved) renderLoopsEditor();
       if (cfg && written) {
         cfg.startTime = written.startTime; cfg.timezone = written.timezone;
         cfg.cutoffs = written.cutoffs; cfg.course = written.course;
       }
-      raceFormDirty = false;
+      raceFormDirty = false; raceChoicesDirty = false;
       render();
       if (editingAid) renderAidEditor();
       // The hub draws its cards from the manifest, not from the config, so a
@@ -2414,6 +2499,9 @@
     document.getElementById('race-editor').classList.toggle('collapsed');
   });
   document.getElementById('race-save').addEventListener('click', saveRaceDetails);
+  for (const id of ['race-activity', 'race-unit-distance', 'race-unit-elevation']) {
+    document.getElementById(id).addEventListener('change', () => { raceChoicesDirty = true; });
+  }
   // The start and the zone. The cutoffs keep their day and time; what
   // changes is which days there are to pick from.
   for (const id of ['race-start-date', 'race-start-time', 'race-tz']) {
@@ -2421,7 +2509,17 @@
       if (!raceForm) return;
       raceFormDirty = true;
       if (id === 'race-tz') raceForm.zone = e.target.value;
-      else raceForm.start[id === 'race-start-date' ? 'date' : 'time'] = e.target.value;
+      else if (id === 'race-start-date') {
+        // The two race cutoffs go with the date, by the same number of days.
+        const from = Date.parse(raceForm.start.date + 'T12:00:00Z'), to = Date.parse(e.target.value + 'T12:00:00Z');
+        if (isFinite(from) && isFinite(to) && from !== to) {
+          for (const k of ['finishCut', 'lastLegCut']) {
+            const w = raceForm[k];
+            if (w && w.date) w.date = new Date(Date.parse(w.date + 'T12:00:00Z') + (to - from)).toISOString().slice(0, 10);
+          }
+        }
+        raceForm.start.date = e.target.value;
+      } else raceForm.start.time = e.target.value;
       renderRaceCutoffs();
     });
   }
@@ -2755,11 +2853,33 @@
       });
       if (used) { renderPresetRows(); return; }
     }
+    // A leg counts an item under its position in this list. Taking a row out
+    // moves every row after it up one, and with it every count already logged:
+    // six gels became six salt pills, on every leg, with nothing said. So an
+    // item with anything logged at or after it is kept in its place and
+    // marked as removed, which hides it everywhere it is offered and leaves
+    // the positions alone. Only an item nothing depends on is taken out.
+    if (loggedFrom(d) && (editingPresets[d].name || '').trim()) {
+      editingPresets[d].removed = true;
+      editingPresetOrder = editingPresetOrder.filter(k => k !== d);
+      for (const plan of Object.values(editingPlans || {})) {
+        if (Array.isArray(plan.items)) plan.items = plan.items.filter(k => k !== d);
+      }
+      renderPresetRows();
+      return;
+    }
     editingPresets.splice(d, 1);
     editingPresetOrder = editingPresetOrder.filter(k => k !== d).map(k => (k > d ? k - 1 : k));
     for (const plan of Object.values(editingPlans || {})) {
       if (Array.isArray(plan.items)) plan.items = plan.items.filter(k => k !== d).map(k => (k > d ? k - 1 : k));
     }
+    renderPresetRows();
+  });
+  document.getElementById('preset-more').addEventListener('click', (e) => {
+    const give = e.target.dataset.givePreset;
+    if (give == null) return;
+    const plan = editingPlans[planKey] || (editingPlans[planKey] = planFrom(null));
+    if (Array.isArray(plan.items) && !plan.items.includes(+give)) plan.items.push(+give);
     renderPresetRows();
   });
 

@@ -753,7 +753,7 @@
 
 </div>
 
-<script src="lib/race-core.js?v=be1d1aab"></script>
+<script src="lib/race-core.js?v=732ba36f"></script>
 <script>
   const DEFAULT_COLORS = ['#0a8b92', '#1f5e8a', '#3a8a3a', '#8a3a5e', '#8a5e3a', '#5e3a8a'];
 
@@ -1493,6 +1493,8 @@
     document.getElementById('race-last-leg-pick').innerHTML =
       Race.tz.cutoffInputs(start, state.timezone, state.lastLegCut, 'data-racecut="lastLegCut"', 'Last-lap gate');
     raceCutoffHint();
+    // The date these were drawn against, for when it is changed.
+    state.cutoffsDate = document.getElementById('race-date').value || state.cutoffsDate;
   }
   function raceCutoffHint() {
     const start = buildStartIso(), c = state.finishCut;
@@ -1599,8 +1601,13 @@
       course: {},
       runners: state.runners
         .filter(r => r.name.trim())
-        .map(r => {
-          const out = { id: Race.slug(r.name), name: r.name.trim(), bib: r.bib.trim() || r.name.trim(), color: r.color };
+        .map((r, n, all) => {
+          // An id of their own each. Two racers called Sam, or two whose names
+          // have no letter or digit in them, used to get the same one, and
+          // then shared one set of splits between them.
+          const base = Race.slug(r.name) || 'racer';
+          const before = all.slice(0, n).filter(x => (Race.slug(x.name) || 'racer') === base).length;
+          const out = { id: before ? `${base}-${before + 1}` : base, name: r.name.trim(), bib: r.bib.trim() || r.name.trim(), color: r.color };
           const g = Race.goal.parse(r.goal, goalCfg()).goal;
           if (g) out.goal = g;
           return out;
@@ -1706,6 +1713,22 @@
     if (!slug) errs.push('Slug could not be derived from name.');
     if (!cfg.startTime) errs.push('Start time is required.');
     if (!(cfg.cutoffs.totalHours > 0)) errs.push('A finish cutoff after the start is required.');
+    // The last-lap gate was never checked: one before the start, or after the
+    // finish cutoff, went in as it was.
+    const gate = cfg.cutoffs.lastLegStartHours;
+    if (gate != null && !(gate > 0 && gate < cfg.cutoffs.totalHours)) errs.push('The last-lap gate has to be between the start and the finish cutoff.');
+    // A row with a name and no distance, or a distance and no name, used to
+    // be left out without a word, and the race was made a station short.
+    const half = (rows, what) => {
+      for (const a of rows || []) {
+        const name = String(a.name || '').trim(), has = !(a.mileage === '' || a.mileage == null);
+        // Not the blank rows the form starts with, which nobody typed.
+        if (name && !has && !/^Aid station \d+$/.test(name)) errs.push(`${name} has no distance. Give it one, or clear the row.`);
+        else if (!name && has && +a.mileage > 0) errs.push(`The ${what} at ${a.mileage} has no name. Name it, or clear the row.`);
+      }
+    };
+    if (cfg.courseType === 'loops') { if (state.loops.length < 2) half(state.loopAidStations, 'station'); }
+    else half(state.aidStations, 'aid station');
     for (const s of ((cfg.course && cfg.course.segments) || [])) {
       if (s.arriveCutoffHours != null && !(s.arriveCutoffHours > 0)) errs.push(`The cutoff for ${s.toAid || s.name} is before the start.`);
     }
@@ -1715,7 +1738,7 @@
       if (g.error) errs.push(`${r.name.trim()}'s goal: put ${g.error}, or leave it blank.`);
     }
     if (cfg.courseType === 'loops') {
-      if (cfg.format !== 'timed' && !cfg.course.loopCount) errs.push('Number of laps is required.');
+      if (cfg.format !== 'timed' && !(cfg.course.loopCount >= 1)) errs.push('Number of laps is required, and has to be at least 1.');
       if (cfg.course.loops && cfg.course.loops.some(l => !(l.distanceMi > 0))) errs.push('Each loop needs a distance, or its stations.');
       else if (!cfg.course.loops && !cfg.course.loopDistanceMi) errs.push('Loop distance is required (set a distance per loop, or list loop aid stations).');
       for (const [i, l] of state.loops.entries()) {
@@ -2108,7 +2131,23 @@
     document.getElementById(id).addEventListener('change', (e) => {
       if (e.target.id === 'race-tz') state.timezone = e.target.value;
       if (state.fuelBands.length) renderBandRows();
-      // Cutoffs keep their day and time; what changes is which days there are.
+      // The date moved: every cutoff already set moves with it by the same
+      // number of days and keeps its time. They used to stay on the date they
+      // were given, so a start date typed wrong and then corrected left the
+      // finish cutoff and every aid station cutoff on the wrong day, some of
+      // them before the start.
+      if (e.target.id === 'race-date') {
+        const from = Date.parse((state.cutoffsDate || '') + 'T12:00:00Z'), to = Date.parse(e.target.value + 'T12:00:00Z');
+        if (isFinite(from) && isFinite(to) && from !== to) {
+          const shift = (w) => { if (w && w.date) w.date = new Date(Date.parse(w.date + 'T12:00:00Z') + (to - from)).toISOString().slice(0, 10); };
+          shift(state.finishCut); shift(state.lastLegCut);
+          for (const a of (state.aidStations || [])) shift(a.cut);
+        }
+        if (isFinite(to)) state.cutoffsDate = e.target.value;
+      }
+      // A finish cutoff nobody has set is 36 hours after whatever the start
+      // now is, not after the first start that happened to be typed.
+      if (!state.finishCutSet) state.finishCut = null;
       renderRaceCutoffs();
       renderAidRows();
     });
@@ -2121,6 +2160,7 @@
       const cell = e.target.closest('.cut-pick');
       const day = cell.querySelector('[data-part="day"]').value, time = cell.querySelector('[data-part="time"]').value;
       state[which] = time ? { date: day, time } : null;
+      if (which === 'finishCut') state.finishCutSet = true;
       raceCutoffHint();
     });
   }
@@ -2211,11 +2251,15 @@
     renderUnitLabels();
     renderAidSummary();
     renderLoopAidSummary();
+    // The loop cards carry the unit in their labels and are drawn by hand:
+    // they went on saying "mi" over numbers now read as kilometres.
+    renderLoopRows();
     syncGoalHints();
   });
   document.getElementById('unit-elevation').addEventListener('change', (e) => {
     state.units.elevation = e.target.value;
     renderUnitLabels();
+    renderLoopRows();
   });
 
   // What this screen says the first time somebody opens it.
