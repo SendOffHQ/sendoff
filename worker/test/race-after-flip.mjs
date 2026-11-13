@@ -215,7 +215,13 @@ j = await (await call('/access?slug=' + SLUG, mateToken)).json();
 ok('and now the crew member, who may invite, sees them',
   [(j.pendingInvites || []).length, (j.shareLinks || []).length], [1, 1]);
 
+// The crew member was typed onto the race when it was made. Their profile is
+// readable through it only once they have opened the race themselves, so that
+// owning a race is not a way to read any account's profile.
 console.log('\nreading a teammate profile, which is gated on the race');
+r = await call('/profile?email=' + encodeURIComponent(MATE) + '&slug=' + SLUG, token);
+ok('not before the teammate has opened the race', r.status, 404);
+await call('/get?path=' + encodeURIComponent(`races/${SLUG}/config.json`), mateToken);
 r = await call('/profile?email=' + encodeURIComponent(MATE) + '&slug=' + SLUG, token);
 ok('the gate opens', r.status, 200);
 

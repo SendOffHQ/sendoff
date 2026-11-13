@@ -89,8 +89,15 @@ await call('/commit', { token: me, body: { path: 'races/mine/config.json', messa
   content: JSON.stringify({ name: 'Mine', visibility: 'public', createdBy: ME, runners: [] }) } });
 const add = await call('/access/add', { token: me, body: { slug: 'mine', username: '@jasmine_r', role: 'crew' } });
 ok('a findable username is added', add.status, 200);
-const roster = await (await call('/access?slug=mine', { token: me })).json();
-ok('and the roster shows their username', roster.people.find(p => p.email === YOU).username, 'jasmine_r');
+// Added is not joined. The roster names them once they have opened the race
+// themselves, and never by a username they have asked not to be found by.
+const rosterEntry = async () => (await (await call('/access?slug=mine', { token: me })).json()).people.find(p => p.email === YOU);
+ok('the roster has no name for them until they open the race', [(await rosterEntry()).username, (await rosterEntry()).displayName], [null, '']);
+await call('/get?path=' + encodeURIComponent('races/mine/config.json'), { token: you });
+ok('and then the roster shows their username', [(await rosterEntry()).username, (await rosterEntry()).displayName], ['jasmine_r', 'Jasmine R']);
+await call('/username/findable', { token: you, body: { findable: false } });
+ok('unless they have turned finding off', [(await rosterEntry()).username, (await rosterEntry()).displayName], [null, 'Jasmine R']);
+await call('/username/findable', { token: you, body: { findable: true } });
 const hidden = await (await call('/access/add', { token: me, body: { slug: 'mine', username: 'jasper', role: 'viewer' } })).json();
 ok('somebody who turned finding off cannot be added that way', hidden.code, 'no_username');
 ok('nor a name nobody has', (await call('/access/add', { token: me, body: { slug: 'mine', username: 'nobody_here', role: 'viewer' } })).status, 404);

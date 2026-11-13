@@ -5,7 +5,8 @@
 //   Auth & users
 //     POST /login            { email, password }                      → { token, email, role, expiresAt }
 //     POST /accept-invite    { token, password }                      → { token, email, expiresAt, slug, role }
-//     POST /change-password  { currentPassword, newPassword }          → { ok: true }  (session required)
+//     POST /change-password  { currentPassword, newPassword }          → { ok: true, token, expiresAt }  (session required;
+//                                                                        ends every earlier session, hence the new token)
 //     POST /reset-link       { email }                                 → { url, token } (admin only)
 //     GET  /reset-info?token=...                                        → { email }
 //     POST /reset-password   { token, newPassword }                     → { token, email, role, expiresAt }
@@ -68,7 +69,9 @@
 //                    Without it, /login still works with USERS env var and ACL still works,
 //                    but invite & share-link endpoints return 503.
 //
-// Session JWTs are HS256, 7 days. Share-token sessions are scoped to a single race and role.
+// Session JWTs are HS256, 7 days, and end early when the account's password is
+// changed or reset (see currentSessionEpoch). Share-token sessions are scoped
+// to a single race and role.
 
 const SESSION_HOURS = 168; // 7 days
 const PBKDF2_DEFAULT_ITERATIONS = 100000;
@@ -322,7 +325,57 @@ async function verifyJwt(token, secret) {
 async function requireAuth(req, env) {
   const h = req.headers.get('authorization') || '';
   const token = h.replace(/^Bearer\s+/i, '');
-  return verifyJwt(token, env.JWT_SECRET);
+  const session = await verifyJwt(token, env.JWT_SECRET);
+  // A token signed before the account's password was last changed or reset is
+  // no longer a session. One with no epoch at all was issued before epochs
+  // existed and is left to run out its seven days.
+  if (session && session.email && typeof session.ep === 'number') {
+    const current = await currentSessionEpoch(env, session.email);
+    if (current !== null && session.ep < current) return null;
+  }
+  return session;
+}
+
+// ---------- ending sessions ----------
+// A session is a signed token and nothing is stored for it, so until this it
+// could not be taken back: a password changed because somebody else had it
+// left that somebody signed in for up to seven days. Each account now has a
+// session epoch, a number on its user record, carried in every token as `ep`
+// and raised whenever the password is changed or reset. A token with an older
+// number is refused.
+//
+// Every request with a session goes through requireAuth, and KV reads are
+// counted against a daily allowance, so the number is remembered per isolate
+// for a minute rather than read each time. That minute, plus the time KV takes
+// to carry a write to another location, is how long an old token can outlive
+// a password change.
+const SESSION_EPOCH_CACHE_MS = 60 * 1000;
+const sessionEpochs = new Map();   // email -> { epoch, at }
+
+function rememberSessionEpoch(email, epoch) {
+  // Bounded, so a flood of made-up addresses cannot grow it without limit.
+  if (sessionEpochs.size > 5000) sessionEpochs.clear();
+  sessionEpochs.set(normalizeEmail(email), { epoch, at: Date.now() });
+}
+
+// The account's epoch as it stands, or null when it cannot be read. Null is
+// answered as "allow": the token is still signed and unexpired, and refusing
+// every session because KV is briefly out of reach would sign the whole crew
+// out in the middle of a race.
+async function currentSessionEpoch(env, email) {
+  email = normalizeEmail(email);
+  const hit = sessionEpochs.get(email);
+  if (hit && Date.now() - hit.at < SESSION_EPOCH_CACHE_MS) return hit.epoch;
+  if (!env.AUTH_KV) return 0;
+  let epoch = 0;
+  try {
+    const raw = await env.AUTH_KV.get('user:' + email);
+    if (raw) { try { epoch = +JSON.parse(raw).sessionEpoch || 0; } catch (e) { epoch = 0; } }
+  } catch (e) {
+    return hit ? hit.epoch : null;
+  }
+  rememberSessionEpoch(email, epoch);
+  return epoch;
 }
 
 // ---------- user lookup ----------
@@ -342,7 +395,8 @@ async function lookupUser(env, email) {
         const u = JSON.parse(raw);
         return { email, hash: u.hash, salt: u.salt, iterations: u.iterations,
                  role: u.role || 'crew', plan: u.plan || DEFAULT_PLAN,
-                 earlyAccess: u.earlyAccess !== false, source: 'kv' };
+                 earlyAccess: u.earlyAccess !== false,
+                 sessionEpoch: +u.sessionEpoch || 0, source: 'kv' };
       } catch (e) {}
     }
   }
@@ -1096,8 +1150,54 @@ function aclFromConfig(cfg) {
     people: racePeople(cfg),
     teamCanInvite: !!(cfg && cfg.teamCanInvite),
     runnerEmails: runnerLinksFromConfig(cfg),
-    runnerCrew: runnerCrewFromConfig(cfg)
+    runnerCrew: runnerCrewFromConfig(cfg),
+    joined: cleanJoined(cfg && cfg.joined)
   };
+}
+
+// Who has joined a race by their own doing: accepted an invite to it, or
+// opened it while signed in. The person who made it always has.
+//
+// Being on a race's access list is something done to a person: anybody who
+// owns a race can type anybody's address into it. That used to be enough to
+// read the person's profile and names through the race, and to put the race
+// on their public profile. Found in review, 2026-11-12. What a race learns
+// about a person, and what a person's public profile says about a race, now
+// wait for the person to have turned up.
+//
+// Kept with the access list, as a list of addresses, so it is never in a file
+// anybody can read, and it holds only people still on the race or still
+// linked to one of its runners: taken off and put back on, a person has to
+// turn up again.
+function cleanJoined(v) {
+  return Array.isArray(v) ? [...new Set(v.map(normalizeEmail).filter(Boolean))] : [];
+}
+function hasJoined(raceCfg, email) {
+  email = normalizeEmail(email);
+  if (!raceCfg || !email) return false;
+  if (normalizeEmail(raceCfg.createdBy) === email) return true;
+  return Array.isArray(raceCfg.joined) && raceCfg.joined.includes(email);
+}
+
+// Written the first time and not again, because KV writes have a small daily
+// allowance and a race page reads its config every minute. The caller has
+// already looked at the access list it loaded and found the person had not
+// joined; this reads the stored one once more so that a copy a moment out of
+// date does not turn every read into a write, and remembers for a minute that
+// it has done so, which covers the time KV takes to show a write everywhere.
+const joinNoted = new Map();   // slug + ' ' + email -> when, per isolate
+async function markJoined(env, slug, email) {
+  email = normalizeEmail(email);
+  if (!env.AUTH_KV || !slug || !email) return;
+  const key = slug + ' ' + email;
+  if (Date.now() - (joinNoted.get(key) || 0) < 60 * 1000) return;
+  const acl = await readAcl(env, slug);
+  if (!acl) return;
+  if (joinNoted.size > 5000) joinNoted.clear();
+  joinNoted.set(key, Date.now());
+  if (acl.joined.includes(email)) return;
+  // writeAcl keeps it only if the stored list still has them on the race.
+  await writeAcl(env, slug, Object.assign({}, acl, { joined: [...acl.joined, email] }));
 }
 
 // null means KV holds no access list for this race. A throw means KV could not
@@ -1127,7 +1227,8 @@ async function readAcl(env, slug) {
         : [],
       teamCanInvite: !!a.teamCanInvite,
       runnerEmails: (a.runnerEmails && typeof a.runnerEmails === 'object') ? a.runnerEmails : {},
-      runnerCrew: cleanRunnerCrew(a.runnerCrew)
+      runnerCrew: cleanRunnerCrew(a.runnerCrew),
+      joined: cleanJoined(a.joined)
     };
   } catch (e) {
     // Stored and unparseable. Unlike the read failing, this will not fix
@@ -1160,7 +1261,10 @@ async function aclFromD1(env, slug) {
     })),
     teamCanInvite: false,
     runnerEmails: {},
-    runnerCrew: {}
+    runnerCrew: {},
+    // Not mirrored. With KV out of reach nobody but the creator counts as
+    // having joined, which hides names for a while and gives nothing away.
+    joined: []
   };
 }
 
@@ -1174,6 +1278,16 @@ async function writeAcl(env, slug, acl) {
     runnerCrew: cleanRunnerCrew(acl.runnerCrew),
     updatedAt: new Date().toISOString()
   };
+  // Only for somebody still on the race or still linked to a runner on it, so
+  // taking a person off also forgets that they had joined. See hasJoined.
+  const here = new Set([...stored.people.map(p => p.email),
+    ...Object.values(stored.runnerEmails).map(normalizeEmail)]);
+  stored.joined = cleanJoined(acl.joined).filter(e => here.has(e));
+  // And what markJoined remembers about this race goes with them, or a person
+  // put back on within the minute could open the race and not be counted.
+  for (const key of joinNoted.keys()) {
+    if (key.startsWith(slug + ' ') && !stored.joined.includes(key.slice(slug.length + 1))) joinNoted.delete(key);
+  }
   await env.AUTH_KV.put(ACL_KEY(slug), JSON.stringify(stored));
   await mirrorAclToD1(env, slug, stored);
 }
@@ -1216,6 +1330,7 @@ function withAcl(cfg, acl) {
   const out = Object.assign({}, cfg);
   out.createdBy = acl.createdBy;
   out.teamCanInvite = acl.teamCanInvite;
+  out.joined = cleanJoined(acl.joined);
   setRacePeople(out, acl.people);
   const links = acl.runnerEmails || {};
   const crew = acl.runnerCrew || {};
@@ -1252,6 +1367,9 @@ async function attachAcl(env, slug, cfg) {
   }
   if (stored) return withAcl(cfg, stored);
   const fromFile = aclFromConfig(cfg);
+  // A file from before the access list moved never said who had joined, and
+  // a file is not where that is allowed to come from.
+  fromFile.joined = [];
   if (env.AUTH_KV && (fromFile.createdBy || fromFile.people.length)) {
     try { await writeAcl(env, slug, fromFile); } catch (e) { /* read still works */ }
   }
@@ -1274,15 +1392,30 @@ async function loadRaceConfig(env, slug) {
 // The stored config, parsed, or null to mean "ask git". Shares its rules with
 // readFromD1 below: off unless READ_FROM_D1 says true, and a row that cannot
 // stand behind its own answer is not an answer.
+//
+// `force` is the caller that decides something on the answer: whether a race
+// exists, who may write it. For that caller a database that could not be asked
+// is not "no such race", and the two used to come back as the same null. A
+// race made since writes moved to D1 has nothing in git, so the fallback then
+// said it did not exist, and "does not exist" is what opens the path that
+// creates a race and writes whoever asked in as its owner. Found in review,
+// 2026-11-12. The read path keeps the quiet null: it falls through to git and
+// at worst answers 404 for a moment.
 async function mirroredConfig(env, slug, force) {
   if (!validSlug(slug)) return null;
   if ((!d1Enabled(env) && !force) || !env.DB || !slug) return null;
+  let r;
   try {
-    const r = (await env.DB.prepare(
+    r = (await env.DB.prepare(
       'SELECT config, config_sha FROM races WHERE slug = ?').bind(slug).all()).results[0];
-    if (!r || !r.config || r.config === '{}' || !r.config_sha) return null;
-    return JSON.parse(r.config);
-  } catch (e) { return null; }
+  } catch (e) {
+    if (!force) return null;
+    throw Object.assign(
+      new Error(`Could not read the race just now: ${e && e.message ? e.message : e}`),
+      { raceUnavailable: true, status: 503 });
+  }
+  if (!r || !r.config || r.config === '{}' || !r.config_sha) return null;
+  try { return JSON.parse(r.config); } catch (e) { return null; }
 }
 
 // The config as it stands. Deliberately uncached: it carries the ACL fields
@@ -1360,11 +1493,19 @@ async function noteRaceCreated(env, slug, email) {
 
 async function createdBySession(env, slug, email) {
   if (!env.AUTH_KV || !slug || !email) return false;
-  try {
-    const raw = await env.AUTH_KV.get('created:' + slug);
-    if (!raw) return false;
-    return normalizeEmail(JSON.parse(raw).email) === normalizeEmail(email);
-  } catch (e) { return false; }
+  let raw;
+  try { raw = await env.AUTH_KV.get('created:' + slug); }
+  catch (e) {
+    // The note could not be read, which is not the same as there being none.
+    // 503 has the wizard's write held and retried; "Race not found" told the
+    // person who had just made the race that it did not exist.
+    throw Object.assign(
+      new Error(`Could not read the race just now: ${e && e.message ? e.message : e}`),
+      { raceUnavailable: true, status: 503 });
+  }
+  if (!raw) return false;
+  try { return normalizeEmail(JSON.parse(raw).email) === normalizeEmail(email); }
+  catch (e) { return false; }
 }
 
 // Access is a role per person. Crew, Racer and Pacer all work the board during
@@ -1455,6 +1596,26 @@ function canViewRace(raceCfg, email) {
 }
 
 // ---------- handlers ----------
+// Wrong passwords are counted, per account and per client address, and past
+// the limit a sign-in is refused before the password is looked at. It used to
+// be unlimited, so a password could be guessed as fast as the worker answered.
+//
+// Only failures are counted, so signing in costs no KV write, and the limits
+// are far above what a tired person mistyping at an aid station gets through:
+// ten for one account, thirty from one address (a crew can share a hotspot),
+// in a quarter of an hour. Each failure restarts that quarter of an hour, and
+// a sign-in that works clears the account's count. Without AUTH_KV there is
+// nowhere to count and nothing is limited.
+const LOGIN_FAILS_PER_ACCOUNT = 10;
+const LOGIN_FAILS_PER_ADDRESS = 30;
+const LOGIN_FAIL_WINDOW_S = 15 * 60;
+const loginFailKey = (kind, v) => `loginfail:${kind}:${String(v).slice(0, 200)}`;
+
+async function loginFails(env, key) {
+  try { return parseInt((await env.AUTH_KV.get(key)) || '0', 10) || 0; }
+  catch (e) { return 0; }
+}
+
 async function handleLogin(req, env) {
   let body;
   try { body = await req.json(); }
@@ -1464,16 +1625,41 @@ async function handleLogin(req, env) {
   if (!email || !password) {
     return json({ error: 'email and password required' }, { status: 400 }, env, req);
   }
+  // Checked before the password, or a guess that happened to be right would
+  // still get in and the limit would only ever slow down the wrong ones.
+  const address = req.headers.get('CF-Connecting-IP');
+  const accountKey = loginFailKey('a', email);
+  const limits = !env.AUTH_KV ? []
+    : [[accountKey, LOGIN_FAILS_PER_ACCOUNT],
+       ...(address ? [[loginFailKey('ip', address), LOGIN_FAILS_PER_ADDRESS]] : [])];
+  let accountFails = 0;
+  for (const [key, max] of limits) {
+    const seen = await loginFails(env, key);
+    if (key === accountKey) accountFails = seen;
+    if (seen >= max) {
+      return json({
+        error: 'Too many wrong passwords. Wait 15 minutes and try again.',
+        code: 'too_many_attempts', retryAfterSec: LOGIN_FAIL_WINDOW_S
+      }, { status: 429, headers: { 'Retry-After': String(LOGIN_FAIL_WINDOW_S) } }, env, req);
+    }
+  }
+  const failed = async () => {
+    for (const [key, max] of limits) {
+      try { await countAndLimit(env, key, max, LOGIN_FAIL_WINDOW_S); } catch (e) { /* still a 401 */ }
+    }
+    return json({ error: 'Invalid credentials' }, { status: 401 }, env, req);
+  };
   const user = await lookupUser(env, email);
   // Always run a hash check to avoid timing leaks for invalid emails.
   if (!user) {
     await verifyPassword(password, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=', 'AAAAAAAAAAAAAAAAAAAAAA==', PBKDF2_DEFAULT_ITERATIONS).catch(() => {});
-    return json({ error: 'Invalid credentials' }, { status: 401 }, env, req);
+    return failed();
   }
   const ok = await verifyPassword(password, user.hash, user.salt, user.iterations);
-  if (!ok) return json({ error: 'Invalid credentials' }, { status: 401 }, env, req);
+  if (!ok) return failed();
+  if (accountFails) { try { await env.AUTH_KV.delete(accountKey); } catch (e) { /* it expires on its own */ } }
   const exp = Date.now() + SESSION_HOURS * 3600 * 1000;
-  const token = await signJwt({ sub: email, email, role: user.role, exp }, env.JWT_SECRET);
+  const token = await signJwt({ sub: email, email, role: user.role, ep: user.sessionEpoch || 0, exp }, env.JWT_SECRET);
   return json({ token, email, username: email, role: user.role, expiresAt: exp }, {}, env, req);
 }
 
@@ -1575,7 +1761,7 @@ async function handleLoginGoogle(req, env) {
     if (!link) await env.AUTH_KV.put('glink:' + email, JSON.stringify({ sub: claims.sub, linkedAt: new Date().toISOString() }));
   }
   const exp = Date.now() + SESSION_HOURS * 3600 * 1000;
-  const token = await signJwt({ sub: email, email, role: user.role, exp }, env.JWT_SECRET);
+  const token = await signJwt({ sub: email, email, role: user.role, ep: user.sessionEpoch || 0, exp }, env.JWT_SECRET);
   return json({ token, email, username: email, role: user.role, expiresAt: exp, via: 'google' }, {}, env, req);
 }
 
@@ -1660,7 +1846,7 @@ async function handleLoginFacebook(req, env) {
     if (!link) await env.AUTH_KV.put('fblink:' + email, JSON.stringify({ id: who.id, linkedAt: new Date().toISOString() }));
   }
   const exp = Date.now() + SESSION_HOURS * 3600 * 1000;
-  const token = await signJwt({ sub: email, email, role: user.role, exp }, env.JWT_SECRET);
+  const token = await signJwt({ sub: email, email, role: user.role, ep: user.sessionEpoch || 0, exp }, env.JWT_SECRET);
   return json({ token, email, username: email, role: user.role, expiresAt: exp, via: 'facebook' }, {}, env, req);
 }
 
@@ -2038,6 +2224,10 @@ async function handlePublicProfile(req, env) {
     if (!cfg || cfg.visibility !== 'public') continue;
     const mine = (cfg.runners || []).find(r => r && normalizeEmail(r.email) === email);
     if (!mine) continue;
+    // Linked is something anybody who can write the race can do to an
+    // address. It goes on this person's public page only once they have
+    // joined the race themselves; their own results page lists it either way.
+    if (!hasJoined(cfg, email)) continue;
     const data = await loadRaceDataNow(env, slug);
     const fuelOn = !!opt(slug).fuel;
     const fuelKeys = Array.isArray(cfg.fuelMetrics) ? cfg.fuelMetrics.map(m => m && m.key).filter(Boolean) : PUB_DEFAULT_FUEL;
@@ -2095,10 +2285,19 @@ async function handleChangePassword(req, env) {
   const ok = await verifyPassword(currentPassword, user.hash, user.salt, user.iterations);
   if (!ok) return json({ error: 'Current password is incorrect' }, { status: 401 }, env, req);
   const { hash, salt, iterations } = await hashPassword(newPassword);
+  // The epoch goes up with the password, in the same write, so every session
+  // signed before this moment ends: that is the point of changing a password
+  // somebody else may have. It ends this one too, so a new token comes back
+  // for the page to carry on with.
+  const sessionEpoch = (user.sessionEpoch || 0) + 1;
   await putUserRecord(env, session.email, {
-    hash, salt, iterations, updatedAt: new Date().toISOString()
+    hash, salt, iterations, sessionEpoch, updatedAt: new Date().toISOString()
   });
-  return json({ ok: true }, {}, env, req);
+  rememberSessionEpoch(session.email, sessionEpoch);
+  const email = normalizeEmail(session.email);
+  const exp = Date.now() + SESSION_HOURS * 3600 * 1000;
+  const token = await signJwt({ sub: email, email, role: user.role, ep: sessionEpoch, exp }, env.JWT_SECRET);
+  return json({ ok: true, token, email, username: email, role: user.role, expiresAt: exp }, {}, env, req);
 }
 
 // Admin-only: mint a one-time password-reset link for a locked-out user.
@@ -2171,13 +2370,17 @@ async function handleResetPassword(req, env) {
   const existing = await lookupUser(env, rec.email);
   const role = existing ? existing.role : 'crew';
   const { hash, salt, iterations } = await hashPassword(newPassword);
+  // A reset ends every session the account had, as a change does: a reset is
+  // what somebody asks for when they think another person can get in.
+  const sessionEpoch = ((existing && existing.sessionEpoch) || 0) + 1;
   await putUserRecord(env, rec.email, {
-    hash, salt, iterations, role, updatedAt: new Date().toISOString()
+    hash, salt, iterations, role, sessionEpoch, updatedAt: new Date().toISOString()
   });
+  rememberSessionEpoch(rec.email, sessionEpoch);
   await env.AUTH_KV.delete('reset:' + token);
 
   const exp = Date.now() + SESSION_HOURS * 3600 * 1000;
-  const sessionToken = await signJwt({ sub: rec.email, email: rec.email, role, exp }, env.JWT_SECRET);
+  const sessionToken = await signJwt({ sub: rec.email, email: rec.email, role, ep: sessionEpoch, exp }, env.JWT_SECRET);
   return json({ token: sessionToken, email: rec.email, username: rec.email, role, expiresAt: exp }, {}, env, req);
 }
 
@@ -2268,7 +2471,7 @@ async function handleAcceptAccountInvite(req, env) {
   if (rec.name) { try { await env.AUTH_KV.put('acctname:' + normalizeEmail(rec.email), clip(rec.name, 80)); } catch (e) {} }
   await env.AUTH_KV.delete('acct:' + token);
   const exp = Date.now() + SESSION_HOURS * 3600 * 1000;
-  const sessionToken = await signJwt({ sub: rec.email, email: rec.email, role: 'crew', exp }, env.JWT_SECRET);
+  const sessionToken = await signJwt({ sub: rec.email, email: rec.email, role: 'crew', ep: 0, exp }, env.JWT_SECRET);
   return json({
     token: sessionToken, email: rec.email, username: rec.email,
     role: 'crew', expiresAt: exp, accountCreated: true
@@ -3451,6 +3654,84 @@ async function handleArchive(req, env) {
   return json(await archiveRace(env, slug), {}, env, req);
 }
 
+// The hub's list as it should be stored when an account that is not an admin
+// writes it: the stored list, with the caller's version of an entry taken only
+// for a race the caller can edit, or made a moment ago. Adding, changing and
+// removing are all the same question. Everything else, including the order
+// and any entry the caller left out or altered, is the stored copy.
+//
+// The caller's lastUpdated is taken, being a time and nothing more; any other
+// field beside the list is the stored one. Returns the document and the slugs
+// whose entries are the caller's.
+const INDEX_CHANGES_PER_WRITE = 25;
+async function ownIndexChanges(env, session, sent) {
+  const r = await githubGetJson(env, 'races/index.json');
+  const stored = (r.data && typeof r.data === 'object' && !Array.isArray(r.data)) ? r.data : {};
+  const storedRaces = Array.isArray(stored.races) ? stored.races : [];
+  const slugOf = (e) => (e && typeof e === 'object' && !Array.isArray(e) && validSlug(e.slug)) ? e.slug : null;
+  const want = new Map();
+  for (const e of sent.races) {
+    const slug = slugOf(e);
+    if (slug && !want.has(slug)) want.set(slug, e);
+  }
+  // Each answer costs a read of the race, and how many are asked for is up to
+  // whoever sent the list. A page changes one entry at a time, so past a
+  // couple of dozen the rest are answered no without being looked up.
+  const answers = new Map();
+  const mayChange = async (slug) => {
+    if (!answers.has(slug)) {
+      if (answers.size >= INDEX_CHANGES_PER_WRITE) return false;
+      const cfg = await loadRaceConfigNow(env, slug);
+      answers.set(slug, cfg ? canEditRace(cfg, session.email)
+                            : await createdBySession(env, slug, session.email));
+    }
+    return answers.get(slug);
+  };
+  const races = [], own = new Set(), seen = new Set();
+  for (const e of storedRaces) {
+    const slug = slugOf(e);
+    if (!slug || seen.has(slug)) { races.push(e); continue; }
+    seen.add(slug);
+    const w = want.get(slug);
+    if (w && JSON.stringify(w) === JSON.stringify(e)) { races.push(e); continue; }
+    if (!(await mayChange(slug))) { races.push(e); continue; }
+    if (w) { races.push(w); own.add(slug); }
+  }
+  for (const [slug, w] of want) {
+    if (seen.has(slug) || !(await mayChange(slug))) continue;
+    races.push(w); own.add(slug);
+  }
+  const doc = Object.assign({}, stored, { races });
+  if (typeof sent.lastUpdated === 'string' && !isNaN(Date.parse(sent.lastUpdated))) {
+    doc.lastUpdated = new Date(sent.lastUpdated).toISOString();
+  }
+  return { doc, own };
+}
+
+// The two things a settings save may change on the access list: which account
+// a runner is, and which crew look after which runner. Put onto the list as
+// it is stored now, not as it was when the request began.
+//
+// It used to write the whole list back from the copy read at the start of the
+// request, so a person taken off the race while somebody else's settings save
+// was under way was put back on by it, with the role they had. Found in
+// review, 2026-11-12. Who made the race, who is on it and whether the team
+// may invite are not a settings save's to write, and no longer pass through
+// one.
+//
+// `loaded` is the list this request read, used only when nothing is stored
+// at all: a race from before the list moved to KV, whose list was in the file
+// this save has just replaced.
+async function saveRunnerLinks(env, slug, loaded, change) {
+  const acl = (await readAcl(env, slug)) || aclFromConfig(loaded);
+  const crew = Object.assign({}, change.crew);
+  // A runner saved with no crew list at all keeps the one they have.
+  for (const id of change.keepCrewFor) {
+    if (acl.runnerCrew[id]) crew[id] = acl.runnerCrew[id];
+  }
+  await writeAcl(env, slug, Object.assign({}, acl, { runnerEmails: change.links, runnerCrew: crew }));
+}
+
 async function handleCommit(req, env, ctx) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -3471,7 +3752,7 @@ async function handleCommit(req, env, ctx) {
   // anyone who can log a split could also write themselves in as the creator,
   // hand out access, or make a private race public. They change only through
   // the access endpoints, which check the right thing.
-  const ACL_FIELDS = ['createdBy', 'people', 'editors', 'viewers', 'teamCanInvite', 'visibility'];
+  const ACL_FIELDS = ['createdBy', 'people', 'editors', 'viewers', 'teamCanInvite', 'joined', 'visibility'];
   // Added by handleGet for the caller's benefit. A client that reads a config
   // and writes it back would otherwise persist one person's role into the file
   // everybody reads.
@@ -3497,23 +3778,48 @@ async function handleCommit(req, env, ctx) {
 
   // Path allowlist + ACL check.
   if (path === 'races/index.json') {
-    // The hub manifest is editable by any signed-in user (the wizard writes
-    // it when creating a public race). Private races are never registered
-    // there; setup.html omits them from the entry it appends.
+    // The hub manifest is written by any signed-in user (the wizard writes
+    // it when creating a public race), and the pages send the whole file.
+    // Private races are never registered there; setup.html omits them from
+    // the entry it appends.
     //
-    // Nor are races held for review, whoever writes the list: the entry is
-    // dropped here rather than trusted to every page that writes one. An
-    // entry naming a race with a name that trips the check is dropped too,
-    // and holds that race, because anybody signed in can write this file and
-    // the name on it is what the hub and the share card show.
+    // What is kept of that file is another matter. It used to be stored as
+    // sent, so any account could take somebody else's race off the hub,
+    // rewrite its entry, or empty the list. Found in review, 2026-11-12. An
+    // account's write now changes only the entries of races it can edit, and
+    // every other entry is the stored one whatever was sent: see
+    // ownIndexChanges. A site admin still writes the file whole.
+    //
+    // Nor are races held for review listed, whoever writes the list: the
+    // entry is dropped here rather than trusted to every page that writes
+    // one. An entry naming a race with a name that trips the check is dropped
+    // too, and holds that race. Only an entry the caller was allowed to write
+    // can do that, or the list would be a way to put anybody's race on hold.
+    const isAdmin = session.role === 'admin';
     let idx = null;
     try { idx = JSON.parse(content); } catch (e) { idx = null; }
-    if (idx && Array.isArray(idx.races) && env.AUTH_KV) {
+    const listed = !!idx && typeof idx === 'object' && Array.isArray(idx.races);
+    let own = null;
+    if (!isAdmin) {
+      if (!listed) return json({ error: 'races/index.json must be an object with a races list' }, { status: 400 }, env, req);
+      let merged;
+      try { merged = await ownIndexChanges(env, session, idx); }
+      catch (e) {
+        if (e && (e.aclUnavailable || e.raceUnavailable)) throw e;
+        return json({ error: `Could not read the race list just now: ${e && e.message ? e.message : e}`, retryable: true },
+          { status: 503 }, env, req);
+      }
+      idx = merged.doc; own = merged.own;
+    }
+    if (listed && env.AUTH_KV) {
       const held = new Set((await heldHolds(env)).map(h => h.slug));
       const keep = [];
       for (const e of idx.races) {
         const s0 = e && typeof e.slug === 'string' ? e.slug : null;
         if (s0 && held.has(s0)) continue;
+        // Somebody else's entry, carried over as stored: not this caller's
+        // name to answer for.
+        if (own && !own.has(s0)) { keep.push(e); continue; }
         const words = await nameHoldWords(env, s0, e && e.name);
         if (words.length) {
           if (s0) await holdRace(env, s0, e.name, words, session.email);
@@ -3523,9 +3829,11 @@ async function handleCommit(req, env, ctx) {
       }
       if (keep.length !== idx.races.length) {
         idx.races = keep;
-        content = JSON.stringify(idx, null, 2) + '\n';
+        if (isAdmin) content = JSON.stringify(idx, null, 2) + '\n';
       }
     }
+    // What is stored is the list as worked out here, never the text sent.
+    if (!isAdmin) content = JSON.stringify(idx, null, 2) + '\n';
   } else if (isRacePath(path)) {
     const slug = racePathSlug(path);
     creationSlug = slug;
@@ -3630,12 +3938,12 @@ async function handleCommit(req, env, ctx) {
       // page that knows about assignments sends one, and an empty list is how
       // it clears them. A page from before this existed cannot wipe them.
       const crew = runnerCrewFromConfig(submitted);
-      const had = runnerCrewFromConfig(raceCfg);
-      for (const r of (submitted.runners || [])) {
-        if (r && r.id && r.crew === undefined && had[r.id]) crew[r.id] = had[r.id];
-      }
+      const keepCrewFor = (Array.isArray(submitted.runners) ? submitted.runners : [])
+        .filter(r => r && r.id && r.crew === undefined).map(r => r.id);
       submitted.runners = runnersWithoutAddresses(submitted.runners);
-      aclUpdate = Object.assign(aclFromConfig(raceCfg), { runnerEmails: links, runnerCrew: crew });
+      // Only these two. The rest of the access list is read again when this
+      // is stored: see saveRunnerLinks.
+      aclUpdate = { links, crew, keepCrewFor };
       content = JSON.stringify(submitted, null, 2) + '\n';
       // A rename is checked as a new race's name is. One that passes lets go
       // of a race held for its old name.
@@ -3674,7 +3982,7 @@ async function handleCommit(req, env, ctx) {
         try { await writeAcl(env, creationSlug, creationAcl); } catch (e) { /* falls back to the file */ }
       }
       if (aclUpdate && creationSlug) {
-        try { await writeAcl(env, creationSlug, aclUpdate); } catch (e) { /* falls back to the file */ }
+        try { await saveRunnerLinks(env, creationSlug, liveCfg, aclUpdate); } catch (e) { /* the links wait for the next save */ }
       }
       await purgeReadCache(env, path);
       await applyNameHold();
@@ -3752,7 +4060,7 @@ async function handleCommit(req, env, ctx) {
     try { await writeAcl(env, creationSlug, creationAcl); } catch (e) { /* falls back to the file */ }
   }
   if (res.ok && aclUpdate && creationSlug) {
-    try { await writeAcl(env, creationSlug, aclUpdate); } catch (e) { /* falls back to the file */ }
+    try { await saveRunnerLinks(env, creationSlug, liveCfg, aclUpdate); } catch (e) { /* the links wait for the next save */ }
   }
   // The mirror, last and on purpose. git has already accepted the write and the
   // caller is about to be told it worked, because it did. Nothing reads D1 yet,
@@ -3989,6 +4297,17 @@ async function handleGet(req, env) {
       const env0 = JSON.parse(text);
       const cfg = JSON.parse(base64ToUtf8(env0.content));
       cfg.myRole = sessionEmail ? roleForRace(aclCfg || cfg, sessionEmail) : null;
+      // Somebody on the race, or linked to one of its runners, reading it
+      // while signed in for the first time: that is them joining it. Looked up
+      // on the list already loaded, so it costs nothing on any later read. An
+      // admin passing through, or a stranger reading a public race, has not
+      // joined anything.
+      if (sessionEmail && aclCfg && !hasJoined(aclCfg, sessionEmail)) {
+        const me = normalizeEmail(sessionEmail);
+        if (cfg.myRole !== null || (aclCfg.runners || []).some(r => r && normalizeEmail(r.email) === me)) {
+          try { await markJoined(env, racePathSlug(path), me); } catch (e) { /* the next read tries again */ }
+        }
+      }
       // Not 'owner'. An admin may work this race and is still not the person
       // whose race it is: deleting it, and handing out access to it, stay with
       // them. The client reads this as a writing role and nothing more.
@@ -4427,6 +4746,13 @@ async function announceFinishes(env, slug, cfg, data) {
 
   const fresh = done.filter(r => r && r.id && !seen.has(r.id));
   if (!fresh.length) return;
+  // Not a race whose name is held for review, for the reason announceNewRace
+  // gives: the post carries the name, and so does finishers.json, which is a
+  // file on the site. Asked only once there is somebody to announce, so an
+  // ordinary split costs no read for it. Nobody is marked as announced, so a
+  // finish still inside its six hours is posted by the first split written
+  // after the name is let through.
+  if (await loadHold(env, slug)) return;
 
   const byId = new Map(((cfg.runners) || []).map(r => [r.id, r]));
   const timed = aiCrew.isTimed(cfg);
@@ -4525,7 +4851,7 @@ async function flushFinishPosts(env) {
   if (!pending.length) return 0;
   const base = (env.PUBLIC_BASE_URL || 'https://sendoff.run').replace(/\/+$/, '');
   const keep = [], send = [];
-  const stillPublic = {};
+  const stillPublic = {}, heldNow = {};
   for (const p of pending) {
     if (!p || !p.slug || !FINISH_ID.test(p.id || '')) continue;
     // Unlisted or deleted while it waited: the rule that it is never posted
@@ -4536,6 +4862,14 @@ async function flushFinishPosts(env) {
       stillPublic[p.slug] = !!(c && isPublicRace(c));
     }
     if (!stillPublic[p.slug]) { send.push({ p, drop: true }); continue; }
+    // Renamed while it waited, to a name now held for review: the post links
+    // to the race, so it waits for the name to be let through, for as long as
+    // a finish counts as news, and is dropped after that.
+    if (heldNow[p.slug] === undefined) heldNow[p.slug] = !!(await loadHold(env, p.slug));
+    if (heldNow[p.slug]) {
+      if (Date.now() - (+p.at || 0) < 6 * 3600e3) keep.push(p); else send.push({ p, drop: true });
+      continue;
+    }
     const url = `${base}/races/${p.slug}/finish-${p.id}`;
     let ready = false;
     try { ready = (await fetch(url, { method: 'HEAD' })).ok; } catch (e) { ready = false; }
@@ -5154,12 +5488,21 @@ async function handleAccessList(req, env) {
   // rather than an email address. Only for people already on this race, and
   // only to someone who can write it, which is the same bar a caller already
   // has to clear to read a teammate's profile at all.
+  //
+  // And only once the person has joined the race themselves (see hasJoined).
+  // Until then the roster has their address, which the caller typed, and
+  // nothing the caller did not already know: adding an address to a race you
+  // own must not be a way to learn the name or the username behind it. A
+  // username is left out for good when its owner has switched off being
+  // found by it, which is the same rule a search and an add by username keep.
   const people = racePeople(raceCfg);
   const named = [];
   for (const p of people) {
+    if (!hasJoined(raceCfg, p.email)) { named.push({ ...p, displayName: '', username: null }); continue; }
     const prof = await loadProfile(env, p.email);
     const h = env.AUTH_KV ? await loadHandle(env, p.email) : {};
-    named.push({ ...p, displayName: profileName(prof), username: h.username || null });
+    named.push({ ...p, displayName: profileName(prof),
+      username: (h.username && h.findable !== false) ? h.username : null });
   }
   let creatorName = '';
   if (raceCfg.createdBy) {
@@ -5296,7 +5639,10 @@ async function handleProfileGet(req, env) {
     if (!canEditRace(raceCfg, session.email)) {
       return json({ error: 'Forbidden, no write access on this race' }, { status: 403 }, env, req);
     }
-    if (roleForRace(raceCfg, wanted) === null) {
+    // On the race, and there by their own doing. Somebody the caller has
+    // only typed onto a race is answered exactly as somebody who is not on
+    // it, or owning a race would be enough to read any account's profile.
+    if (roleForRace(raceCfg, wanted) === null || !hasJoined(raceCfg, wanted)) {
       return json({ error: 'That person is not on this race' }, { status: 404 }, env, req);
     }
   }
@@ -5668,6 +6014,8 @@ async function handleAcceptInvite(req, env) {
       const people = racePeople(cfg).filter(p => p.email !== email);
       people.push({ email, role: RACE_ROLES.includes(role) ? role : 'viewer' });
       setRacePeople(cfg, people);
+      // Accepting an invite is joining the race, by the person's own hand.
+      cfg.joined = [...(cfg.joined || []), email];
       return cfg;
     }, `hub: accept invite on ${inv.slug}`, inv.email);
   } catch (err) {
@@ -5677,7 +6025,8 @@ async function handleAcceptInvite(req, env) {
   await env.AUTH_KV.delete('invite:' + token);
 
   const exp = Date.now() + SESSION_HOURS * 3600 * 1000;
-  const sessionToken = await signJwt({ sub: inv.email, email: inv.email, role: 'crew', exp }, env.JWT_SECRET);
+  const sessionToken = await signJwt({ sub: inv.email, email: inv.email, role: 'crew',
+    ep: (existing && existing.sessionEpoch) || 0, exp }, env.JWT_SECRET);
   return json({
     token: sessionToken,
     email: inv.email, username: inv.email,
@@ -6458,8 +6807,35 @@ async function moveSharePageForVisibility(env, slug, want, cfg, actor) {
         `hub: unlist ${slug}, share page off the site`);
       if (!del.ok) left.push(path);
     }
+    // And the race itself. A finished public race has its config.json and
+    // data.json committed by archiveRace, and a race from before the database
+    // has them there because that was where it lived. Either way they are
+    // files on the site: every split, every note the crew wrote, readable by
+    // address after the race was taken off the hub. Found in review,
+    // 2026-11-12, where unlisting a finished race left both behind.
+    //
+    // Each goes only once the database holds it, and for a race from before
+    // the database it is copied in first: the other order deletes the only
+    // copy there is.
+    const kept = [];
+    for (const file of ['config.json', 'data.json']) {
+      const path = `races/${slug}/${file}`;
+      let cur;
+      try { cur = await githubGetJson(env, path); } catch (e) { kept.push(path); continue; }
+      if (cur.missing) continue;
+      if (!(await readFromD1(env, path))) {
+        await mirrorToD1(env, path, cur.text, actor, cur.sha);
+        if (!(await readFromD1(env, path))) { kept.push(path); continue; }
+      }
+      const del = await gitDeleteRaw(env, path, cur.sha,
+        `hub: unlist ${slug}, ${file} off the site`);
+      if (!del.ok) kept.push(path);
+    }
     // Named, because what is left is a page that still opens the race.
-    return left.length ? `the share page is still published (${left.join(', ')})` : null;
+    const why = [];
+    if (left.length) why.push(`the share page is still published (${left.join(', ')})`);
+    if (kept.length) why.push(`the race's own files are still published (${kept.join(', ')})`);
+    return why.length ? why.join('; ') : null;
   }
 
   // Going public. Written even if one is already there: the name, the date or
@@ -6610,6 +6986,10 @@ async function handleRaceVisibility(req, env, ctx) {
     try { shareErr = await moveSharePageForVisibility(env, slug, want, raceCfg, session.email); }
     catch (e) { shareErr = `could not move the share page: ${e.message || e}`; }
   }
+  // Unlisting takes a finished race's archive out of the repository, so
+  // listing it again puts it back, the way the next split written would have.
+  // After the response, like every other archive.
+  if (want === 'public' && !held && ctx && ctx.waitUntil) ctx.waitUntil(archiveIfDone(env, slug));
 
   // Reported rather than thrown. The race has changed, and an operator being
   // told which half did not finish can act on it; a 500 that hides a completed
@@ -6685,7 +7065,13 @@ async function handleRaceDelete(req, env) {
     }
   }
   if (env.AUTH_KV) {
-    for (const prefix of ['share:', 'invite:']) {
+    // AI crew links and push registrations go the same way as share links
+    // and invites, and for a stronger reason: both are keyed to the slug and
+    // nothing else, so a race made later under the same slug would have
+    // inherited an assistant that can write its splits and phones that are
+    // nudged about it. Found in review, 2026-11-12.
+    const gonePush = [];
+    for (const prefix of ['share:', 'invite:', 'aicrew:', 'push:sub:']) {
       try {
         let cursor;
         do {
@@ -6694,12 +7080,22 @@ async function handleRaceDelete(req, env) {
             const raw = await env.AUTH_KV.get(k.name);
             if (!raw) continue;
             try {
-              if (JSON.parse(raw).slug === slug) await env.AUTH_KV.delete(k.name);
+              if (JSON.parse(raw).slug === slug) {
+                await env.AUTH_KV.delete(k.name);
+                if (prefix === 'push:sub:') gonePush.push(k.name.slice(prefix.length));
+              }
             } catch (e) { /* not JSON we wrote; leave it alone */ }
           }
           cursor = list.list_complete ? null : list.cursor;
         } while (cursor);
       } catch (e) { /* tokens for a deleted race fail their slug check anyway */ }
+    }
+    // The index the cron walks, written once however many registrations went.
+    if (gonePush.length) {
+      try {
+        const idx = JSON.parse((await env.AUTH_KV.get(PUSH_INDEX)) || '[]');
+        await env.AUTH_KV.put(PUSH_INDEX, JSON.stringify(idx.filter(h => !gonePush.includes(h))));
+      } catch (e) { /* runNudges drops an entry whose registration is gone */ }
     }
   }
 
@@ -6808,7 +7204,11 @@ export default {
       // says so, and the client's queue already holds a press on a 503 and
       // retries it, which for somebody standing at an aid station is the
       // difference between a lost split and a slow one.
-      if (err && err.aclUnavailable) {
+      //
+      // The same for a race the database could not be asked about: it is not
+      // missing, and answering as if it were is how a failed read used to
+      // become a new race.
+      if (err && (err.aclUnavailable || err.raceUnavailable)) {
         return json({ error: msg, retryable: true }, { status: 503 }, env, request);
       }
       return json({ error: msg, unhandled: true }, { status: 500 }, env, request);

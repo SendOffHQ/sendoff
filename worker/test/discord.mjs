@@ -257,6 +257,33 @@ const oldLegs = { runners: [{ id: 'jd', legs: Array.from({ length: 4 }, (_, i) =
 await commit('races/909-old/data.json', oldLegs);
 ok('is not announced as if it had just happened', [posts.length, repo.has('races/909-old/finishers.json')], [0, false]);
 
+// A race whose name is held for review is kept off everything that shows the
+// name to strangers. Its creation was already not posted; its finishes were,
+// name and all, and the name went into finishers.json on the site as well.
+console.log('\na race whose name is held for review');
+posts = [];
+await commit('races/910-held/config.json',
+  { ...course, name: 'Shit Show 50', location: 'Texas', visibility: 'public', createdBy: ME });
+ok('is held, and not announced when it is made', [kvStore.has('held:910-held'), posts.length], [true, 0]);
+await commit('races/910-held/data.json', legs(4));
+ok('a finish on it is not posted', posts.length, 0);
+ok('nor queued to be posted later', (JSON.parse(kvStore.get('dsc:finpend') || '[]')).some(p => p.slug === '910-held'), false);
+ok('nor written to the site with the name on it', repo.has('races/910-held/finishers.json'), false);
+ok('nothing with the name has left the worker', posts.some(p => /Shit Show/.test(JSON.stringify(p))), false);
+// The admin lets the name through, and the next split written finds the
+// finish still waiting to be announced.
+kvStore.delete('held:910-held');
+await commit('races/910-held/data.json', legs(4));
+ok('once the name is let through, the finish is announced',
+  (JSON.parse(kvStore.get('dsc:finpend') || '[]')).filter(p => p.slug === '910-held').map(p => p.text),
+  ['**Jason Dupree** finished Shit Show 50 in 04:00:00.']);
+// Held again while that post waits for its card: it waits for the name too.
+kvStore.set('held:910-held', JSON.stringify({ slug: '910-held', name: 'Shit Show 50', words: ['shit'] }));
+finishPages.add('910-held/jd');
+ok('a post already waiting is not sent while the name is held', [(await flush()).posted, posts.length], [0, 0]);
+kvStore.delete('held:910-held');
+ok('and goes when it is let through', [(await flush()).posted, posts.length], [1, 1]);
+
 console.log('\na race cannot ping the server');
 posts = [];
 await commit('races/903-loud/config.json',
