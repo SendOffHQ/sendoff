@@ -152,10 +152,12 @@ await page.waitForTimeout(1500);
 const segs = await page.evaluate(async (slug) => {
   const r = await (await fetch(`/api/get?path=races/${slug}/config.json`, { headers: { Authorization: 'Bearer stub' } })).json();
   const c = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(r.content), c => c.charCodeAt(0))));
-  return c.course.segments.map(s => [s.toAid || s.name, +s.distanceMi.toFixed(1), s.arriveCutoffHours]);
+  // In whole minutes: a cutoff is stored to the minute now, where it used to
+  // be cut to a hundredth of an hour (123.31 for 123 h 19 min).
+  return c.course.segments.map(s => [s.toAid || s.name, +s.distanceMi.toFixed(1), s.arriveCutoffHours == null ? null : Math.round(s.arriveCutoffHours * 60)]);
 }, SLUG);
-ok('Save changes writes them as the course, cutoffs as hours from the start', segs,
-  [['Ridge Road', 6.2, null], ['Summit Timing', 5.2, null], ['Lakeside', 6.5, 123.31], ['Pine Hollow', 6.7, 125.81], ['Finish', 6.5, 127.81]]);
+ok('Save changes writes them as the course, cutoffs as minutes from the start', segs,
+  [['Ridge Road', 6.2, null], ['Summit Timing', 5.2, null], ['Lakeside', 6.5, 123 * 60 + 19], ['Pine Hollow', 6.7, 125 * 60 + 49], ['Finish', 6.5, 127 * 60 + 49]]);
 
 ok('no page errors', errs, []);
 await b.close(); srv.kill('SIGKILL');
