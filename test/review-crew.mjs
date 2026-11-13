@@ -111,6 +111,10 @@ ok('a station picked by hand stays through a refresh', await picked(), '1');
 await page.evaluate(() => document.activeElement && document.activeElement.blur());
 await page.click('[data-action="press"][data-runner="jason"]');
 ok('and lets go when the race moves on', await until(async () => (await picked()) === '3'), true);
+// The send-off is on the phone first and at the server a moment later. Wait
+// for it there, or it lands on top of the next section's starting point.
+await until(async () => (await legs()).some(l => l.index === 3 && l.startTime));
+await until(() => page.evaluate(() => Race.queue.pending().length === 0));
 
 console.log('\na time out earlier than the time in');
 await setLegs([{ index: 1, startTime: T.s1, endTime: T.e1 }, { index: 2, startTime: T.e1, endTime: T.est }, { index: 3, startTime: T.e3 }]);
@@ -147,6 +151,7 @@ await page.evaluate(() => document.activeElement && document.activeElement.blur(
 const before = await card();
 await page.click('[data-action="press"][data-runner="jason"]');
 ok('the button moves on', await until(async () => (await card()).button !== before.button), true);
+await until(async () => (await legs()).some(l => l.index === 3 && l.startTime));
 ok('and the tap is still in front of them, on the station it was for',
   [await picked(), (await page.textContent('article[data-runner="jason"] [data-action="preset"][data-preset="1"] .chip-count')).trim()], ['2', '×1']);
 await page.click('article[data-runner="jason"] [data-action="save-intake"]');
@@ -160,7 +165,7 @@ await page.click('[data-action="stop"][data-runner="jason"]');
 ok('is asked about first, in words about dropping', /as dropped/.test(said[0] || ''), true);
 const dropped = await until(async () => { const c = await card(); return c.badge === 'Dropped' ? c : null; });
 ok('the badge says Dropped and there is nothing left to press', dropped && [dropped.badge, dropped.button, dropped.disabled], ['Dropped', 'Dropped', true]);
-ok('it is on the record', !!(await read('data.json')).runners[0].stoppedAt, true);
+ok('it is on the record', !!(await until(async () => (await read('data.json')).runners[0].stoppedAt)), true);
 await page.waitForTimeout(2300);
 ok('and the clock has stopped', (await card()).timer, dropped.timer);
 ok('the stop they ended at does not say "still here"', /still here/.test(await page.textContent('article[data-runner="jason"] .intake-times')), false);
