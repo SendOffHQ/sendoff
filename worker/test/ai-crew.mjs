@@ -179,6 +179,79 @@ ok('it is not a session anywhere else', (await call('/commit', { token: made.tok
   path: 'races/other/data.json', content: '{"runners":[]}', message: 'x' } })).status, 401);
 ok('nor on the race it is crew for', (await call('/get?path=races/hen/data.json', { token: made.token })).status, 401);
 
+console.log('\na note typed at an earlier station');
+// Pat is on leg 2. Two lines went onto leg 1 at Ridge with no signal, and are
+// read now: what they say is logged where Pat is, and marked where it was typed.
+{
+  const doc = dataOf('hen');
+  doc.runners[0].legs[0].notes += '\n9:10 AM: two cups of broth\n9:12 AM: took a gel\n9:15 AM: hat is in the drop bag';
+  await put(owner, 'hen', 'data', doc);
+}
+ok('is handed over once', (await tool('race_status')).data.notesToHandleFirst.map(n => [n.leg, n.line]),
+  [[1, '9:10 AM: two cups of broth'], [1, '9:12 AM: took a gel'], [1, '9:15 AM: hat is in the drop bag']]);
+r = await tool('log_intake', { items: [{ what: 'broth, two cups', calories: 40, sodiumMg: 900 }], forNotes: ['9:10 AM: two cups of broth'] });
+ok('its food goes on the leg they are running', r.data.leg, 2);
+ok('and it is marked on the leg it was typed on', dataOf('hen').runners[0].legs[0].aiNoted.includes('9:10 AM: two cups of broth'), true);
+ok('so it is not handed over again', (await tool('race_status')).data.notesToHandleFirst.map(n => n.line), ['9:12 AM: took a gel', '9:15 AM: hat is in the drop bag']);
+await tool('log_item', { item: 'Gel', forNotes: ['9:12 AM: took a gel'] });
+ok('the same for a one-tap item', (await tool('race_status')).data.notesToHandleFirst.map(n => n.line), ['9:15 AM: hat is in the drop bag']);
+await tool('add_note', { text: 'Hat is in the Ridge drop bag', forNotes: ['9:15 AM: hat is in the drop bag'] });
+const st3 = (await tool('race_status')).data;
+ok('and for a note', [st3.unreadNotes, 'notesToHandleFirst' in st3], [0, false]);
+{
+  const { logIntake, unreadNotes } = await import('../src/ai-crew.js');
+  const twice = { runners: [{ id: 'pat', legs: [{ index: 1, startTime: 'a', endTime: 'b', notes: 'ate a gel' }, { index: 2, startTime: 'c', endTime: 'd', notes: 'ate a gel' }, { index: 3, startTime: 'e' }] }] };
+  const cfg3 = { courseType: 'segments', course: { segments: [{ toAid: 'A' }, { toAid: 'B' }, { toAid: 'C' }] } };
+  logIntake(twice, cfg3, 'pat', { items: [{ what: 'gel', calories: 100 }], forNotes: ['ate a gel'] });
+  ok('the same words typed at two stations are two notes', unreadNotes(cfg3, twice, 'pat').map(n => n.leg), [2]);
+}
+
+console.log('\na racer\'s own one-tap items');
+{
+  const { logItem, tools, raceStatus } = await import('../src/ai-crew.js');
+  // Two gels of one name, as two racers each bring their own, and an order
+  // that is not the stored one.
+  const cfgI = { courseType: 'segments', course: { segments: [{ toAid: 'A' }, { toAid: 'B' }] },
+    fuelPresets: [{ name: 'Gel', values: { calories: 100, sodiumMg: 50 } }, { name: 'Flask', values: { fluidOz: 16 } }, { name: 'Gel', values: { calories: 90 } }, { name: 'gel', values: { calories: 25 } }],
+    presetOrder: [1, 0, 2, 3],
+    runners: [{ id: 'ann', presets: [2, 1] }, { id: 'bo', presets: [1] }, { id: 'cy' }, { id: 'di', presets: [0, 3] }] };
+  const fresh = () => ({ runners: ['ann', 'bo', 'cy', 'di'].map(id => ({ id, legs: [{ index: 1, startTime: '2026-10-03T12:00:00Z' }] })) });
+  const leg = (d, id) => d.runners.find(x => x.id === id).legs[0];
+  const says = (fn) => { try { fn(); return null; } catch (err) { return err.message; } };
+  let d2 = fresh();
+  logItem(d2, cfgI, 'ann', { item: 'Gel' });
+  ok('the racer\'s own gel, not the first of that name', [leg(d2, 'ann').calories, leg(d2, 'ann').preset_2, leg(d2, 'ann').preset_0], [90, 1, undefined]);
+  ok('an item that is another racer\'s is not theirs to log', says(() => logItem(d2, cfgI, 'bo', { item: 'Gel' })), 'No one-tap item called "Gel". This racer has: Flask.');
+  ok('and nothing was written for it', leg(d2, 'bo'), { index: 1, startTime: '2026-10-03T12:00:00Z' });
+  ok('two of their own with one name: the choices, not a guess', says(() => logItem(d2, cfgI, 'cy', { item: 'Gel' })),
+    'More than one of this racer\'s items is called "Gel". Pass item as one of: Gel (100 cal, 50 mg); Gel (90 cal).');
+  logItem(d2, cfgI, 'cy', { item: 'Gel (90 cal)' });
+  ok('and one of the choices is taken', [leg(d2, 'cy').calories, leg(d2, 'cy').preset_2], [90, 1]);
+  logItem(d2, cfgI, 'di', { item: 'gel' });
+  ok('a name exactly as written wins over one that differs in case', [leg(d2, 'di').calories, leg(d2, 'di').preset_3], [25, 1]);
+  ok('written in neither way, it is the choices again', /Pass item as one of: Gel \(100 cal, 50 mg\); gel \(25 cal\)\.$/.test(says(() => logItem(d2, cfgI, 'di', { item: 'GEL' }))), true);
+  const item = (id) => tools(cfgI, id).find(t => t.name === 'log_item').inputSchema.properties.item.enum;
+  ok('the tool offers each racer their own, in the order they see them', [item('ann'), item('bo'), item('cy')],
+    [['Flask', 'Gel'], ['Flask'], ['Flask', 'Gel (100 cal, 50 mg)', 'Gel (90 cal)', 'gel (25 cal)']]);
+  ok('as race status does', raceStatus(cfgI, fresh(), 'ann', Date.now()).oneTapItems.map(i => i.name), ['Flask', 'Gel']);
+}
+
+console.log('\nper hour, once they are done');
+{
+  const { raceStatus } = await import('../src/ai-crew.js');
+  const T0 = Date.parse('2026-10-03T12:00:00Z'), at = (h) => new Date(T0 + h * 3600e3).toISOString();
+  const perHour = (cfgR, runner, h) => raceStatus(cfgR, { runners: [runner] }, 'pat', T0 + h * 3600e3).intake.perHourSoFar['Calories (cal)'];
+  const toFinish = { courseType: 'segments', startTime: at(0), course: { segments: [{ toAid: 'A', distanceMi: 10 }, { toAid: 'Finish', distanceMi: 10 }] }, runners: [{ id: 'pat' }] };
+  const done = { id: 'pat', legs: [{ index: 1, startTime: at(0), endTime: at(5), calories: 1500 }, { index: 2, startTime: at(5), endTime: at(10), calories: 1000 }] };
+  ok('at the finish, ten hours in', perHour(toFinish, done, 10), 250);
+  ok('and the same two days later', perHour(toFinish, done, 58), 250);
+  ok('still by the race clock while they are out there', perHour(toFinish, { id: 'pat', legs: [done.legs[0], { index: 2, startTime: at(5), calories: 1000 }] }, 20), 125);
+  const timedR = { courseType: 'loops', format: 'timed', startTime: at(0), cutoffs: { totalHours: 24 }, course: { loopDistanceMi: 3 }, runners: [{ id: 'pat' }] };
+  const stopped = { id: 'pat', stoppedAt: at(8), legs: [{ index: 1, startTime: at(0), endTime: at(4), calories: 1000 }, { index: 2, startTime: at(4), endTime: at(7), calories: 600 }] };
+  ok('stopped in a timed race: up to when they stopped', [perHour(timedR, stopped, 9), perHour(timedR, stopped, 40)], [200, 200]);
+  ok('ran to the end of a timed race: up to their last lap', perHour(timedR, { id: 'pat', legs: stopped.legs }, 40), 229);
+}
+
 console.log('\ntaken away');
 const rev = await call('/ai-crew/revoke', { token: crew, body: { token: made.token } });
 ok('crew who cannot hand out access cannot take it away', rev.status, 403);
