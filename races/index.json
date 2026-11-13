@@ -141,7 +141,25 @@
         "Socrates"
       ],
       "cutoffHours": 36
+    },
+    {
+      "slug": "000010-mcnotagain-fall-trail-race-50-miler",
+      "name": "McNotagain Fall Trail Race - 50 Miler",
+      "location": "Pekin, IL",
+      "startTime": "2026-11-14T07:00:00-06:00",
+      "timezone": "America/Chicago",
+      "courseType": "loops",
+      "units": {
+        "distance": "mi",
+        "elevation": "ft"
+      },
+      "activity": "trail-run",
+      "totalDistanceMi": 250,
+      "runnerNames": [
+        "Ronnie Reineke"
+      ],
+      "cutoffHours": 13
     }
   ],
-  "lastUpdated": "2026-11-07T12:06:55.353Z"
+  "lastUpdated": "2026-11-13T02:48:30.814Z"
 }
