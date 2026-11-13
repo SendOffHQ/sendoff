@@ -185,6 +185,8 @@ These are deliberate and they stay:
   (#FFB07A) for close to a cutoff and warnings; cutoff (#FF7377) for over a cutoff, off pace,
   errors and destructive actions; low-emphasis (#8AA9D0) for upcoming, finished, viewer and
   checkpoint states. Never use these for decoration, or the board stops meaning anything.
+- **Dropped is not a pace.** A racer who is out of a race reads Dropped in text-dim: not a pace
+  colour, because nothing is being measured any more, and not teal, because nothing is live.
 - **Beam (#5EFDF6)** is a glow only. Never a surface, never behind text.
 - The racer screen's recording microphone keeps the older, deeper red (#E5484D) as a fill, so
   its white icon stays readable; every other red is #FF7377.
@@ -307,7 +309,7 @@ Don't:
 
 These hold the rules above on every push, as part of `npm run test:browser`:
 
-- `test/legibility.mjs`: ten pages at phone width; fails on text drawn under 11px (chart
+- `test/legibility.mjs`: eleven pages at phone width, the printed report among them; fails on text drawn under 11px (chart
   labels included) or contrast under 4.5:1.
 - `test/touch-and-focus.mjs`: twelve pages on an emulated phone; fails if zoom is off, a field
   is under 16px, a control has no name, the colour scheme is not dark, a field has no focus

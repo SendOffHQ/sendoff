@@ -129,7 +129,11 @@
   <a href="/data-deletion">deleting your data</a>.</p>
 
 <h3>Your profile, if you fill one in</h3>
-<p>A display name, fueling goals, hour bands, and the notes you want a crew to have.</p>
+<p>A display name, fueling goals, hour bands, and the notes you want a crew to have. The people who
+  work a race with you can read these, so a crew can load your goals, but only once you have joined
+  that race yourself: by accepting an invite to it, by making it, or by opening it while signed in.
+  Somebody who adds your address to a race of theirs sees your address, which they typed, and
+  nothing else about you until you do.</p>
 
 <h3>Your username, if you pick one</h3>
 <p>A username, like @jason, is optional and is never used to sign in. While "Let people find me by
@@ -137,7 +141,7 @@
   it. What they see is your username and the name on your profile, never your email address,
   your races or your results. They can also add you to a race they run by your username. Once
   you are on a race, the people who run it can see your email address, as they can for everyone
-  on it. Turn finding off and nobody can find you or add you by username; you keep the name.
+  on it; your name, username and profile are shown to them only after you have joined it yourself. Turn finding off and nobody can find you or add you by username; you keep the name.
   SendOff's admins see your username beside your account in their list of accounts, with finding
   on or off.</p>
 <p>You can change your username once every 30 days. A username you give up, or one belonging to
@@ -161,6 +165,8 @@
     finish times or how far you got, places and official results links;</li>
   <li>the totals and personal bests worked out from those races alone.</li>
 </ul>
+<p>A race somebody else made shows there only once you have joined it yourself, so nobody can put a
+  race on your profile by typing your address onto one of their racers.</p>
 <p>It never shows a private or unlisted race, not even in its totals, never your email address,
   and never the notes, issues, medications or gear written on a leg. Your race report and "what I'd
   change" appear only on races where you switch them on, and so do your calories, fluid and sodium,
@@ -252,10 +258,14 @@
   <p><strong>A public race can be unlisted, but it cannot be made private.</strong> While a race is
     public its hub entry, its share page, its preview card and its course files are committed to a
     public GitHub repository. Those carry the race's name, its location, its date, its distance and
-    the names of its racers, and a course file is the route itself. Taking the race off the hub
-    deletes them from the current files and starts checking who is asking, which is worth doing.
-    What it cannot do is remove them from that repository's history, where they stay. Splits,
-    notes, photographs and the roster of addresses were never in there and are not affected. If a
+    the names of its racers, and a course file is the route itself. Once a public race has finished,
+    its settings and its splits, with the notes written on them, are published there too, so its
+    page keeps working. Taking the race off the hub deletes all of these from the current files
+    and starts checking who is asking, which is worth doing.
+    What it cannot do is remove them from that repository's history, where they stay. For a
+    race unlisted before it finished, that is the hub entry, the share page and the course; its
+    splits and notes were never there. For one unlisted after it finished, the splits and notes
+    are in that history as well. Photographs and the roster of addresses never are. If a
     race needs to be private, make it private when you create it.</p>
   <p>So SendOff calls that race <strong>unlisted</strong> rather than private, on its hub card and
     wherever else it describes it, and keeps calling it that for as long as it exists. The two
@@ -367,7 +377,10 @@
   it on, the aid station names, and which stations it has already reminded about. Every five minutes
   the worker looks at that racer's check-ins in the race data it already holds; if they checked in
   at a station and have not been sent off well past their usual stop, it sends one reminder for that
-  station. It works from the check-in times alone. It never asks for or uses the phone's location.
+  station, and none once that racer has finished, stopped or dropped, the race is over, or they have
+  been there more than three hours. It works from the check-in times alone. It never asks for or
+  uses the phone's location. Reminders are only sent to the push services browsers actually use
+  (Google's, Mozilla's, Apple's and Microsoft's).
   Turning it off deletes the record at once; otherwise it is deleted four days after it was last
   renewed, and straight away if the push service says the address is gone.</p>
 
@@ -394,7 +407,10 @@
   data is never written to a public file.</p>
 
 <h2>On your device</h2>
-<p>Signing in stores a session that lasts seven days. Opening a race stores a copy of it so the
+<p>Signing in stores a session that lasts seven days. Changing or resetting your password ends every
+  session signed in before it, on every device, within about five minutes. Wrong passwords are
+  counted, and after ten in fifteen minutes for one account, or thirty from one network address,
+  sign-in waits out the rest of the fifteen minutes. Opening a race stores a copy of it so the
   page still works when the signal goes, which for a crew at an aid station is the point. Feedback
   written with no signal is held until it can be sent. Signing out deletes all of it, and so does
   clearing your browser's data for the site. The crew page also remembers which leg you last picked
@@ -414,7 +430,7 @@
   <tr><td>Share links</td><td>30 days by default</td></tr>
   <tr><td>Invite and access requests</td><td>90 days</td></tr>
   <tr><td>Feedback</td><td>180 days</td></tr>
-  <tr><td>Rate limit counters</td><td>1 hour, or a day for adding people by username</td></tr>
+  <tr><td>Rate limit counters</td><td>1 hour; 15 minutes for wrong passwords; a day for adding people by username and for turning reminders on</td></tr>
   <tr><td>A username given up</td><td>kept back from others for 30 days</td></tr>
   <tr><td>Reactions on race photos</td><td>until taken back, or the photo, race or account is deleted</td></tr>
   <tr><td>A race name held for review</td><td>until it is let through, or the race is renamed or deleted; a name let through is remembered until the race is deleted</td></tr>
