@@ -269,5 +269,31 @@ ok('and as a course to write', [(await put('races/evil.html#/course.gpx', '<html
 ok('and as a race to read', [(await get('races/evil.html#/config.json', token)).status, (await get('races/../config.json', token)).status], [403, 403]);
 ok('nothing reached the repository', [...repo.keys()].sort().join('|') === before, true);
 
+// A racer's colour and id are written into attributes on every page. A colour
+// that is not one is dropped on the way in, and an id carrying markup is
+// refused: found in review, where `red;" onmouseover="..."` went straight
+// through and onto the race page.
+console.log('\na colour that is not a colour, and an id that is markup');
+const withRunners = (runners) => { const c = JSON.parse(race('public')); c.runners = runners; return JSON.stringify(c, null, 2) + '\n'; };
+const PAINT = '000077-paint';
+let pr = await put(`races/${PAINT}/config.json`, withRunners([
+  { id: 'a', name: 'A', color: '#19d3c5' }, { id: 'b', name: 'B', color: 'red;" onmouseover="alert(1)' }]));
+ok('the race is created', pr.status, 200);
+let kept = JSON.parse(atob((await (await get(`races/${PAINT}/config.json`, token)).json()).content));
+ok('a real colour is kept', kept.runners[0].color, '#19d3c5');
+ok('and the other is not stored', 'color' in kept.runners[1], false);
+await save(`races/${PAINT}/config.json`, withRunners([
+  { id: 'a', name: 'A', color: 'url(javascript:1)' }, { id: 'b', name: 'B', color: '#abc' }]));
+kept = JSON.parse(atob((await (await get(`races/${PAINT}/config.json`, token)).json()).content));
+ok('the same on a later save', [kept.runners[0].color || null, kept.runners[1].color], [null, '#abc']);
+ok('an id carrying markup is refused on create',
+  (await put('races/000078-ids/config.json', withRunners([{ id: 'x" onclick="1', name: 'X' }]))).status, 400);
+const cur = await (await get(`races/${PAINT}/config.json`, token)).json();
+const idSave = await worker.fetch(new Request('https://w/commit', { method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+  body: JSON.stringify({ path: `races/${PAINT}/config.json`, sha: cur.sha, message: 'test',
+    content: withRunners([{ id: 'a', name: 'A' }, { id: '<img src=x>', name: 'B' }]) }) }), env, ctx);
+ok('and on a later save', idSave.status, 400);
+
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');
 process.exit(bad ? 1 : 0);

@@ -1070,11 +1070,24 @@ function cleanRunnerCrew(v) {
 }
 // The file's runners with their addresses taken out: the account link and the
 // crew assigned to them both live in KV.
+// Also where a racer's colour is checked. Every page writes it into a style
+// attribute, and a colour picker only produces #rrggbb, so anything else is
+// not a colour and is not stored. The pages check again when they read.
+const HEX_COLOR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 function runnersWithoutAddresses(runners) {
   return (runners || []).map(r => {
-    if (!r || (r.email === undefined && r.crew === undefined)) return r;
-    const copy = Object.assign({}, r); delete copy.email; delete copy.crew; return copy;
+    if (!r || typeof r !== 'object') return r;
+    const badColor = r.color != null && !(typeof r.color === 'string' && HEX_COLOR.test(r.color));
+    if (r.email === undefined && r.crew === undefined && !badColor) return r;
+    const copy = Object.assign({}, r); delete copy.email; delete copy.crew;
+    if (badColor) delete copy.color;
+    return copy;
   });
+}
+// A racer's id goes into attributes and selectors on every page. The app
+// makes one from letters and digits; one carrying markup is refused.
+function badRunnerId(runners) {
+  return (Array.isArray(runners) ? runners : []).some(r => r && r.id != null && /[<>"'&`]/.test(String(r.id)));
 }
 
 function aclFromConfig(cfg) {
@@ -3550,6 +3563,9 @@ async function handleCommit(req, env, ctx) {
           runnerEmails: runnerLinksFromConfig(created),
           runnerCrew: runnerCrewFromConfig(created)
         };
+        if (badRunnerId(created.runners)) {
+          return json({ error: 'A racer id cannot contain quotes or angle brackets' }, { status: 400 }, env, req);
+        }
         for (const f of ACL_FIELDS) if (f !== 'visibility') delete created[f];
         for (const f of INJECTED_FIELDS) delete created[f];
         created.runners = runnersWithoutAddresses(created.runners);
@@ -3578,6 +3594,12 @@ async function handleCommit(req, env, ctx) {
       catch (e) { return json({ error: 'config.json must be valid JSON' }, { status: 400 }, env, req); }
       if (!submitted || typeof submitted !== 'object' || Array.isArray(submitted)) {
         return json({ error: 'config.json must be an object' }, { status: 400 }, env, req);
+      }
+      // Only ids this save introduces: a race that somehow holds one already
+      // can still be saved, and so can be repaired.
+      const knownIds = new Set((raceCfg.runners || []).map(r => r && String(r.id)));
+      if (badRunnerId((Array.isArray(submitted.runners) ? submitted.runners : []).filter(r => r && !knownIds.has(String(r.id))))) {
+        return json({ error: 'A racer id cannot contain quotes or angle brackets' }, { status: 400 }, env, req);
       }
       const ent = await raceOwnerEntitlements(env, raceCfg);
       const wantRunners = (submitted.runners || []).length;

@@ -302,8 +302,8 @@
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/race-core.js?v=6acfaa49"></script>
-<script src="lib/course-view.js?v=9a7a055a"></script>
+<script src="lib/race-core.js?v=b6a32863"></script>
+<script src="lib/course-view.js?v=e062d140"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -838,8 +838,11 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   function escapeAttr(s) {
+    // Angle brackets and the single quote too: this is used for text inside
+    // an element as well as for attribute values, and both decode the same.
     return String(s == null ? '' : s)
-      .replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+      .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   function whereLine(runner, next) {
@@ -1118,7 +1121,7 @@
     `;
 
     return `
-      <article class="runner ${stateClass}" style="--runner-color: ${/^#[0-9a-f]{3,8}$/i.test(runner.color || '') ? runner.color : 'var(--accent)'};" data-runner="${runner.id}">
+      <article class="runner ${stateClass}" style="--runner-color: ${Race.safeColor(runner.color, 'var(--accent)')};" data-runner="${runner.id}">
         <div class="runner-head">
           <div class="runner-name">${escapeHtml(runner.name)}</div>
           <div class="state-badge state-${stateClass}">${stateLabel}</div>

@@ -579,8 +579,8 @@
 <script src="lib/demo.js?v=68e3cb36"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8a2565f0"></script>
-<script src="lib/course-view.js?v=9a7a055a"></script>
-<script src="lib/race-core.js?v=6acfaa49"></script>
+<script src="lib/course-view.js?v=e062d140"></script>
+<script src="lib/race-core.js?v=b6a32863"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -1089,7 +1089,7 @@
 
   function renderRunner(runner) {
     const c = Race.compute.runner(runner, cfg);
-    const color = runner.color || 'var(--accent)';
+    const color = Race.safeColor(runner.color, 'var(--accent)');
     const totalDist = c.courseDist;
     const totalCutSec = (cfg.cutoffs?.totalHours || 0) * 3600;
 
@@ -1195,7 +1195,7 @@
               <div class="stat${liveCls}">
                 <span class="label">Live</span>
                 <span class="value live-timer" data-base="0" data-since="${c.liveSince || ''}">${liveValue}</span>
-                <span class="sub">${liveSub}</span>
+                <span class="sub">${escapeHtml(liveSub)}</span>
               </div>`;
           })()}
           <div class="stat">
@@ -1385,8 +1385,9 @@
       searchTags(cfg);
 
       document.title = `${cfg.name} · SendOff`;
+      // Escaped first: the name is whatever somebody typed, and this is markup.
       document.getElementById('race-title').innerHTML =
-        cfg.name.replace(/(\w+)$/, '<em>$1</em>');
+        escapeHtml(cfg.name || '').replace(/(\w+)$/, '<em>$1</em>');
       // Place and discipline read as one line: where it is and what it is.
       const actLabel = Race.activities.label(cfg);
       document.getElementById('brand-subtitle').textContent = [

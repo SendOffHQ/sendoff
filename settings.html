@@ -632,7 +632,7 @@
 
 <div id="toast" role="status" aria-live="polite" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=6acfaa49"></script>
+<script src="lib/race-core.js?v=b6a32863"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -778,8 +778,11 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   function escapeAttr(s) {
+    // Angle brackets and the single quote too: this is used for text inside
+    // an element as well as for attribute values, and both decode the same.
     return String(s == null ? '' : s)
-      .replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+      .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   function render() {
@@ -1504,7 +1507,7 @@
         <td data-label="Bib / label"><input type="text" data-runner="${i}" data-k="bib" value="${escapeAttr(r.bib)}" placeholder="#42" aria-label="Racer ${i + 1} bib or label" /></td>
         <td data-label="Goal"><input type="text" data-runner="${i}" data-k="goal" aria-label="Racer ${i + 1} goal" value="${escapeAttr(r.goal || '')}" placeholder="${escapeAttr(Race.goal.placeholder(cfg))}"
                    aria-label="Goal (optional)" class="goal-in" /></td>
-        <td class="color-cell" data-label="Dot"><input type="color" data-runner="${i}" data-k="color" value="${r.color || RUNNER_COLORS[0]}" aria-label="Racer ${i + 1} colour" /></td>
+        <td class="color-cell" data-label="Dot"><input type="color" data-runner="${i}" data-k="color" value="${Race.safeColor(r.color, RUNNER_COLORS[0])}" aria-label="Racer ${i + 1} colour" /></td>
         <td>${editingRunners.length > 1 ? `<button class="row-del" data-del-runner="${i}" type="button" aria-label="Delete">×</button>` : ''}</td>
       </tr>
     `).join('');
