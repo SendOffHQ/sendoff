@@ -179,6 +179,8 @@
   .status-offpace { color: var(--red); }
   .status-notstarted { color: var(--text-muted); }
   .status-finished { color: var(--accent); }
+  /* Out of the race. Not a pace and not live, so neither a pace colour nor teal. */
+  .status-dnf { color: var(--text-dim); }
 
   /* Four across at every size above phones. The runner card is capped at
      900px, so a nine-column row gave each tile about 100px of content
@@ -580,7 +582,7 @@
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8a2565f0"></script>
 <script src="lib/course-view.js?v=e062d140"></script>
-<script src="lib/race-core.js?v=b00a80ec"></script>
+<script src="lib/race-core.js?v=08a0311f"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -652,7 +654,7 @@
     // A timed race has no pace to be on or off unless the racer has a goal:
     // the clock is fixed and the distance is the result.
     if (c && c.timed && s === 'onpace' && !c.goalStatus) return 'Racing';
-    return { onpace: 'On Pace', tight: 'Tight', offpace: 'Off Pace', notstarted: 'Not Started', finished: 'Finished' }[s] || s;
+    return { onpace: 'On Pace', tight: 'Tight', offpace: 'Off Pace', notstarted: 'Not Started', finished: 'Finished', dnf: 'Dropped' }[s] || s;
   }
   const hmLeft = (sec) => { const m = Math.round(sec / 60); return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`; };
 
@@ -662,6 +664,7 @@
   function goalLine(c) {
     if (!c.goal) return '';
     const what = escapeHtml(Race.goal.text(c.goal, cfg));
+    if (c.dropped) return `<span class="sub proj-goal">Goal ${what} · did not finish</span>`;
     const done = c.status === 'finished';
     let cls = c.goalStatus || (done ? (c.goalMet ? 'onpace' : 'offpace') : ''), how = '';
     if (c.goal.hours && c.goalMarginSec != null) {
@@ -948,15 +951,23 @@
   // A race with two hundred photos on it would otherwise be two hundred
   // downloads for somebody who wanted to look at the splits, on a phone, on
   // whatever signal a trailhead has.
+  const openStrips = new Set();
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-media-leg]');
     if (!btn) return;
     const idx = parseInt(btn.dataset.mediaLeg, 10);
-    const strip = document.getElementById('media-leg-' + idx);
+    // The strip beside the button that was pressed. Every racer's log has a
+    // row for the same station, and they all used to carry the one id: with
+    // two racers the first one's strip opened, wherever on the page that was,
+    // and often inside a card that was folded shut.
+    const strip = btn.parentElement.querySelector('.media-strip');
     if (!strip) return;
     const open = strip.hidden;
     strip.hidden = !open;
     btn.setAttribute('aria-expanded', String(open));
+    // Remembered, so the next refresh draws it open again rather than
+    // shutting it in the hand of whoever is looking.
+    if (btn.dataset.mediaKey) { if (open) openStrips.add(btn.dataset.mediaKey); else openStrips.delete(btn.dataset.mediaKey); }
     if (open && !strip.dataset.filled) {
       strip.dataset.filled = '1';
       strip.innerHTML = photosOnLeg(idx).map(photoFigure).join('');
@@ -986,7 +997,7 @@
         `<div class="gallery-body">` +
           legs.map(idx => {
             const def = Race.course.legAt(cfg, idx);
-            const label = def && def.toAid ? `Leg ${idx} · ${escapeHtml(def.toAid)}` : `Leg ${idx}`;
+            const label = escapeHtml(Race.stations.label(cfg, idx));
             return `<div class="gallery-leg"><h3>${label}</h3>` +
               `<div class="media-strip">${photosOnLeg(idx).map(photoFigure).join('')}</div></div>`;
           }).join('') +
@@ -1048,9 +1059,12 @@
       const shots = photosOnLeg(l.index);
       const mediaRow = shots.length
         ? `<tr class="media-row${noteOldCls}"><td colspan="${logCols()}">` +
-          `<button type="button" class="media-toggle" data-media-leg="${l.index}" aria-expanded="false">` +
-          `Media · ${shots.length}</button>` +
-          `<div class="media-strip" id="media-leg-${l.index}" hidden></div>` +
+          (() => {
+            const key = `${runner.id}|${l.index}`, isOpen = openStrips.has(key);
+            return `<button type="button" class="media-toggle" data-media-leg="${l.index}" data-media-key="${escapeHtml(key)}" aria-expanded="${isOpen}">` +
+              `Media · ${shots.length}</button>` +
+              `<div class="media-strip" data-media-strip="${l.index}"${isOpen ? ` data-filled="1">${shots.map(photoFigure).join('')}` : ' hidden>'}</div>`;
+          })() +
           `</td></tr>`
         : '';
       // Show the leg name for segments and loops-with-aids; a simple
@@ -1190,6 +1204,10 @@
               liveSub = cfg.courseType === 'segments'
                 ? `at ${segDef && segDef.toAid ? segDef.toAid : 'aid'}`
                 : (segDef && segDef.toAid && segDef.lapEnd === false ? `Lap ${lap} · at ${segDef.toAid}` : `In pit · after lap ${lap}`);
+            } else if (c.dropped) {
+              // Where they stopped, which is the last thing there is to say.
+              const at = Race.stations.label(cfg, c.droppedOnCourse ? c.liveLegIndex - 1 : c.liveLegIndex);
+              liveSub = c.liveLegIndex ? `dropped ${c.droppedOnCourse ? 'after' : 'at'} ${at}` : 'dropped';
             } else if (c.legsDone >= c.totalLegs && c.legsDone > 0) {
               liveSub = 'finished';
             } else {
@@ -1230,6 +1248,17 @@
             // The finish as a time of day on the race's clock, the way the
             // cutoffs are shown, and by how much it beats or misses the final
             // cutoff, small underneath. Counted from this racer's own start.
+            // Out of the race: no finish to project. When they stopped, and
+            // how long they had been going.
+            if (c.dropped) {
+              return `
+              <div class="stat stat-projected">
+                <span class="label">Dropped</span>
+                <span class="value">${Race.fmt.duration(c.raceSec)}</span>
+                <span class="sub proj-at">${escapeHtml(Race.tz.dayClock(Date.parse(c.stoppedAt), cfg))} ${escapeHtml(Race.tz.label(cfg, Date.parse(c.stoppedAt)))}</span>
+                ${goalLine(c)}
+              </div>`;
+            }
             const proj = c.projectedFinishSec;
             const first = (runner.legs || []).filter(l => l && l.startTime).sort((a, b) => a.index - b.index)[0];
             const from = Date.parse((first && first.startTime) || cfg.startTime);

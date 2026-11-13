@@ -352,7 +352,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
-<script src="lib/race-core.js?v=b00a80ec"></script>
+<script src="lib/race-core.js?v=08a0311f"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -460,6 +460,7 @@
     const runner = merged();
     const next = Race.compute.nextActionFor(runner, cfg);
     if (next.state === 'finished') {
+      if (next.dropped) return '<div class="rmargin">Dropped. Your times up to here are kept.</div>';
       if (!Race.course.isTimed(cfg)) return '<div class="rmargin ok">Finished.</div>';
       const done = Race.compute.runner(runner, cfg);
       return `<div class="rmargin ok">Done: ${done.legsDone} lap${done.legsDone === 1 ? '' : 's'}, ${esc(Race.units.distance(done.milesDone, cfg))}.</div>`;
@@ -538,8 +539,7 @@
     }).join('');
     return `<div class="rblock">
       <span class="rlbl">Per hour so far</span>
-      ${through ? `<div class="rlogged">Logged through leg ${through}${throughDef && throughDef.toAid
-          ? ' (' + esc(throughDef.toAid) + ')' : ''}. Nothing since, so the rate stops there.</div>` : ''}
+      ${through ? `<div class="rlogged">Logged through ${esc(Race.stations.label(cfg, through))}. Nothing since, so the rate stops there.</div>` : ''}
       ${banded && band ? `<div class="rband">${esc(band.label || `from hour ${band.fromHour}`)}</div>` : '<div style="height:6px"></div>'}
       ${rows}
     </div>`;
@@ -767,8 +767,8 @@
     const timed = Race.course.isTimed(cfg);
     if (!next.nextAction) {
       // A timed race stopped by hand can be taken back, in case of a slip.
-      act.innerHTML = `<button class="rbtn" type="button" disabled>${timed ? 'Done' : 'Finished'}</button>` +
-        (timed && runner.stoppedAt ? `<button class="rstop" type="button" id="unstop">Stopped by mistake? Back in the race</button>` : '');
+      act.innerHTML = `<button class="rbtn" type="button" disabled>${next.dropped ? 'Dropped' : timed ? 'Done' : 'Finished'}</button>` +
+        ((timed || next.dropped) && runner.stoppedAt ? `<button class="rstop" type="button" id="unstop">Stopped by mistake? Back in the race</button>` : '');
       const un = document.getElementById('unstop');
       if (un) un.addEventListener('click', () => setStopped(false));
       return;
@@ -795,7 +795,10 @@
     const html = `<button class="rbtn ${next.nextAction === 'in' ? 'in' : 'out'}" type="button" id="go">${esc(label)}<span class="sub">${esc(sub)}</span></button>` +
       // A timed race ends for a runner when they say so: from the pit, where
       // a lap has just ended and every one so far counts.
-      (timed && next.state === 'in-pit' ? `<button class="rstop" type="button" id="stop">Done for the race: stop here</button>` : '');
+      (timed && next.state === 'in-pit' ? `<button class="rstop" type="button" id="stop">Done for the race: stop here</button>` : '') +
+      // And in a race to a finish, from an aid station: dropping out. Small,
+      // under the button, and it asks first.
+      (!timed && next.state === 'in-pit' ? `<button class="rstop" type="button" id="stop">Dropping out: stop here</button>` : '');
     // Rebuilt only when it says something different. This runs on every poll
     // and every live push, and a button swapped for an identical one between
     // a thumb going down and coming up never gets the tap.
@@ -892,7 +895,9 @@
   }
 
   async function setStopped(on) {
-    if (on && !confirm('Stop here? The laps you have run are your result.')) return;
+    if (on && !confirm(Race.course.isTimed(cfg)
+      ? 'Stop here? The laps you have run are your result.'
+      : 'Drop out here? Your clocks stop, and your crew and anyone following see that you dropped. You can take it back.')) return;
     const dr = (data.runners || []).find(r => r.id === meId);
     if (dr) { if (on) dr.stoppedAt = new Date().toISOString(); else delete dr.stoppedAt; }
     render();
@@ -923,6 +928,8 @@
   // done lastTs is the finish, and nothing after it counts.
   function raceClockSec(next, c) {
     if (next.state === 'idle') return 0;
+    // Dropped: up to the moment they stopped, which compute.runner has counted.
+    if (next.dropped) return c.raceSec || 0;
     const running = next.state !== 'finished' && next.lastTs;
     const since = running
       ? Math.max(0, (Date.now() - new Date(next.lastTs).getTime()) / 1000) : 0;

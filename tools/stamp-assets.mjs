@@ -41,7 +41,7 @@ export function hashOf(assetPath) {
 // it here, which is the same mistake this file exists to stop.
 export function htmlFiles(dir = ROOT, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name === '.git') continue;
+    if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.claude') continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) htmlFiles(full, out);
     else if (entry.name.endsWith('.html')) out.push(full);

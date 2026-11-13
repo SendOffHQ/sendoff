@@ -45,10 +45,10 @@ const openStrip = async (url) => {
   // The leg log starts folded; open it the way a person would.
   if (!(await page.locator('[data-media-leg="1"]').isVisible())) await page.locator('.leglog.collapsed .leglog-head').first().click();
   await page.click('[data-media-leg="1"]');
-  await page.waitForSelector(`#media-leg-1 [data-react-for]`, { timeout: 5000 });
+  await page.waitForSelector(`[data-media-strip="1"] [data-react-for]`, { timeout: 5000 });
 };
 const bar = () => page.evaluate(() => {
-  const el = document.querySelector('#media-leg-1 [data-react-for]');
+  const el = document.querySelector('[data-media-strip="1"] [data-react-for]');
   return [...el.querySelectorAll('.react-chip')].map(c => c.textContent + (c.classList.contains('mine') ? ' mine' : ''));
 });
 const stored = () => page.evaluate(async (id) => {
@@ -59,7 +59,7 @@ const stored = () => page.evaluate(async (id) => {
 console.log('\nsigned out, by a share link');
 await openStrip(`/race.html?id=${SLUG}&t=stub-${SLUG}`);
 ok('the photo shows its reactions, with counts', await bar(), ['🔥1']);
-await page.click('#media-leg-1 .react-chip');
+await page.click('[data-media-strip="1"] .react-chip');
 await page.waitForSelector('.modal-overlay', { timeout: 5000 });
 ok('a tap asks them to sign in', /Sign in/.test(await page.textContent('.modal-overlay')), true);
 ok('and adds nothing', await stored(), [{ '🔥': 1 }, []]);
@@ -69,20 +69,20 @@ console.log('\nsigned in');
 await page.evaluate(base => localStorage.setItem('race-hub-session-v1', JSON.stringify({ session: 'stub', proxyUrl: base + '/api',
   email: 'crew@example.com', role: 'owner', expiresAt: Date.now() + 7 * 24 * 3600e3 })), BASE);
 await openStrip(`/race.html?id=${SLUG}`);
-await page.click('#media-leg-1 .react-chip');
-await page.waitForFunction(() => /mine/.test(document.querySelector('#media-leg-1 .react-chip').className), null, { timeout: 5000 });
+await page.click('[data-media-strip="1"] .react-chip');
+await page.waitForFunction(() => /mine/.test(document.querySelector('[data-media-strip="1"] .react-chip').className), null, { timeout: 5000 });
 ok('a tap on a reaction adds theirs', [await bar(), await stored()], [['🔥2 mine'], [{ '🔥': 2 }, ['🔥']]]);
-await page.click('#media-leg-1 .react-chip');
-await page.waitForFunction(() => !/mine/.test(document.querySelector('#media-leg-1 .react-chip').className), null, { timeout: 5000 });
+await page.click('[data-media-strip="1"] .react-chip');
+await page.waitForFunction(() => !/mine/.test(document.querySelector('[data-media-strip="1"] .react-chip').className), null, { timeout: 5000 });
 ok('and another takes it back', [await bar(), await stored()], [['🔥1'], [{ '🔥': 1 }, []]]);
 
-await page.click('#media-leg-1 [data-react-add]');
-const six = await page.$$eval('#media-leg-1 .react-pick button', bs => bs.map(x => x.textContent));
+await page.click('[data-media-strip="1"] [data-react-add]');
+const six = await page.$$eval('[data-media-strip="1"] .react-pick button', bs => bs.map(x => x.textContent));
 ok('+ react offers the six', six, ['❤️', '🔥', '👏', '💪', '😂', '😮']);
-await page.click('#media-leg-1 .react-pick button[data-react="👏"]');
-await page.waitForFunction(() => document.querySelectorAll('#media-leg-1 .react-chip').length === 2, null, { timeout: 5000 });
+await page.click('[data-media-strip="1"] .react-pick button[data-react="👏"]');
+await page.waitForFunction(() => document.querySelectorAll('[data-media-strip="1"] .react-chip').length === 2, null, { timeout: 5000 });
 ok('picking one adds it, beside the others', await bar(), ['🔥1', '👏1 mine']);
-ok('and puts the picker away', await page.$eval('#media-leg-1 .react-pick', p => p.hidden), true);
+ok('and puts the picker away', await page.$eval('[data-media-strip="1"] .react-pick', p => p.hidden), true);
 ok('it all fits a phone', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 
 console.log('\nthe gallery');

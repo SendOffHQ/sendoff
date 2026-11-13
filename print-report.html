@@ -95,19 +95,19 @@
   }
   .summary-stat:last-child { border-right: none; }
   .summary-stat .l {
-    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
     text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted);
   }
   .summary-stat .v {
     font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700;
   }
-  .summary-stat .s { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+  .summary-stat .s { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
 
   table.legs {
     width: 100%; border-collapse: collapse; font-size: 12px;
   }
   table.legs th {
-    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
     letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted);
     text-align: left; padding: 12px 10px 10px;
     border-bottom: 1px solid var(--border); font-weight: 500;
@@ -119,7 +119,7 @@
   table.legs tr:last-child td { border-bottom: none; }
   table.legs .leg-num {
     font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; font-size: 16px; font-weight: 600;
-    color: var(--accent); width: 30px;
+    color: var(--accent); min-width: 30px;
   }
   table.legs tr.note td {
     border-top: none; border-bottom: 1px solid var(--border);
@@ -173,7 +173,7 @@
   }
   .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
   .chart-svg { width: 100%; height: auto; display: block; }
-  .chart-svg .axis text { font-family: 'JetBrains Mono', monospace; font-size: 10px; fill: var(--text-muted); }
+  .chart-svg .axis text { font-family: 'JetBrains Mono', monospace; font-size: 11px; fill: var(--text-muted); }
   .chart-svg .axis line { stroke: var(--border); stroke-width: 1; }
   .chart-svg .grid line { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 4; opacity: 0.6; }
   .chart-svg .data-line { fill: none; stroke-width: 2; }
@@ -182,7 +182,7 @@
   .chart-svg .data-dot { stroke-width: 0; }
   .chart-svg .projection-dot { opacity: 0.85; }
   .chart-svg .target { stroke: var(--yellow); stroke-width: 1; stroke-dasharray: 4 4; fill: none; }
-  .chart-svg .target-label { fill: var(--yellow); font-size: 10px; }
+  .chart-svg .target-label { fill: var(--yellow); font-size: 11px; }
   .chart-svg .cutoff { stroke: var(--red); stroke-width: 1; stroke-dasharray: 4 4; fill: none; }
   .chart-svg .cutoff-label { fill: var(--red); font-size: 11px; }
   .intake-grid {
@@ -321,7 +321,7 @@
   <div>Auto-generated · race-dashboard hub</div>
 </footer>
 
-<script src="lib/race-core.js?v=b00a80ec"></script>
+<script src="lib/race-core.js?v=08a0311f"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -366,7 +366,7 @@
     const first = (runner.legs || []).find(l => l.index === 1);
     const startRow = first && first.startTime ? `
         <tr>
-          <td class="leg-num">–<span style="font-size: 10px; color: var(--text-muted); display: block;">${escapeHtml(Race.stations.startName(cfg))}</span></td>
+          <td class="leg-num">–<span style="font-size: 11px; color: var(--text-muted); display: block;">${escapeHtml(Race.stations.startName(cfg))}</span></td>
           <td class="num">–</td>
           <td class="num">${Race.fmt.clockTimeSec(first.startTime, cfg)}</td>
           <td class="num"></td><td class="num"></td>
@@ -402,7 +402,7 @@
       // By station: the stop this leg ends at, in and out of it, the split
       // from the stop before and the time spent there (Race.stations).
       const legName = showName
-        ? `<span style="font-size: 10px; color: var(--text-muted); display: block;">${escapeHtml(Race.stations.label(cfg, l.index))}</span>`
+        ? `<span style="font-size: 11px; color: var(--text-muted); display: block;">${escapeHtml(Race.stations.label(cfg, l.index))}</span>`
         : '';
       const outCell = !(next && next.startTime) ? '–' : l.skipped ? 'no check-in' : Race.fmt.clockTimeSec(next.startTime, cfg);
       return `

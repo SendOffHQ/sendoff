@@ -111,6 +111,8 @@ const PAGES = [
   ['crew page', `/pit.html?id=${SLUG}`], ['racer screen', `/racer.html?id=${SLUG}&runner=${runner}`],
   ['settings', `/settings.html?id=${SLUG}`], ['setup wizard', '/setup.html'], ['admin', '/admin.html'],
   ['profile', '/profile.html'], ['charts', `/charts.html?id=${SLUG}`],
+  // Read on a phone at the finish as often as it is printed.
+  ['printed report', `/print-report.html?id=${SLUG}`],
 ];
 for (const [name, url] of PAGES) {
   await page.goto(BASE + url);

@@ -311,7 +311,7 @@ const perHour = () => page.evaluate(() => {
 });
 const ph = await perHour();
 ok('it says where the log ends', ph.note,
-  'Logged through leg 3 (Colony Creek 1). Nothing since, so the rate stops there.');
+  'Logged through Colony Creek 1. Nothing since, so the rate stops there.');
 // Five hours of legs, 600 calories: 120 an hour if the silence counted as
 // eating nothing, 200 over the three hours that were logged.
 ok('and the rate is the one it logged', ph.cal.startsWith('200'), true);

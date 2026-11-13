@@ -302,7 +302,7 @@
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/race-core.js?v=b00a80ec"></script>
+<script src="lib/race-core.js?v=08a0311f"></script>
 <script src="lib/course-view.js?v=e062d140"></script>
 <script>
   const slug = Race.qs('id');
@@ -409,8 +409,10 @@
     drawSkip();
 
     const what = throughCheckpoint && !(arr && arr.skips)
-      ? `through checkpoint · leg ${at}`
-      : `${next.nextAction === 'out' ? 'sent off' : 'checked in'} · leg ${at}`;
+      ? `through ${Race.stations.label(cfg, at)}`
+      : next.nextAction === 'out'
+        ? `sent off from ${at === 1 ? Race.stations.startName(cfg) : Race.stations.label(cfg, at - 1)}`
+        : `checked in at ${Race.stations.label(cfg, at)}`;
     try {
       const r = await Race.queue.write(DATA_PATH, 'setLegTimes', { runnerId, legs },
         `pit: ${runner.name || runnerId} sign-${next.nextAction} leg ${at}`);
@@ -541,6 +543,12 @@
       : (leg.skipped && nb(legIndex + 1) && nb(legIndex + 1).startTime === leg.endTime ? legIndex + 1 : null);
     const cur = leg[field] ? Date.parse(leg[field]) : null;
     const otherMs = Date.parse(isStart ? leg.endTime : leg.startTime) || null;
+    // The other time at the same stop: for a time out, when they came in;
+    // for a time in, when they left. Not for a station with no check-in,
+    // where the two are one estimate and are set together.
+    const stopLeg = isStart ? nb(legIndex - 1) : nb(legIndex + 1);
+    const stopOtherMs = joined != null || !stopLeg ? null : (Date.parse(isStart ? stopLeg.endTime : stopLeg.startTime) || null);
+    const stopName = isStart ? (legIndex === 1 ? 'the start' : Race.stations.label(cfg, legIndex - 1)) : Race.stations.label(cfg, legIndex);
     const pad = n => String(n).padStart(2, '0');
     const dayOf = ms => Race.tz.toInputs(ms, cfg).date;
     // The calendar day after a YYYY-MM-DD, for the one guess below.
@@ -568,6 +576,7 @@
           </div>
         </label>
         ${otherMs != null ? `<p class="edit-time-other">${isStart ? `In at ${escapeHtml(Race.stations.label(cfg, legIndex))}` : `Out of ${escapeHtml(legIndex === 1 ? 'the start' : Race.stations.label(cfg, legIndex - 1))}`}: ${escapeHtml(Race.tz.format(otherMs, cfg, { weekday: 'short', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }))}</p>` : ''}
+        ${stopOtherMs != null ? `<p class="edit-time-other">${isStart ? 'In' : 'Out'} at this stop: ${escapeHtml(Race.tz.format(stopOtherMs, cfg, { weekday: 'short', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }))}</p>` : ''}
         ${joined != null ? `<p class="edit-time-other">No check-in here, so this is an estimate. A time saved goes on both legs either side of the station.</p>` : ''}
       </div>`;
     const daySel = m.body.querySelector('[data-edit="day"]');
@@ -607,13 +616,22 @@
         const day2 = nextDay(daySel.value);
         if (at(day2) >= otherMs) { next = at(day2); daySel.value = day2; }
       }
+      // The same stop's other time. A time out is the start of one leg and
+      // the time in is the end of the leg before it, so the check above,
+      // which looks along a leg, never compared them: a time out typed a
+      // minute before the time in saved without a word.
+      if (stopOtherMs != null && (isStart ? next < stopOtherMs : next > stopOtherMs) && confirmed !== next) {
+        confirmed = next;
+        m.setMsg(`That puts the time ${isStart ? 'out before the time in' : 'in after the time out'} at ${stopName} (${Race.tz.format(stopOtherMs, cfg, { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}). Check it, or press Save time again to keep it.`, 'err');
+        return;
+      }
       const legMs = otherMs == null ? null : (isStart ? otherMs - next : next - otherMs);
       const odd = legMs != null && (legMs < 0 || legMs > 24 * 3600e3);
       if (odd && confirmed !== next) {
         confirmed = next;
         m.setMsg(legMs < 0
           ? `That puts the ${isStart ? 'send-off after the arrival' : 'arrival before the send-off'}. Check the date, or press Save time again to keep it.`
-          : `That makes this leg ${Race.fmt.duration(legMs / 1000)}. Check the date, or press Save time again to keep it.`, 'err');
+          : `That makes it ${Race.fmt.duration(legMs / 1000)} between stations. Check the date, or press Save time again to keep it.`, 'err');
         return;
       }
       m.primary.disabled = true;
@@ -640,11 +658,15 @@
   // or when they say so, and this is them saying so. Every lap so far counts.
   async function stopRunner(runnerId) {
     const who = ((cfg.runners || []).find(r => r.id === runnerId) || {}).name || 'this runner';
-    if (!confirm(`Stop ${who} here? Their laps so far are their result, and the crew page stops offering a send-off. Undo last takes it back.`)) return;
+    // In a race to a finish this is dropping out. Every clock stops, the
+    // board stops offering check-ins, and the send-off reminder stops asking.
+    if (!confirm(Race.course.isTimed(cfg)
+      ? `Stop ${who} here? Their laps so far are their result, and the crew page stops offering a send-off. Undo last takes it back.`
+      : `Mark ${who} as dropped? Their clocks stop here and nothing more is asked of them. Undo last takes it back.`)) return;
     try {
       const r = await Race.queue.write(DATA_PATH, 'setRunnerStopped', { runnerId, stoppedAt: new Date().toISOString() },
         `pit: ${runnerId} stopped`);
-      toast(r.queued ? `${r.label} · saved on this phone` : `${who} is done`, 'ok');
+      toast(r.queued ? `${r.label} · saved on this phone` : (Race.course.isTimed(cfg) ? `${who} is done` : `${who} is marked as dropped`), 'ok');
       await load();
     } catch (err) { toast(`Could not save: ${err.message}`, 'error'); }
   }
@@ -652,7 +674,9 @@
   async function deleteLastEvent(runnerId) {
     // In a timed race the last thing done may have been stopping: that is
     // what an undo takes back first, before any lap.
-    const stopped = Race.course.isTimed(cfg) && ((data.runners || []).find(r => r.id === runnerId) || {}).stoppedAt;
+    // In a timed race the last thing done may have been stopping; in a race to
+    // a finish, dropping. Either is what an undo takes back first.
+    const stopped = ((data.runners || []).find(r => r.id === runnerId) || {}).stoppedAt;
     if (stopped) {
       if (!confirm('Take back the stop and put this runner back in the race?')) return;
       try {
@@ -670,7 +694,11 @@
       delete pitPress[runnerId];
       drawSkip();
       try {
-        const r = await Race.queue.write(DATA_PATH, 'reopenLeg', { runnerId, legIndex: p.legIndex, upTo: p.upTo },
+        // Only what this press wrote: if somebody has corrected the time
+        // since, the undo leaves their correction alone (Race.queue, `was`).
+        const wrote = (((data.runners || []).find(r => r.id === runnerId) || {}).legs || []).find(l => l.index === p.legIndex);
+        const r = await Race.queue.write(DATA_PATH, 'reopenLeg',
+          { runnerId, legIndex: p.legIndex, upTo: p.upTo, was: wrote && wrote.endTime ? [wrote.endTime] : undefined },
           `pit: undo ${runnerId} leg ${p.legIndex}`);
         toast(r.queued ? `${r.label} · undo saved on this phone` : 'Undone', 'ok');
         await load();
@@ -683,20 +711,45 @@
     if (!runner || !runner.legs?.length) return;
     const sorted = runner.legs.slice().sort((a, b) => a.index - b.index);
     const last = sorted[sorted.length - 1];
-    // Pick the field with the later timestamp; if only one is set, clear that.
+    const prev = sorted[sorted.length - 2];
     const hasIn  = !!last.endTime;
     const hasOut = !!last.startTime;
-    let field, deleteWholeLeg = false;
-    if (hasIn && hasOut) field = 'endTime';
-    else if (hasOut) { field = 'startTime'; deleteWholeLeg = true; }
-    else return;
+    if (!hasIn && !hasOut) return;
+
+    // The last thing that happened, taken back whole. Three shapes:
+    //
+    //   a send-off              the leg it started is removed;
+    //   an arrival              the leg is open again;
+    //   an arrival that wrote   more than one leg: a checkpoint passed
+    //   more than its own leg   straight through opens the next leg in the
+    //                           same instant, and stations that went by with
+    //                           no check-in (a Skipped press, or a racer who
+    //                           checks in only at the pit) are filled in
+    //                           behind it by estimate.
+    //
+    // The third used to be undone a piece at a time: this cleared the last
+    // leg's end and left the estimates and their "skipped" marks on the legs
+    // before it, which is the tangle that had to be corrected by hand after
+    // Rio del Lago. Now the whole press goes: back to the leg the racer was
+    // on before it, with everything it wrote after that removed.
+    const through = !hasIn && hasOut && prev && prev.endTime && prev.endTime === last.startTime
+      && !!(Race.stationAt(cfg, prev.index) || {}).checkpoint;
+    const plainSendOff = !hasIn && hasOut && !through;
 
     try {
-      const r = deleteWholeLeg
-        ? await Race.queue.write(DATA_PATH, 'removeLeg', { runnerId, legIndex: last.index },
-            `pit: undo ${runnerId} leg ${last.index}`)
-        : await Race.queue.write(DATA_PATH, 'clearLegField', { runnerId, legIndex: last.index, field },
-            `pit: undo ${runnerId} leg ${last.index}`);
+      let r;
+      if (plainSendOff) {
+        r = await Race.queue.write(DATA_PATH, 'removeLeg', { runnerId, legIndex: last.index, was: [last.startTime] },
+          `pit: undo ${runnerId} leg ${last.index}`);
+      } else {
+        const arrived = through ? prev : last;
+        const span = Race.skip.span(sorted, arrived.index);
+        const first = span ? span.first : arrived.index;
+        const firstLeg = sorted.find(l => l.index === first) || arrived;
+        r = await Race.queue.write(DATA_PATH, 'reopenLeg',
+          { runnerId, legIndex: first, upTo: last.index, was: [firstLeg.endTime] },
+          `pit: undo ${runnerId} leg ${arrived.index}`);
+      }
       toast(r.queued ? `${r.label} · undo saved on this phone` : 'Undone', 'ok');
       await load();
     } catch (err) { toast(`Undo failed: ${err.message}`, 'error'); }
@@ -852,6 +905,10 @@
       if (!first) return 'Race not configured yet';
       return `Ready: <strong>${escapeHtml(first.name)}</strong>`;
     }
+    if (next.dropped) {
+      const at = next.currentLegIndex ? Race.stations.label(cfg, next.droppedOnCourse ? next.currentLegIndex - 1 : next.currentLegIndex) : '';
+      return at ? `Dropped ${next.droppedOnCourse ? 'after' : 'at'} <strong>${escapeHtml(at)}</strong>` : 'Dropped';
+    }
     if (next.state === 'finished') return 'Finished';
     const def = Race.course.legAt(cfg, next.currentLegIndex);
     if (!def) return `Leg ${next.currentLegIndex}`;
@@ -930,9 +987,13 @@
       return `<div class="intake-times">${before && before.skipped ? none('Left') : cell(`Left ${escapeHtml(from)}`, leg.startTime, leg.feelOut)}` +
         `${leg.startTime ? '<span class="k">on the way</span>' : ''}</div>`;
     }
+    // Nothing to say about leaving the last stop of their race: the finish,
+    // or wherever a racer who is done or dropped ended.
+    const ended = Race.compute.nextActionFor(runner, cfg).state === 'finished'
+      && !legs.some(l => l.index > leg.index && (l.startTime || l.endTime));
     const out = t.next && t.next.startTime
       ? (t.skipped ? none('Out') : cell('Out', t.next.startTime, t.next.feelOut))
-      : '<span class="k">still here</span>';
+      : ended ? '' : (t.next ? cell('Out', null) : '<span class="k">still here</span>');
     const stop = t.stopSec != null && !t.skipped ? `<span><span class="k">Here</span> ${Race.fmt.duration(t.stopSec)}</span>` : '';
     const start = leg.index === 1 && leg.startTime ? `<div class="intake-from">Started ${escapeHtml(clock(leg.startTime))}</div>` : '';
     return `<div class="intake-times">${t.skipped ? none('In') : cell('In', leg.endTime, leg.feelIn)}${out}${stop}</div>` +
@@ -952,8 +1013,10 @@
       return btn(leg.index, 'startTime', leg.startTime ? `Edit time out of ${from}` : `Set time out of ${from}`) +
         btn(leg.index, 'endTime', 'Set arrival');
     }
+    // The time out, to edit, or to set where the send-off was never pressed
+    // and the racer is already further on: that one had no button at all.
     return btn(leg.index, 'endTime', 'Edit time in') +
-      (next && next.startTime ? btn(leg.index + 1, 'startTime', 'Edit time out') : '') +
+      (next ? btn(leg.index + 1, 'startTime', next.startTime ? 'Edit time out' : 'Set time out') : '') +
       (leg.index === 1 ? btn(1, 'startTime', 'Edit start') : '');
   }
 
@@ -964,12 +1027,13 @@
                      next.state === 'finished'  ? 'done'   : 'idle';
     let stateLabel = next.state === 'on-course' ? 'On Course' :
                      next.state === 'in-pit'    ? 'In Pit'    :
+                     next.dropped               ? 'Dropped'   :
                      next.state === 'finished'  ? 'Finished'  : 'Not Started';
 
     let buttonAction = next.nextAction;
     let buttonLabel = '–', buttonDisabled = false;
     if (next.state === 'finished') {
-      buttonLabel = 'Finished'; buttonDisabled = true;
+      buttonLabel = next.dropped ? 'Dropped' : 'Finished'; buttonDisabled = true;
     } else if (next.state === 'on-course') {
       const stop = Race.checkIns.stop(cfg, runner, next.currentLegIndex);
       const def = Race.course.legAt(cfg, stop);
@@ -999,7 +1063,10 @@
     // the finish rather than the time it took. A finished race has a total, and
     // a total does not move, so it is rendered once and left alone.
     const done = next.state === 'finished';
-    const finishedSec = done ? Race.compute.runner(runner, cfg).completedRaceSec : null;
+    // For a racer who dropped, up to the moment they stopped, the leg or the
+    // stop they were in included.
+    const doneC = done ? Race.compute.runner(runner, cfg) : null;
+    const finishedSec = done ? (next.dropped ? doneC.raceSec : doneC.completedRaceSec) : null;
     const since = done ? '' : (next.lastTs || '');
     const timerLabel = next.state === 'on-course' ? 'On course for'
                      : next.state === 'in-pit'    ? 'In pit for'
@@ -1011,7 +1078,12 @@
     // holding a phone presses a minute or two late, and until now there was
     // nowhere to fix that until the runner had arrived somewhere.
     const panelLegs = (runner.legs || []).filter(l => l.startTime || l.endTime).sort((a, b) => b.index - a.index);
-    const stickyIdx = stickyIntakeLegByRunner[runner.id];
+    // A station picked by hand is kept only until the race moves on from
+    // where it was when it was picked. It used to be kept for as long as the
+    // tab was open: pick one station at ten in the morning to fix a time, and
+    // every stop after that had to be found in the list by hand.
+    const pick = stickyIntakeLegByRunner[runner.id];
+    const stickyIdx = pick && typeof pick === 'object' && pick.at === (panelLegs[0] ? panelLegs[0].index : null) ? pick.leg : null;
     const selectedLegIdx = (stickyIdx && panelLegs.find(l => l.index === stickyIdx))
       ? stickyIdx
       : (panelLegs[0]?.index || null);
@@ -1136,6 +1208,8 @@
           <button class="btn" data-action="undo" data-runner="${runner.id}">Undo last</button>
           ${Race.course.isTimed(cfg) && next.state === 'in-pit'
             ? `<button class="btn" data-action="stop" data-runner="${runner.id}">Stopped: done for the race</button>` : ''}
+          ${!Race.course.isTimed(cfg) && (next.state === 'in-pit' || next.state === 'on-course')
+            ? `<button class="btn" data-action="stop" data-runner="${runner.id}">Dropped: out of the race</button>` : ''}
         </div>
         ${intakePanel}
       </article>
@@ -1165,8 +1239,7 @@
   // clears itself the moment the text goes back to what was rendered, and
   // there is no state to get stuck on.
   function intakeDirty() {
-    return [...document.querySelectorAll('#runners [data-intake]')]
-      .some(el => el.value !== (el.dataset.rendered ?? ''));
+    return [...document.querySelectorAll('#runners article.runner > .intake-panel:not(.intake-preview)')].some(panelInUse);
   }
 
   // The ten second poll rebuilds every card's innerHTML, which used to throw
@@ -1200,6 +1273,15 @@
     // change.
     const at = document.activeElement;
     if (at && panel.contains(at) && at.matches('[data-intake], select[data-intake-leg]')) return true;
+    // An item tapped and not yet saved. One with no amounts changes no box,
+    // only its own count, so it did not look like unsaved input: Send Off
+    // redrew the panel for the next station and the tap was left behind,
+    // out of sight, under the one before.
+    const card = panel.closest('article.runner'), sel = panel.querySelector('select[data-intake-leg]');
+    if (card && sel) {
+      const staged = stagedItems.get(stageKey(card.dataset.runner, +sel.value));
+      if (staged && Object.values(staged).some(n => n > 0)) return true;
+    }
     return [...panel.querySelectorAll('[data-intake]')].some(el => el.value !== (el.dataset.rendered ?? ''));
   }
 
@@ -1254,9 +1336,7 @@
     // minute, so a dropdown left focused on a laptop cannot hold it for good.
     const picking = !force && pickingLeg();
     if (picking) renderWaiting = true;
-    const at = document.activeElement;
-    const soft = !force && (picking || intakeDirty() ||
-      !!(at && at.matches && at.matches('#runners .intake-panel [data-intake], #runners select[data-intake-leg]')));
+    const soft = !force && (picking || intakeDirty());
     const runnersById = new Map((cfg.runners || []).map(r => [r.id, r]));
     const all = (cfg.runners || []).map(r => {
       const dr = (data.runners || []).find(d => d.id === r.id) || { id: r.id, legs: [] };
@@ -1464,7 +1544,12 @@
 
   document.getElementById('runners').addEventListener('change', (e) => {
     if (e.target.matches('[data-intake-leg]')) {
-      stickyIntakeLegByRunner[e.target.dataset.runner] = +e.target.value;
+      const rid = e.target.dataset.runner;
+      const latest = Math.max(0, ...((((data.runners || []).find(r => r.id === rid) || {}).legs || [])
+        .filter(l => l.startTime || l.endTime).map(l => l.index)));
+      // Picking the station the race is at is not a pick at all.
+      if (+e.target.value === latest) delete stickyIntakeLegByRunner[rid];
+      else stickyIntakeLegByRunner[rid] = { leg: +e.target.value, at: latest };
       try { sessionStorage.setItem(STICKY_KEY, JSON.stringify(stickyIntakeLegByRunner)); } catch (e) {}
       renderWaiting = false;
       // Asked for by hand, so it redraws even over an unsaved edit: choosing

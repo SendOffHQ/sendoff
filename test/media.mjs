@@ -367,7 +367,7 @@ ok('expanding the log brings it back',
 await sp.click('[data-media-leg="4"]');
 await sp.waitForTimeout(400);
 ok('opening it draws the photo', await sp.evaluate(() =>
-  document.querySelectorAll('#media-leg-4 img').length), 1);
+  document.querySelectorAll('[data-media-strip="4"] img').length), 1);
 
 console.log('\nand there is a way to see all of them');
 ok('the button appeared', await sp.locator('#gallery-open').count(), 1);
