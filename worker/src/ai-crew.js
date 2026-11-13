@@ -237,6 +237,42 @@ export function presets(cfg) {
   return list.filter(p => p && p.name && p.values && typeof p.values === 'object');
 }
 
+// One racer's items in the order they are shown, each with the position its
+// count is kept under (preset_<i>): the same reading lib/race-core.js
+// fuel.presetsFor makes. The list is the race's, a racer may name the
+// positions that are theirs (runner.presets), and a racer who names none has
+// every item.
+export function itemsFor(cfg, runnerId) {
+  const list = presets(cfg);
+  const seen = new Set(), all = [];
+  for (const raw of (cfg && Array.isArray(cfg.presetOrder) ? cfg.presetOrder : [])) {
+    const i = +raw;
+    if (!Number.isInteger(i) || i < 0 || i >= list.length || seen.has(i)) continue;
+    seen.add(i); all.push({ p: list[i], i });
+  }
+  list.forEach((p, i) => { if (!seen.has(i)) all.push({ p, i }); });
+  const def = ((cfg && cfg.runners) || []).find(r => r && r.id === runnerId) || {};
+  if (!Array.isArray(def.presets)) return all;
+  const keep = new Set(def.presets.map(Number));
+  return all.filter(x => keep.has(x.i));
+}
+
+// What log_item calls each of them: its name where no other of this racer's
+// items has it, and where two share a name, the name with what it adds, so
+// the assistant can say which. Two the same in name and amounts are numbered.
+function itemLabels(cfg, runnerId) {
+  const ms = metrics(cfg);
+  const nameOf = (p) => String(p.name).replace(/\s+/g, ' ').trim();
+  const items = itemsFor(cfg, runnerId).map(x => ({ ...x, name: nameOf(x.p), label: nameOf(x.p) }));
+  const shared = (key) => (x, _, list) => list.filter(y => y[key].toLowerCase() === x[key].toLowerCase()).length > 1;
+  for (const x of items.filter(shared('name'))) {
+    const adds = ms.map(m => [m, num(x.p.values[m.key])]).filter(([, v]) => v).map(([m, v]) => `${v} ${m.unit}`.trim());
+    x.label = `${x.name} (${adds.join(', ') || 'no amounts'})`;
+  }
+  items.filter(shared('label')).forEach((x, n) => { x.label += ` #${n + 1}`; });
+  return items;
+}
+
 // ---------- clocks ----------
 // On the race's clock. A race from before zones has none, and its start was
 // written with the offset of wherever it was set up, so that offset stands in.
@@ -307,7 +343,17 @@ export function raceStatus(cfg, data, runnerId, now) {
   const ms = metrics(cfg);
   const p = plan(cfg, def);
   const legs = (runner.legs || []);
-  const elapsedH = !isNaN(start) && now > start ? (now - start) / 3600e3 : 0;
+  // Per hour is per hour of this racer's race. Once they are done (finished,
+  // or in a timed race stopped or out of time) their clock stops where they
+  // did: their last arrival, or when they were stopped. Held against the
+  // race's clock instead, every rate went on falling for ever after the finish.
+  const arrived = legs.map(l => Date.parse(l && l.endTime)).filter(Number.isFinite);
+  const lastIn = arrived.length ? Math.max(...arrived) : NaN;
+  const stop = Date.parse(runner.stoppedAt);
+  const endedAt = !(where.state === 'finished' || runnerDone(cfg, runner, now)) ? NaN
+    : Number.isFinite(stop) && (!Number.isFinite(lastIn) || stop > lastIn) ? stop : lastIn;
+  const until = Number.isFinite(endedAt) ? Math.min(now, endedAt) : now;
+  const elapsedH = !isNaN(start) && until > start ? (until - start) / 3600e3 : 0;
   const total = {}, est = {};
   for (const m of ms) {
     total[m.key] = round(m, legs.reduce((a, l) => a + (+l[m.key] || 0), 0));
@@ -381,10 +427,8 @@ export function raceStatus(cfg, data, runnerId, now) {
   };
   if (p.crewNotes) out.racerNotesForCrew = p.crewNotes;
   // The racer's own items, where the race gives them some (runner.presets,
-  // by position in the race's list). log_item still takes any of the race's.
-  const mine = ((cfg && cfg.runners) || []).find(r => r && r.id === runnerId) || {};
-  const all = presets(cfg);
-  const items = Array.isArray(mine.presets) ? all.filter((_, i) => mine.presets.map(Number).includes(i)) : all;
+  // by position in the race's list). These are the ones log_item takes.
+  const items = itemsFor(cfg, runnerId).map(x => x.p);
   if (items.length) {
     out.oneTapItems = items.map(it => ({ name: it.name,
       adds: fmtVals(Object.fromEntries(ms.map(m => [m.key, num(it.values[m.key])]).filter(([, v]) => v))) }));
@@ -455,6 +499,24 @@ function markNoted(leg, lines) {
   leg.aiNoted = [...done].slice(-100);
 }
 
+// The lines a write was made for, marked on the leg each was typed on. That
+// is often not the leg being written to: a line typed at one station is read
+// two stations later and its food logged on the leg the racer is on by then.
+// Marked only on the leg written to, such a line was never marked at all, so
+// it was handed back with every race_status and logged again. A line on the
+// leg written to is marked there; any other on the first leg that has it
+// unmarked, so the same words typed at two stations are two notes.
+function markHandled(data, runnerId, leg, lines) {
+  if (!Array.isArray(lines) || !lines.length) return;
+  const legs = (findRunner(data, runnerId).legs || []).filter(Boolean).slice().sort((a, b) => a.index - b.index);
+  for (const l of lines) {
+    const s = String(l || '').trim();
+    const open = (x) => noteLines(x).includes(s) && !(Array.isArray(x.aiNoted) && x.aiNoted.includes(s));
+    const on = !s ? null : noteLines(leg).includes(s) ? leg : legs.find(open);
+    if (on) markNoted(on, [s]);
+  }
+}
+
 function cleanText(v, n) {
   return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, n || MAX_NOTE);
 }
@@ -496,18 +558,28 @@ export function logIntake(data, cfg, runnerId, args, now) {
   }
   if (Object.keys(est).length) leg.aiEst = est; else delete leg.aiEst;
   const line = addNoteLine(leg, cfg, now, parts.join('; '));
-  markNoted(leg, args && args.forNotes);
+  markHandled(data, runnerId, leg, args && args.forNotes);
   return { leg: leg.index, wrote: line, legNowHolds: Object.fromEntries(ms.map(m => [`${m.label} (${m.unit})`, +leg[m.key] || 0])) };
 }
 
-// One of the race's one-tap items, the same as a press on the racer page:
+// One of the racer's one-tap items, the same as a press on the racer page:
 // exact amounts, and the count kept beside them under the item's position.
+//
+// Only among the items this racer has: another racer's gel of the same name
+// is a different item with different numbers. And never a guess between two
+// of their own: the name exactly as written wins, then the name in any case,
+// and if that is still more than one the answer is the choices.
 export function logItem(data, cfg, runnerId, args, now) {
   now = now || Date.now();
   const list = presets(cfg);
-  const name = cleanText(args && args.item, 120).toLowerCase();
-  const i = list.findIndex(p => String(p.name).trim().toLowerCase() === name);
-  if (i < 0) throw new Error(`No one-tap item called "${args && args.item}". The race has: ${list.map(p => p.name).join(', ') || 'none'}.`);
+  const mine = itemLabels(cfg, runnerId);
+  const asked = cleanText(args && args.item, 120), low = asked.toLowerCase();
+  let hits = mine.filter(x => x.label === asked);
+  if (!hits.length) hits = mine.filter(x => x.name === asked);
+  if (!hits.length) hits = mine.filter(x => x.label.toLowerCase() === low || x.name.toLowerCase() === low);
+  if (!hits.length) throw new Error(`No one-tap item called "${args && args.item}". This racer has: ${mine.map(x => x.label).join(', ') || 'none'}.`);
+  if (hits.length > 1) throw new Error(`More than one of this racer's items is called "${asked}". Pass item as one of: ${hits.map(x => x.label).join('; ')}.`);
+  const i = hits[0].i;
   const count = Math.max(-20, Math.min(20, Math.trunc(+((args && args.count) ?? 1)) || 0));
   if (!count) throw new Error('count must be a whole number, not zero.');
   const leg = legFor(data, cfg, runnerId, args && args.leg);
@@ -522,7 +594,7 @@ export function logItem(data, cfg, runnerId, args, now) {
   }
   leg[`preset_${i}`] = had + n;
   const line = addNoteLine(leg, cfg, now, `${n > 0 ? '' : 'took back '}${Math.abs(n)} × ${list[i].name}`);
-  markNoted(leg, args && args.forNotes);
+  markHandled(data, runnerId, leg, args && args.forNotes);
   return { leg: leg.index, wrote: line };
 }
 
@@ -531,7 +603,7 @@ export function addNote(data, cfg, runnerId, args, now) {
   if (!text) throw new Error('text is required.');
   const leg = legFor(data, cfg, runnerId, args && args.leg);
   const line = addNoteLine(leg, cfg, now || Date.now(), text);
-  markNoted(leg, args && args.forNotes);
+  markHandled(data, runnerId, leg, args && args.forNotes);
   return { leg: leg.index, wrote: line };
 }
 
@@ -548,13 +620,13 @@ export function markRead(data, cfg, runnerId, args) {
 }
 
 // ---------- the tools ----------
-export function tools(cfg) {
+export function tools(cfg, runnerId) {
   const ms = metrics(cfg);
   const amount = {};
   for (const m of ms) amount[m.key] = { type: 'number', description: `${m.label}, in ${m.unit || 'units'}. Negative to take back a mistake.` };
   const leg = { type: 'integer', minimum: 1, description: 'Which leg to put it on. Leave out for the leg the racer is on now (or the one that ended at the aid station they are standing in).' };
   const forNotes = { type: 'array', items: { type: 'string' }, description: 'The racer\'s note lines this turns into numbers, copied exactly from race_status or read_notes, so they are not handed to you again.' };
-  const items = presets(cfg).map(p => p.name);
+  const items = itemLabels(cfg, runnerId).map(x => x.label);
   return [
     {
       name: 'race_status',
@@ -583,8 +655,8 @@ export function tools(cfg) {
     {
       name: 'log_item',
       title: 'Log a one-tap item',
-      description: 'The same as the racer pressing one of the race\'s one-tap items: exact amounts, counted. A negative count takes presses back.' +
-        (items.length ? ` The items: ${items.join(', ')}.` : ' This race has none set up.'),
+      description: 'The same as the racer pressing one of their one-tap items: exact amounts, counted. A negative count takes presses back.' +
+        (items.length ? ` The items: ${items.join(', ')}.` : ' This racer has none set up.'),
       inputSchema: {
         type: 'object',
         properties: Object.assign({
@@ -655,8 +727,8 @@ export async function handleRpc(msg, io) {
     }
     case 'ping': return reply({});
     case 'tools/list': {
-      const { cfg } = await io.load();
-      return reply({ tools: tools(cfg) });
+      const { cfg, runnerId } = await io.load();
+      return reply({ tools: tools(cfg, runnerId) });
     }
     case 'tools/call': {
       const name = params.name, args = params.arguments || {};

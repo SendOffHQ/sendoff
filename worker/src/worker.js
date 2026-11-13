@@ -3198,18 +3198,34 @@ async function handleMediaReact(req, env, ctx) {
 //
 // The racer turns it on from the racer screen, which registers the phone for
 // web push. Every five minutes the scheduled run reads each registered
-// racer's legs: checked in at a station, not sent off, not the finish, and
-// there longer than twice their usual stop plus five minutes (between ten and
-// forty-five; fifteen until they have a stop to go on), it sends one push for
-// that station. Nothing is tracked and nothing about place is read: only the
-// times the race already has. The push carries no payload; the phone asks
-// /push/message for its words, so nothing about the race passes through the
-// push service. A registration lasts four days and goes when the push service
-// says the phone has gone.
+// racer's legs: checked in at a station, not sent off, not the finish, the
+// race not over for them, and there longer than twice their usual stop plus
+// five minutes (between ten and forty-five; fifteen until they have a stop to
+// go on) but not longer than three hours, it sends one push for that station.
+// Nothing is tracked and nothing about place is read: only the times the race
+// already has. The push carries no payload; the phone asks /push/message for
+// its words, so nothing about the race passes through the push service. A
+// registration is one phone watching one racer in one race. It lasts four
+// days and goes when the push service says the phone has gone.
 const PUSH_KEYS = 'push:vapid';
 const PUSH_INDEX = 'push:index';
-const PUSH_SUB = (h) => 'push:sub:' + h;
+const PUSH_SUB = (id) => 'push:sub:' + id;
 const PUSH_TTL = 4 * 86400;
+// What one account may do, so that no account can crowd out another: twenty
+// new or changed registrations a day, and ten held at once, where an eleventh
+// replaces that account's own oldest. A hundred for one race and five hundred
+// in all: past either a new one is refused, and nobody's is removed.
+const PUSH_SUBSCRIBES_PER_DAY = 20;
+const PUSH_PER_ACCOUNT = 10;
+const PUSH_PER_RACE = 100;
+const PUSH_MAX = 500;
+// A racer three hours at a station with no send-off has dropped or gone to
+// sleep, or the reminder was turned on long after they got there: "checked in
+// 4300 min ago" helps nobody. The longest wait before a reminder is forty-five
+// minutes, so three hours leaves room for the tries below.
+const NUDGE_MAX_WAIT_SEC = 3 * 3600;
+// How many runs try one station's push when the push service does not take it.
+const NUDGE_TRIES = 3;
 const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 async function sha256Hex(text) {
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
@@ -3219,16 +3235,21 @@ async function sha256Hex(text) {
 // kept in KV: the public half goes to every phone that subscribes, the
 // private half signs each push and never leaves the worker.
 async function vapidKeys(env) {
-  const have = await env.AUTH_KV.get(PUSH_KEYS);
-  if (have) {
-    const k = JSON.parse(have);
-    return { pub: k.pub, priv: await crypto.subtle.importKey('jwk', k.jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']) };
+  let have = await env.AUTH_KV.get(PUSH_KEYS);
+  if (!have) {
+    const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const pub = b64u(await crypto.subtle.exportKey('raw', pair.publicKey));
+    const jwk = await crypto.subtle.exportKey('jwk', pair.privateKey);
+    const mine = JSON.stringify({ pub, jwk, createdAt: new Date().toISOString() });
+    await env.AUTH_KV.put(PUSH_KEYS, mine);
+    // Two first requests at once each make a pair and each write it. The key
+    // is whichever is stored once the writes are in, so it is read back and
+    // that one is used: a phone handed the pair that lost could never be
+    // pushed to.
+    have = (await env.AUTH_KV.get(PUSH_KEYS)) || mine;
   }
-  const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
-  const pub = b64u(await crypto.subtle.exportKey('raw', pair.publicKey));
-  const jwk = await crypto.subtle.exportKey('jwk', pair.privateKey);
-  await env.AUTH_KV.put(PUSH_KEYS, JSON.stringify({ pub, jwk, createdAt: new Date().toISOString() }));
-  return { pub, priv: pair.privateKey };
+  const k = JSON.parse(have);
+  return { pub: k.pub, priv: await crypto.subtle.importKey('jwk', k.jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']) };
 }
 async function vapidAuth(env, endpoint) {
   const { pub, priv } = await vapidKeys(env);
@@ -3238,17 +3259,65 @@ async function vapidAuth(env, endpoint) {
   const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, priv, new TextEncoder().encode(head));
   return `vapid t=${head}.${b64u(sig)}, k=${pub}`;
 }
+// Only the real web push services: Google, Mozilla, Apple and Microsoft. The
+// scheduled run POSTs to whatever address a registration holds, so an address
+// anywhere else would make the worker a way to send a request to a host of
+// somebody else's choosing.
+function pushEndpointOk(endpoint) {
+  let u; try { u = new URL(endpoint); } catch (e) { return false; }
+  if (u.protocol !== 'https:' || u.port || u.username || u.password) return false;
+  const h = u.hostname.toLowerCase();
+  return h === 'fcm.googleapis.com' || h === 'updates.push.services.mozilla.com' ||
+    h === 'web.push.apple.com' || h.endsWith('.web.push.apple.com') || h.endsWith('.notify.windows.com');
+}
+// A registration is kept under the phone (its push address, hashed) and then
+// the race and the racer, so one phone can watch two races and each keeps its
+// own marks. One made before this is kept under the phone alone, and is still
+// read from there.
+async function pushSubId(h, slug, runnerId) {
+  return h + ':' + (await sha256Hex(slug + '\n' + runnerId)).slice(0, 16);
+}
+// The index: every registration the scheduled run looks at, each with what
+// the run needs to decide without reading the registration itself:
+// { id, slug, runnerId, email, legs, exp }. An entry from before this is the
+// id alone, a string, and the scheduled run fills it in the first time it
+// meets it.
+const pushIdOf = (e) => typeof e === 'string' ? e : e.id;
+const pushOfPhone = (e, h) => pushIdOf(e) === h || pushIdOf(e).startsWith(h + ':');
+async function readPushIndex(env) {
+  let v = null;
+  try { v = JSON.parse((await env.AUTH_KV.get(PUSH_INDEX)) || '[]'); } catch (e) {}
+  return Array.isArray(v) ? v.filter(e => typeof e === 'string' || (e && typeof e.id === 'string')) : [];
+}
+// The index is one KV value, so every change to it is read, edit, write, and
+// two at once can lose one. It is read immediately before each write, which
+// keeps that moment as short as it can be made.
+async function editPushIndex(env, edit) {
+  const before = await readPushIndex(env);
+  const after = edit(before);
+  if (JSON.stringify(after) !== JSON.stringify(before)) await env.AUTH_KV.put(PUSH_INDEX, JSON.stringify(after));
+  return after;
+}
+// Written to go when the registration does, however many times it is written.
+async function putPushSub(env, id, sub, exp, now) {
+  await env.AUTH_KV.put(PUSH_SUB(id), JSON.stringify(sub), { expirationTtl: Math.max(60, Math.round((exp - now) / 1000)) });
+}
 // How long a racer may sit at a station before the nudge: twice their usual
 // stop and five minutes, from ten to forty-five. Seconds.
-function nudgeAfterSec(legs) {
-  const by = new Map((legs || []).filter(l => l).map(l => [l.index, l]));
+//
+// Their usual stop is taken from the places they really stopped. A checkpoint
+// is gone straight through and a missed check-in is an estimate, and both
+// read as a stop of no time at all: counted, they pulled the usual stop down
+// to nothing, and a racer who stops ten minutes was reminded at every station.
+function nudgeAfterSec(legs, cfg) {
+  const by = new Map((Array.isArray(legs) ? legs : []).filter(l => l).map(l => [l.index, l]));
   const stops = [];
   for (const l of by.values()) {
     const n = by.get(l.index + 1);
-    if (l.endTime && !l.skipped && n && n.startTime) {
-      const s = (Date.parse(n.startTime) - Date.parse(l.endTime)) / 1000;
-      if (s >= 0 && s < 6 * 3600) stops.push(s);
-    }
+    if (!l.endTime || l.skipped || !n || !n.startTime) continue;
+    if (cfg && ((aiCrew.legAt(cfg, l.index) || {}).station || {}).checkpoint) continue;
+    const s = (Date.parse(n.startTime) - Date.parse(l.endTime)) / 1000;
+    if (s > 0 && s < 6 * 3600) stops.push(s);
   }
   if (!stops.length) return 900;
   stops.sort((a, b) => a - b);
@@ -3257,12 +3326,28 @@ function nudgeAfterSec(legs) {
 }
 // Where the racer is waiting to be sent off from, or null: { legIndex, since }.
 function waitingAt(legs, totalLegs) {
-  const done = (legs || []).filter(l => l && l.endTime).sort((a, b) => a.index - b.index);
+  legs = Array.isArray(legs) ? legs : [];
+  const done = legs.filter(l => l && l.endTime).sort((a, b) => a.index - b.index);
   const last = done[done.length - 1];
   if (!last) return null;
   if (totalLegs && last.index >= totalLegs) return null;
-  if ((legs || []).some(l => l && l.index > last.index && l.startTime)) return null;
+  if (legs.some(l => l && l.index > last.index && l.startTime)) return null;
   return { legIndex: last.index, since: Date.parse(last.endTime) };
+}
+// Where a reminder is due now, or null: { legIndex, since }. Never once the
+// race is over for this racer (stopped, or the race's own clock run out, which
+// in a timed race is the horn and otherwise the final cutoff), never at the
+// last station, and never after NUDGE_MAX_WAIT_SEC. The course says how many
+// legs there are; `legsHint` is the count the phone gave, for a race whose
+// course cannot be read here.
+function nudgeDue(cfg, runner, legsHint, now) {
+  if (!runner || runner.stoppedAt || !Array.isArray(runner.legs)) return null;
+  const end = cfg ? aiCrew.endsAt(cfg) : null;
+  if (end != null && now >= end) return null;
+  const w = waitingAt(runner.legs, (cfg && totalLegs(cfg)) || +legsHint || 0);
+  if (!w) return null;
+  const waited = (now - w.since) / 1000;
+  return waited >= nudgeAfterSec(runner.legs, cfg) && waited <= NUDGE_MAX_WAIT_SEC ? w : null;
 }
 
 // GET /push/key: the public key a phone subscribes with.
@@ -3271,7 +3356,9 @@ async function handlePushKey(req, env) {
   return json({ key: (await vapidKeys(env)).pub }, {}, env, req);
 }
 // POST /push/subscribe  { slug, runnerId, endpoint, legs, stations: [name] }
-// The racer, or somebody who works the race, for that racer's legs.
+// The racer, or somebody who works the race, for that racer's legs. The answer
+// carries the key in use, so a phone can tell a subscription made with an
+// older one.
 async function handlePushSubscribe(req, env) {
   if (!env.AUTH_KV) return json({ error: 'Not configured' }, { status: 503 }, env, req);
   const session = await requireAuth(req, env);
@@ -3280,41 +3367,93 @@ async function handlePushSubscribe(req, env) {
   const slug = b && typeof b.slug === 'string' ? b.slug : '';
   const runnerId = b && typeof b.runnerId === 'string' ? b.runnerId : '';
   const endpoint = b && typeof b.endpoint === 'string' ? b.endpoint : '';
-  if (!slug || !runnerId || !/^https:\/\//.test(endpoint) || endpoint.length > 1000) {
+  if (!slug || !runnerId || !endpoint || endpoint.length > 1000) {
     return json({ error: 'Missing slug, runnerId or endpoint' }, { status: 400 }, env, req);
   }
+  if (!pushEndpointOk(endpoint)) return json({ error: 'That is not a web push address.' }, { status: 400 }, env, req);
   const cfg = await loadRaceConfigNow(env, slug);
   if (!cfg) return json({ error: 'No such race' }, { status: 404 }, env, req);
   const role = roleForRace(cfg, session.email);
   if (!WRITING_ROLES.has(role) && !asSiteAdmin(env, session)) return json({ error: 'Not on this race' }, { status: 403 }, env, req);
   if (!(cfg.runners || []).some(r => r && r.id === runnerId)) return json({ error: 'No such racer' }, { status: 404 }, env, req);
+  const email = normalizeEmail(session.email);
+  const now = Date.now();
   const h = await sha256Hex(endpoint);
+  const id = await pushSubId(h, slug, runnerId);
   const sub = {
-    endpoint, slug, runnerId, email: normalizeEmail(session.email),
+    endpoint, slug, runnerId, email,
     legs: Math.max(0, Math.min(10000, +b.legs || 0)),
     stations: Array.isArray(b.stations) ? b.stations.slice(0, 2000).map(x => String(x || '').slice(0, 80)) : [],
-    nudged: {}, createdAt: new Date().toISOString()
+    nudged: {}, createdAt: new Date(now).toISOString()
   };
-  const old = await env.AUTH_KV.get(PUSH_SUB(h));
-  if (old) { try { sub.nudged = JSON.parse(old).nudged || {}; } catch (e) {} }
-  await env.AUTH_KV.put(PUSH_SUB(h), JSON.stringify(sub), { expirationTtl: PUSH_TTL });
-  const idx = JSON.parse((await env.AUTH_KV.get(PUSH_INDEX)) || '[]');
-  if (!idx.includes(h)) { idx.push(h); await env.AUTH_KV.put(PUSH_INDEX, JSON.stringify(idx.slice(-500))); }
-  return json({ ok: true }, {}, env, req);
+  // The marks it has already: its own, or those of a registration this phone
+  // made for this racer before registrations were kept by race, which this one
+  // takes the place of. Never those of another race.
+  let old = null, legacy = null;
+  try { old = JSON.parse(await env.AUTH_KV.get(PUSH_SUB(id))); } catch (e) {}
+  if (!old) {
+    try { legacy = JSON.parse(await env.AUTH_KV.get(PUSH_SUB(h))); } catch (e) {}
+    if (legacy && !(legacy.slug === slug && legacy.runnerId === runnerId)) legacy = null;
+  }
+  for (const k of ['nudged', 'tries', 'message', 'messageAt']) {
+    const v = (old || legacy || {})[k];
+    if (v) sub[k] = v;
+  }
+  const idx = await readPushIndex(env);
+  const key = (await vapidKeys(env)).pub;
+  // The racer screen sends this again every time it is opened. Nothing new in
+  // it and less than a day since it was written: there is nothing to write,
+  // and it is not counted against the day's limit.
+  const same = !!old && old.endpoint === endpoint && old.email === email && old.legs === sub.legs &&
+    JSON.stringify(old.stations) === JSON.stringify(sub.stations) && now - Date.parse(old.createdAt) < 86400e3;
+  if (same && idx.some(e => pushIdOf(e) === id)) return json({ ok: true, key }, {}, env, req);
+  const live = idx.filter(e => typeof e === 'string' || e.exp > now);
+  const others = live.filter(e => pushIdOf(e) !== id && !(legacy && pushIdOf(e) === h));
+  if (others.length >= PUSH_MAX) {
+    return json({ error: 'There is no room for another reminder just now. Try again tomorrow.' }, { status: 503 }, env, req);
+  }
+  if (others.filter(e => e.slug === slug).length >= PUSH_PER_RACE) {
+    return json({ error: 'This race has as many reminders as it can hold.' }, { status: 429 }, env, req);
+  }
+  if (!same && !await countAndLimit(env, 'pushsub:' + email, PUSH_SUBSCRIBES_PER_DAY, 86400)) {
+    return json({ error: 'Too many reminder changes today. Try again tomorrow.' }, { status: 429 }, env, req);
+  }
+  // Past what one account may hold, its own oldest go. Nobody else's do.
+  const own = others.filter(e => e.email === email).sort((a, c) => a.exp - c.exp);
+  const gone = new Set(own.slice(0, Math.max(0, own.length - (PUSH_PER_ACCOUNT - 1))).map(pushIdOf));
+  if (legacy) gone.add(h);
+  const exp = same ? Date.parse(old.createdAt) + PUSH_TTL * 1000 : now + PUSH_TTL * 1000;
+  if (!same) await putPushSub(env, id, sub, exp, now);
+  for (const k of gone) await env.AUTH_KV.delete(PUSH_SUB(k));
+  const entry = { id, slug, runnerId, email, legs: sub.legs, exp };
+  const place = (list) => [...list.filter(e => pushIdOf(e) !== id && !gone.has(pushIdOf(e)) && (typeof e === 'string' || e.exp > now)), entry];
+  await editPushIndex(env, place);
+  // Another sign-up in the same moment can write the index without this
+  // entry. Read back, and put in again if it is not there. One that is lost
+  // after this is put back the next time the racer screen is opened, above.
+  if (!(await readPushIndex(env)).some(e => pushIdOf(e) === id)) await editPushIndex(env, place);
+  return json({ ok: true, key }, {}, env, req);
 }
-// POST /push/unsubscribe  { endpoint }
+// POST /push/unsubscribe  { endpoint, slug?, runnerId? }
+// Every race this phone is watching, or with a race and a racer only that one.
 async function handlePushUnsubscribe(req, env) {
   if (!env.AUTH_KV) return json({ error: 'Not configured' }, { status: 503 }, env, req);
   let b; try { b = await req.json(); } catch (e) { b = null; }
   const endpoint = b && typeof b.endpoint === 'string' ? b.endpoint : '';
   if (!endpoint) return json({ error: 'Missing endpoint' }, { status: 400 }, env, req);
-  await dropPushSub(env, await sha256Hex(endpoint));
+  const h = await sha256Hex(endpoint);
+  const slug = typeof b.slug === 'string' ? b.slug : '', runnerId = typeof b.runnerId === 'string' ? b.runnerId : '';
+  const one = slug && runnerId;
+  const ids = new Set(one ? [await pushSubId(h, slug, runnerId)] : [h]);
+  for (const e of await readPushIndex(env)) {
+    if (pushOfPhone(e, h) && (!one || (e.slug === slug && e.runnerId === runnerId))) ids.add(pushIdOf(e));
+  }
+  await dropPushSubs(env, ids);
   return json({ ok: true }, {}, env, req);
 }
-async function dropPushSub(env, h) {
-  await env.AUTH_KV.delete(PUSH_SUB(h));
-  const idx = JSON.parse((await env.AUTH_KV.get(PUSH_INDEX)) || '[]');
-  if (idx.includes(h)) await env.AUTH_KV.put(PUSH_INDEX, JSON.stringify(idx.filter(x => x !== h)));
+async function dropPushSubs(env, ids) {
+  for (const id of ids) await env.AUTH_KV.delete(PUSH_SUB(id));
+  await editPushIndex(env, list => list.filter(e => !ids.has(pushIdOf(e))));
 }
 // POST /push/message  { endpoint }: what the phone shows. Knowing the
 // endpoint, which only that phone and this worker do, is the credential.
@@ -3322,49 +3461,115 @@ async function handlePushMessage(req, env) {
   if (!env.AUTH_KV) return json({ error: 'Not configured' }, { status: 503 }, env, req);
   let b; try { b = await req.json(); } catch (e) { b = null; }
   const endpoint = b && typeof b.endpoint === 'string' ? b.endpoint : '';
-  const raw = endpoint ? await env.AUTH_KV.get(PUSH_SUB(await sha256Hex(endpoint))) : null;
-  if (!raw) return json({ error: 'Not subscribed' }, { status: 404 }, env, req);
-  const sub = JSON.parse(raw);
+  const h = endpoint ? await sha256Hex(endpoint) : '';
+  const subs = [];
+  for (const e of h ? await readPushIndex(env) : []) {
+    if (!pushOfPhone(e, h)) continue;
+    try { const s = JSON.parse(await env.AUTH_KV.get(PUSH_SUB(pushIdOf(e)))); if (s) subs.push(s); } catch (err) {}
+  }
+  if (!subs.length) return json({ error: 'Not subscribed' }, { status: 404 }, env, req);
+  // A phone watching two races is told the words of the reminder sent last.
+  subs.sort((a, c) => (Date.parse(c.messageAt) || 0) - (Date.parse(a.messageAt) || 0));
+  const sub = subs.find(s => s.message) || subs[0];
   return json(sub.message || { title: 'SendOff', body: 'Still at the aid station? Tap to send off.', url: `/racer.html?id=${encodeURIComponent(sub.slug)}` }, {}, env, req);
 }
 // The scheduled run: every registered racer, nudged where they are waiting.
+//
+// It runs 288 times a day, so it reads as little from KV as it can: the index
+// once, and a registration only when its racer is due a reminder. It writes
+// only when it sends one or when a registration goes.
 async function runNudges(env, now = Date.now()) {
   if (!env.AUTH_KV) return { checked: 0, sent: 0 };
-  const idx = JSON.parse((await env.AUTH_KV.get(PUSH_INDEX)) || '[]');
+  const idx = await readPushIndex(env);
   let checked = 0, sent = 0;
-  const dataCache = new Map();
-  for (const h of idx) {
-    const raw = await env.AUTH_KV.get(PUSH_SUB(h));
-    if (!raw) { await dropPushSub(env, h); continue; }
-    const sub = JSON.parse(raw);
-    checked++;
-    let data = dataCache.get(sub.slug);
-    if (data === undefined) {
-      data = null;
-      try {
-        const env0 = await readFromD1(env, `races/${sub.slug}/data.json`);
-        if (env0) data = JSON.parse(base64ToUtf8(JSON.parse(env0).content));
-      } catch (e) { data = null; }
-      dataCache.set(sub.slug, data);
-    }
-    const r = data && (data.runners || []).find(x => x && x.id === sub.runnerId);
-    if (!r || r.stoppedAt) continue;
-    const w = waitingAt(r.legs, sub.legs);
-    if (!w || sub.nudged[w.legIndex]) continue;
-    const mins = Math.round((now - w.since) / 60000);
-    if ((now - w.since) / 1000 < nudgeAfterSec(r.legs)) continue;
-    const at = sub.stations[w.legIndex - 1] || 'the aid station';
-    sub.message = { title: `Still at ${at}?`, body: `You checked in ${mins} min ago. Tap to send off when you leave.`,
-      url: `/racer.html?id=${encodeURIComponent(sub.slug)}`, tag: `${sub.slug}:${sub.runnerId}` };
-    sub.nudged[w.legIndex] = new Date(now).toISOString();
-    await env.AUTH_KV.put(PUSH_SUB(h), JSON.stringify(sub), { expirationTtl: PUSH_TTL });
-    let res = null;
+  const races = new Map();
+  // What this run changes in the index, written once at the end: the entries
+  // to take out (with the expiry each had, so one renewed meanwhile stays) and
+  // the old ones filled in.
+  const gone = new Map(), filled = new Map();
+  for (const e of idx) {
+    const id = pushIdOf(e);
+    const seen = typeof e === 'string' ? undefined : e.exp;
+    // One registration that cannot be read, or a race file with something
+    // unexpected in it, is that racer's alone. The rest are still looked at.
     try {
-      res = await fetch(sub.endpoint, { method: 'POST', headers: {
-        Authorization: await vapidAuth(env, sub.endpoint), TTL: '1800', Urgency: 'high', 'Content-Length': '0' } });
-    } catch (e) { res = null; }
-    if (res && (res.status === 404 || res.status === 410)) await dropPushSub(env, h);
-    else if (res && res.ok) sent++;
+      let sub = null, meta = e;
+      if (typeof e === 'string') {
+        const raw = await env.AUTH_KV.get(PUSH_SUB(id));
+        if (!raw) { gone.set(id, seen); continue; }
+        sub = JSON.parse(raw);
+        // It went four days after it was last written, which was when it was
+        // made or when it was last nudged.
+        const last = Math.max(Date.parse(sub.createdAt) || now, ...Object.values(sub.nudged || {}).map(t => Date.parse(t) || 0));
+        meta = { id, slug: sub.slug, runnerId: sub.runnerId, email: sub.email, legs: +sub.legs || 0, exp: last + PUSH_TTL * 1000 };
+        filled.set(id, meta);
+      }
+      if (!(meta.exp > now)) { gone.set(id, seen); continue; }
+      checked++;
+      let race = races.get(meta.slug);
+      if (race === undefined) {
+        race = { cfg: null, data: null };
+        try {
+          const row = (await env.DB.prepare(
+            'SELECT config, config_sha, data, data_sha FROM races WHERE slug = ?'
+          ).bind(meta.slug).all()).results[0];
+          if (row && row.data && row.data_sha) race.data = JSON.parse(row.data);
+          if (row && row.config && row.config !== '{}' && row.config_sha) race.cfg = JSON.parse(row.config);
+        } catch (err) {}
+        races.set(meta.slug, race);
+      }
+      const r = race.data && (race.data.runners || []).find(x => x && x.id === meta.runnerId);
+      const w = nudgeDue(race.cfg, r, meta.legs, now);
+      if (!w) continue;
+      if (!sub) {
+        const raw = await env.AUTH_KV.get(PUSH_SUB(id));
+        if (!raw) { gone.set(id, seen); continue; }
+        sub = JSON.parse(raw);
+      }
+      // One stored before addresses were checked, at a host that is not a push
+      // service, is never sent to.
+      if (!pushEndpointOk(sub.endpoint)) { await env.AUTH_KV.delete(PUSH_SUB(id)); gone.set(id, seen); continue; }
+      if (!sub.nudged || typeof sub.nudged !== 'object') sub.nudged = {};
+      const tries = (sub.tries && +sub.tries[w.legIndex]) || 0;
+      if (sub.nudged[w.legIndex] || tries >= NUDGE_TRIES) continue;
+      const mins = Math.round((now - w.since) / 60000);
+      const at = (Array.isArray(sub.stations) && sub.stations[w.legIndex - 1]) || 'the aid station';
+      sub.message = { title: `Still at ${at}?`, body: `You checked in ${mins} min ago. Tap to send off when you leave.`,
+        url: `/racer.html?id=${encodeURIComponent(sub.slug)}`, tag: `${sub.slug}:${sub.runnerId}` };
+      sub.messageAt = new Date(now).toISOString();
+      // The words have to be there before the push, because the phone asks for
+      // them the moment it arrives, and the try is counted with them. The
+      // station is marked only once the push service has taken the push: a
+      // mark made first meant a push that failed was never sent again.
+      sub.tries = { [w.legIndex]: tries + 1 };
+      await putPushSub(env, id, sub, meta.exp, now);
+      let res = null;
+      try {
+        res = await fetch(sub.endpoint, { method: 'POST', headers: {
+          Authorization: await vapidAuth(env, sub.endpoint), TTL: '1800', Urgency: 'high', 'Content-Length': '0' } });
+      } catch (err) { res = null; }
+      if (res && res.ok) {
+        sub.nudged[w.legIndex] = new Date(now).toISOString();
+        delete sub.tries;
+        await putPushSub(env, id, sub, meta.exp, now);
+        sent++;
+      } else if (res && [404, 410, 401, 403].includes(res.status)) {
+        // 404 and 410: the phone has gone. 401 and 403: the push service will
+        // not take this key for that subscription, which is one made with a
+        // key that has since changed, and no later try can succeed. Either
+        // way it is forgotten, and the phone registers again when the racer
+        // screen is next opened.
+        await env.AUTH_KV.delete(PUSH_SUB(id));
+        gone.set(id, seen);
+      }
+      // Anything else (no answer, a 429, a 5xx) is taken to be passing: the
+      // next run tries again, NUDGE_TRIES times in all for one station.
+    } catch (err) { /* this registration only */ }
+  }
+  if (gone.size || filled.size) {
+    await editPushIndex(env, list => list
+      .filter(e => !(gone.has(pushIdOf(e)) && (typeof e === 'string' ? undefined : e.exp) === gone.get(pushIdOf(e))))
+      .map(e => typeof e === 'string' && filled.has(e) ? filled.get(e) : e));
   }
   return { checked, sent };
 }
@@ -6820,7 +7025,7 @@ export default {
     ctx.waitUntil(migrateLegacyCourses(env).catch(() => {}));
   }
 };
-export { runNudges, nudgeAfterSec, waitingAt, migrateLegacyCourses };
+export { runNudges, nudgeAfterSec, waitingAt, nudgeDue, pushEndpointOk, migrateLegacyCourses };
 
 async function route(request, env, ctx) {
     {
