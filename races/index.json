@@ -159,7 +159,25 @@
         "ronnie.reineke"
       ],
       "cutoffHours": 13
+    },
+    {
+      "slug": "000011-roosters-backyard-ultra",
+      "name": "Rooster's Backyard Ultra",
+      "location": "Bonita, CA",
+      "startTime": "2026-11-14T09:00:00-08:00",
+      "timezone": "America/Los_Angeles",
+      "courseType": "loops",
+      "units": {
+        "distance": "mi",
+        "elevation": "ft"
+      },
+      "activity": "other",
+      "totalDistanceMi": 0,
+      "format": "backyard",
+      "runnerNames": [
+        "Shaun Ingram"
+      ]
     }
   ],
-  "lastUpdated": "2026-11-13T18:27:39.043Z"
+  "lastUpdated": "2026-11-14T11:38:47.296Z"
 }
