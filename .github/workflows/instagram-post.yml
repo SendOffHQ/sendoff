@@ -51,6 +51,7 @@ on:
           - ghost-train
           - ghost-train-both
           - rio-del-lago
+          - backyard
       dry_run:
         description: Dry run (check everything, post nothing)
         type: boolean

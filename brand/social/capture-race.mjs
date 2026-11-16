@@ -41,6 +41,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 //             something the phone has and a headless browser does not
 //   live      read the race from the live worker rather than races/, for a
 //             public race whose files are not in the repository
+//   race      a race made up for the shot, { cfg, data }, for a kind of race
+//             nobody has run on SendOff yet. Every name in it is invented
 const click = (page, sel) => page.click(sel).then(() => sleep(400));
 const openSection = (page, head) => page.evaluate(h => {
   const el = document.querySelector(h);
@@ -230,10 +232,51 @@ const SHOTS = {
     scrollTo: 'article.runner ~ article.runner', scrollPad: 76, height: 1100 },
   'ghost-train-live-map': { page: 'race.html', slug: '000007-ghost-train-30-hour-ultra', live: true, at: 'now',
     scrollTo: '.leaflet-container', height: 820 },
+  // A backyard at dawn on Sunday, a minute after the 6:00 bell: one racer
+  // back in time and sent off on it by the bell, and one with no check-in, so
+  // the crew page has split the button and is asking which it was. A race
+  // made up for the shot (backyardRace below), drawn by the real crew page.
+  'backyard': { page: 'pit.html', slug: '000099-lakeside-backyard', at: '2026-11-15T12:01:20Z', signedIn: true, notRacer: true,
+    race: () => backyardRace(), scrollTo: '#runners', scrollPad: 12, height: 680,
+    prep: async page => {
+      // Each card from its name to its bell line, and nothing below: the
+      // intake panels are what every other post shows.
+      await page.addStyleTag({ content: '#course-map-section, .intake-panel, .pit-scope { display: none !important; }' });
+      await sleep(300);
+    } },
   // The finish as a clock time on the race's own clock, which for a race in
   // Westcliffe is Denver's, whoever is watching from wherever.
   'clock': { page: 'race.html', at: MID, cfg: { timezone: 'America/Denver' }, scrollTo: '#cutoffs', scrollPad: 20 }
 };
+
+// The backyard for the shot: on the hour, every hour, from 7:00 AM Saturday
+// in Chicago, the way most of them are run, with automatic send-off. Laps
+// take 47 to 58 minutes and the times vary the way tired legs do.
+function backyardRace() {
+  const start = Date.parse('2026-11-14T13:00:00Z');    // 7:00 AM CST
+  const H = 3600e3, M = 60e3, iso = (ms) => new Date(ms).toISOString();
+  const laps = (n, base, open) => {
+    const legs = [];
+    for (let i = 1; i <= n; i++) {
+      const took = (base + ((i * 7) % 6) + Math.floor(i / 6)) * M;
+      legs.push({ index: i, startTime: iso(start + (i - 1) * H), endTime: iso(start + (i - 1) * H + Math.min(took, 59 * M)) });
+    }
+    if (open) legs.push({ index: n + 1, startTime: iso(start + n * H) });
+    return legs;
+  };
+  return {
+    cfg: { name: 'Lakeside Backyard', location: 'Somewhere, IL', timezone: 'America/Chicago', visibility: 'public',
+      courseType: 'loops', format: 'backyard', startTime: iso(start), activity: 'trail-run',
+      backyard: { intervalMin: 60, autoStart: true }, course: { loopDistanceMi: 4.167 }, cutoffs: {},
+      units: { distance: 'mi', elevation: 'ft' }, createdBy: ME,
+      runners: [{ id: 'maya', name: 'Maya', bib: '41', color: '#0fb8bf' }, { id: 'theo', name: 'Theo', bib: '17', color: '#6ee7a8' }] },
+    data: { runners: [
+      // Out on lap 23 at the 5:00 bell, and no check-in by 6:00.
+      { id: 'maya', legs: laps(22, 47, true) },
+      // Back from lap 23 at 5:56, and off on the 6:00 bell by itself.
+      { id: 'theo', legs: [...laps(23, 49, false), { index: 24, startTime: iso(start + 23 * H) }] } ] }
+  };
+}
 
 const listening = () => new Promise(r => { const s = net.connect(8787, '127.0.0.1');
   const d = v => { s.destroy(); r(v); }; s.once('connect', () => d(true)); s.once('error', () => d(false));
@@ -282,7 +325,8 @@ for (const [name, s] of Object.entries(SHOTS)) {
   // A public race, from the worker, the same read a spectator's page makes.
   const remote = (file) => JSON.parse(Buffer.from(JSON.parse(execSync(
     `curl -sS '${WORKER}/get?path=races/${slug}/${file}'`, { encoding: 'utf8' })).content, 'base64').toString('utf8'));
-  const data = s.live ? remote('data.json') : JSON.parse(fs.readFileSync(path.join(ROOT, 'races', slug, 'data.json'), 'utf8'));
+  const made = s.race ? s.race() : null;
+  const data = made ? made.data : s.live ? remote('data.json') : JSON.parse(fs.readFileSync(path.join(ROOT, 'races', slug, 'data.json'), 'utf8'));
   for (const r of data.runners) {
     r.legs = r.legs.filter(l => new Date(l.startTime).getTime() < at).map(l => {
       l = { ...l };
@@ -290,7 +334,7 @@ for (const [name, s] of Object.entries(SHOTS)) {
       return l;
     });
   }
-  const cfg = s.live ? remote('config.json') : JSON.parse(fs.readFileSync(path.join(ROOT, 'races', slug, 'config.json'), 'utf8'));
+  const cfg = made ? made.cfg : s.live ? remote('config.json') : JSON.parse(fs.readFileSync(path.join(ROOT, 'races', slug, 'config.json'), 'utf8'));
   delete cfg.myRole;
   if (s.cfg) Object.assign(cfg, s.cfg);
   if (s.signedIn) {

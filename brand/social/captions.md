@@ -358,3 +358,19 @@ Rio del Lago also has live results on Race Result, and they'll have a live feed 
 🔗 sendoff.run/race?id=000005-rio-del-lago-100
 
 #riodellago100 #ultrarunning #100miler #trailrunning #folsom #sendoff
+
+---
+
+## 30. Backyard ultras (`sendoff-feature-backyard.png`)
+
+Back by the bell, or out. 🔔
+
+Backyard ultras are here. A lap goes out on every bell, every hour unless your race says otherwise, until one runner is left. The crew page, the racer's screen and the race page all count down to the next bell.
+
+Choose whether a runner who's back in time goes out with the bell on their own, or the crew sends each lap. When a bell rings with no check-in, the button splits in two: back in time and off again, or didn't make it back. Nothing is guessed, and going out takes two taps.
+
+The result is laps, and the last one standing is marked the winner.
+
+Free in beta, link in bio.
+
+#backyardultra #lastpersonstanding #ultrarunning #trailrunning #crewlife #sendoff
