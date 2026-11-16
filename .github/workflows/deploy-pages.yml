@@ -44,5 +44,16 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
+      # GitHub sometimes can't find the artifact it has just been handed
+      # ("Fetching artifact metadata failed"), most often while its own status
+      # page reads degraded. Rerunning the job uploads a second artifact of the
+      # same name and fails on that instead, so wait and try again here.
       - id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - name: Wait, then try the deploy again
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 60
+      - id: deployment-retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
