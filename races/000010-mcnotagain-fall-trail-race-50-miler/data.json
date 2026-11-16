@@ -1,0 +1,67 @@
+{
+  "lastUpdated": "2026-11-15T01:13:19.263Z",
+  "runners": [
+    {
+      "id": "ronnie-reineke",
+      "legs": [
+        {
+          "index": 1,
+          "startTime": "2026-11-14T13:07:10.463Z",
+          "endTime": "2026-11-14T14:45:55.901Z",
+          "fluidOz": 850,
+          "preset_0": 1,
+          "preset_1": 1,
+          "calories": 320,
+          "carbs": 80,
+          "preset_5": 1,
+          "sodiumMg": 260,
+          "preset_7": 1,
+          "preset_8": 1,
+          "preset_11": 1
+        },
+        {
+          "index": 2,
+          "startTime": "2026-11-14T14:50:35.550Z",
+          "calories": 570,
+          "sodiumMg": 1470,
+          "carbs": 104,
+          "preset_3": 1,
+          "endTime": "2026-11-14T17:05:34.896Z",
+          "fluidOz": 850,
+          "preset_0": 1,
+          "preset_1": 1,
+          "preset_5": 1,
+          "preset_6": 1,
+          "preset_7": 1
+        },
+        {
+          "index": 3,
+          "startTime": "2026-11-14T17:09:33.968Z",
+          "fluidOz": 850,
+          "preset_0": 1,
+          "endTime": "2026-11-14T19:33:22.687Z",
+          "preset_1": 1,
+          "calories": 225,
+          "carbs": 57,
+          "preset_5": 2,
+          "sodiumMg": 1,
+          "preset_13": 1
+        },
+        {
+          "index": 4,
+          "startTime": "2026-11-14T19:42:21.851Z",
+          "calories": 90,
+          "sodiumMg": 370,
+          "carbs": 1,
+          "preset_4": 1,
+          "endTime": "2026-11-14T22:20:42.455Z"
+        },
+        {
+          "index": 5,
+          "startTime": "2026-11-14T22:30:19.942Z",
+          "endTime": "2026-11-15T01:13:19.136Z"
+        }
+      ]
+    }
+  ]
+}
