@@ -46,7 +46,7 @@
 //   Race listing for logged-in users
 //     GET  /my-races                                                   → { races: [...] }
 //     GET  /next-race-id                                               → { id: "000042" }
-//     POST /race/delete      { slug }                                  → { ok, deleted } (creator or site admin)
+//     POST /race/delete      { slug, reason? }                         → { ok, deleted, mailed? } (creator, or site admin with a reason)
 //     POST /race/visibility  { slug, visibility }                      → { slug, visibility, changed } (creator or admin)
 //
 //   Misc
@@ -7326,6 +7326,17 @@ async function handleRaceDelete(req, env) {
   if (!isCreator && !asSiteAdmin(env, session)) {
     return json({ error: 'Only the race creator can delete it' }, { status: 403 }, env, req);
   }
+  // An admin deleting somebody else's race says why, and the creator is sent
+  // that reason. Checked here rather than only in the page, so no client can
+  // delete a race out from under somebody without one.
+  const byAdmin = !isCreator;
+  const reason = byAdmin ? String((body && body.reason) || '').trim().slice(0, 1000) : '';
+  if (byAdmin && reason.length < 3) {
+    return json({ error: 'Say why you are deleting this race. The person who made it is sent the reason.' },
+      { status: 400 }, env, req);
+  }
+  const raceName = String(raceCfg.name || slug);
+  const creator = raceCfg.createdBy ? normalizeEmail(raceCfg.createdBy) : '';
 
   // The database first, because it is what answers a read. Deleting the git
   // files and the manifest entry took the race off the hub and out of the
@@ -7473,10 +7484,48 @@ async function handleRaceDelete(req, env) {
   // with an error nobody can act on. Both key spaces are paginated: a listing
   // that stops at the first page would leave tokens behind on a busy account.
 
-  if (failed.length || manifestErr || mediaErr) {
-    return json({ ok: false, deleted, failed, manifestErr, mediaErr }, { status: 207 }, env, req);
+  // The race is gone from the database by now, which is what makes it gone
+  // to everybody, so the creator is told even if some files were left over.
+  // The admin is told whether the mail went: mailed true, or why not.
+  let mail = {};
+  if (byAdmin) {
+    if (!creator) mail = { mailed: false, mailErr: 'the race does not say who made it' };
+    else {
+      const err = await sendMail(env, { to: creator, from: mailFrom(env, 'notify'),
+        ...raceDeletedMail(env, raceName, reason) });
+      mail = err ? { mailed: false, mailErr: err } : { mailed: true };
+      if (err) console.error('race-deleted mail failed:', err);
+    }
   }
-  return json({ ok: true, deleted }, {}, env, req);
+
+  if (failed.length || manifestErr || mediaErr) {
+    return json({ ok: false, deleted, failed, manifestErr, mediaErr, ...mail }, { status: 207 }, env, req);
+  }
+  return json({ ok: true, deleted, ...mail }, {}, env, req);
+}
+
+// To the person who made a race a site admin has deleted, with the reason the
+// admin gave. Not who the admin was: the reason is the useful part, and a
+// question goes to the address everything else on the site points at.
+function raceDeletedMail(env, name, reason) {
+  const h1 = `<h1 style="margin:0 0 14px;font-size:22px;line-height:1.25;color:${MAIL_INK}">` +
+             `Your race was deleted</h1>`;
+  return {
+    subject: 'Your SendOff race was deleted',
+    html: mailShell(env, `${name} was deleted by SendOff.`,
+      h1 +
+      `<p style="margin:0 0 14px">One of SendOff's admins deleted <strong>${escHtml(name)}</strong>, ` +
+      `with everything logged on it, its roster and its course. Its share links no longer work.</p>` +
+      `<p style="margin:0 0 4px;font-size:13px;color:${MAIL_MUTED}">The reason they gave:</p>` +
+      `<p style="margin:0 0 18px;padding:10px 14px;border-left:3px solid ${MAIL_LINK};background:${MAIL_PAGE};` +
+        `white-space:pre-wrap">${escHtml(reason)}</p>` +
+      `<p style="margin:0;font-size:13px;color:${MAIL_MUTED}">If you think this was a mistake, write to ` +
+      `<a href="mailto:info@sendoff.run" style="color:${MAIL_LINK}">info@sendoff.run</a>.</p>`),
+    text: `Your race was deleted\n\nOne of SendOff's admins deleted ${name}, with everything logged on it, ` +
+          `its roster and its course. Its share links no longer work.\n\nThe reason they gave:\n\n${reason}\n\n` +
+          `If you think this was a mistake, write to info@sendoff.run.\n\n` +
+          `SendOff, live crew tracking for ultras. ${mailBase(env)}\n`
+  };
 }
 
 // ---------- router ----------

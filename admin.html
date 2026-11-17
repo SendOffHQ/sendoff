@@ -395,7 +395,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=7280cc23"></script>
+<script src="lib/race-core.js?v=8c15f16e"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -1158,7 +1158,10 @@
     box.querySelectorAll('[data-del]').forEach(b => {
       b.addEventListener('click', async () => {
         const slug = b.dataset.del, name = b.dataset.name || slug;
-        if (!await Race.access.confirmDelete(name, null)) return;
+        // The admin's own races ask for a reason too: this page cannot tell
+        // which are theirs, and the worker ignores a reason from the creator.
+        const reason = await Race.access.confirmDelete(name, null, { askReason: true });
+        if (!reason) return;
         const row = b.closest('.race-row');
         b.disabled = true; b.textContent = '…';
         row.querySelectorAll('.vis-err').forEach(e => e.remove());
@@ -1169,13 +1172,21 @@
           row.appendChild(e);
         };
         try {
-          const res = await Race.api.deleteRace(slug);
+          const res = await Race.api.deleteRace(slug, reason);
           if (res && res.ok === false) {
             const bits = [];
             if (res.manifestErr) bits.push('the hub listing');
             if ((res.failed || []).length) bits.push(res.failed.map(f => f.path).join(', '));
             say(`Partly deleted. Still there: ${bits.join('; ')}. Try again, or remove them in GitHub.`);
             b.disabled = false; b.textContent = 'Delete';
+            return;
+          }
+          if (res && res.mailed === false) {
+            // Kept on screen, because the creator has not heard and the
+            // admin needs to tell them some other way.
+            say(`Deleted, but the email to the person who made it did not go: ${res.mailErr || 'unknown'}. Tell them another way.`);
+            b.remove();
+            row.querySelectorAll('[data-vis]').forEach(v => v.remove());
             return;
           }
           document.querySelectorAll('.race-row').forEach(r => {

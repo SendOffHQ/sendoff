@@ -771,7 +771,11 @@ const server = http.createServer((req, res) => {
     return req.on('end', () => {
       if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
       let j; try { j = JSON.parse(body); } catch (e) { return send(400, '{"error":"Invalid JSON"}', 'application/json'); }
-      send(200, JSON.stringify({ ok: true, slug: j.slug, deleted: [] }), 'application/json');
+      // A reason means an admin deleting somebody else's race, and the worker
+      // emails the creator; "mail-fails" in it stands for that mail failing.
+      const mail = !j.reason ? {} : /mail-fails/i.test(j.reason)
+        ? { mailed: false, mailErr: 'destination address not verified' } : { mailed: true };
+      send(200, JSON.stringify({ ok: true, slug: j.slug, deleted: [], ...mail }), 'application/json');
     });
   }
   // Makes visibility saves fail, for the half-done path, until they are turned

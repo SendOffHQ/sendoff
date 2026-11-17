@@ -183,12 +183,36 @@ ok('while the creator is still the creator', await roleSeenBy(await login(OWNER)
 
 console.log('\ndeleting a race, asked for on 2026-11-17');
 reset();
-ok('a stranger may not', (await call('/race/delete', { token: await login(OUT), body: { slug: SLUG } })).status, 403);
-ok('a site admin may, though it is not theirs',
-  (await call('/race/delete', { token: await login(ADMIN), body: { slug: SLUG } })).status, 200);
-reset();
-ok('and so, as ever, may the creator',
-  (await call('/race/delete', { token: await login(OWNER), body: { slug: SLUG } })).status, 200);
+const sent = [];
+const mailOn = () => { env.EMAIL = { async send(m) { sent.push(m); } }; env.INFO_FROM = 'info@example.com'; };
+mailOn();
+const del = async (who, extra = {}) => {
+  const r = await call('/race/delete', { token: await login(who), body: { slug: SLUG, ...extra } });
+  return [r.status, await r.json()];
+};
+ok('a stranger may not', (await del(OUT, { reason: 'because' }))[0], 403);
+let [st, res] = await del(ADMIN);
+ok('a site admin may not without saying why', [st, /Say why/.test(res.error)], [400, true]);
+ok('nor with a blank reason', (await del(ADMIN, { reason: '   ' }))[0], 400);
+ok('and nothing was sent', sent.length, 0);
+[st, res] = await del(ADMIN, { reason: 'Made as a test, <b>never run</b>.' });
+ok('with a reason, a site admin may, though it is not theirs', [st, res.mailed], [200, true]);
+ok('the person who made it is emailed', sent.map(m => [m.to, m.from, m.subject]),
+  [[OWNER, 'info@example.com', 'Your SendOff race was deleted']]);
+ok('with the reason, escaped, and the race name',
+  [/Made as a test, &lt;b&gt;never run&lt;\/b&gt;\./.test(sent[0].html), /Made as a test, <b>never run<\/b>\./.test(sent[0].text),
+   /A race/.test(sent[0].text)], [true, true, true]);
+ok('and not who the admin was', sent[0].html.includes(ADMIN) || sent[0].text.includes(ADMIN), false);
+
+reset(); mailOn();
+env.EMAIL = { async send() { throw new Error('destination address not verified'); } };
+[st, res] = await del(ADMIN, { reason: 'Asked to by the people on it' });
+ok('when the mail cannot go, the race is still deleted and the admin is told why',
+  [st, res.mailed, res.mailErr], [200, false, 'destination address not verified']);
+
+reset(); mailOn(); sent.length = 0;
+ok('and the creator, as ever, may delete their own, with no reason and no mail',
+  [(await del(OWNER))[0], sent.length], [200, 0]);
 
 console.log('\nwith ADMIN_RACE_ACCESS="false", which is the whole of switching it back');
 reset();

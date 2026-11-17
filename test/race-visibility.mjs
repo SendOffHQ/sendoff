@@ -259,7 +259,7 @@ ok('and can delete it', await page.evaluate(() =>
   document.getElementById('delete-editor').style.display), '');
 ok('told it is not theirs, and pointed at the gentler lever', await page.evaluate(() => {
   const t = document.getElementById('delete-editor-body').textContent;
-  return [/not your race/.test(t), /site admin/.test(t), /Who can find this race/.test(t)];
+  return [/not your race/.test(t), /emailed your reason/.test(t), /Who can find this race/.test(t)];
 }), [true, true, true]);
 // The free plan is still switched on from the section above, and an admin is
 // not gated by it: the owner's plan is a reason they cannot hide their own
@@ -347,15 +347,17 @@ ok('and the race really did move', await page.evaluate(async base => {
 }, BASE), 'public');
 
 // And Delete, beside it, asked for on 2026-11-17: for a race that should go
-// rather than only leave the hub. Same type-the-name modal as settings.
+// rather than only leave the hub. Same type-the-name modal as settings, plus
+// a reason, which the worker emails to whoever made the race.
 console.log('\ndeleting from the admin page');
 const asked = [];
-page.on('request', r => { if (r.url().endsWith('/api/race/delete')) asked.push(JSON.parse(r.postData()).slug); });
+page.on('request', r => { if (r.url().endsWith('/api/race/delete')) asked.push(JSON.parse(r.postData())); });
 const delRow = '.race-row[data-slug="zz-fixture-unlisted"]';
 await page.click(delRow + ' .del-btn');
 await page.waitForSelector('#del-confirm');
-ok('asks for the race name first', await page.evaluate(() =>
-  [document.getElementById('del-go').disabled, /every leg/.test(document.querySelector('.modal-box').textContent)]), [true, true]);
+ok('asks for a reason and the race name first', await page.evaluate(() =>
+  [document.getElementById('del-go').disabled, /every leg/.test(document.querySelector('.modal-box').textContent),
+   !!document.getElementById('del-reason'), document.activeElement.id]), [true, true, true, 'del-reason']);
 await page.click('#del-cancel');
 await page.waitForTimeout(200);
 ok('and Cancel deletes nothing', [asked.length, await page.evaluate(s => !!document.querySelector(s), delRow)], [0, true]);
@@ -363,10 +365,28 @@ await page.click(delRow + ' .del-btn');
 await page.waitForSelector('#del-confirm');
 const raceName = await page.evaluate(s => document.querySelector(s + ' .del-btn').dataset.name, delRow);
 await page.fill('#del-confirm', raceName);
+ok('the name alone is not enough', await page.evaluate(() => document.getElementById('del-go').disabled), true);
+await page.fill('#del-reason', 'Mail-fails: set up as a test');
+ok('with a reason, Delete wakes up', await page.evaluate(() => document.getElementById('del-go').disabled), false);
 await page.click('#del-go');
 await page.waitForTimeout(800);
-ok('typing the name and pressing Delete deletes it', asked, ['zz-fixture-unlisted']);
-ok('and the row goes', await page.evaluate(s => !!document.querySelector(s), delRow), false);
+ok('pressing it sends the reason with the delete', asked,
+  [{ slug: 'zz-fixture-unlisted', reason: 'Mail-fails: set up as a test' }]);
+ok('when the email to the creator fails, the row stays and says so', await page.evaluate(s => {
+  const r = document.querySelector(s);
+  return r && [/did not go: destination address not verified/.test(r.textContent), !r.querySelector('.del-btn')];
+}, delRow), [true, true]);
+await page.goto(BASE + '/admin');
+await page.waitForTimeout(1500);
+await page.click('[data-email="crew@example.com"] .acct-head');
+await page.waitForTimeout(800);
+await page.click(delRow + ' .del-btn');
+await page.waitForSelector('#del-confirm');
+await page.fill('#del-reason', 'Set up as a test');
+await page.fill('#del-confirm', raceName);
+await page.click('#del-go');
+await page.waitForTimeout(800);
+ok('when it goes, the row goes', await page.evaluate(s => !!document.querySelector(s), delRow), false);
 
 ok('no page errors', errs, []);
 await b.close(); srv.kill('SIGKILL');

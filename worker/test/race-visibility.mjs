@@ -416,9 +416,9 @@ ok('and can put it back', (await flip(POORSLUG, 'public', bossToken)).status, 20
 ok('somebody who did not make it still cannot delete it',
   (await call('/race/delete', mateToken, { method: 'POST',
     body: JSON.stringify({ slug: POORSLUG }) })).status, 403);
-ok('and an admin can',
+ok('and an admin can, giving a reason',
   (await call('/race/delete', bossToken, { method: 'POST',
-    body: JSON.stringify({ slug: POORSLUG }) })).status, 200);
+    body: JSON.stringify({ slug: POORSLUG, reason: 'Never run' }) })).status, 200);
 
 // A course big enough that GitHub will not hand it back inline. Copying an
 // empty file to R2 and then deleting the real one would destroy the course, so
