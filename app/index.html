@@ -56,7 +56,16 @@
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
     background: linear-gradient(90deg, var(--accent), transparent);
   }
-  .card.status-live::before     { background: linear-gradient(90deg, var(--green), transparent); }
+  /* Live is the loudest card on the hub, above upcoming: a thicker solid
+     bar, a full-strength green edge, a faint flat green tint (text-muted
+     still 5.3:1 on it) and a filled chip with the pulsing dot. */
+  .card.status-live {
+    border-color: var(--green);
+    background: #1e2e32; /* the mix below, for a browser without color-mix */
+    background: color-mix(in srgb, var(--green) 7%, var(--bg-card));
+  }
+  .card.status-live:hover { border-color: var(--green); }
+  .card.status-live::before { height: 6px; background: var(--green); }
   /* Upcoming is the one state meant to stand out on the hub: a solid violet
      bar the full width, a violet edge, and a filled chip. Violet because
      every other saturated colour already means something (teal live, green,
@@ -109,7 +118,9 @@
     padding: 3px 7px; border-radius: 2px; border: 1px solid currentColor;
     margin-bottom: 10px;
   }
-  .card-status.status-live { color: var(--green); }
+  .card-status.status-live {
+    color: var(--accent-ink); background: var(--green); border-color: var(--green);
+  }
   .card-status.status-upcoming {
     color: var(--upcoming-ink); background: var(--upcoming); border-color: var(--upcoming);
   }

@@ -191,6 +191,9 @@ These are deliberate and they stay:
   2026-11-17): a solid 4px bar across the card's top, a violet edge, and a filled Upcoming chip
   with on-upcoming (#120A24) ink. Violet because every other saturated colour already means
   something. It is for that card only; upcoming legs and stations elsewhere stay low-emphasis.
+  A **live** race's card stays louder still: a 6px solid green bar, a full green edge, a flat 7%
+  green tint over the card (text-muted holds 5.3:1 on it) and a filled Live chip in dark ink
+  with its pulsing dot.
 - **Dropped is not a pace.** A racer who is out of a race reads Dropped in text-dim: not a pace
   colour, because nothing is being measured any more, and not teal, because nothing is live.
 - **Beam (#5EFDF6)** is a glow only. Never a surface, never behind text.
