@@ -37,7 +37,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=ac98921b">
+<link rel="stylesheet" href="lib/race-theme.css?v=4fe079c7">
 <style>
   .cards {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -57,7 +57,13 @@
     background: linear-gradient(90deg, var(--accent), transparent);
   }
   .card.status-live::before     { background: linear-gradient(90deg, var(--green), transparent); }
-  .card.status-upcoming::before { background: linear-gradient(90deg, var(--blue), transparent); }
+  /* Upcoming is the one state meant to stand out on the hub: a solid violet
+     bar the full width, a violet edge, and a filled chip. Violet because
+     every other saturated colour already means something (teal live, green,
+     warm and red pace). */
+  .card.status-upcoming { border-color: rgba(183, 148, 255, 0.55); }
+  .card.status-upcoming:hover { border-color: var(--upcoming); }
+  .card.status-upcoming::before { height: 4px; background: var(--upcoming); }
   .card.status-finished::before { background: linear-gradient(90deg, var(--text-muted), transparent); }
   .card-head {
     padding: 22px 24px 16px;
@@ -104,7 +110,9 @@
     margin-bottom: 10px;
   }
   .card-status.status-live { color: var(--green); }
-  .card-status.status-upcoming { color: var(--blue); }
+  .card-status.status-upcoming {
+    color: var(--upcoming-ink); background: var(--upcoming); border-color: var(--upcoming);
+  }
   .card-status.status-finished { color: var(--text-muted); }
   .live-dot {
     width: 6px; height: 6px; border-radius: 50%; background: currentColor;

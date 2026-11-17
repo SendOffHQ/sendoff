@@ -20,6 +20,8 @@
   --yellow: #ffb07a;
   --red: #ff7377;           /* 4.5:1 or better on every card and highlight */
   --blue: #8aa9d0;            /* low-emphasis states: upcoming, done, viewer */
+  --upcoming: #b794ff;        /* an upcoming race on the hub: 6.8:1 on a card */
+  --upcoming-ink: #120a24;    /* text on a filled --upcoming, 7.9:1 */
 
   /* SendOff brand: see brand/README.md. One hue, two values: the signal
      reads heavier on light grounds, so each ground gets its own. */

@@ -19,7 +19,9 @@ colors:
   on-pace: "#6EE7A8"          # on pace, leg done clean, saved
   tight: "#FFB07A"            # tight against a cutoff, warnings
   cutoff: "#FF7377"           # cutoff blown, off pace, errors, delete
-  low-emphasis: "#8AA9D0"     # upcoming, finished, viewer, checkpoint
+  low-emphasis: "#8AA9D0"     # upcoming legs, finished, viewer, checkpoint
+  upcoming: "#B794FF"         # an upcoming race on the hub, the one state meant to stand out there
+  on-upcoming: "#120A24"      # text on a filled upcoming, 7.9:1
   signal-on-light: "#0A8B92"  # the signal on cream, white and paper
   cream: "#F5F2EA"            # light ground: print, marketing, partner pages
   beam: "#5EFDF6"             # glow only, never behind text (1.2:1 on white)
@@ -185,6 +187,10 @@ These are deliberate and they stay:
   (#FFB07A) for close to a cutoff and warnings; cutoff (#FF7377) for over a cutoff, off pace,
   errors and destructive actions; low-emphasis (#8AA9D0) for upcoming, finished, viewer and
   checkpoint states. Never use these for decoration, or the board stops meaning anything.
+- **Upcoming races on the hub are violet (#B794FF)**, and loud on purpose (asked for on
+  2026-11-17): a solid 4px bar across the card's top, a violet edge, and a filled Upcoming chip
+  with on-upcoming (#120A24) ink. Violet because every other saturated colour already means
+  something. It is for that card only; upcoming legs and stations elsewhere stay low-emphasis.
 - **Dropped is not a pace.** A racer who is out of a race reads Dropped in text-dim: not a pace
   colour, because nothing is being measured any more, and not teal, because nothing is live.
 - **Beam (#5EFDF6)** is a glow only. Never a surface, never behind text.

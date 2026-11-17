@@ -81,6 +81,7 @@ things that actually change during a race:
 | `--yellow` | `#ffb07a` | tight against a cutoff |
 | `--red` | `#ff7377` | cutoff blown |
 | `--blue` | `#8aa9d0` | low emphasis: upcoming, finished, viewer |
+| `--upcoming` | `#b794ff` | an upcoming race's card on the hub (text on it: `--upcoming-ink`, `#120a24`) |
 
 Keep the two files in step: change a value here, mirror it there, and bump
 the `?v=` on the stylesheet link in every page so browsers pick it up.
