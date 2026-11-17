@@ -243,7 +243,8 @@ ok('and cannot see Delete either', await page.evaluate(() =>
 // The moderation case. A race set up and never run sits on the hub with
 // nothing behind it, and the person who made it has stopped looking: if only
 // they can take it down, it stays up. Taking it off the hub is reversible and
-// destroys nothing, which is why this is an admin's to do and Delete is not.
+// destroys nothing. Since 2026-11-17 an admin may delete it too, and is told
+// it is not theirs.
 console.log('\nand a site admin, who also did not make it');
 await page.evaluate(() => {
   const s = JSON.parse(localStorage.getItem('race-hub-session-v1'));
@@ -254,8 +255,12 @@ await page.goto(BASE + `/settings.html?id=${SLUG}`);
 await page.waitForSelector('#runner-editor-head', { timeout: 20000 });
 await page.waitForTimeout(1200);
 ok('can take it off the hub', await shown(), true);
-ok('but still cannot delete it', await page.evaluate(() =>
-  document.getElementById('delete-editor').style.display), 'none');
+ok('and can delete it', await page.evaluate(() =>
+  document.getElementById('delete-editor').style.display), '');
+ok('told it is not theirs, and pointed at the gentler lever', await page.evaluate(() => {
+  const t = document.getElementById('delete-editor-body').textContent;
+  return [/not your race/.test(t), /site admin/.test(t), /Who can find this race/.test(t)];
+}), [true, true, true]);
 // The free plan is still switched on from the section above, and an admin is
 // not gated by it: the owner's plan is a reason they cannot hide their own
 // race, never a reason a dead one has to stay on the hub.
@@ -340,6 +345,28 @@ ok('and the race really did move', await page.evaluate(async base => {
   const j = await r.json();
   return JSON.parse(atob(j.content)).visibility;
 }, BASE), 'public');
+
+// And Delete, beside it, asked for on 2026-11-17: for a race that should go
+// rather than only leave the hub. Same type-the-name modal as settings.
+console.log('\ndeleting from the admin page');
+const asked = [];
+page.on('request', r => { if (r.url().endsWith('/api/race/delete')) asked.push(JSON.parse(r.postData()).slug); });
+const delRow = '.race-row[data-slug="zz-fixture-unlisted"]';
+await page.click(delRow + ' .del-btn');
+await page.waitForSelector('#del-confirm');
+ok('asks for the race name first', await page.evaluate(() =>
+  [document.getElementById('del-go').disabled, /every leg/.test(document.querySelector('.modal-box').textContent)]), [true, true]);
+await page.click('#del-cancel');
+await page.waitForTimeout(200);
+ok('and Cancel deletes nothing', [asked.length, await page.evaluate(s => !!document.querySelector(s), delRow)], [0, true]);
+await page.click(delRow + ' .del-btn');
+await page.waitForSelector('#del-confirm');
+const raceName = await page.evaluate(s => document.querySelector(s + ' .del-btn').dataset.name, delRow);
+await page.fill('#del-confirm', raceName);
+await page.click('#del-go');
+await page.waitForTimeout(800);
+ok('typing the name and pressing Delete deletes it', asked, ['zz-fixture-unlisted']);
+ok('and the row goes', await page.evaluate(s => !!document.querySelector(s), delRow), false);
 
 ok('no page errors', errs, []);
 await b.close(); srv.kill('SIGKILL');

@@ -649,7 +649,7 @@
 
 <div id="toast" role="status" aria-live="polite" style="display:none;"></div>
 
-<script src="lib/race-core.js?v=54ee8fd8"></script>
+<script src="lib/race-core.js?v=7280cc23"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -1137,10 +1137,10 @@
     maybeShowDeleteSection();
   }
 
-  // Creator only, which is stricter than managing access and is the same bar
-  // the worker enforces on the endpoint: an editor was invited to help run the
-  // race, not to unmake it. Anybody else never sees the section rather than
-  // seeing a button that answers 403.
+  // The creator or a site admin, which is stricter than managing access and is
+  // the same bar the worker enforces on the endpoint: an editor was invited to
+  // help run the race, not to unmake it. Anybody else never sees the section
+  // rather than seeing a button that answers 403.
   //
   // The panel is asked because it knows: the config no longer names the
   // creator, so this cannot be read off cfg. Called again from onRosterChanged
@@ -1152,19 +1152,21 @@
     const sec = document.getElementById('delete-editor');
     if (!sec || !cfg) return;
     const mine = accessPanel ? accessPanel.isCreator() : (cfg.myRole === 'owner');
-    sec.style.display = mine ? '' : 'none';
-    if (mine && !deleteMounted) {
+    // A site admin may delete any race too (the worker checks the same), and
+    // is told in the panel that it is not theirs.
+    const canDelete = mine || Race.auth.isAdmin();
+    sec.style.display = canDelete ? '' : 'none';
+    if (canDelete && !deleteMounted) {
       Race.access.mountDelete(document.getElementById('delete-editor-body'), {
-        slug, cfg: () => cfg, data: () => data
+        slug, cfg: () => cfg, data: () => data, asAdmin: !mine
       });
       deleteMounted = true;
     }
 
-    // Nearly the same gate. A site admin sees this one and not Delete, because
-    // this is the moderation lever: a race set up and never run sits on the
-    // public hub with nothing behind it, and the person who made it has
-    // stopped looking. Taking it off the hub is reversible and destroys
-    // nothing, which is what makes it theirs to do and deleting not.
+    // The same gate. For a site admin this is the gentler moderation lever: a
+    // race set up and never run sits on the public hub with nothing behind it,
+    // and the person who made it has stopped looking. Taking it off the hub is
+    // reversible and destroys nothing; deleting is for when it should go.
     const canMove = mine || Race.auth.isAdmin();
     const vis = document.getElementById('visibility-editor');
     if (vis) {

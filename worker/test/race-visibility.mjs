@@ -411,9 +411,14 @@ ok('the owner\'s plan is not a reason it has to stay up', j.error || null, null)
 ok('the stored config moved', stored(POORSLUG).visibility, 'private');
 ok('and it is off the hub', listed(POORSLUG), false);
 ok('and can put it back', (await flip(POORSLUG, 'public', bossToken)).status, 200);
-ok('but cannot delete somebody else\'s race, which is a different thing',
-  (await call('/race/delete', bossToken, { method: 'POST',
+// Deleting was creator-only until 2026-11-17, when admins were let in too.
+// Somebody who is neither still may not.
+ok('somebody who did not make it still cannot delete it',
+  (await call('/race/delete', mateToken, { method: 'POST',
     body: JSON.stringify({ slug: POORSLUG }) })).status, 403);
+ok('and an admin can',
+  (await call('/race/delete', bossToken, { method: 'POST',
+    body: JSON.stringify({ slug: POORSLUG }) })).status, 200);
 
 // A course big enough that GitHub will not hand it back inline. Copying an
 // empty file to R2 and then deleting the real one would destroy the course, so

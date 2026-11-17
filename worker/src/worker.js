@@ -46,7 +46,7 @@
 //   Race listing for logged-in users
 //     GET  /my-races                                                   → { races: [...] }
 //     GET  /next-race-id                                               → { id: "000042" }
-//     POST /race/delete      { slug }                                  → { ok, deleted } (creator only)
+//     POST /race/delete      { slug }                                  → { ok, deleted } (creator or site admin)
 //     POST /race/visibility  { slug, visibility }                      → { slug, visibility, changed } (creator or admin)
 //
 //   Misc
@@ -7292,9 +7292,16 @@ async function handleRaceVisibility(req, env, ctx) {
 }
 
 // ---------- race deletion ----------
-// Deleting is creator-only, deliberately stricter than editing. An editor was
-// invited to help run a race, not to destroy one; the person who made it is the
-// one who gets to unmake it.
+// The creator, or a site admin. Deliberately stricter than editing: an editor
+// was invited to help run a race, not to destroy one.
+//
+// Admins were left out at first, on the grounds that deleting destroys
+// somebody's race and unlisting does not. Asked for on 2026-11-17: unlisting
+// hides a dead race but leaves it in the database for good, and a race made
+// by mistake, as a test, or for somebody who has asked for it to go had no
+// way out unless its creator came back to do it. Behind the same switch as
+// every other admin power over a race (ADMIN_RACE_ACCESS), and the privacy
+// page says so.
 async function handleRaceDelete(req, env) {
   const session = await requireAuth(req, env);
   if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
@@ -7315,7 +7322,8 @@ async function handleRaceDelete(req, env) {
   if (!raceCfg) return json({ error: 'Race not found' }, { status: 404 }, env, req);
 
   const me = normalizeEmail(session.email);
-  if (!raceCfg.createdBy || normalizeEmail(raceCfg.createdBy) !== me) {
+  const isCreator = !!raceCfg.createdBy && normalizeEmail(raceCfg.createdBy) === me;
+  if (!isCreator && !asSiteAdmin(env, session)) {
     return json({ error: 'Only the race creator can delete it' }, { status: 403 }, env, req);
   }
 

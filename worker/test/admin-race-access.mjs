@@ -10,6 +10,7 @@
 // The second is the admin override, asked for the same night: support was
 // impossible without it, because helping somebody with a race meant asking
 // them to add you to it, and somebody locked out of their own race could not.
+// Deleting joined it on 2026-11-17.
 //
 //   node worker/test/admin-race-access.mjs
 import worker from '../src/worker.js';
@@ -102,7 +103,14 @@ const baseEnv = {
 };
 let env = { ...baseEnv };
 
-globalThis.fetch = async () => new Response('{"message":"Not Found"}', { status: 404 });
+// Deleting a race lists the repository's files to find the race's own; an
+// empty tree is a race that only ever lived in the database.
+// Writes (the hub listing it is taken off) succeed.
+globalThis.fetch = async (url, opts = {}) => {
+  if (String(url).includes('/git/trees/')) return new Response(JSON.stringify({ tree: [] }), { status: 200 });
+  if ((opts.method || 'GET') !== 'GET') return new Response(JSON.stringify({ content: { sha: 'x' } }), { status: 200 });
+  return new Response('{"message":"Not Found"}', { status: 404 });
+};
 
 function reset() {
   kv = new Map();
@@ -173,6 +181,15 @@ ok('may write it', (await writeCourse(admin)).status, 200);
 ok('and may see the roster', (await call('/access?slug=' + SLUG, { token: admin })).status, 200);
 ok('while the creator is still the creator', await roleSeenBy(await login(OWNER)), 'owner');
 
+console.log('\ndeleting a race, asked for on 2026-11-17');
+reset();
+ok('a stranger may not', (await call('/race/delete', { token: await login(OUT), body: { slug: SLUG } })).status, 403);
+ok('a site admin may, though it is not theirs',
+  (await call('/race/delete', { token: await login(ADMIN), body: { slug: SLUG } })).status, 200);
+reset();
+ok('and so, as ever, may the creator',
+  (await call('/race/delete', { token: await login(OWNER), body: { slug: SLUG } })).status, 200);
+
 console.log('\nwith ADMIN_RACE_ACCESS="false", which is the whole of switching it back');
 reset();
 env.ADMIN_RACE_ACCESS = 'false';
@@ -180,6 +197,7 @@ const admin2 = await login(ADMIN);
 ok('reading a private race is refused again', (await readConfig(admin2)).status, 403);
 ok('and so is writing it', (await writeCourse(admin2)).status, 403);
 ok('and the roster', (await call('/access?slug=' + SLUG, { token: admin2 })).status, 403);
+ok('and deleting it', (await call('/race/delete', { token: admin2, body: { slug: SLUG } })).status, 403);
 
 console.log(bad ? `\n${bad} failed\n` : '\nall good\n');
 process.exit(bad ? 1 : 0);

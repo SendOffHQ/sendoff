@@ -763,6 +763,17 @@ const server = http.createServer((req, res) => {
       send(404, '{"error":"Race not found"}', 'application/json');
     });
   }
+  // Deleting a race: answered as the worker answers a clean delete, without
+  // touching the fixture, which later tests still read.
+  if (url.pathname === '/api/race/delete') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+      let j; try { j = JSON.parse(body); } catch (e) { return send(400, '{"error":"Invalid JSON"}', 'application/json'); }
+      send(200, JSON.stringify({ ok: true, slug: j.slug, deleted: [] }), 'application/json');
+    });
+  }
   // Makes visibility saves fail, for the half-done path, until they are turned
   // back on. A run that needs a race actually moved after using this has to say
   // so: the flag used to be set once and stay set, which silently turned a

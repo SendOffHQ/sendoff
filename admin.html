@@ -195,6 +195,7 @@
     letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
   }
   .acct-races .vis-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+  .acct-races .del-btn:hover:not(:disabled) { color: var(--red); border-color: var(--red); }
   .acct-races .vis-btn:disabled { opacity: 0.5; cursor: default; }
   .acct-races .vis-err { color: var(--red); padding: 2px 0 6px; white-space: normal; }
   /* A held race: its name, its link, what tripped it, and the one action.
@@ -394,7 +395,7 @@
   </div>
 </div>
 
-<script src="lib/race-core.js?v=54ee8fd8"></script>
+<script src="lib/race-core.js?v=7280cc23"></script>
 <script>
   function esc(s) {
     return String(s == null ? '' : s)
@@ -1119,7 +1120,8 @@
     });
   }
 
-  // The hub lever, and the only thing this page does to a race.
+  // The hub lever. With Delete below, the only things this page does to a
+  // race.
   //
   // It is here rather than on the race's own settings page because that page
   // cannot open a race an admin is not on: a private race has no published
@@ -1141,8 +1143,50 @@
           <span class="role ${esc(rc.role)}">${rc.isCreator ? 'creator' : esc(rc.role)}${rc.visibility === 'private' ? ' &middot; private' : ''}</span>
           <button type="button" class="vis-btn" data-vis="${esc(rc.slug)}"
             data-want="${rc.visibility === 'private' ? 'public' : 'private'}">${visLabel(rc.visibility)}</button>
+          <button type="button" class="vis-btn del-btn" data-del="${esc(rc.slug)}"
+            data-name="${esc(rc.name || rc.slug)}">Delete</button>
         </span>
       </div>`).join('');
+  }
+
+  // Deleting, for a race that should go rather than just leave the hub: one
+  // made by mistake or as a test, or one whose people have asked for it to
+  // go. The worker allows it to a site admin as it does to the creator. The
+  // same type-the-name modal as the race's own settings page, and the row
+  // goes from every account it is listed under.
+  function wireDelButtons(box) {
+    box.querySelectorAll('[data-del]').forEach(b => {
+      b.addEventListener('click', async () => {
+        const slug = b.dataset.del, name = b.dataset.name || slug;
+        if (!await Race.access.confirmDelete(name, null)) return;
+        const row = b.closest('.race-row');
+        b.disabled = true; b.textContent = '…';
+        row.querySelectorAll('.vis-err').forEach(e => e.remove());
+        const say = (text) => {
+          const e = document.createElement('div');
+          e.className = 'vis-err';
+          e.textContent = text;
+          row.appendChild(e);
+        };
+        try {
+          const res = await Race.api.deleteRace(slug);
+          if (res && res.ok === false) {
+            const bits = [];
+            if (res.manifestErr) bits.push('the hub listing');
+            if ((res.failed || []).length) bits.push(res.failed.map(f => f.path).join(', '));
+            say(`Partly deleted. Still there: ${bits.join('; ')}. Try again, or remove them in GitHub.`);
+            b.disabled = false; b.textContent = 'Delete';
+            return;
+          }
+          document.querySelectorAll('.race-row').forEach(r => {
+            if (r.dataset.slug === slug) r.remove();
+          });
+        } catch (err) {
+          say(err.message);
+          b.disabled = false; b.textContent = 'Delete';
+        }
+      });
+    });
   }
 
   function wireVisButtons(box) {
@@ -1204,6 +1248,7 @@
       const r = await Race.api.accountRaces(row.dataset.email);
       box.innerHTML = nameEditor(acct) + raceRows(r.races || []);
       wireVisButtons(box);
+      wireDelButtons(box);
     } catch (err) {
       box.innerHTML = nameEditor(acct) + '<span class="err">' + esc(err.message) + '</span>';
     }
