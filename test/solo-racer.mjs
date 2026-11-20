@@ -11,6 +11,7 @@
 //   - a write-in box for whatever has no item, which keeps what was typed
 //     through a poll and is held on the phone with no signal;
 //   - the per-hour rate stops at the last leg that was logged, and says so;
+//   - and it is live while they log on the leg they are on (2026-11-20);
 //   - photos sit above the items, and the button stays at the bottom of the
 //     screen however far down the page has been scrolled.
 //
@@ -319,6 +320,46 @@ ok('and the rate is the one it logged', ph.cal.startsWith('200'), true);
 await setLegs(legsFrom(5.5, 5, { 1: { calories: 200 }, 2: { calories: 200 }, 3: { calories: 200 }, 5: { preset_1: 1 } }));
 await openRacer();
 ok('logging again puts it back to the whole race', (await perHour()).note, null);
+
+// Asked for on 2026-11-20: a solo racer logs as they go and needs to see it
+// land, not wait for the next aid station. Once the leg they are on has
+// anything on it, the gauges count it live.
+console.log('\nthe gauges, live as a solo racer logs');
+const live = () => page.evaluate(() => {
+  const blk = [...document.querySelectorAll('#readout .rblock')].find(b => /per hour/i.test(b.textContent));
+  return { live: !!blk.querySelector('.rlive'), note: (blk.querySelector('.rlivenote') || {}).textContent || null,
+           cal: parseFloat(blk.querySelector('.rfuel .v').textContent).toString() };
+});
+// Two finished hours at 100 calories each, half an hour into the third leg
+// with nothing on it yet: finished legs only, as a crewed race reads.
+await setLegs(legsFrom(2.5, 2, { 1: { calories: 100 }, 2: { calories: 100 } }));
+await openRacer();
+let g = await live();
+ok('before a tap on this leg, the finished legs only', [g.cal, g.live], ['100', false]);
+await page.click('#intake .rchip[data-preset="0"]');
+await page.waitForTimeout(300);
+g = await live();
+// 300 calories over two and a half hours.
+ok('a gel moves it at once, counting this leg so far', [g.cal, g.live], ['120', true]);
+ok('and it says so', g.note, 'Counting this leg as you log it.');
+
+// Quarter of an hour into the race, one gel: held against the first hour,
+// not 400 an hour.
+await setLegs(legsFrom(0.25, 0));
+await openRacer();
+await page.click('#intake .rchip[data-preset="0"]');
+await page.waitForTimeout(300);
+g = await live();
+ok('in the first hour, held against an hour', [g.cal, g.live], ['100', true]);
+ok('and says that too', /first hour/.test(g.note || ''), true);
+
+// The race page, for whoever is following, reads the same.
+await page.goto(BASE + `/race.html?id=${SLUG}`);
+await page.waitForSelector('.intake-row', { timeout: 20000 });
+await page.waitForTimeout(800);
+ok('the race page shows it live too', await page.evaluate(() => [
+  !!document.querySelector('.intake-live'),
+  parseFloat(document.querySelector('.intake-row .num').textContent).toString()]), [true, '100']);
 
 ok('no page errors', errs, []);
 await b.close(); srv.kill('SIGKILL');

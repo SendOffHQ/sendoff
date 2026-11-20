@@ -163,6 +163,9 @@
   .rjot-list { margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-dim); }
   .rjot-list div { padding: 3px 0; overflow-wrap: anywhere; }
   .rlogged { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--yellow); margin: 2px 0 8px; }
+  /* Live is teal, as everywhere: the gauges are counting the leg in progress. */
+  .rlive { color: var(--accent); }
+  .rlivenote { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); margin: 2px 0 8px; }
 
   /* Reordering the items from here. The switch sits on the heading's row; the
      grips only exist while it is on, on the left, away from the right edge
@@ -362,7 +365,7 @@
 <!-- Before everything else: the demo race at /try is answered from this
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
-<script src="lib/race-core.js?v=8c15f16e"></script>
+<script src="lib/race-core.js?v=6cad5e75"></script>
 <script>
   const slug = Race.qs('id');
   if (!slug) { window.location = '/app/'; }
@@ -528,8 +531,10 @@
 
   // ---------- readout ----------
   function fuelRows(runner) {
-    const c = Race.compute.runner(runner, cfg);
-    const raceHours = (c.completedRaceSec || 0) / 3600;
+    // Live once anything is logged on the leg they are on (a solo racer
+    // logging as they go); over finished legs otherwise. See intakeRate.
+    const rate = Race.compute.intakeRate(runner, cfg);
+    const raceHours = rate.raceHours;
     const plan = Race.fuel.forRunner(cfg, runner);
     const metrics = Race.fuel.metrics(plan, raceHours);
     const goals = metrics.filter(m => m.expectedPerHour);
@@ -540,13 +545,9 @@
     // and says so. Otherwise a runner who stopped writing things down is told
     // hour after hour that they are falling further behind on everything,
     // which is the one thing this page cannot know.
-    const logged = Race.compute.loggedIntake(runner, cfg);
-    const through = logged.throughLeg;
-    const throughDef = through ? Race.course.legAt(cfg, through) : null;
+    const through = rate.throughLeg;
     const rows = goals.map(m => {
-      const per = through
-        ? (logged.perHour[m.key] || 0)
-        : ((c.intake[m.key] && c.intake[m.key].perHour) || 0);
+      const per = rate.perHour[m.key] || 0;
       const goal = m.expectedPerHour;
       const pct = Math.max(0, Math.min(100, (per / goal) * 100));
       const cls = pct >= 90 ? 'ok' : pct >= 70 ? 'low' : 'bad';
@@ -557,7 +558,10 @@
       </div>`;
     }).join('');
     return `<div class="rblock">
-      <span class="rlbl">Per hour so far</span>
+      <span class="rlbl">Per hour so far${rate.live ? ' <span class="rlive">· live</span>' : ''}</span>
+      ${rate.live ? `<div class="rlivenote">${rate.firstHour
+        ? 'Counting this leg as you log it. Under an hour in, so it is held against the first hour.'
+        : 'Counting this leg as you log it.'}</div>` : ''}
       ${through ? `<div class="rlogged">Logged through ${esc(Race.stations.label(cfg, through))}. Nothing since, so the rate stops there.</div>` : ''}
       ${banded && band ? `<div class="rband">${esc(band.label || `from hour ${band.fromHour}`)}</div>` : '<div style="height:6px"></div>'}
       ${rows}

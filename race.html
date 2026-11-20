@@ -251,6 +251,8 @@
     padding: 2px 6px; letter-spacing: 0.12em; min-width: 0; overflow-wrap: anywhere;
   }
   .intake-now { color: var(--text-muted); font-size: 11px; margin-left: 4px; }
+  /* Counting the leg in progress as it is logged: live, so teal. */
+  .intake-live { color: var(--accent); }
   .intake-row {
     display: grid; grid-template-columns: 90px 1fr auto auto;
     gap: 14px; align-items: center; padding: 8px 0;
@@ -583,7 +585,7 @@
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8a2565f0"></script>
 <script src="lib/course-view.js?v=e062d140"></script>
-<script src="lib/race-core.js?v=8c15f16e"></script>
+<script src="lib/race-core.js?v=6cad5e75"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -1311,7 +1313,11 @@
           // moving time, which is how this page has always computed it; the two
           // clocks differ by aid station time, and they differed by exactly as
           // much when the goal was a single flat number.
-          const raceHours = (c.completedRaceSec || 0) / 3600;
+          // Live once anything is logged on the leg the racer is on (a solo
+          // racer logging as they go); over finished legs otherwise. See
+          // Race.compute.intakeRate.
+          const rate = Race.compute.intakeRate(runner, cfg);
+          const raceHours = rate.raceHours;
           // This runner's goals and bands, not the race's: two people on the
           // same course are held to their own plan.
           const plan = Race.fuel.forRunner(cfg, runner);
@@ -1322,10 +1328,12 @@
           const banded = Race.fuel.bands(plan).length > 0;
           return `
         <div class="intake">
-          <div class="intake-title">Intake / Hour${banded && band
+          <div class="intake-title">Intake / Hour${rate.live ? ' <span class="intake-live">· live</span>' : ''}${banded && band
             ? ` <span class="intake-band">${escapeHtml(band.label || `from hour ${band.fromHour}`)}</span>` : ''}</div>
           ${goals.map(m => {
-            const per = c.intake[m.key]?.perHour || 0;
+            // Not live: the plain rate over finished legs, as this page has
+            // always shown (the racer screen's "logged through" stop is its own).
+            const per = rate.live ? (rate.perHour[m.key] || 0) : (c.intake[m.key]?.perHour || 0);
             // Against the average they should be at by now, not against the
             // rate in force this minute: a cumulative number held against an
             // instantaneous goal would call a runner behind for the whole
