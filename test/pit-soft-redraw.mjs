@@ -161,6 +161,14 @@ ok('and the keyboard stays: same box, cursor still in it', await boTyping(),
   { value: 'Blister, left heel', focused: true, same: true });
 await page.keyboard.type(', taped');
 ok('so typing carries on', (await boTyping()).value, 'Blister, left heel, taped');
+// The splits sit below the intake panel (2026-11-21), and stay there through
+// a redraw round a panel in use.
+ok('the splits are still below the panel being typed in', await page.evaluate(() => {
+  const a = document.querySelector('article.runner[data-runner="bo"]');
+  const kids = [...a.children].map(k => k.classList.contains('splits') ? 'splits'
+    : k.matches('.intake-panel:not(.intake-preview)') ? 'panel' : null).filter(Boolean);
+  return kids;
+}), ['panel', 'splits']);
 
 ok('no page threw', errs, []);
 await b.close();

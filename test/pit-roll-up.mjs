@@ -81,6 +81,10 @@ ok('with the racer\'s splits, drawn as the race page draws them', await page.eva
   return [a.querySelector('.splits-title').textContent.trim(), a.querySelectorAll('.seg-row').length > 2,
     !!a.querySelector('.seg-row.current')];
 }), ['Aid stations', true, true]);
+ok('below the intake panel', await page.evaluate(() => {
+  const a = document.querySelector('article.runner[data-runner="bo"]');
+  return !!a.querySelector(':scope > .intake-panel ~ .splits');
+}), true);
 await page.click('article[data-runner="bo"] .runner-name');
 // Asked for the same day: Undo and Dropped go too, and the big button stays.
 ok('a tap rolls it up to its name, badge and big button', await state('bo'),

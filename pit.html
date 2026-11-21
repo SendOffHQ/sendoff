@@ -1234,8 +1234,8 @@
 
   // The racer's lap times, or a row per aid station, as the race page draws
   // them (Race.splits), so a crew reading splits need not switch pages
-  // (2026-11-21). Under the buttons, above the intake panel, which stays the
-  // last thing in a card (see softRender). Rolled up with the rest.
+  // (2026-11-21). Below the intake panel, asked for the same day (softRender
+  // keeps it there while somebody types). Rolled up with the rest.
   function splitsBlock(runner) {
     const c = Race.compute.runner(runner, cfg);
     return `<div class="splits">
@@ -1450,8 +1450,8 @@
           ${Race.course.isBackyard(cfg) && next.state === 'in-pit' && !Race.backyard.state(cfg, Race.backyard.view(cfg, runner)).onLap
             ? armBtn('btn', 'by-won', runner.id, 'by-won', 'Won: last one standing', 'Tap again to confirm: won') : ''}
         </div>
-        ${splitsBlock(runner)}
         ${intakePanel}
+        ${splitsBlock(runner)}
       </article>
     `;
   }
@@ -1546,12 +1546,16 @@
       // A panel in use is kept only while the new card still has one: with
       // every leg undone there is nothing left for the typing to be about.
       if (panel && fresh && panelInUse(panel)) {
+        // What the new card has before its panel goes before the kept one,
+        // and what it has after (the splits), after it.
+        const kids = [...node.childNodes], at = kids.indexOf(fresh);
         fresh.remove();
         for (const c of [...was.childNodes]) if (c !== panel) c.remove();
         was.className = node.className;
         was.setAttribute('style', node.getAttribute('style') || '');
-        // The panel is the last thing in a card, so the rest goes before it.
-        while (node.firstChild) was.insertBefore(node.firstChild, panel);
+        kids.slice(0, at).forEach(c => was.insertBefore(c, panel));
+        let after = panel;
+        kids.slice(at + 1).forEach(c => { after.after(c); after = c; });
         want.push(was);
       } else {
         want.push(node);
