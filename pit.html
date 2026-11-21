@@ -1093,21 +1093,26 @@
   // The corrections for that stop: its arrival and its departure, and on the
   // first one the start. A leg still under way offers its send-off from the
   // stop before, and the arrival for when it was missed.
+  //
+  // In two parts (2026-11-21): the time-out corrections on their own row,
+  // and the arrival beside Save intake. "Edit time out of <station>" takes a
+  // phone's whole row, so the arrival used to land alone on the next one and
+  // Save on a third.
   function stationEditButtons(leg, runner) {
-    if (!leg) return '';
+    if (!leg) return { top: '', beside: '' };
     const btn = (legIndex, field, label) =>
       `<button class="btn" data-action="edit-time" data-runner="${runner.id}" data-leg="${legIndex}" data-field="${field}">${escapeHtml(label)}</button>`;
     const next = (runner.legs || []).find(l => l.index === leg.index + 1);
     const from = Race.stations.fromLabel(cfg, leg.index);
     if (!leg.endTime) {
-      return btn(leg.index, 'startTime', leg.startTime ? `Edit time out of ${from}` : `Set time out of ${from}`) +
-        btn(leg.index, 'endTime', 'Set arrival');
+      return { top: btn(leg.index, 'startTime', leg.startTime ? `Edit time out of ${from}` : `Set time out of ${from}`),
+        beside: btn(leg.index, 'endTime', 'Set arrival') };
     }
     // The time out, to edit, or to set where the send-off was never pressed
     // and the racer is already further on: that one had no button at all.
-    return btn(leg.index, 'endTime', 'Edit time in') +
-      (next ? btn(leg.index + 1, 'startTime', next.startTime ? 'Edit time out' : 'Set time out') : '') +
-      (leg.index === 1 ? btn(1, 'startTime', 'Edit start') : '');
+    return { top: (next ? btn(leg.index + 1, 'startTime', next.startTime ? 'Edit time out' : 'Set time out') : '') +
+        (leg.index === 1 ? btn(1, 'startTime', 'Edit start') : ''),
+      beside: btn(leg.index, 'endTime', 'Edit time in') };
   }
 
   // ---------- backyard ----------
@@ -1387,16 +1392,17 @@
             <input type="text" data-intake="gearChanges" autocomplete="off" value="${escapeAttr(selectedLeg?.gearChanges ?? '')}" />
           </label>
         </div>
-        <!-- Two rows, not one wrapping row. The three buttons used to share a
-             flex row and the wrap fell wherever the widths happened to land:
-             on a phone that put Save intake beside Edit start time with Set
-             end time orphaned underneath, so the button this whole panel
-             exists for read as one of a set of three. The corrections belong
-             together; saving belongs on its own line. -->
-        <div class="intake-actions">${stationEditButtons(selectedLeg, runner)}</div>
+        <!-- Two rows, not one wrapping row, so where the wrap falls is
+             decided here rather than by the widths: the time-out corrections
+             on the first, which one long label fills on a phone, and the
+             arrival beside Save intake on the second (2026-11-21). Save is
+             the filled button, so it does not read as one of a set. -->
+        ${(() => { const eb = stationEditButtons(selectedLeg, runner); return `
+        ${eb.top ? `<div class="intake-actions">${eb.top}</div>` : ''}
         <div class="intake-actions">
+          ${eb.beside}
           <button class="btn primary" data-action="save-intake" data-runner="${runner.id}">Save intake</button>
-        </div>
+        </div>`; })()}
       </div>
     `;
 
