@@ -141,22 +141,22 @@ const pitLabel = () => page.evaluate(sel => {
 }, intake);
 ok('starts as Save intake', await pitLabel(), { text: 'Save intake', saved: false });
 
-// The three buttons here used to share one wrapping flex row, so on a phone
-// the wrap fell wherever the widths landed and Save ended up beside a time
-// correction with the other one orphaned below it. The two corrections belong
-// together; saving is what the panel is for and gets its own line.
+// The buttons here used to share one wrapping flex row, so on a phone the
+// wrap fell wherever the widths landed. Now there are two rows decided by
+// what each button does (2026-11-21): the time-out corrections on the first,
+// since "Edit time out of <station>" fills a phone's row by itself, and the
+// arrival correction beside Save intake on the second.
 console.log('\nand the buttons are laid out by what they do');
 const rows = await page.evaluate(() => {
   const box = el => { const r = el.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom) }; };
-  const times = [...document.querySelectorAll('[data-action="edit-time"]')].map(box);
+  const arrival = [...document.querySelectorAll('[data-action="edit-time"][data-field="endTime"]')].map(box);
+  const out = [...document.querySelectorAll('[data-action="edit-time"][data-field="startTime"]')].map(box);
   const save = box(document.querySelector('[data-action="save-intake"]'));
-  return { times, save };
+  return { arrival, out, save };
 });
-// By station, the finish has a time in and no time out, so one correction
-// here; wherever there are more, they share a line.
-ok('the time buttons are on the same line', rows.times.length >= 1 &&
-   rows.times.every(t => Math.abs(t.top - rows.times[0].top) < 2), true);
-ok('and save is below them, on its own', rows.save.top >= rows.times[0].bottom - 1, true);
+ok('the arrival correction sits beside Save', rows.arrival.length === 1 &&
+   Math.abs(rows.arrival[0].top - rows.save.top) < 2, true);
+ok('and any time-out correction is on the row above', rows.out.every(t => t.bottom <= rows.save.top + 1), true);
 
 const idleWidth = await page.evaluate(sel => document.querySelector(sel).offsetWidth, intake);
 
