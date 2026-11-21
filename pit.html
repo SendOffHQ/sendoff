@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css" />
-<link rel="stylesheet" href="lib/race-theme.css?v=4fe079c7">
+<link rel="stylesheet" href="lib/race-theme.css?v=080f8cc3">
 <style>
   body { padding: 20px 16px 32px; }
   .wrap { max-width: 860px; margin: 0 auto; }
@@ -86,6 +86,10 @@
      Everything else goes, including the Undo row, whose inline display is
      why this needs !important. */
   .runner.rolled > :not(.runner-head):not(.big-btn):not(.big-split) { display: none !important; }
+  .splits { padding: 14px 16px 6px; border-bottom: 1px solid var(--border); }
+  .splits-title { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; }
+  .splits .legs-grid { margin-bottom: 8px; }
   .runner-name {
     font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; font-size: 24px;
     font-weight: 600; letter-spacing: -0.02em;
@@ -332,7 +336,7 @@
      browser, and only when this page was opened for it. -->
 <script src="lib/demo.js?v=68e3cb36"></script>
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="lib/race-core.js?v=905a4310"></script>
+<script src="lib/race-core.js?v=1dc75475"></script>
 <script src="lib/course-view.js?v=e062d140"></script>
 <script>
   const slug = Race.qs('id');
@@ -1228,6 +1232,18 @@
     await load();
   }
 
+  // The racer's lap times, or a row per aid station, as the race page draws
+  // them (Race.splits), so a crew reading splits need not switch pages
+  // (2026-11-21). Under the buttons, above the intake panel, which stays the
+  // last thing in a card (see softRender). Rolled up with the rest.
+  function splitsBlock(runner) {
+    const c = Race.compute.runner(runner, cfg);
+    return `<div class="splits">
+        <div class="splits-title">${Race.splits.simpleLoop(cfg) ? 'Lap times' : 'Aid stations'}</div>
+        ${Race.splits.html(cfg, runner, c)}
+      </div>`;
+  }
+
   // Racers whose cards are rolled up; see toggleRoll.
   const ROLL_KEY = 'pit-rolled:' + slug;
   const rolled = new Set();
@@ -1434,6 +1450,7 @@
           ${Race.course.isBackyard(cfg) && next.state === 'in-pit' && !Race.backyard.state(cfg, Race.backyard.view(cfg, runner)).onLap
             ? armBtn('btn', 'by-won', runner.id, 'by-won', 'Won: last one standing', 'Tap again to confirm: won') : ''}
         </div>
+        ${splitsBlock(runner)}
         ${intakePanel}
       </article>
     `;
@@ -1726,6 +1743,13 @@
       }
       const seconds = (Date.now() - new Date(since).getTime()) / 1000;
       if (valueEl) valueEl.textContent = Race.fmt.duration(seconds);
+    });
+    // The running leg and pit times in each racer's splits, as on the race page.
+    document.querySelectorAll('#runners .splits .live-timer[data-since]').forEach(t => {
+      const since = t.dataset.since;
+      if (!since) return;
+      const seconds = (parseFloat(t.dataset.base) || 0) + Math.max(0, (Date.now() - new Date(since).getTime()) / 1000);
+      t.textContent = t.dataset.fmt === 'short' ? Race.fmt.durationShort(seconds) : Race.fmt.duration(seconds);
     });
     // The racer dots on the course move with the clock, like the timers.
     courseView.update();

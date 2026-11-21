@@ -40,7 +40,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=4fe079c7">
+<link rel="stylesheet" href="lib/race-theme.css?v=080f8cc3">
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css" />
 <style>
   .cutoffs {
@@ -285,64 +285,8 @@
     letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted);
   }
 
-  /* Loops grid (Bloodroot style) */
-  .legs-grid {
-    display: grid; grid-template-columns: repeat(10, 1fr);
-    gap: 6px; margin-bottom: 16px;
-  }
-  @media (max-width: 600px) { .legs-grid { grid-template-columns: repeat(5, 1fr); } }
-  .leg-cell {
-    aspect-ratio: 1; background: var(--bg-elevated);
-    border: 1px solid var(--border); border-radius: 3px;
-    display: flex; flex-direction: column;
-    justify-content: center; align-items: center;
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .leg-cell .n { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
-  .leg-cell .n .lp { margin-left: 3px; color: var(--accent); }
-  .leg-cell .t { font-size: 11px; font-weight: 700; }
-  .leg-cell.done { background: rgba(110, 231, 168, 0.08); border-color: rgba(110, 231, 168, 0.4); }
-  .leg-cell.done .t { color: var(--green); }
-  .leg-cell.slow { background: rgba(255, 176, 122, 0.08); border-color: rgba(255, 176, 122, 0.4); }
-  .leg-cell.slow .t { color: var(--yellow); }
-  .leg-cell.danger { background: rgba(229, 72, 77, 0.08); border-color: rgba(229, 72, 77, 0.4); }
-  .leg-cell.danger .t { color: var(--red); }
-  .leg-cell.current { background: var(--accent-glow); border-color: var(--accent); }
-  .leg-cell.current .t { color: var(--accent); }
-
-  /* Segments timeline (Sangre-style) */
-  .seg-list { display: flex; flex-direction: column; }
-  .seg-row {
-    /* minmax(0, 1fr), not 1fr: a plain 1fr will not go narrower than the
-       longest thing in it that cannot wrap, and a long crew note (shown here
-       until 2026-10-04) used to push the whole row past the edge of a phone,
-       taking the leg time with it. */
-    display: grid; grid-template-columns: 32px minmax(0, 1fr) 80px 80px 80px;
-    gap: 10px; padding: 10px 8px;
-    border-bottom: 1px solid var(--border);
-    align-items: center; font-size: 12px;
-  }
-  @media (max-width: 700px) {
-    .seg-row { grid-template-columns: 28px minmax(0, 1fr) auto; }
-    .seg-row .col-cut, .seg-row .col-pit { display: none; }
-  }
-  .seg-row:last-child { border-bottom: none; }
-  .seg-row .num { font-family: 'JetBrains Mono', monospace; color: var(--accent); font-weight: 700; }
-  .seg-row .nm { color: var(--text); min-width: 0; overflow-wrap: anywhere; }
-  .seg-row .nm .meta { color: var(--text-muted); font-size: 11px; font-family: 'JetBrains Mono', monospace; }
-  .seg-row .nm .feel-line { margin-top: 3px; display: flex; gap: 10px; }
-  .seg-row .col-dur, .seg-row .col-cut, .seg-row .col-pit {
-    font-family: 'JetBrains Mono', monospace; text-align: right;
-  }
-  .seg-row .col-dur { color: var(--text); white-space: nowrap; min-width: 60px; }
-  .seg-row .col-cut { color: var(--text-muted); font-size: 11px; }
-  .seg-row .col-pit { color: var(--text-dim); font-size: 11px; }
-  .seg-row.done { background: rgba(110, 231, 168, 0.05); }
-  .seg-row.done .col-dur { color: var(--green); }
-  .seg-row.current { background: var(--accent-glow); }
-  .seg-row.current .col-dur { color: var(--accent); }
-  .seg-row.current .col-dur::after { content: ' ●'; }
-  .seg-row.danger .col-dur { color: var(--red); }
+  /* The lap grid and aid station rows (.legs-grid, .seg-row): lib/race-theme.css,
+     shared with the crew page, which draws the same under each racer. */
 
   /* Leg log */
   /* Photos on a leg. Shut until asked for: a leg log is a table somebody is
@@ -460,20 +404,7 @@
   .leglog tr.empty td { color: var(--text-muted); font-style: italic; text-align: center; padding: 24px; }
   /* The station is what a row is now, so its name reads as the row's name. */
   .leglog .leg-seg { color: var(--text); font-size: 13px; display: block; }
-  .st-tag {
-    display: inline-block; margin-left: 5px; padding: 1px 5px; border-radius: 2px;
-    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
-    letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid currentColor;
-    vertical-align: 1px; white-space: nowrap;
-  }
-  .st-tag.cp     { color: var(--blue); }
-  .st-tag.nocrew { color: var(--red); }
-  .st-tag.bag    { color: var(--accent); }
-  .st-tag.pacer  { color: var(--green); }
-  /* A station that went by with no check-in, and the legs either side of it
-     shown as one time: on the first of them, with the rest pointing back. */
-  .st-tag.skip   { color: var(--yellow); }
-  .joined { color: var(--text-muted); font-weight: 400; font-size: 11px; }
+  /* .st-tag and .joined: lib/race-theme.css, shared with the crew page. */
 
   /* On a phone the columns do not fit: the segment name wraps to four lines
      and the last fuel metric falls off the right edge, and a race is free to
@@ -585,7 +516,7 @@
 <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
 <script src="lib/finish-card.js?v=8a2565f0"></script>
 <script src="lib/course-view.js?v=e062d140"></script>
-<script src="lib/race-core.js?v=905a4310"></script>
+<script src="lib/race-core.js?v=1dc75475"></script>
 <script>
   const slug = Race.qs('id');
 
@@ -685,15 +616,6 @@
     return cfg && cfg.courseType === 'loops' && !Race.course.hasLoopAid(cfg);
   }
 
-  function loopCellClass(durationSec, status) {
-    if (durationSec == null) return '';
-    if (status === 'onpace' || status === 'finished') return 'done';
-    // Without per-loop reference, fall back to runner overall status.
-    if (status === 'tight') return 'slow';
-    if (status === 'offpace') return 'danger';
-    return 'done';
-  }
-
   // On the race's own clock, as the race publishes them: "Sun 1:00 PM", and
   // the zone named once, so somebody watching from elsewhere knows whose
   // clock it is.
@@ -715,124 +637,8 @@
     `;
   }
 
-  function loopLegCells(runner, c) {
-    // A timed race: the laps run so far and the one under way or next.
-    const totalLoops = c.timed ? c.totalLegs : (cfg.course?.loopCount || 0);
-    return Array.from({ length: totalLoops }, (_, i) => {
-      const idx1 = i + 1;
-      const dur = c.legDurations[i];
-      const isCurrent = idx1 === c.legsDone + 1 && c.status !== 'notstarted' && c.legsDone < totalLoops;
-      let cls = '';
-      if (dur != null) cls = loopCellClass(dur, c.status);
-      if (isCurrent) cls = 'current';
-      // A lap whose end went by with no tap is one time with the lap after it.
-      const span = Race.skip.span(runner.legs, idx1);
-      const text = span
-        ? (idx1 === span.first ? Race.fmt.durationShort(span.sec) : `<span class="joined">with L${span.first}</span>`)
-        : dur != null
-        ? Race.fmt.durationShort(dur)
-        : (isCurrent ? '···' : '–');
-      // How they felt finishing the lap, if they said.
-      const lap = (runner.legs || []).find(l => l.index === idx1);
-      const face = lap && Race.feel.valid(lap.feelIn) ? Race.feel.svg(lap.feelIn, 12) : '';
-      // Which loop, when the course has more than one.
-      const def = Race.course.legAt(cfg, idx1);
-      const which = span ? ` title="${escapeHtml(`No tap at ${Race.skip.missed(cfg, span).join(', ')}: one time for laps ${span.first} to ${span.last}`)}"`
-        : def && def.loopName ? ` title="${escapeHtml(def.loopName)}, ${escapeHtml(Race.units.distance(def.distanceMi, cfg))}"` : '';
-      const tag = def && def.loopName ? `<span class="lp">${escapeHtml(def.loopName.replace(/^loop\s+/i, ''))}</span>` : '';
-      return `<div class="leg-cell ${cls}"${which}><span class="n">L${idx1}${tag}${face ? ' ' + face : ''}</span><span class="t">${text}</span></div>`;
-    }).join('');
-  }
-
-  // What waits at the end of a leg: a timing point with no aid, a stop the crew
-  // cannot drive to, a bag, a pacer. The crew's own notes (the lot, the walk-in,
-  // a pin to drop) are not here: they are for the people driving to it, and
-  // they live on the pit board, beside the racer the crew is meeting.
-  function stationTags(st) {
-    if (!st) return '';
-    const tags = [];
-    if (st.checkpoint) tags.push(['cp', 'Checkpoint']);
-    else if (!st.crewAccess) tags.push(['nocrew', 'No crew']);
-    if (st.dropBag) tags.push(['bag', 'Drop bag']);
-    if (st.pacerEligible) tags.push(['pacer', 'Pacer']);
-    return tags.length
-      ? ' ' + tags.map(([c, t]) => `<span class="st-tag ${c}">${escapeHtml(t)}</span>`).join('')
-      : '';
-  }
-
-  function segmentRows(runner, c) {
-    const segs = Race.course.legsFor(cfg, runner);
-    // The start is not a leg, so it has no row of its own, but a bag left there
-    // or a lot the crew parks in is worth saying before the race begins.
-    const st = Race.course.startAidTags(cfg);
-    // A start with only a crew note has nothing left to say here.
-    const startRow = !st || !stationTags(st) ? '' : `
-        <div class="seg-row start">
-          <span class="num">–</span>
-          <span class="nm">
-            ${escapeHtml(Race.stations.startName(cfg))}${stationTags(st)}
-            <div class="meta">Before the start</div>
-          </span>
-          <span class="col-dur"></span><span class="col-cut"></span><span class="col-pit"></span>
-        </div>`;
-    return startRow + segs.map((s, i) => {
-      const entry = (runner.legs || []).find(l => l.index === s.index);
-      const dur = entry && entry.startTime && entry.endTime
-        ? (new Date(entry.endTime) - new Date(entry.startTime)) / 1000 : null;
-      const isCurrent = entry && entry.startTime && !entry.endTime;
-      const isDone = dur != null;
-      // A station passed with no check-in: the time from the one before it
-      // to the one after is a single stretch, shown on its first leg.
-      const span = Race.skip.span(runner.legs, s.index);
-      let cls = '';
-      if (isDone) cls = 'done';
-      if (isCurrent) cls = 'current';
-      const cutoffText = s.arriveCutoffHours != null
-        ? Race.fmt.hoursToHm(s.arriveCutoffHours) : '–';
-      // Pit time after this segment: a finished gap, or the live pit if the
-      // runner is in the pit after this leg right now.
-      const nextEntry = (runner.legs || []).find(l => l.index === s.index + 1);
-      const pitDone = entry && entry.endTime && nextEntry && nextEntry.startTime
-        ? (new Date(nextEntry.startTime) - new Date(entry.endTime)) / 1000 : null;
-      const pitLive = entry && entry.endTime && c.inPit && c.liveLegIndex === s.index;
-
-      // Current-leg duration ticks every second via the .live-timer class.
-      const durCell = isCurrent
-        ? `<span class="col-dur live-timer" data-base="0" data-since="${entry.startTime}" data-fmt="short">${Race.fmt.durationShort(c.currentLegSeconds)}</span>`
-        : span
-        ? `<span class="col-dur">${s.index === span.first ? Race.fmt.durationShort(span.sec) : `<span class="joined">with ${span.first}</span>`}</span>`
-        : `<span class="col-dur">${isDone ? Race.fmt.durationShort(dur) : '–'}</span>`;
-
-      let pitCell = '<span class="col-pit"></span>';
-      if (entry && entry.skipped) {
-        // Nobody stopped there that anybody saw.
-      } else if (pitLive) {
-        pitCell = `<span class="col-pit"><span class="live-timer" data-base="0" data-since="${entry.endTime}" data-fmt="short">${Race.fmt.durationShort(c.currentPitSeconds)}</span> pit</span>`;
-      } else if (pitDone != null) {
-        pitCell = `<span class="col-pit">${Race.fmt.durationShort(pitDone)} pit</span>`;
-      }
-
-      // A row is the aid station this leg ends at: in and out of it on the
-      // race's clock, and the leg there as where it is from (Race.stations).
-      const inOut = entry && entry.endTime && !entry.skipped
-        ? `In ${Race.fmt.clockTime(entry.endTime, cfg)}${nextEntry && nextEntry.startTime ? ` · Out ${Race.fmt.clockTime(nextEntry.startTime, cfg)}` : ''}`
-        : '';
-      return `
-        <div class="seg-row ${cls}">
-          <span class="num">${s.index}</span>
-          <span class="nm">
-            ${escapeHtml(Race.stations.label(cfg, s.index))}${stationTags(Race.stationAt(cfg, s.index))}${entry && entry.skipped ? ' <span class="st-tag skip">No check-in</span>' : ''}
-            <div class="meta">${Race.units.distance(s.cumulativeMi, cfg)} · ${Race.units.distance(s.distanceMi, cfg)} from ${escapeHtml(Race.stations.fromLabel(cfg, s.index))}${s.elevationGainFt != null ? ` · +${Math.round(Race.units.elevationVal(s.elevationGainFt, cfg))}/-${Math.round(Race.units.elevationVal(Math.abs(s.elevationLossFt || 0), cfg))} ${Race.units.elevationLabel(cfg)}` : ''}</div>
-            ${inOut ? `<div class="meta in-out">${inOut}</div>` : ''}
-            ${span && s.index === span.first ? `<div class="meta skip-line">One time for legs ${span.first} to ${span.last}</div>` : ''}
-            ${Race.feel.pair(entry) ? `<div class="meta feel-line">${Race.feel.pair(entry)}</div>` : ''}
-          </span>
-          ${durCell}
-          <span class="col-cut">${cutoffText}</span>
-          ${pitCell}
-        </div>`;
-    }).join('');
-  }
+  // What waits at the end of a leg: now in Race.splits, shared with the crew page.
+  const stationTags = (st) => Race.splits.tags(st);
 
   // The leg log is four fixed columns (#, Done, Leg, Pit) plus one per tracked
   // fuel metric, so both live here rather than as a hardcoded 7 in three places.
@@ -1113,9 +919,7 @@
     // A loop with aid stations expands into per-segment legs, so it renders
     // like a segments course (each row already names its lap). Only a simple
     // lap-only loop uses the lap grid.
-    const legsBlock = isSimpleLoop()
-      ? `<div class="legs-grid">${loopLegCells(runner, c)}</div>`
-      : `<div class="seg-list">${segmentRows(runner, c)}</div>`;
+    const legsBlock = Race.splits.html(cfg, runner, c);
 
     // Distance covered against the whole course, which is what somebody
     // following along wants. A count of segments said how the course was

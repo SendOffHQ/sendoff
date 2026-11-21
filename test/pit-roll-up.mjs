@@ -67,18 +67,24 @@ const state = (id) => page.evaluate((id) => {
     button: shown(a.querySelector('.big-btn')),
     undo: shown(a.querySelector('[data-action="undo"]')),
     drop: shown(a.querySelector('[data-arm="stop"], [data-action="stop"]')),
-    where: shown(a.querySelector('.where')),
+    where: shown(a.querySelector('.where')), splits: shown(a.querySelector('.splits')),
     name: shown(a.querySelector('.runner-name')), badge: shown(a.querySelector('.state-badge')) };
 }, id);
 
 await open();
 console.log('\nthe name bar');
 ok('a card starts open', await state('bo'),
-  { rolled: false, expanded: 'true', button: true, undo: true, drop: true, where: true, name: true, badge: true });
+  { rolled: false, expanded: 'true', button: true, undo: true, drop: true, where: true, splits: true, name: true, badge: true });
+// The splits as the race page draws them (2026-11-21), under each racer.
+ok('with the racer\'s splits, drawn as the race page draws them', await page.evaluate(() => {
+  const a = document.querySelector('article.runner[data-runner="bo"] .splits');
+  return [a.querySelector('.splits-title').textContent.trim(), a.querySelectorAll('.seg-row').length > 2,
+    !!a.querySelector('.seg-row.current')];
+}), ['Aid stations', true, true]);
 await page.click('article[data-runner="bo"] .runner-name');
 // Asked for the same day: Undo and Dropped go too, and the big button stays.
 ok('a tap rolls it up to its name, badge and big button', await state('bo'),
-  { rolled: true, expanded: 'false', button: true, undo: false, drop: false, where: false, name: true, badge: true });
+  { rolled: true, expanded: 'false', button: true, undo: false, drop: false, where: false, splits: false, name: true, badge: true });
 ok('and leaves the other racer open', (await state('ann')).rolled, false);
 
 console.log('\nkept');

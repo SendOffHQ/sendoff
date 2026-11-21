@@ -876,3 +876,79 @@ label.field > .hint {
 .feel-face { display: inline-block; vertical-align: -3px; }
 .feel-tag { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;
   font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); }
+
+/* A racer's splits (Race.splits): the lap grid on a plain loop course and a
+   row per aid station otherwise. Drawn by the race page and, under each
+   racer, by the crew page. */
+/* Loops grid (Bloodroot style) */
+.legs-grid {
+  display: grid; grid-template-columns: repeat(10, 1fr);
+  gap: 6px; margin-bottom: 16px;
+}
+@media (max-width: 600px) { .legs-grid { grid-template-columns: repeat(5, 1fr); } }
+.leg-cell {
+  aspect-ratio: 1; background: var(--bg-elevated);
+  border: 1px solid var(--border); border-radius: 3px;
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+}
+.leg-cell .n { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+.leg-cell .n .lp { margin-left: 3px; color: var(--accent); }
+.leg-cell .t { font-size: 11px; font-weight: 700; }
+.leg-cell.done { background: rgba(110, 231, 168, 0.08); border-color: rgba(110, 231, 168, 0.4); }
+.leg-cell.done .t { color: var(--green); }
+.leg-cell.slow { background: rgba(255, 176, 122, 0.08); border-color: rgba(255, 176, 122, 0.4); }
+.leg-cell.slow .t { color: var(--yellow); }
+.leg-cell.danger { background: rgba(229, 72, 77, 0.08); border-color: rgba(229, 72, 77, 0.4); }
+.leg-cell.danger .t { color: var(--red); }
+.leg-cell.current { background: var(--accent-glow); border-color: var(--accent); }
+.leg-cell.current .t { color: var(--accent); }
+
+/* Segments timeline (Sangre-style) */
+.seg-list { display: flex; flex-direction: column; }
+.seg-row {
+  /* minmax(0, 1fr), not 1fr: a plain 1fr will not go narrower than the
+     longest thing in it that cannot wrap, and a long crew note (shown here
+     until 2026-10-04) used to push the whole row past the edge of a phone,
+     taking the leg time with it. */
+  display: grid; grid-template-columns: 32px minmax(0, 1fr) 80px 80px 80px;
+  gap: 10px; padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  align-items: center; font-size: 12px;
+}
+@media (max-width: 700px) {
+  .seg-row { grid-template-columns: 28px minmax(0, 1fr) auto; }
+  .seg-row .col-cut, .seg-row .col-pit { display: none; }
+}
+.seg-row:last-child { border-bottom: none; }
+.seg-row .num { font-family: 'JetBrains Mono', monospace; color: var(--accent); font-weight: 700; }
+.seg-row .nm { color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.seg-row .nm .meta { color: var(--text-muted); font-size: 11px; font-family: 'JetBrains Mono', monospace; }
+.seg-row .nm .feel-line { margin-top: 3px; display: flex; gap: 10px; }
+.seg-row .col-dur, .seg-row .col-cut, .seg-row .col-pit {
+  font-family: 'JetBrains Mono', monospace; text-align: right;
+}
+.seg-row .col-dur { color: var(--text); white-space: nowrap; min-width: 60px; }
+.seg-row .col-cut { color: var(--text-muted); font-size: 11px; }
+.seg-row .col-pit { color: var(--text-dim); font-size: 11px; }
+.seg-row.done { background: rgba(110, 231, 168, 0.05); }
+.seg-row.done .col-dur { color: var(--green); }
+.seg-row.current { background: var(--accent-glow); }
+.seg-row.current .col-dur { color: var(--accent); }
+.seg-row.current .col-dur::after { content: ' ●'; }
+.seg-row.danger .col-dur { color: var(--red); }
+.st-tag {
+  display: inline-block; margin-left: 5px; padding: 1px 5px; border-radius: 2px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid currentColor;
+  vertical-align: 1px; white-space: nowrap;
+}
+.st-tag.cp     { color: var(--blue); }
+.st-tag.nocrew { color: var(--red); }
+.st-tag.bag    { color: var(--accent); }
+.st-tag.pacer  { color: var(--green); }
+/* A station that went by with no check-in, and the legs either side of it
+   shown as one time: on the first of them, with the rest pointing back. */
+.st-tag.skip   { color: var(--yellow); }
+.joined { color: var(--text-muted); font-weight: 400; font-size: 11px; }
