@@ -70,6 +70,27 @@ await page.goto(BASE + `/print-report.html?id=${SLUG}`);
 await page.waitForSelector('#chart-cum line.cutoff', { timeout: 20000, state: 'attached' });
 ok('has them as well', (await lines()).count, 6);
 
+// Elevation per leg (2026-11-21): drawn when the course has elevation, on
+// the same leg axis as the pace, and left out when it has none.
+console.log('\nelevation per leg');
+await page.goto(BASE + `/charts.html?id=${SLUG}`);
+await page.waitForSelector('#chart-elev path.data-line', { timeout: 20000, state: 'attached' });
+const elev = await page.evaluate(() => {
+  const titles = [...document.querySelectorAll('.chart-title')].map(t => t.textContent);
+  const dots = document.querySelectorAll('#chart-elev circle.data-dot').length;
+  return { after: titles.indexOf('Elevation per leg') === titles.indexOf('Leg pace') + 1, dots };
+});
+const legsWithElev = (await api(CFG)).course.segments.filter(sg => sg.elevationGainFt != null || sg.elevationLossFt != null).length;
+ok('is drawn after the leg pace', elev.after, true);
+ok('a climb and a descent point for each leg', elev.dots, legsWithElev * 2);
+const flat = await api(CFG); delete flat.myRole;
+flat.course.segments = flat.course.segments.map(({ elevationGainFt, elevationLossFt, ...rest }) => rest);
+await api(CFG, flat);
+await page.goto(BASE + `/charts.html?id=${SLUG}`);
+await page.waitForSelector('#chart-leg-time', { timeout: 20000, state: 'attached' });
+await page.waitForTimeout(500);
+ok('and a course with no elevation has no such chart', await page.evaluate(() => !!document.querySelector('#chart-elev')), false);
+
 ok('no page errors', errs, []);
 await b.close(); srv.kill('SIGKILL');
 console.log(bad ? `\n${bad} failed\n` : '\nall good\n');
