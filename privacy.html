@@ -95,7 +95,7 @@
 </header>
 
 <main class="legal">
-<p class="updated">Last updated 17 November 2026</p>
+<p class="updated">Last updated 21 November 2026</p>
 <h2>The short version</h2>
 <p>SendOff stores what you type into it: your email address, your race, and what your crew logs.
   There is no analytics, no advertising, no third-party trackers, no cookies, and nothing is sold
@@ -343,18 +343,20 @@
 
 <h2 id="ai-crew">An AI as crew</h2>
 <p>Whoever can hand out access to a race can connect an AI assistant to it, such as Claude, as crew
-  for one racer. It is made from Manage access on the race's settings page, and that is where this
+  for one racer, or for every racer on the race. It is made from Manage access on the race's settings page, and that is where this
   is said first.</p>
 <p><strong>What it is sent.</strong> Every time the assistant asks, it is given that race's name,
   location, course, aid station names and notes, start and cutoffs, and that one racer's name,
   bib, splits, food, drink, one-tap items, notes and goals. Nothing about anybody else on the
-  race, and no email address. It is asked to look at the racer's new notes each time the racer
+  race, and no email address. A link made for every racer is sent the same for each racer on the
+  race, still with no email addresses. It is asked to look at the racer's new notes each time the racer
   talks to it, but SendOff never sends it anything on its own: it only gets what it asks for.</p>
 <p><strong>Who gets it.</strong> Whoever runs the assistant: Anthropic for Claude, OpenAI for
   ChatGPT, and so on. What they keep, for how long, and whether they use it to train their models
   is set by their terms and your settings with them, not by SendOff. The conversation with the
   assistant is theirs, not SendOff's, and SendOff never sees it.</p>
-<p><strong>What it can change.</strong> Food, drink, one-tap items and notes on that racer's legs.
+<p><strong>What it can change.</strong> Food, drink, one-tap items and notes on that racer's legs
+  (on a link for every racer, on the legs of whichever racer it names each time).
   Each line it writes says it came from the AI, and its numbers are kept as estimates and shown
   with a ~ until a person types the real one. It cannot check anybody in or out, or change the
   course, the roster or who can see the race.</p>
@@ -365,7 +367,8 @@
   the chat, so it is sent nothing more and can change nothing more, and in Claude it asks the racer's
   permission before it uses SendOff. If it shows data from a watch, that comes from a watch the
   racer connected to their assistant themselves; SendOff is not sent it.</p>
-<p><strong>The link.</strong> Connecting one makes a link that works for that race and racer only.
+<p><strong>The link.</strong> Connecting one makes a link that works for that race and racer only, or for that race and every
+  racer on it if that is what was chosen.
   SendOff keeps it, with who made it, when, and when it expires, until it is removed or expires:
   a week after the race's cutoff or a month after it was made, whichever is later. Removing it from
   Manage access stops it at once. Whoever has the link
@@ -502,6 +505,6 @@
     <span aria-hidden="true"> &middot; </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=89670abc"></script>
+<script src="lib/race-core.js?v=905a4310"></script>
 </body>
 </html>

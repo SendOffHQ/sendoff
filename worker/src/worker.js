@@ -30,7 +30,7 @@
 //     POST /access/add       { slug, email, role }                    → { people, editors, viewers }
 //     POST /access/remove    { slug, email }                          → { people, editors, viewers }
 //     POST /share/revoke     { token }                                 → { ok: true }
-//     POST /ai-crew          { slug, runnerId, label? }               → { token, url, expiresAt } (Pro)
+//     POST /ai-crew          { slug, runnerId | "*", label? }         → { token, url, expiresAt } (Pro; "*" crews every racer)
 //     GET  /ai-crew?slug=...                                           → { aiCrew: [...] }
 //     POST /ai-crew/revoke   { token }                                 → { ok: true }
 //     POST /mcp/<token>      MCP (JSON-RPC) for an AI invited as crew   → see src/ai-crew.js
@@ -6411,8 +6411,10 @@ async function handleAiCrewCreate(req, env) {
       code: 'plan_limit', limit: 'aiCrew', plan: ent.plan
     }, { status: 402 }, env, req);
   }
-  const runner = (cfg.runners || []).find(r => r && r.id === runnerId);
+  // aiCrew.ALL: one assistant crewing every racer on the race (2026-11-21).
+  const runner = runnerId === aiCrew.ALL ? { id: aiCrew.ALL } : (cfg.runners || []).find(r => r && r.id === runnerId);
   if (!runner) return json({ error: 'No such racer on this race' }, { status: 400 }, env, req);
+  if (runnerId === aiCrew.ALL && !(cfg.runners || []).length) return json({ error: 'This race has no racers yet' }, { status: 400 }, env, req);
   const have = await aiCrewForRace(env, slug);
   if (have.length >= AI_CREW_MAX_PER_RACE) {
     return json({ error: `A race can have ${AI_CREW_MAX_PER_RACE} AI crew at once. Remove one first.` }, { status: 400 }, env, req);
@@ -6446,7 +6448,8 @@ async function handleAiCrewList(req, env) {
   let list = [];
   try { list = await aiCrewForRace(env, slug); } catch (e) { list = null; }
   return json({ aiCrew: list && list.map(r => Object.assign({
-    label: r.label, runnerId: r.runnerId, runnerName: names[r.runnerId] || r.runnerId,
+    label: r.label, runnerId: r.runnerId,
+    runnerName: r.runnerId === aiCrew.ALL ? 'every racer' : (names[r.runnerId] || r.runnerId),
     createdAt: r.createdAt, expiresAt: r.expiresAt
   }, manager ? { token: r.token, url: aiCrewUrl(req, env, r.token) } : {})), canManage: manager }, {}, env, req);
 }
@@ -6593,8 +6596,10 @@ async function handleMcp(req, env, ctx, pathToken) {
     if (loaded) return loaded;
     const cfg = await loadRaceConfigNow(env, rec.slug);
     if (!cfg) throw new Error('This race no longer exists.');
-    const runner = (cfg.runners || []).find(r => r && r.id === rec.runnerId);
+    const all = rec.runnerId === aiCrew.ALL;
+    const runner = all ? { name: null } : (cfg.runners || []).find(r => r && r.id === rec.runnerId);
     if (!runner) throw new Error('The racer this AI crew was for is no longer on the race.');
+    if (all && !(cfg.runners || []).length) throw new Error('This race has no racers on it.');
     const ent = await raceOwnerEntitlements(env, cfg);
     if (!ent.aiCrew) throw new Error('AI crew is a Pro feature, and this race is no longer on Pro.');
     const data = await loadRaceDataNow(env, rec.slug);

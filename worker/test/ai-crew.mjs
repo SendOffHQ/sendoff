@@ -285,6 +285,43 @@ ok('the owner can', (await call('/ai-crew/revoke', { token: owner, body: { token
 ok('and the address stops working at once', (await rpc('tools/call', { name: 'race_status', arguments: {} })).status, 404);
 ok('and it is off the list', (await (await call('/ai-crew?slug=hen', { token: owner })).json()).aiCrew, []);
 
+// One assistant crewing every racer (2026-11-21): every tool takes the racer
+// by name, required wherever something is written, so nothing lands on the
+// wrong person by default.
+console.log('\na link for every racer');
+const allMade = await (await call('/ai-crew', { token: owner, body: { slug: 'hen', runnerId: '*', label: 'Team Claude' } })).json();
+ok('can be made', /\/mcp\//.test(allMade.url || ''), true);
+ok('and is listed as crew for every racer', (await (await call('/ai-crew?slug=hen', { token: crew })).json()).aiCrew
+  .filter(a => a.label === 'Team Claude').map(a => a.runnerName), ['every racer']);
+const allPath = new URL(allMade.url).pathname;
+const allTool = async (name, args) => {
+  const r = await rpc('tools/call', { name, arguments: args || {} }, 1, allPath);
+  const res = r.body.result;
+  return { error: res && res.isError ? res.content[0].text : null, data: res && res.structuredContent };
+};
+const allInit = await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '1' } }, 1, allPath);
+ok('is told it crews everybody, by name', /every racer at Hennepin Test 100 \(Pat, Sam\)/.test(allInit.body.result.instructions), true);
+const allTools = Object.fromEntries((await rpc('tools/list', {}, 1, allPath)).body.result.tools.map(t => [t.name, t.inputSchema]));
+ok('every tool takes the racer, by name', [allTools.log_item.properties.racer.enum, allTools.race_status.properties.racer.enum],
+  [['Pat', 'Sam'], ['Pat', 'Sam']]);
+ok('required to write, not to read', [allTools.log_item.required.includes('racer'), allTools.log_intake.required.includes('racer'),
+  allTools.add_note.required.includes('racer'), (allTools.race_status.required || []).includes('racer')], [true, true, true, false]);
+const everyone = (await allTool('race_status')).data;
+ok('race status with no racer is everybody', everyone.racers.map(r => r.racer.name), ['Pat', 'Sam']);
+ok('or one, by name in any case', (await allTool('race_status', { racer: 'sam' })).data.racer.name, 'Sam');
+const samBefore = JSON.stringify(dataOf('hen').runners.find(r => r.id === 'sam'));
+const patBefore = JSON.stringify(dataOf('hen').runners.find(r => r.id === 'pat'));
+const noWho = await allTool('log_item', { item: 'Gel' });
+ok('logging without a racer is refused, naming them', [!!noWho.error, /Pat, Sam/.test(noWho.error || '')], [true, true]);
+ok('and writes nothing', JSON.stringify(dataOf('hen').runners.find(r => r.id === 'sam')), samBefore);
+ok('nor does a racer who is not on the race', /No racer called "Kim"/.test((await allTool('add_note', { racer: 'Kim', text: 'hi' })).error || ''), true);
+const gel = await allTool('log_item', { racer: 'Sam', item: 'Gel' });
+ok('with a racer, it logs for them and says whom', [gel.error, gel.data && gel.data.racer], [null, 'Sam']);
+const samLeg = dataOf('hen').runners.find(r => r.id === 'sam').legs.find(l => l.index === 1);
+ok('on their leg', [samLeg.preset_0, samLeg.calories], [1, 150]);
+ok('and nobody else\'s', JSON.stringify(dataOf('hen').runners.find(r => r.id === 'pat')), patBefore);
+await call('/ai-crew/revoke', { token: owner, body: { token: allMade.token } });
+
 console.log('\nan owner who leaves Pro');
 const again = await (await call('/ai-crew', { token: owner, body: { slug: 'hen', runnerId: 'pat' } })).json();
 const again2 = new URL(again.url).pathname;

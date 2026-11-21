@@ -678,7 +678,8 @@ const server = http.createServer((req, res) => {
         return send(200, '{"ok":true}', 'application/json');
       }
       let cfg = {}; try { cfg = JSON.parse(raceFile(j.slug, 'config.json') || '{}'); } catch (e) {}
-      const r = (cfg.runners || []).find(x => x.id === j.runnerId);
+      // "*" crews every racer, as the worker allows.
+      const r = j.runnerId === '*' ? { id: '*', name: 'every racer' } : (cfg.runners || []).find(x => x.id === j.runnerId);
       if (!r) return send(400, '{"error":"No such racer on this race"}', 'application/json');
       const token = 'stubaicrew' + String(aiCrewLinks.length + 1).padStart(22, '0');
       const link = { slug: j.slug, token, url: `https://worker.example/mcp/${token}`, label: j.label || 'AI crew',

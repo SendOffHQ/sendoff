@@ -693,14 +693,53 @@ export function markRead(data, cfg, runnerId, args) {
 }
 
 // ---------- the tools ----------
+// A link made for every racer on the race (runnerId ALL, 2026-11-21) rather
+// than for one: one assistant crewing a whole team. Every tool then takes the
+// racer by name, required for anything that writes, so nothing is ever put on
+// the wrong person by default.
+export const ALL = '*';
+export function racerNames(cfg) {
+  return ((cfg && cfg.runners) || []).filter(r => r && r.id).map(r => String(r.name || r.id));
+}
+// Which racer a call means: the link's own, or for a link to every racer the
+// one named in `racer`, by name or id, in any case. Throws, listing the
+// racers, when it is missing or matches nobody.
+export function pickRacer(cfg, linkRunnerId, args, needed) {
+  if (linkRunnerId !== ALL) return linkRunnerId;
+  const runners = ((cfg && cfg.runners) || []).filter(r => r && r.id);
+  const asked = String((args && args.racer) || '').trim().toLowerCase();
+  if (!asked) {
+    if (!needed) return null;
+    throw new Error(`Say which racer: pass racer as one of ${racerNames(cfg).join(', ')}.`);
+  }
+  const hit = runners.filter(r => String(r.name || '').trim().toLowerCase() === asked || String(r.id).toLowerCase() === asked);
+  if (hit.length === 1) return hit[0].id;
+  throw new Error(hit.length
+    ? `More than one racer is called "${args.racer}". Pass their id instead: ${hit.map(r => r.id).join(', ')}.`
+    : `No racer called "${args.racer}" on this race. The racers: ${racerNames(cfg).join(', ')}.`);
+}
+
 export function tools(cfg, runnerId) {
+  const all = runnerId === ALL;
+  const names = racerNames(cfg);
+  const racer = { type: 'string', enum: names, description: 'Which racer this is for, by name.' };
+  const withRacer = (schema, required) => {
+    if (!all) return schema;
+    const out = { ...schema, properties: { racer, ...schema.properties } };
+    if (required) out.required = ['racer', ...(schema.required || [])];
+    return out;
+  };
   const ms = metrics(cfg);
   const amount = {};
   for (const m of ms) amount[m.key] = { type: 'number', description: `${m.label}, in ${m.unit || 'units'}. Negative to take back a mistake.` };
   const leg = { type: 'integer', minimum: 1, description: 'Which leg to put it on. Leave out for the leg the racer is on now (or the one that ended at the aid station they are standing in).' };
   const forNotes = { type: 'array', items: { type: 'string' }, description: 'The racer\'s note lines this turns into numbers, copied exactly from race_status or read_notes, so they are not handed to you again.' };
-  const items = itemLabels(cfg, runnerId).map(x => x.label);
-  return [
+  // For a link to every racer, every racer's items: log_item checks the one
+  // asked for against the racer named.
+  const items = all
+    ? [...new Set(((cfg && cfg.runners) || []).filter(r => r && r.id).flatMap(r => itemLabels(cfg, r.id).map(x => x.label)))]
+    : itemLabels(cfg, runnerId).map(x => x.label);
+  const list = [
     {
       name: 'race_status',
       title: 'Race status',
@@ -763,9 +802,27 @@ export function tools(cfg, runnerId) {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     }
   ];
+  if (!all) return list;
+  // The racer on every tool: optional where reading (left out, race_status
+  // and read_notes cover everybody), required wherever something is written.
+  const reads = new Set(['race_status', 'read_notes']);
+  return list.map(t => ({ ...t,
+    description: reads.has(t.name)
+      ? t.description + ` This link crews every racer (${names.join(', ')}): name one in racer, or leave it out for all of them.`
+      : t.description + ` This link crews every racer (${names.join(', ')}): racer says which one, and is required.`,
+    inputSchema: withRacer(t.inputSchema, !reads.has(t.name)) }));
 }
 
-export function instructions(cfg, runnerName) {
+export function instructions(cfg, runnerName, all) {
+  if (all) {
+    return `You are crew for every racer at ${(cfg && cfg.name) || 'a race'} (${racerNames(cfg).join(', ')}), through SendOff. ` +
+      'Whoever messages you tells you what a racer ate or drank, and you log it with your best estimate of the numbers so the crew, family and the race page see it. ' +
+      'Every tool takes racer, the racer\'s name: always pass it when logging, and if it is not clear who something was for, ask rather than guess. ' +
+      'Every time you are messaged, call race_status first (with no racer for everyone, or with the racer being talked about). ' +
+      'If it has notesToHandleFirst, those are lines a racer typed into SendOff, often with no signal: log them for that racer before you answer ' +
+      '(food and drink with log_intake or log_item, anything else with add_note or mark_notes_read, passing the lines in forNotes), then answer and say in a few words what you logged and for whom. ' +
+      'Use the aid station names race_status gives you. Keep replies short.';
+  }
   return `You are crew for ${runnerName || 'a racer'} at ${(cfg && cfg.name) || 'a race'}, through SendOff. ` +
     'The racer will tell you what they eat and drink, often in passing, and you log it with your best estimate of the numbers so their crew, family and the race page see it. ' +
     'Every time they message you, about anything, call race_status first. ' +
@@ -790,12 +847,12 @@ export async function handleRpc(msg, io) {
   switch (msg.method) {
     case 'initialize': {
       const asked = params.protocolVersion;
-      const { cfg, runnerName } = await io.load();
+      const { cfg, runnerName, runnerId } = await io.load();
       return reply({
         protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: 'sendoff-crew', title: 'SendOff crew', version: '1.0.0' },
-        instructions: instructions(cfg, runnerName)
+        instructions: instructions(cfg, runnerName, runnerId === ALL)
       });
     }
     case 'ping': return reply({});
@@ -808,19 +865,38 @@ export async function handleRpc(msg, io) {
       const text = (o) => ({ content: [{ type: 'text', text: JSON.stringify(o, null, 2) }], structuredContent: o });
       const err = (m) => ({ content: [{ type: 'text', text: m }], isError: true });
       try {
+        // A link to every racer: the racer named, or for a read with none
+        // named, everybody, each under their own name.
+        const everyone = (cfg) => ((cfg && cfg.runners) || []).filter(r => r && r.id);
         if (name === 'race_status') {
           const { cfg, data, runnerId } = await io.load();
-          return reply(text(raceStatus(cfg, data, runnerId, io.now && io.now())));
+          const who = pickRacer(cfg, runnerId, args, false);
+          if (runnerId === ALL && !who) {
+            return reply(text({ racers: everyone(cfg).map(r => raceStatus(cfg, data, r.id, io.now && io.now())),
+              howTo: 'This link crews every racer. Pass racer (their name) to every tool that logs anything.' }));
+          }
+          return reply(text(raceStatus(cfg, data, who, io.now && io.now())));
         }
         if (name === 'read_notes') {
           const { cfg, data, runnerId } = await io.load();
-          const notes = unreadNotes(cfg, data, runnerId, !!args.includeHandled);
-          return reply(text({ notes, howTo: notes.length ? 'Pass each line you handle in forNotes, or to mark_notes_read.' : 'Nothing new.' }));
+          const who = pickRacer(cfg, runnerId, args, false);
+          const howTo = (n) => n ? 'Pass each line you handle in forNotes, or to mark_notes_read.' : 'Nothing new.';
+          if (runnerId === ALL && !who) {
+            const byRacer = everyone(cfg).map(r => ({ racer: r.name || r.id, notes: unreadNotes(cfg, data, r.id, !!args.includeHandled) }))
+              .filter(x => x.notes.length);
+            return reply(text({ byRacer, howTo: byRacer.length ? howTo(1) + ' Pass the racer with each.' : howTo(0) }));
+          }
+          const notes = unreadNotes(cfg, data, who, !!args.includeHandled);
+          return reply(text({ notes, howTo: howTo(notes.length) }));
         }
         const writers = { log_intake: logIntake, log_item: logItem, add_note: addNote, mark_notes_read: markRead };
         if (writers[name]) {
-          const result = await io.write((data, cfg, runnerId) => writers[name](data, cfg, runnerId, args, io.now && io.now()));
-          return reply(text(result));
+          const { cfg, runnerId } = await io.load();
+          // Checked before writing, so a call naming nobody writes nothing.
+          const who = pickRacer(cfg, runnerId, args, true);
+          const result = await io.write((data, cfgNow) => writers[name](data, cfgNow, who, args, io.now && io.now()));
+          return reply(text(runnerId === ALL && result && typeof result === 'object' && !Array.isArray(result)
+            ? { racer: (everyone(cfg).find(r => r.id === who) || {}).name || who, ...result } : result));
         }
         return fail(-32602, `Unknown tool: ${name}`);
       } catch (e) {

@@ -127,6 +127,35 @@ await page.waitForTimeout(1500);
 const tapped = (await readData()).runners[0].legs.find(l => l.index === legShown);
 ok('a save that only adds a tapped item keeps the guess', tapped.aiEst, { calories: 200, sodiumMg: 400 });
 
+// One assistant for every racer (2026-11-21), from the same picker.
+console.log('\na link for every racer');
+const cfgAll = await page.evaluate(async (slug) => {
+  const r = await (await fetch(`/api/get?path=races/${slug}/config.json`, { headers: { Authorization: 'Bearer stub' } })).json();
+  return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(r.content), c => c.charCodeAt(0))));
+}, SLUG);
+delete cfgAll.myRole;
+const firstRacer = cfgAll.runners[0];
+cfgAll.runners = [firstRacer, { ...firstRacer, id: 'second', name: 'Second Racer', email: undefined }];
+await page.evaluate(async ([slug, c]) => fetch('/api/commit', { method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: 'Bearer stub' },
+  body: JSON.stringify({ path: `races/${slug}/config.json`, content: JSON.stringify(c), message: 'test' }) }), [SLUG, cfgAll]);
+await page.goto(BASE + `/settings.html?id=${SLUG}`);
+await page.waitForSelector('#access .access-head', { state: 'visible', timeout: 20000 });
+await page.click('#access .access-head');
+await page.waitForSelector('#ax-ai-runner', { timeout: 10000 });
+ok('the picker offers every racer', await page.$$eval('#ax-ai-runner option', o => o.map(x => x.textContent.trim())),
+  ['Crew for Test Racer', 'Crew for Second Racer', 'Crew for every racer']);
+const sent = [];
+page.on('request', r => { if (r.url().endsWith('/api/ai-crew') && r.method() === 'POST') sent.push(JSON.parse(r.postData()).runnerId); });
+await page.selectOption('#ax-ai-runner', '*');
+await page.fill('#ax-ai-label', 'Team Claude');
+await page.click('#ax-ai-make');
+await page.waitForSelector('#ax-ai-result .url', { timeout: 10000 });
+ok('making it asks for every racer', sent, ['*']);
+ok('the notice says every racer\'s data goes', /every racer's splits, food, drink, notes and goals/.test(dialogs.at(-1)), true);
+ok('and the link says whose it is', /crew for every racer/.test(await page.textContent('#ax-ai-result .ax-ai-what')), true);
+ok('with the racer named when talking to it', /by name/.test(await page.textContent('#ax-ai-result .ax-ai-steps')), true);
+
 ok('no page errors', errs, []);
 await b.close(); srv.kill('SIGKILL');
 console.log(bad ? `\n${bad} failed\n` : '\nall good\n');
