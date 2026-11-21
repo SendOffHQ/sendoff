@@ -71,6 +71,17 @@
     justify-content: space-between; align-items: center; gap: 12px;
     border-bottom: 1px solid var(--border);
   }
+  /* The name bar rolls a racer's card up to just itself, for a crew watching
+     several who only needs the one in front of them open. Remembered per
+     race on this device. Still says where they are: the badge stays. */
+  .runner-head { cursor: pointer; }
+  .runner-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .runner-head .roll { display: flex; align-items: center; gap: 10px; }
+  .runner-caret { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted);
+    transition: transform 0.15s ease; }
+  .runner.rolled .runner-caret { transform: rotate(-90deg); }
+  .runner.rolled > :not(.runner-head) { display: none; }
+  .runner.rolled .runner-head { border-bottom: 0; padding-bottom: 16px; }
   .runner-name {
     font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; font-size: 24px;
     font-weight: 600; letter-spacing: -0.02em;
@@ -1208,6 +1219,10 @@
     await load();
   }
 
+  // Racers whose cards are rolled up; see toggleRoll.
+  const ROLL_KEY = 'pit-rolled:' + slug;
+  const rolled = new Set();
+  try { (JSON.parse(localStorage.getItem(ROLL_KEY) || '[]') || []).forEach(id => rolled.add(String(id))); } catch (e) {}
   function renderRunner(runner) {
     const next = Race.compute.nextActionFor(runner, cfg);
     let stateClass = next.state === 'on-course' ? 'course' :
@@ -1382,10 +1397,14 @@
     `;
 
     return `
-      <article class="runner ${stateClass}" style="--runner-color: ${Race.safeColor(runner.color, 'var(--accent)')};" data-runner="${runner.id}">
-        <div class="runner-head">
+      <article class="runner ${stateClass}${rolled.has(runner.id) ? ' rolled' : ''}" style="--runner-color: ${Race.safeColor(runner.color, 'var(--accent)')};" data-runner="${runner.id}">
+        <div class="runner-head" role="button" tabindex="0" data-roll="${escapeAttr(runner.id)}"
+          aria-expanded="${rolled.has(runner.id) ? 'false' : 'true'}">
           <div class="runner-name">${escapeHtml(runner.name)}</div>
-          <div class="state-badge state-${stateClass}">${stateLabel}</div>
+          <div class="roll">
+            <div class="state-badge state-${stateClass}">${stateLabel}</div>
+            <span class="runner-caret" aria-hidden="true">&#9662;</span>
+          </div>
         </div>
         <div class="where">${whereLine(runner, next)}${stopLine(next, runner)}</div>
         <div class="state-timer" data-since="${since}"${done ? ` data-elapsed="${finishedSec}"` : ''}>
@@ -1552,6 +1571,31 @@
     updateLastUpdatedLabel();
     if (Race.course.isBackyard(cfg)) writeBellStarts();
   }
+
+  // ---------- rolling a racer's card up ----------
+  // Toggled on the page as it stands rather than by a redraw, so a roll never
+  // touches typing in another card's intake panel. renderRunner draws from
+  // the same set, so the next redraw agrees.
+  function toggleRoll(head) {
+    const id = head.dataset.roll;
+    const card = head.closest('article.runner');
+    if (!id || !card) return;
+    if (rolled.has(id)) rolled.delete(id); else rolled.add(id);
+    const on = rolled.has(id);
+    card.classList.toggle('rolled', on);
+    head.setAttribute('aria-expanded', on ? 'false' : 'true');
+    try { localStorage.setItem(ROLL_KEY, JSON.stringify([...rolled])); } catch (e) {}
+  }
+  document.getElementById('runners').addEventListener('click', (e) => {
+    const head = e.target.closest('[data-roll]');
+    if (head) toggleRoll(head);
+  });
+  document.getElementById('runners').addEventListener('keydown', (e) => {
+    const head = e.target.closest('[data-roll]');
+    if (!head || e.target !== head || (e.key !== 'Enter' && e.key !== ' ')) return;
+    e.preventDefault();
+    toggleRoll(head);
+  });
 
   // ---------- whose racers ----------
   // On a race with several athletes, each crew looks after some of them. A
