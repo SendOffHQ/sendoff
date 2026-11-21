@@ -1,8 +1,9 @@
 // A racer's card on the crew page rolls up to its name bar (2026-11-21), for
 // a crew looking after several racers who only needs the one in front of
 // them open. This checks that:
-//   - tapping the name bar rolls the card up and back, keeping the name and
-//     where-they-are badge on show;
+//   - tapping the name bar rolls the card up and back, keeping the name, the
+//     where-they-are badge and the big Check in / Send off button on show,
+//     and hiding the rest, Undo and Dropped included;
 //   - it stays rolled through a refresh and a reload, per race on the device;
 //   - the keyboard can do it (Enter and Space), as DESIGN.md asks of a fold;
 //   - rolling one card up does not touch typing in another card's panel.
@@ -64,14 +65,20 @@ const state = (id) => page.evaluate((id) => {
   return { rolled: a.classList.contains('rolled'),
     expanded: a.querySelector('[data-roll]').getAttribute('aria-expanded'),
     button: shown(a.querySelector('.big-btn')),
+    undo: shown(a.querySelector('[data-action="undo"]')),
+    drop: shown(a.querySelector('[data-arm="stop"], [data-action="stop"]')),
+    where: shown(a.querySelector('.where')),
     name: shown(a.querySelector('.runner-name')), badge: shown(a.querySelector('.state-badge')) };
 }, id);
 
 await open();
 console.log('\nthe name bar');
-ok('a card starts open', await state('bo'), { rolled: false, expanded: 'true', button: true, name: true, badge: true });
+ok('a card starts open', await state('bo'),
+  { rolled: false, expanded: 'true', button: true, undo: true, drop: true, where: true, name: true, badge: true });
 await page.click('article[data-runner="bo"] .runner-name');
-ok('a tap rolls it up to its name and badge', await state('bo'), { rolled: true, expanded: 'false', button: false, name: true, badge: true });
+// Asked for the same day: Undo and Dropped go too, and the big button stays.
+ok('a tap rolls it up to its name, badge and big button', await state('bo'),
+  { rolled: true, expanded: 'false', button: true, undo: false, drop: false, where: false, name: true, badge: true });
 ok('and leaves the other racer open', (await state('ann')).rolled, false);
 
 console.log('\nkept');
