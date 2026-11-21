@@ -124,5 +124,22 @@ console.log('\nbefore a timed race starts');
 const early = { ...timed, startTime: new Date(Date.now() + 15 * H).toISOString(), cutoffs: { totalHours: 30 } };
 ok('the time left is the race, not the wait as well', Race.compute.runner({ id: 'r', legs: [] }, early).timeLeftSec / 3600, 30);
 
+// The map's dot on the first leg (Dinosaur Valley 100K, 2026-11-21): with no
+// finished leg there is no pace, and every racer sat at the start until the
+// first check-in. Now their goal places them, or three quarters of the cutoff.
+console.log('\nwhere the map puts somebody on the first leg');
+const onLeg1 = { legs: [{ index: 1, startTime: new Date(Date.now() - H).toISOString() }] };
+const mi = r => +Race.compute.predictedMileage(r, race).courseMi.toFixed(2);
+ok('not at the start an hour in', mi({ id: 'r', ...onLeg1 }) > 0, true);
+// 30h cutoff, 100 mi: 0.75 x 30h is 810 s a mile, so an hour is 4.44 mi.
+ok('with no goal, at three quarters of the cutoff pace', mi({ id: 'r', ...onLeg1 }), 4.44);
+// A 20 hour goal over 100 mi is 12 minutes a mile: 5 mi in an hour.
+ok('with a goal, at the goal\'s pace', mi({ id: 'r', goal: { hours: 20 }, ...onLeg1 }), 5);
+// Once a leg is done, their own pace: 10 mi in 2h, then an hour into leg 2.
+const own = { id: 'r', goal: { hours: 20 }, legs: [
+  { index: 1, startTime: new Date(Date.now() - 3 * H).toISOString(), endTime: new Date(Date.now() - H).toISOString() },
+  { index: 2, startTime: new Date(Date.now() - H).toISOString() }] };
+ok('and their own pace once they have one', mi(own), 15);
+
 console.log(bad ? `\n${bad} failed\n` : '\nall good\n');
 process.exit(bad ? 1 : 0);
