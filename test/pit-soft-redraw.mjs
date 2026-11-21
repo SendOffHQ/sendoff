@@ -131,6 +131,37 @@ ok('files the note and the item under the station it was typed for',
 ok('and the board is whole again', await until(() => page.evaluate(() =>
   [...document.querySelectorAll('#runners [data-intake]')].every(el => el.value === (el.dataset.rendered ?? '')))), true);
 
+// Found at Dinosaur Valley 100K (2026-11-21), four racers: typing in any card
+// but the first lost the focus on every poll, and on a phone the keyboard
+// with it. Putting the board back in order moved the kept card past the new
+// one above it, and a moved field is blurred. Everything above types in
+// Ann's, the first card, which is why it was never seen here.
+console.log('\ntyping in the second racer\'s card');
+const BONOTE = 'article[data-runner="bo"] textarea[data-intake="notes"]';
+await page.waitForSelector(BONOTE);
+await page.click(BONOTE);
+await page.keyboard.type('Blister, left heel');
+await page.evaluate((sel) => { window.__bonote = document.querySelector(sel); }, BONOTE);
+const boTyping = () => page.evaluate((sel) => {
+  const t = document.querySelector(sel);
+  return { value: t.value, focused: document.activeElement === t, same: t === window.__bonote };
+}, BONOTE);
+// Somebody else moves Ann on, so her card, above Bo's, is the one redrawn.
+const d2 = await api(DATA);
+const annLegs = d2.runners.find(r => r.id === 'ann').legs;
+const annOpen = annLegs.find(l => l.startTime && !l.endTime);
+if (annOpen) annOpen.endTime = new Date().toISOString();
+else annLegs.push({ index: Math.max(...annLegs.map(l => l.index)) + 1, startTime: new Date().toISOString() });
+await api(DATA, d2);
+const annBefore2 = await card('ann');
+await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+ok('a poll redraws the card above it', !!(await until(async () => {
+  const c = await card('ann'); return c.button !== annBefore2.button ? c : null; }, 120)), true);
+ok('and the keyboard stays: same box, cursor still in it', await boTyping(),
+  { value: 'Blister, left heel', focused: true, same: true });
+await page.keyboard.type(', taped');
+ok('so typing carries on', (await boTyping()).value, 'Blister, left heel, taped');
+
 ok('no page threw', errs, []);
 await b.close();
 console.log(bad ? `\n${bad} failed\n` : '\nall passed\n');

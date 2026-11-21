@@ -1540,14 +1540,29 @@
         want.push(node);
       }
     }
-    // Into order. A kept card that is already in its place is not moved.
-    for (const c of [...box.childNodes]) if (c.nodeType !== 1) c.remove();
-    let cursor = box.firstElementChild;
-    for (const n of want) {
-      if (n === cursor) { cursor = cursor.nextElementSibling; continue; }
-      box.insertBefore(n, cursor);
+    // Into order, without ever moving a kept card. This used to walk the
+    // board inserting each node before a cursor, which for a kept card below
+    // a replaced one meant insertBefore on the kept card itself: a move, and
+    // a moved field loses its focus. On a phone that shut the keyboard on
+    // every poll for whoever was typing in any card but the first (found at
+    // Dinosaur Valley 100K, 2026-11-21, four racers). Now everything that is
+    // not kept goes, and the new cards are put in around the kept ones.
+    const kept = want.filter(n => n.parentNode === box);
+    const inOrder = kept.every((n, k) => !k ||
+      (kept[k - 1].compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING));
+    for (const c of [...box.childNodes]) if (!kept.includes(c)) c.remove();
+    if (!inOrder) {
+      // The racers themselves were reordered under a kept card, which is
+      // rare enough that losing the focus once is the honest cost.
+      for (const n of want) box.appendChild(n);
+      return;
     }
-    while (cursor) { const next = cursor.nextElementSibling; cursor.remove(); cursor = next; }
+    let prev = null;
+    for (const n of want) {
+      if (kept.includes(n)) { prev = n; continue; }
+      if (prev) prev.after(n); else box.prepend(n);
+      prev = n;
+    }
   }
 
   function render(force) {
