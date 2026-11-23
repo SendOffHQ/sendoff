@@ -144,12 +144,17 @@
     padding: 8px 10px; text-transform: none; letter-spacing: 0;
   }
   .search-control input { width: 190px; }
+  /* display:flex above would beat the hidden attribute: a filter with only
+     one kind of race to offer is not drawn. */
+  .sort-control[hidden] { display: none; }
   .search-control input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .search-control input::placeholder { color: var(--text-muted); }
   /* Filters own the row once they stop fitting beside the New race button. */
   @media (max-width: 700px) {
     .hub-filters { margin-left: 0; width: 100%; }
     .search-control, .sort-control { flex: 1 1 100%; }
+    /* Type and discipline share a row on a phone. */
+    .sort-control:has(#race-type), .sort-control:has(#race-disc) { flex: 1 1 40%; }
     .search-control input, .sort-control select { flex: 1; min-width: 0; }
   }
   .no-matches {
@@ -419,6 +424,35 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     );
   }
 
+  // Race type and discipline (2026-11-23). Race type in the words the cards
+  // use; discipline by activity group, as the profile page filters, with a
+  // race from before activities existed counted as on foot, which every one
+  // of them was. Each select lists only what the races loaded have, and is
+  // hidden when they are all the same.
+  const TYPE_KEY = 'race-hub-type-v1', DISC_KEY = 'race-hub-disc-v1';
+  const TYPES = [['segments', 'Segments'], ['loops', 'Loops'], ['timed', 'Timed'], ['backyard', 'Backyard']];
+  function typeOf(r) {
+    if (r.format === 'backyard') return 'backyard';
+    if (r.format === 'timed') return 'timed';
+    return r.courseType === 'loops' ? 'loops' : 'segments';
+  }
+  const disciplineOf = r => Race.archive.familyOf(r.activity);
+  function facetOptions(sel, pairs, of, key) {
+    if (!sel) return;
+    const have = new Set(loadedRaces.map(of));
+    const opts = pairs.filter(([k]) => have.has(k));
+    sel.closest('label').hidden = opts.length < 2;
+    sel.innerHTML = '<option value="">All</option>' +
+      opts.map(([k, label]) => `<option value="${k}">${escapeHtml(label)}</option>`).join('');
+    let saved = '';
+    try { saved = localStorage.getItem(key) || ''; } catch (e) {}
+    sel.value = opts.some(([k]) => k === saved) ? saved : '';
+  }
+  function facetValue(id) {
+    const el = document.getElementById(id);
+    return el && !el.closest('label').hidden ? el.value : '';
+  }
+
   function renderCard(r) {
     const status = raceStatus(r);
     const finished = status === 'finished';
@@ -473,10 +507,18 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     localStorage.setItem(SORT_KEY, sel.value);
     const search = document.getElementById('race-search');
     const q = search ? search.value : '';
-    const shown = sortRaces(filterRaces(loadedRaces, q), sel.value);
+    const type = facetValue('race-type'), disc = facetValue('race-disc');
+    try { localStorage.setItem(TYPE_KEY, type); localStorage.setItem(DISC_KEY, disc); } catch (e) {}
+    const picked = loadedRaces.filter(r => (!type || typeOf(r) === type) && (!disc || disciplineOf(r) === disc));
+    const shown = sortRaces(filterRaces(picked, q), sel.value);
+    // Saying what is narrowing it, since a filter left on from last time is
+    // the easiest one to forget.
+    const what = [q.trim() && `“${escapeHtml(q.trim())}”`,
+      type && escapeHtml((TYPES.find(t => t[0] === type) || [])[1] || type),
+      disc && escapeHtml(Race.archive.FAMILIES[disc] || disc)].filter(Boolean).join(', ');
     document.getElementById('cards').innerHTML = shown.length
       ? shown.map(renderCard).join('')
-      : `<div class="no-matches">No races match “${escapeHtml(q.trim())}”.</div>`;
+      : `<div class="no-matches">No races match ${what}.</div>`;
   }
 
   function escapeHtml(s) {
@@ -551,6 +593,12 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
                 <input type="search" id="race-search" placeholder="Name, place or racer"
                        autocomplete="off" spellcheck="false" aria-label="Search races" />
               </label>
+              <label class="sort-control" hidden>Type
+                <select id="race-type" aria-label="Race type"></select>
+              </label>
+              <label class="sort-control" hidden>Discipline
+                <select id="race-disc" aria-label="Discipline"></select>
+              </label>
               <label class="sort-control">Sort
                 <select id="sort-mode">
                   <option value="status">Live / upcoming / past</option>
@@ -567,6 +615,10 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
         const saved = localStorage.getItem(SORT_KEY) || 'status';
         if ([...sel.options].some(o => o.value === saved)) sel.value = saved;
         sel.addEventListener('change', renderList);
+        facetOptions(document.getElementById('race-type'), TYPES, typeOf, TYPE_KEY);
+        facetOptions(document.getElementById('race-disc'), Object.entries(Race.archive.FAMILIES), disciplineOf, DISC_KEY);
+        document.getElementById('race-type').addEventListener('change', renderList);
+        document.getElementById('race-disc').addEventListener('change', renderList);
         const search = document.getElementById('race-search');
         search.addEventListener('input', renderList);
         // Escape clears rather than leaving a filter you have to hunt for.

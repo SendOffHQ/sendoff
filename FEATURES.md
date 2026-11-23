@@ -93,6 +93,7 @@ optional Cloudflare Worker auth proxy.
 
 ## Hub
 - Race list home page (`index.html`); auto-tags races as done when complete
+- Race type and discipline filters on the hub (2026-11-23): Type (Segments, Loops, Timed, Backyard, the cards' words) and Discipline (by activity group: On foot, Bike, Paddle and so on; a race with no activity counts as on foot), each listing only what the hub's races have and not drawn when they are all the same; with the search, kept for the next visit, and a no-match line that says what is narrowing it. `test/hub-filters.mjs`.
 - Share links for read-only access
 - Demo race at `/try`, linked from the home page: the real racer screen, crew page and race page side by side (tabs on a phone), running a race that lives only in the visitor's browser. `lib/demo.js` answers the pages' worker calls from localStorage under its own prefix, stands in for the live push with a BroadcastChannel, keeps the demo inside its three pages, and never touches a real sign-in. Seeded from `demo/seed.json` (the Sangre de Cristo course, a made-up racer) with times relative to the visit; Reset starts over, and so does six hours untouched. `test/try-demo.mjs`.
 - Search engines: every canonical tag names the address that serves (`/privacy`, not `/privacy.html`), public races are listed at `/race?id=<slug>` in `sitemap.xml` (written by `tools/make-og.py`) with `robots.txt` pointing at it, and an unlisted or private race asks not to be indexed. `test/search-tags.mjs`.
