@@ -58,6 +58,11 @@ const reactionsOf = (id, who) => {
 const RESULTS = { bySlug: {}, manual: [], notMine: [] };
 let googleOn = false, facebookOn = false;
 const authLinks = { google: null, facebook: null };
+// Paying for Pro: off as shipped, the way the real worker is. /api/billing-on
+// and /api/billing-subscribed stand in for BILLING being set and for Stripe
+// having confirmed a payment. A checkout sends the page straight back to the
+// profile with billing=done, as Stripe would after paying.
+let billingState = 'off', lastBillingAsk = null;
 // Usernames: this stub's own, and a small directory of other people. The
 // worker's rules are tested against the worker; here 'taken' is taken.
 const myHandle = { username: null, findable: true, nextChangeAt: null };
@@ -251,6 +256,27 @@ const server = http.createServer((req, res) => {
   // The Account box's sign-in methods. The worker's rules are tested against
   // the worker; here a credential or token is a word: 'good' is this
   // account's, 'other' carries another address.
+  if (url.pathname === '/api/billing-on') { billingState = 'on'; return send(200, '{"ok":true}'); }
+  if (url.pathname === '/api/billing-subscribed') { billingState = 'subscribed'; return send(200, '{"ok":true}'); }
+  if (url.pathname === '/api/billing' && req.method === 'GET') {
+    if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
+    const sub = billingState === 'subscribed';
+    return send(200, JSON.stringify(billingState === 'off'
+      ? { enabled: false, canSubscribe: false, canManage: false, intervals: [], plan: 'pro', paid: false, subscription: null }
+      : { enabled: true, canSubscribe: !sub, canManage: sub, intervals: ['month', 'year'], plan: sub ? 'pro' : 'free', paid: sub,
+          subscription: sub ? { status: 'active', interval: 'month', currentPeriodEnd: '2026-12-23T00:00:00Z', cancelAtPeriodEnd: false } : null }), 'application/json');
+  }
+  if (url.pathname === '/api/billing/checkout' || url.pathname === '/api/billing/portal') {
+    let body = '';
+    req.on('data', c => { body += c; });
+    return req.on('end', () => {
+      if (billingState === 'off') return send(404, '{"error":"Not found"}', 'application/json');
+      let j = {}; try { j = JSON.parse(body || '{}'); } catch (e) {}
+      lastBillingAsk = { path: url.pathname, interval: j.interval || null };
+      send(200, JSON.stringify({ url: url.pathname.endsWith('checkout') ? '/profile.html?billing=done' : '/profile.html' }), 'application/json');
+    });
+  }
+  if (url.pathname === '/api/billing-last') return send(200, JSON.stringify(lastBillingAsk), 'application/json');
   if (url.pathname === '/api/auth-links' && req.method === 'GET') {
     if (!req.headers.authorization) return send(401, '{"error":"Unauthorized"}', 'application/json');
     return send(200, JSON.stringify({ email: ME, password: true, google: authLinks.google, facebook: authLinks.facebook,

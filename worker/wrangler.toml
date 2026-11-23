@@ -36,6 +36,14 @@ GITHUB_BRANCH = "main"
 # change. A promise that is quietly too generous is the survivable direction;
 # one that is quietly too narrow is not.
 ADMIN_RACE_ACCESS = "true"
+# Paying for Pro through Stripe (src/billing.js). "off" until it is turned on:
+# "admins" shows it only to site admins, for trying it with test keys first,
+# and "on" to everybody. Needs the STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET
+# secrets and the price ids below. Steps in ROADMAP.md under Billing.
+BILLING = "off"
+# STRIPE_PRICE_MONTHLY = "price_..."
+# STRIPE_PRICE_YEARLY = "price_..."
+# STRIPE_TAX = "true"
 # Sign in with Google: the OAuth client ID ID tokens must be issued for. Not
 # a secret (Google shows it in the button on every page). Empty turns Google
 # sign-in off and the button is not drawn. See worker/src/worker.js,

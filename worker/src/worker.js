@@ -15,6 +15,10 @@
 //     POST /accept-account-invite { token, password }                   → { token, email, role, expiresAt }
 //     GET  /accounts                                                    → { accounts, pendingInvites } (admin only)
 //     POST /account/delete   { email }                                  → { ok: true } (admin only, KV accounts)
+//     GET  /billing                                                     → { enabled, canSubscribe, canManage, plan, subscription }
+//     POST /billing/checkout { interval: "month"|"year" }               → { url } (Stripe Checkout; off unless BILLING is set)
+//     POST /billing/portal                                              → { url } (Stripe customer portal)
+//     POST /stripe/webhook   (Stripe, signed)                           → "ok" (only with STRIPE_WEBHOOK_SECRET)
 //     GET  /account-races?email=...                                     → { races } (admin only)
 //
 //   Race file IO (session required; reads honour share-token query)
@@ -85,6 +89,7 @@ const RESET_TTL_DAYS = 2;
 export { RaceHub } from './race-hub.js';
 import { RaceHub as _RaceHub } from './race-hub.js';
 import * as aiCrew from './ai-crew.js';
+import * as billing from './billing.js';
 import { nameProblems } from './moderation.js';
 
 // ---------- live push ----------
@@ -397,6 +402,7 @@ async function lookupUser(env, email) {
         const u = JSON.parse(raw);
         return { email, hash: u.hash, salt: u.salt, iterations: u.iterations,
                  role: u.role || 'crew', plan: u.plan || DEFAULT_PLAN,
+                 paidPlan: u.paidPlan || null,
                  earlyAccess: u.earlyAccess !== false,
                  sessionEpoch: +u.sessionEpoch || 0, source: 'kv' };
       } catch (e) {}
@@ -657,8 +663,12 @@ const DEFAULT_PLAN = 'pro';
 const GRANDFATHERED = ['privateRaces', 'shareLinks'];
 
 function entitlementsFor(user) {
-  const plan = (user && PLANS[user.plan]) ? user.plan : DEFAULT_PLAN;
-  const out = Object.assign({ plan }, PLANS[plan]);
+  // A plan paid for through Stripe (billing.js) wins over the one an admin
+  // set, and stops counting the moment the subscription does: the admin's
+  // plan is what is left underneath, untouched by either.
+  const paid = !!(user && user.paidPlan && PLANS[user.paidPlan]);
+  const plan = paid ? user.paidPlan : (user && PLANS[user.plan]) ? user.plan : DEFAULT_PLAN;
+  const out = Object.assign({ plan }, PLANS[plan], paid ? { paid: true } : {});
   if (user && user.earlyAccess) {
     for (const k of GRANDFATHERED) out[k] = true;
     out.earlyAccess = true;
@@ -2876,6 +2886,16 @@ async function handleAccountDelete(req, env) {
   try { envUsers = JSON.parse(env.USERS || '[]'); } catch (e) { envUsers = []; }
   if (envUsers.some(u => normalizeEmail(u.email || u.username) === email)) {
     return json({ error: 'This account is in the USERS list: remove it with `wrangler secret put USERS`.' }, { status: 400 }, env, req);
+  }
+  // A subscription still running would go on charging an account that no
+  // longer exists. Cancelled first, in Stripe, where the money is.
+  const bill = await readBilling(env, email);
+  if (bill && billing.paidStatus(bill.status)) {
+    return json({ error: 'This account has a paid subscription. Cancel it in Stripe first, then delete the account.' }, { status: 409 }, env, req);
+  }
+  if (bill) {
+    await env.AUTH_KV.delete('billing:' + email);
+    if (bill.customerId) await env.AUTH_KV.delete('stripecust:' + bill.customerId);
   }
   await env.AUTH_KV.delete('user:' + email);
   await env.AUTH_KV.delete('profile:' + email);
@@ -7533,6 +7553,142 @@ function raceDeletedMail(env, name, reason) {
   };
 }
 
+// ---------- billing (Stripe) ----------
+// Built 2026-11-23 and switched off: see src/billing.js for what each setting
+// does and ROADMAP.md for turning it on. Nothing here charges anybody unless
+// BILLING is set and the Stripe keys are in place.
+async function readBilling(env, email) {
+  if (!env.AUTH_KV || !email) return null;
+  const raw = await env.AUTH_KV.get('billing:' + normalizeEmail(email));
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
+function billingBase(env) {
+  return (env.PUBLIC_BASE_URL || 'https://sendoff.run').replace(/\/+$/, '');
+}
+
+// What the account page needs: whether to offer anything at all, the plan
+// now, and the subscription if there is one. A person with a subscription
+// always sees it, even with billing switched back off, so they can manage it.
+async function handleBillingGet(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  const email = normalizeEmail(session.email);
+  const user = await lookupUser(env, email);
+  const bill = await readBilling(env, email);
+  const open = billing.openTo(env, session);
+  const ent = entitlementsFor(user);
+  return json({
+    enabled: open || !!bill,
+    canSubscribe: open && !!user && user.source === 'kv' && !(bill && billing.paidStatus(bill.status)),
+    canManage: !!(bill && bill.customerId && env.STRIPE_SECRET_KEY),
+    intervals: open ? Object.keys(billing.prices(env)) : [],
+    plan: ent.plan, paid: !!ent.paid,
+    subscription: bill ? { status: bill.status, interval: bill.interval, currentPeriodEnd: bill.currentPeriodEnd,
+      cancelAtPeriodEnd: !!bill.cancelAtPeriodEnd } : null
+  }, {}, env, req);
+}
+
+async function handleBillingCheckout(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  if (!billing.openTo(env, session)) return json({ error: 'Not found' }, { status: 404 }, env, req);
+  let body = {};
+  try { body = await req.json(); } catch (e) {}
+  const interval = body && body.interval === 'year' ? 'year' : 'month';
+  if (!billing.prices(env)[interval]) return json({ error: `No ${interval}ly price is set up` }, { status: 400 }, env, req);
+  const email = normalizeEmail(session.email);
+  const user = await lookupUser(env, email);
+  if (!user || user.source !== 'kv') {
+    return json({ error: 'This account has no stored record to put a plan on.' }, { status: 400 }, env, req);
+  }
+  const bill = await readBilling(env, email);
+  if (bill && billing.paidStatus(bill.status)) {
+    return json({ error: 'You are already on Pro. Manage it from the account page.' }, { status: 409 }, env, req);
+  }
+  try {
+    const s = await billing.stripe(env, 'checkout/sessions',
+      billing.checkoutBody(env, { email, customerId: bill && bill.customerId, interval, base: billingBase(env) }));
+    return json({ url: s.url }, {}, env, req);
+  } catch (err) { return json({ error: err.message }, { status: err.status || 502 }, env, req); }
+}
+
+async function handleBillingPortal(req, env) {
+  const session = await requireAuth(req, env);
+  if (!session || !session.email) return json({ error: 'Unauthorized' }, { status: 401 }, env, req);
+  const bill = await readBilling(env, normalizeEmail(session.email));
+  if (!bill || !bill.customerId || !env.STRIPE_SECRET_KEY) return json({ error: 'No subscription to manage' }, { status: 404 }, env, req);
+  try {
+    const s = await billing.stripe(env, 'billing_portal/sessions',
+      { customer: bill.customerId, return_url: `${billingBase(env)}/profile` });
+    return json({ url: s.url }, {}, env, req);
+  } catch (err) { return json({ error: err.message }, { status: err.status || 502 }, env, req); }
+}
+
+// A subscription's state, written to the account it belongs to. Events can
+// arrive out of order and more than once, so an older event never overwrites
+// a newer one for the same subscription, and a finished subscription never
+// takes Pro off an account that has since started a new one.
+async function applySubscription(env, email, sub, eventCreated) {
+  email = normalizeEmail(email);
+  const was = (await readBilling(env, email)) || {};
+  const now = billing.fromSubscription(sub);
+  if (was.subscriptionId === now.subscriptionId && (was.lastEventAt || 0) > eventCreated) return 'stale';
+  if (was.subscriptionId && was.subscriptionId !== now.subscriptionId &&
+      billing.paidStatus(was.status) && !billing.paidStatus(now.status)) return 'older subscription';
+  const rec = Object.assign({}, was, now, { email, lastEventAt: eventCreated, updatedAt: new Date().toISOString() });
+  await env.AUTH_KV.put('billing:' + email, JSON.stringify(rec));
+  if (now.customerId) await env.AUTH_KV.put('stripecust:' + now.customerId, email);
+  const user = await lookupUser(env, email);
+  if (user && user.source === 'kv') {
+    await putUserRecord(env, email, { paidPlan: billing.paidStatus(now.status) ? 'pro' : null });
+  }
+  return 'applied';
+}
+
+async function stripeGet(env, path) {
+  const res = await fetch('https://api.stripe.com/v1/' + path, {
+    headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, 'Stripe-Version': '2024-06-20' }
+  });
+  if (!res.ok) throw new Error(`Stripe answered ${res.status}`);
+  return res.json();
+}
+
+async function handleStripeWebhook(req, env) {
+  if (!env.STRIPE_WEBHOOK_SECRET || !env.AUTH_KV) return new Response('Not found', { status: 404 });
+  const raw = await req.text();
+  if (!(await billing.verify(raw, req.headers.get('Stripe-Signature'), env.STRIPE_WEBHOOK_SECRET))) {
+    return new Response('Bad signature', { status: 400 });
+  }
+  let event;
+  try { event = JSON.parse(raw); } catch (e) { return new Response('Bad JSON', { status: 400 }); }
+  const obj = event && event.data && event.data.object;
+  if (!obj) return new Response('ok');
+  // Seen before: Stripe retries anything it did not hear a 2xx for.
+  if (event.id && await env.AUTH_KV.get('stripeevt:' + event.id)) return new Response('ok');
+  const created = +event.created || 0;
+  try {
+    if (event.type === 'checkout.session.completed' && obj.mode === 'subscription') {
+      const email = obj.client_reference_id || (obj.metadata && obj.metadata.email) || obj.customer_email;
+      if (email && obj.subscription && env.STRIPE_SECRET_KEY) {
+        const sub = typeof obj.subscription === 'string' ? await stripeGet(env, 'subscriptions/' + obj.subscription) : obj.subscription;
+        await applySubscription(env, email, sub, created);
+      }
+    } else if (/^customer\.subscription\.(created|updated|deleted|paused|resumed)$/.test(event.type || '')) {
+      const email = (obj.metadata && obj.metadata.email) ||
+        (obj.customer && await env.AUTH_KV.get('stripecust:' + (typeof obj.customer === 'string' ? obj.customer : obj.customer.id)));
+      if (email) await applySubscription(env, email, obj, created);
+    }
+  } catch (err) {
+    // A 500 has Stripe try again later, which is what a failed read wants.
+    console.error('stripe webhook:', err && err.message ? err.message : err);
+    return new Response('Try again', { status: 500 });
+  }
+  if (event.id) await env.AUTH_KV.put('stripeevt:' + event.id, '1', { expirationTtl: 7 * 86400 });
+  return new Response('ok');
+}
+
 // ---------- router ----------
 export default {
   async fetch(request, env, ctx) {
@@ -7665,6 +7821,10 @@ async function route(request, env, ctx) {
     if (request.method === 'POST' && path === '/d1-backfill')     return handleD1Backfill(request, env);
     if (request.method === 'GET'  && path === '/entitlements')    return handleEntitlements(request, env);
     if (request.method === 'POST' && path === '/account/plan')    return handleAccountPlan(request, env);
+    if (request.method === 'GET'  && path === '/billing')          return handleBillingGet(request, env);
+    if (request.method === 'POST' && path === '/billing/checkout') return handleBillingCheckout(request, env);
+    if (request.method === 'POST' && path === '/billing/portal')   return handleBillingPortal(request, env);
+    if (request.method === 'POST' && path === '/stripe/webhook')   return handleStripeWebhook(request, env);
     if (request.method === 'POST' && path === '/account/name')    return handleAccountName(request, env);
     if (request.method === 'GET'  && path === '/accounts')        return handleAccounts(request, env);
     if (request.method === 'GET'  && path === '/held')            return handleHeldList(request, env);

@@ -29,7 +29,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;1,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="lib/race-theme.css?v=080f8cc3">
+<link rel="stylesheet" href="lib/race-theme.css?v=54823afc">
 <style>
   /* A reading column. Legal text that runs the width of a desktop screen does
      not get read, and this is text somebody should actually be able to read. */
@@ -95,7 +95,7 @@
 </header>
 
 <main class="legal">
-<p class="updated">Last updated 21 November 2026</p>
+<p class="updated">Last updated 23 November 2026</p>
 <h2>The short version</h2>
 <p>SendOff stores what you type into it: your email address, your race, and what your crew logs.
   There is no analytics, no advertising, no third-party trackers, no cookies, and nothing is sold
@@ -388,6 +388,22 @@
   Turning it off deletes the record at once; otherwise it is deleted four days after it was last
   renewed, and straight away if the push service says the address is gone.</p>
 
+<h2 id="payments">Paying for Pro</h2>
+<p><strong>Not switched on yet.</strong> Nobody can pay for SendOff today, and nothing below happens
+  until it is. This section says what will, so it is written down before the first payment rather
+  than after.</p>
+<p>When it is on, payment for Pro is taken by Stripe, Inc., on Stripe's own checkout page. You type
+  your card there, not on SendOff, and SendOff never sees or stores it. Stripe is sent your account's
+  email address, so the payment can be tied to your account, and keeps what you give it on its page
+  under <a href="https://stripe.com/privacy">its own privacy policy</a>. Changing or cancelling the
+  subscription happens on Stripe's page too, reached from Account in the menu.</p>
+<p>SendOff keeps, in Cloudflare KV beside your account, Stripe's identifiers for you and your
+  subscription, its status, whether it is monthly or yearly, when it renews or ends, and when that
+  last changed. That is what decides whether your account is on Pro. It is kept while your account
+  exists and deleted with it; an account with a subscription still running cannot be deleted until
+  the subscription is cancelled, so it is never left charging an account that is gone. Stripe keeps
+  its own record of payments as the law requires of it.</p>
+
 <h2>What is not done</h2>
 <p>No cookies are set. Your sign-in session lives in your browser's local storage rather than a
   cookie, which is why there is no cookie banner: there is nothing to consent to. Nothing is sold,
@@ -486,7 +502,8 @@
 <p>Both are United States companies operating globally, so your data is stored in the United States
   and may pass through or be cached in other countries as it is served. Nobody else is given it,
   except an AI that somebody running a race connects as crew, which is their choice and goes to
-  whoever runs that AI: see <a href="#ai-crew">an AI as crew</a>.
+  whoever runs that AI: see <a href="#ai-crew">an AI as crew</a>. Once paying for Pro is switched on,
+  Stripe will be a third, for payments only: see <a href="#payments">paying for Pro</a>.
   There is no advertising network, no analytics provider and no data broker in this list because
   there are none.</p>
 
@@ -505,6 +522,6 @@
     <span aria-hidden="true"> &middot; </span><a class="intro-link" href="mailto:info@sendoff.run">info@sendoff.run</a></div>
 </footer>
 
-<script src="lib/race-core.js?v=a2aaeacd"></script>
+<script src="lib/race-core.js?v=ce520ee8"></script>
 </body>
 </html>

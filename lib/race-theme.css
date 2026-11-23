@@ -764,6 +764,8 @@ label.field > .hint {
 .signin-fb.acct-connect { margin: 0 0 12px; }
 .acct-note { font-size: 12px; line-height: 1.5; color: var(--text-muted); margin: 14px 0 0; }
 .acct-note a { color: var(--accent); }
+/* Pro by the month or the year, when billing is on: Stripe's pages do the rest. */
+.acct-plan-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0 0; }
 /* A cutoff as a race publishes it: the day, and the time on that day. */
 .cut-pick { display: flex; gap: 6px; align-items: center; min-width: 0; }
 .cut-pick select { flex: 1 1 7.5em; min-width: 0; width: auto; }

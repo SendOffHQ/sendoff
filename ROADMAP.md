@@ -1061,14 +1061,44 @@ still only mandatory for the organizer half. See the fork above.
 
 ## 0. The thing the pricing plan assumes and nobody has built
 
-**Billing and plan enforcement.** There is no payment processor, no
-subscription state, no notion of a tier anywhere in the app or the worker.
-Every paid row in the matrix is gated on this existing first, so it is item
-zero rather than one item among many.
+**Billing and plan enforcement.** *Built 2026-11-23 with Stripe, and switched
+off.* Plans and the worker's entitlement checks existed already
+(`PLANS`, `entitlementsFor`); what was added is the payment path:
+`worker/src/billing.js` and the `/billing`, `/billing/checkout`,
+`/billing/portal` and `/stripe/webhook` routes, a Plan section in Account that
+appears only when billing applies, and `privacy.html#payments`. A paid
+subscription sets `paidPlan` on the account, which wins over the plan an admin
+set and stops counting when the subscription does. Tests:
+`worker/test/billing.mjs`, `test/account-box.mjs`.
 
-What it needs, roughly in order: a plan field on the account, a checkout and
-webhook path, and an entitlement check the worker can apply to a write. The
-worker is already the gate for access, so it is the natural place for it.
+Turning it on, in order:
+
+1. **Stripe account.** Create it, and stay in test mode for steps 2 to 6.
+2. **The product.** In Stripe, a product "SendOff Pro" with a monthly price and,
+   if wanted, a yearly one. Copy each price id (`price_...`).
+3. **The customer portal.** Settings, Billing, Customer portal: allow
+   cancelling and switching between the monthly and yearly prices, and set the
+   return address to `https://sendoff.run/profile`.
+4. **The webhook.** Developers, Webhooks, add an endpoint at
+   `https://race-dashboard-proxy.thebillyman.workers.dev/stripe/webhook` for
+   `checkout.session.completed` and `customer.subscription.created`,
+   `.updated`, `.deleted`, `.paused` and `.resumed`. Copy its signing secret
+   (`whsec_...`).
+5. **The worker.** `wrangler secret put STRIPE_SECRET_KEY` (the `sk_test_...`
+   key) and `wrangler secret put STRIPE_WEBHOOK_SECRET`; in `wrangler.toml`,
+   `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY` and `BILLING = "admins"`.
+   Admins now see the Plan section; nobody else does.
+6. **Try it.** Pay with Stripe's test card (4242 4242 4242 4242), check the
+   account shows Pro, cancel from Manage billing, check it goes back.
+7. **Before anybody is charged:** decide the grandfathering date (below),
+   switch `DEFAULT_PLAN` from `pro` so new accounts start on free, decide on
+   tax (`STRIPE_TAX = "true"` once Stripe Tax is set up, or use a merchant of
+   record instead), and put subscription terms in `terms.html`.
+8. **Live.** Repeat 2 to 5 in live mode with the `sk_live_...` key and the live
+   webhook secret, then `BILLING = "on"`.
+
+Still the same decision as before on scale: the free tier's caps are
+"1 runner per race" and "2 crew editors", both enforced in the worker today.
 
 One decision to make before writing any of it: the free tier's caps are
 "1 runner per race" and "2 crew editors". Both are enforceable in the worker

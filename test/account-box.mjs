@@ -110,6 +110,30 @@ await openAccount();
 ok('and it holds after a reload', (await rows()).map(r => r[1].split(' ')[0]), ['Always', 'Not', 'Connected']);
 ok('Done closes the box', await page.click('.modal-box .modal-primary').then(() => page.isVisible('.modal-box')), false);
 
+// Paying for Pro (2026-11-23). Off as shipped: the rows above are the proof
+// there is no Plan section then. Switched on, it offers Pro and sends the
+// page to Stripe; subscribed, it says so and offers to manage it.
+console.log('\nwith billing switched on');
+await page.evaluate(async () => { await fetch('/api/google-off').catch(() => {}); await fetch('/api/billing-on'); });
+await openAccount();
+ok('a Plan section, saying Free', (await rows())[0], ['Plan', 'Free']);
+ok('offering Pro by the month and the year', await page.$$eval('[data-acct-upgrade]', e => e.map(x => x.textContent.trim())),
+  ['Pro, by the month', 'Pro, by the year']);
+ok('and saying who takes the payment', /Stripe, on its own page/.test(await page.textContent('.modal-box')), true);
+await Promise.all([page.waitForURL(/profile/), page.click('[data-acct-upgrade="month"]')]);
+await page.waitForSelector('#billing-back:not([hidden])', { timeout: 10000 });
+ok('choosing one asks for that checkout', await page.evaluate(async () => (await fetch('/api/billing-last')).json()),
+  { path: '/api/billing/checkout', interval: 'month' });
+ok('and coming back says what happens next', /You are on Pro as soon as Stripe confirms/.test(await page.textContent('#billing-back')), true);
+ok('once: the address is tidied', page.url().includes('billing='), false);
+
+console.log('\nsubscribed');
+await page.evaluate(async () => { await fetch('/api/billing-subscribed'); });
+await openAccount();
+ok('says the plan and when it renews', (await rows())[0][1].startsWith('Pro, by the month · renews'), true);
+ok('offers to manage it, and no second checkout', [await page.isVisible('[data-acct-billing]'),
+  await page.$$eval('[data-acct-upgrade]', e => e.length)], [true, 0]);
+
 ok('no page errors', errs, []);
 await b.close(); srv.kill('SIGKILL');
 console.log(bad ? `\n${bad} failed\n` : '\nall good\n');

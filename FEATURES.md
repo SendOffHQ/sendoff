@@ -79,6 +79,9 @@ optional Cloudflare Worker auth proxy.
 
 - Ran together (`settings.html`, Racers): give a racer who went the whole way beside another, untracked, that racer's laps. Times, skipped stations and a timed race's stop only; what was eaten and drunk stays with whoever it was logged for. Replaces their own laps, so copying again later brings them up to date. `test/copy-laps.mjs`, `test/timed-course.mjs`.
 
+## Paying for Pro (switched off)
+- Stripe billing, built 2026-11-23 and off until set up (`BILLING` in `worker/wrangler.toml`: off, admins, on). Checkout and the customer portal are Stripe's own pages; the worker makes the sessions (`/billing/checkout`, `/billing/portal`), takes Stripe's signed events (`/stripe/webhook`: checked signature, five-minute window, each event once, older events never undoing newer ones) and sets `paidPlan` on the account, which wins over an admin's plan while the subscription is active, trialing or past due. Account, in the menu, gains a Plan section only when billing applies; an account with a live subscription cannot be deleted. `privacy.html#payments`; setup steps in ROADMAP.md, item 0. `worker/test/billing.mjs`, `test/account-box.mjs`.
+
 ## Admin panel (`admin.html`)
 - Account list with per-account race roles (editor/viewer)
 - Send account invites and password-reset links
