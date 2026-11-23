@@ -1,6 +1,6 @@
 // The hub's race type and discipline filters (2026-11-23). This checks that:
 //   - each lists only what the races on the hub have, in the cards' words,
-//     and is not drawn at all when every race is the same;
+//     and is drawn even when every race is the same kind;
 //   - picking one narrows the cards, together with the search;
 //   - nothing matching says what is narrowing it;
 //   - and the choice is kept for the next visit.
@@ -73,8 +73,10 @@ ok('the choice is kept', [await page.inputValue('#race-type'), await page.inputV
 console.log('\na hub where every race is the same');
 races = MIXED.filter(r => r.slug === 'a' || r.slug === 'c').map(r => ({ ...r, activity: 'trail-run' }));
 await open();
-ok('neither filter is drawn, and a kept choice does not hide everything',
-  [await shown('race-type'), await shown('race-disc'), (await names()).length], [false, false, 2]);
+ok('both are still drawn, offering the one kind there is',
+  [await shown('race-type'), await shown('race-disc'), await opts('race-disc')], [true, true, ['All', 'On foot']]);
+ok('and a kept choice the races no longer have does not hide everything',
+  [await page.inputValue('#race-type'), (await names()).length], ['', 2]);
 
 ok('no page errors', errs, []);
 await b.close();

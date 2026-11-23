@@ -427,8 +427,9 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
   // Race type and discipline (2026-11-23). Race type in the words the cards
   // use; discipline by activity group, as the profile page filters, with a
   // race from before activities existed counted as on foot, which every one
-  // of them was. Each select lists only what the races loaded have, and is
-  // hidden when they are all the same.
+  // of them was. Each select lists only what the races loaded have. Both are
+  // always drawn, even with one kind to offer (asked for the same day, when
+  // every race on the hub was a trail run and Discipline seemed missing).
   const TYPE_KEY = 'race-hub-type-v1', DISC_KEY = 'race-hub-disc-v1';
   const TYPES = [['segments', 'Segments'], ['loops', 'Loops'], ['timed', 'Timed'], ['backyard', 'Backyard']];
   function typeOf(r) {
@@ -441,7 +442,7 @@ footer.site a[href^="mailto:"] { text-transform: none; letter-spacing: 0.08em; }
     if (!sel) return;
     const have = new Set(loadedRaces.map(of));
     const opts = pairs.filter(([k]) => have.has(k));
-    sel.closest('label').hidden = opts.length < 2;
+    sel.closest('label').hidden = !opts.length;
     sel.innerHTML = '<option value="">All</option>' +
       opts.map(([k, label]) => `<option value="${k}">${escapeHtml(label)}</option>`).join('');
     let saved = '';
